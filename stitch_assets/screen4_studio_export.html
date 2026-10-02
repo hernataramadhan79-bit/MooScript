@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#131315;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "background": "#131315", "on-primary": "#1f3700", "inverse-on-surface": "#313032", "on-tertiary": "#472a00", "on-error": "#690005", "surface-container-high": "#2a2a2c", "surface-variant": "#353437", "error-container": "#93000a", "surface-container": "#201f22", "surface-bright": "#39393b", "primary-fixed": "#acf847", "outline": "#8b947d", "on-surface": "#e5e1e4", "surface-container-low": "#1c1b1d", "surface-container-highest": "#353437", "tertiary-fixed": "#ffddb8", "surface-container-lowest": "#0e0e10", "on-primary-fixed": "#102000", "on-secondary-container": "#004119", "surface": "#131315", "on-error-container": "#ffdad6", "tertiary-container": "#fea518", "primary-fixed-dim": "#91db2a", "primary": "#9ee939", "secondary": "#4ae176", "surface-dim": "#131315", "on-background": "#e5e1e4", "tertiary-fixed-dim": "#ffb95f", "secondary-fixed-dim": "#4ae176", "secondary-fixed": "#6bff8f", "on-secondary-fixed": "#002109", "on-primary-container": "#315200", "outline-variant": "#424936", "on-surface-variant": "#c1cab0", "primary-container": "#84cc16", "on-tertiary-container": "#684000", "error": "#ffb4ab", "on-primary-fixed-variant": "#304f00", "inverse-surface": "#e5e1e4", "on-secondary-fixed-variant": "#005321", "secondary-container": "#00b954", "inverse-primary": "#416900", "surface-tint": "#91db2a", "on-tertiary-fixed": "#2a1700", "on-tertiary-fixed-variant": "#653e00", "on-secondary": "#003915", "tertiary": "#ffcb8d" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "fontFamily": { "label-sm": ["JetBrains Mono"], "headline-sm": ["Plus Jakarta Sans"], "label-md": ["JetBrains Mono"], "headline-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "label-lg": ["JetBrains Mono"], "body-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] } } } }</script></head><body class="bg-surface text-on-surface font-body-md text-sm flex flex-col min-h-screen antialiased"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl border-b border-zinc-800/80"><div class="h-14 px-4 flex items-center justify-between gap-2"><div class="flex items-center gap-2 min-w-0"><img alt="MooScript Logo" class="h-7 w-7 rounded-lg object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1UOBQw4TDn_IS8-snZNMARUsAojqT6BRHhnjy_0AVkUgTpSfiX7jW2eq_OASbeI2hbx38xkj4rKc_RSbwCPRDTWW3OyLzNjmVwtOed7vWTkn4-OuVGkBRvExRX5sWqrTvkxZIaI-M-KfrPkawCYG2gtUvKeQN_MF3og4bew9VjpRhQdWWn70WJA4MmJ31u0ZgwR1ZoCXjnXQwvz6GLzAxCKTVMrULbTgBk_o-1sqa0fH0sUyahwQ-nSb2E"/><div class="flex items-center gap-1.5"><span class="font-headline-sm text-base font-bold text-white tracking-tight">MooScript</span><span class="font-label-sm text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">v0.1.0</span></div></div><div class="flex items-center gap-2 shrink-0"><div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800"><span class="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span><span class="text-[11px] font-medium text-zinc-300 font-label-sm">Ready</span></div><button aria-label="Settings" class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white transition-colors" type="button"><span class="material-symbols-outlined text-[19px]">tune</span></button><div class="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0"><img alt="User Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.parentElement.innerHTML='&lt;span class=\'material-symbols-outlined text-zinc-300 text-[16px]\'&gt;person&lt;/span&gt;'" src="https://lh3.googleusercontent.com/aida/AEtjO1WgO7cxcs-t_Ja_NMPfJXxDGBvCHNuqN_9OSAl28DxKteX1TnNImU4WIDTJ9NHG4g9xl_ja6FJ3jkTer8U2CKAQ-nMszA-ot37saov9f5CciCeOtpwCPeZMkiuDJDz75nNJCp74qQXxTApjFdJdNAQItpX1hwp36Ij2ruZO4FkOdFgBvR6ZK5S_eU2DTNvEYdCNNqTLtx5fIStypsGFiWf1mPwRIpY3_ewDZeqwyiTNZMIxV1Dg3DNRpF4"/></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface"><div class="flex flex-col w-full max-w-md mx-auto px-4 py-2 gap-3.5"><!-- Progress header -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-lime-400"></span>
+<h1 class="text-sm font-semibold text-white tracking-tight">Step 3 of 3 • Studio &amp; Export</h1>
+</div>
+<span class="text-[11px] font-mono text-zinc-400 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800">9:16 • 1080×1920</span>
+</div>
+<!-- Video Preview Viewport -->
+<div class="flex flex-col items-center gap-2 w-full">
+<div class="relative w-full max-w-[240px] aspect-[9/16] h-[320px] rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-lg mx-auto select-none group">
+<!-- Realistic bakery video background -->
+<img alt="Bakery Background" class="absolute inset-0 w-full h-full object-cover brightness-[0.62] contrast-[1.08] saturate-[1.1]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXyL9nutPcN03DSewkdpqW7MRUsYjpQRwYXXX_wdMoG8C6PdvXkdGVIxU1VUvQtxQFG-V7-QGMFHa0dgjoczlOaMZTkpBhpQB699op1QcWX5iSS7P9RwogvrqWBntGfMfuRzAIDAkaxZhKhOL_c6mWE2vyUtCqyIPitaIkjg5o1KcJ9OqoOBinrMAAJl4Yok-4L12aIaXLDWD6oGRH8Z6__XBe2mzTAXgY0VS2awAAIwVRs9d9ZkA-gg"/>
+<div class="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none"></div>
+<!-- Inside Top Badge -->
+<div class="relative z-10 p-2.5 flex items-center justify-between w-full">
+<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-400"></span>
+<span class="text-[10px] font-mono text-zinc-200">LIVE</span>
+</div>
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md text-[10px] font-mono text-zinc-300">
+<span class="material-symbols-outlined text-[12px] text-lime-400">hd</span>
+<span>60FPS</span>
+</div>
+</div>
+<!-- Kinetic typography animated overlay text -->
+<div class="relative z-10 my-auto flex flex-col items-center justify-center text-center px-3 -mt-3" id="kinetic-text-target">
+<span class="text-[9px] font-mono uppercase tracking-widest text-lime-300 font-semibold mb-1 px-1.5 py-0.5 rounded bg-black/40 backdrop-blur-sm">SCENE 03</span>
+<h2 class="text-xl font-extrabold uppercase text-lime-400 tracking-tight leading-none drop-shadow-[0_0_12px_rgba(163,230,53,0.55)] transition-all" id="caption-main">
+        FRESH BREAD
+      </h2>
+<span class="text-lg font-bold uppercase text-white tracking-wide leading-tight drop-shadow-md" id="caption-sub">
+        AROMA
+      </span>
+<p class="text-[11px] text-zinc-200 font-medium tracking-normal mt-1 opacity-90 drop-shadow">
+        crisp crust &amp; golden crumb
+      </p>
+<!-- Audio wave indicator bar -->
+<div class="flex items-center gap-1 pt-3">
+<span class="w-0.5 h-2.5 rounded-full bg-lime-400/50 animate-pulse"></span>
+<span class="w-0.5 h-4.5 rounded-full bg-lime-400 animate-pulse" style="animation-delay: 150ms;"></span>
+<span class="w-0.5 h-6 rounded-full bg-lime-400 animate-pulse" style="animation-delay: 300ms;"></span>
+<span class="w-0.5 h-3.5 rounded-full bg-lime-400/80 animate-pulse" style="animation-delay: 75ms;"></span>
+<span class="w-0.5 h-2 rounded-full bg-lime-400/40 animate-pulse" style="animation-delay: 220ms;"></span>
+</div>
+</div>
+<!-- Quick mini status banner bottom overlay -->
+<div class="relative z-10 p-2 text-center">
+<span class="text-[10px] font-mono text-zinc-400 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">Voice: Adam (Warm Natural)</span>
+</div>
+</div>
+<!-- Frame transport controls below -->
+<div class="w-full max-w-[280px] bg-zinc-900/90 border border-zinc-800 rounded-xl px-3 py-2 flex flex-col gap-1.5 shadow-sm">
+<div class="relative w-full h-3 flex items-center cursor-pointer group" id="scrubber-bar">
+<div class="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+<div class="h-full bg-lime-400 rounded-full" id="scrubber-progress" style="width: 33%;"></div>
+</div>
+<div class="absolute w-2.5 h-2.5 rounded-full bg-white shadow -translate-x-1/2 left-[33%]" id="scrubber-thumb"></div>
+</div>
+<div class="flex items-center justify-between text-zinc-400">
+<div class="flex items-center gap-1.5">
+<button aria-label="Play or pause" class="w-6 h-6 rounded-full bg-zinc-800 text-zinc-200 flex items-center justify-center hover:bg-zinc-700 active:scale-95 transition-all" id="btn-toggle-play" type="button">
+<span class="material-symbols-outlined text-[15px]" id="play-icon">play_arrow</span>
+</button>
+<span class="font-mono text-[11px] text-zinc-300">00:09.40 / 00:28.40</span>
+</div>
+<button aria-label="Toggle loop" class="text-zinc-400 hover:text-lime-400 transition-colors flex items-center" type="button">
+<span class="material-symbols-outlined text-[16px] text-lime-400">repeat</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Style Customization Card ('Style & Captions') -->
+<div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 flex flex-col gap-3">
+<div class="flex items-center justify-between border-b border-zinc-800/80 pb-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-lime-400 text-[18px]">format_paint</span>
+<span class="text-xs font-semibold text-white tracking-tight">Style &amp; Captions</span>
+</div>
+<span class="text-[10px] font-mono text-zinc-400">Preset: Custom</span>
+</div>
+<!-- Font Family selector -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[11px] font-medium text-zinc-400">Font Family</span>
+<div class="grid grid-cols-3 gap-1.5">
+<button class="font-btn h-8 rounded-lg text-xs font-semibold bg-zinc-800 text-lime-400 border border-lime-400/40 active:scale-95 transition-all" data-font="headline" type="button">
+        Jakarta
+      </button>
+<button class="font-btn h-8 rounded-lg text-xs font-medium font-mono bg-zinc-950 text-zinc-300 border border-zinc-800 active:scale-95 transition-all" data-font="mono" type="button">
+        Mono
+      </button>
+<button class="font-btn h-8 rounded-lg text-xs font-black uppercase tracking-wider bg-zinc-950 text-zinc-300 border border-zinc-800 active:scale-95 transition-all" data-font="impact" type="button">
+        Impact Bold
+      </button>
+</div>
+</div>
+<!-- Text Highlight Color & Animation Preset -->
+<div class="grid grid-cols-2 gap-2.5 pt-0.5">
+<!-- Text Highlight Color -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[11px] font-medium text-zinc-400">Highlight Color</span>
+<div class="flex items-center gap-2 h-8 px-1">
+<button aria-label="Neon Lime" class="color-dot w-6 h-6 rounded-full bg-[#a3e635] ring-2 ring-lime-400 ring-offset-2 ring-offset-zinc-900 transition-all" data-color="text-lime-400" type="button"></button>
+<button aria-label="Mint Green" class="color-dot w-6 h-6 rounded-full bg-[#4ae176] hover:scale-105 transition-all" data-color="text-[#4ae176]" type="button"></button>
+<button aria-label="Warm Amber" class="color-dot w-6 h-6 rounded-full bg-[#f59e0b] hover:scale-105 transition-all" data-color="text-[#f59e0b]" type="button"></button>
+<button aria-label="Soft Cream" class="color-dot w-6 h-6 rounded-full bg-[#ffedd5] hover:scale-105 transition-all" data-color="text-[#ffedd5]" type="button"></button>
+</div>
+</div>
+<!-- Animation Preset dropdown -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[11px] font-medium text-zinc-400">Animation Preset</span>
+<div class="relative">
+<select class="w-full h-8 bg-zinc-950 text-zinc-200 border border-zinc-800 text-xs rounded-lg px-2.5 pr-7 appearance-none focus:outline-none focus:border-zinc-700" id="anim-preset-select">
+<option selected="" value="pop">Scale Pop</option>
+<option value="fade">Kinetic Fade</option>
+<option value="slide">Slide Up</option>
+</select>
+<span class="material-symbols-outlined text-[16px] text-zinc-500 absolute right-2 top-2 pointer-events-none">unfold_more</span>
+</div>
+</div>
+</div>
+<!-- Video specs metadata tag -->
+<div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-950/70 border border-zinc-800/80 text-[11px] font-mono text-zinc-400">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-lime-400">video_settings</span>
+<span>MP4 • 1080×1920 (9:16)</span>
+</div>
+<span class="text-zinc-300">On-device render</span>
+</div>
+</div>
+<!-- Main Export CTA -->
+<button class="w-full h-11 text-sm font-semibold rounded-xl bg-lime-400 text-black hover:bg-lime-300 active:scale-[0.98] transition-colors flex items-center justify-center gap-1.5 shadow-[0_0_20px_rgba(163,230,53,0.25)]" id="btn-export-trigger" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+<span>Export Video (MP4)</span>
+</button>
+<!-- Ready Card ('Video Ready to Download') -->
+<div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-sm" id="render-success-panel">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<h2 class="text-xs font-semibold text-white">Video Ready to Download</h2>
+</div>
+<span class="text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">14.8 MB</span>
+</div>
+<p class="text-xs text-zinc-400 leading-relaxed">
+    Saved in full resolution for Instagram Reels, TikTok, or YouTube Shorts.
+  </p>
+<div class="grid grid-cols-2 gap-2 pt-0.5">
+<button class="h-9 text-xs font-medium rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-750 active:scale-95 transition-all flex items-center justify-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">download</span>
+<span>Save to Gallery</span>
+</button>
+<button class="h-9 text-xs font-medium rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-750 active:scale-95 transition-all flex items-center justify-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">share</span>
+<span>Share</span>
+</button>
+</div>
+</div></div>
+<script>
+  (function () {
+    const playBtn = document.getElementById('btn-toggle-play');
+    const playIcon = document.getElementById('play-icon');
+    const kineticTarget = document.getElementById('kinetic-text-target');
+    const captionMain = document.getElementById('caption-main');
+    const fontButtons = document.querySelectorAll('.font-btn');
+    const colorDots = document.querySelectorAll('.color-dot');
+    const animSelect = document.getElementById('anim-preset-select');
+    const exportBtn = document.getElementById('btn-export-trigger');
+    const scrubProgress = document.getElementById('scrubber-progress');
+    const scrubThumb = document.getElementById('scrubber-thumb');
+    const scrubBar = document.getElementById('scrubber-bar');
+
+    let isPlaying = false;
+    let playInterval;
+
+    if (playBtn) {
+      playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        playIcon.textContent = isPlaying ? 'pause' : 'play_arrow';
+        if (isPlaying) {
+          kineticTarget.classList.add('scale-105');
+          playInterval = setInterval(() => {
+            let cur = parseFloat(scrubProgress.style.width) || 33;
+            cur = (cur >= 100) ? 0 : cur + 0.6;
+            scrubProgress.style.width = cur + '%';
+            scrubThumb.style.left = cur + '%';
+          }, 60);
+        } else {
+          kineticTarget.classList.remove('scale-105');
+          clearInterval(playInterval);
+        }
+      });
+    }
+
+    if (scrubBar) {
+      scrubBar.addEventListener('click', (e) => {
+        const rect = scrubBar.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const pct = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+        scrubProgress.style.width = pct + '%';
+        scrubThumb.style.left = pct + '%';
+      });
+    }
+
+    fontButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        fontButtons.forEach(b => {
+          b.className = 'font-btn h-8 rounded-lg text-xs font-medium bg-zinc-950 text-zinc-300 border border-zinc-800 active:scale-95 transition-all';
+        });
+        btn.className = 'font-btn h-8 rounded-lg text-xs font-semibold bg-zinc-800 text-lime-400 border border-lime-400/40 active:scale-95 transition-all';
+        
+        const type = btn.getAttribute('data-font');
+        if (type === 'mono') {
+          captionMain.style.fontFamily = 'JetBrains Mono, monospace';
+          captionMain.style.fontWeight = '700';
+          captionMain.style.letterSpacing = '-0.03em';
+        } else if (type === 'impact') {
+          captionMain.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+          captionMain.style.fontWeight = '900';
+          captionMain.style.letterSpacing = '0.02em';
+        } else {
+          captionMain.style.fontFamily = 'Plus Jakarta Sans, sans-serif';
+          captionMain.style.fontWeight = '800';
+          captionMain.style.letterSpacing = '-0.02em';
+        }
+      });
+    });
+
+    colorDots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        colorDots.forEach(d => d.className = 'color-dot w-6 h-6 rounded-full hover:scale-105 transition-all ' + d.className.split(' ').filter(c => c.startsWith('bg-')).join(' '));
+        dot.classList.add('ring-2', 'ring-lime-400', 'ring-offset-2', 'ring-offset-zinc-900');
+        const colorClass = dot.getAttribute('data-color');
+        captionMain.className = 'text-xl font-extrabold uppercase tracking-tight leading-none transition-all ' + colorClass;
+      });
+    });
+
+    if (animSelect) {
+      animSelect.addEventListener('change', () => {
+        kineticTarget.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        kineticTarget.style.transform = 'scale(0.9) translateY(4px)';
+        setTimeout(() => {
+          kineticTarget.style.transform = 'scale(1) translateY(0)';
+        }, 180);
+      });
+    }
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        const originalContent = exportBtn.innerHTML;
+        exportBtn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span><span>Encoding Frames...</span>';
+        exportBtn.classList.add('opacity-90');
+        setTimeout(() => {
+          exportBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">check_circle</span><span>Export Completed!</span>';
+          exportBtn.classList.remove('opacity-90');
+          setTimeout(() => {
+            exportBtn.innerHTML = originalContent;
+          }, 3000);
+        }, 1200);
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl border-t border-zinc-800/80"><div class="flex justify-around items-center h-16 px-2"><a class="flex flex-col items-center justify-center min-w-[56px] py-1 gap-1 text-zinc-400 hover:text-zinc-200 transition-colors" data-path="script" href="#"><span class="material-symbols-outlined text-[20px]">description</span><span class="font-label-sm text-[10px] tracking-tight">Script</span></a><a class="flex flex-col items-center justify-center min-w-[56px] py-1 gap-1 text-zinc-400 hover:text-zinc-200 transition-colors" data-path="voice" href="#"><span class="material-symbols-outlined text-[20px]">graphic_eq</span><span class="font-label-sm text-[10px] tracking-tight">Voice</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] py-1 gap-1 text-lime-400 transition-colors" data-path="studio" href="#"><span class="material-symbols-outlined text-[20px]">movie_edit</span><span class="font-label-sm text-[10px] font-semibold tracking-tight">Studio</span></a><a class="flex flex-col items-center justify-center min-w-[56px] py-1 gap-1 text-zinc-400 hover:text-zinc-200 transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span class="font-label-sm text-[10px] tracking-tight">Settings</span></a></div></nav></body></html>

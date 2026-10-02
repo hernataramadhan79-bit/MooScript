@@ -1,0 +1,334 @@
+<!DOCTYPE html><html class="dark" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#131315;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface": "#131315",
+        "surface-container-lowest": "#0b0b0d",
+        "surface-container-low": "#18181b",
+        "surface-container": "#1f1f23",
+        "surface-container-high": "#27272a",
+        "surface-container-highest": "#323238",
+        "primary": "#84cc16",
+        "primary-hover": "#9ee939",
+        "primary-container": "#203604",
+        "on-surface": "#f4f4f5",
+        "on-surface-variant": "#a1a1aa",
+        "outline-border": "#27272a"
+      },
+      fontFamily: {
+        sans: ["Plus Jakarta Sans", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"]
+      }
+    }
+  }
+};</script></head><body class="bg-surface text-on-surface font-sans antialiased flex flex-col min-h-screen select-none">
+<!-- Minimal Header -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-[#131315]/90 backdrop-blur-md border-b border-[#27272a]">
+<div class="h-14 px-4 flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 shrink-0 rounded overflow-hidden flex items-center justify-center"><img src="https://lh3.googleusercontent.com/aida/AEtjO1UOBQw4TDn_IS8-snZNMARUsAojqT6BRHhnjy_0AVkUgTpSfiX7jW2eq_OASbeI2hbx38xkj4rKc_RSbwCPRDTWW3OyLzNjmVwtOed7vWTkn4-OuVGkBRvExRX5sWqrTvkxZIaI-M-KfrPkawCYG2gtUvKeQN_MF3og4bew9VjpRhQdWWn70WJA4MmJ31u0ZgwR1ZoCXjnXQwvz6GLzAxCKTVMrULbTgBk_o-1sqa0fH0sUyahwQ-nSb2E" alt="MooScript Logo" class="w-full h-full object-contain"></div>
+<div class="flex items-center gap-1.5">
+<span class="font-bold text-[15px] tracking-tight text-white">MooScript</span>
+<span class="font-mono text-[10px] text-on-surface-variant font-medium bg-[#1f1f23] px-1.5 py-0.5 rounded border border-[#27272a]">v0.1.0</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#18181b] border border-[#27272a]">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="font-mono text-[11px] text-zinc-300 font-medium">API Connected</span>
+</div>
+<a class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-white rounded-lg hover:bg-[#27272a] transition-colors" data-path="byok-settings" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+</a>
+<div class="w-7 h-7 rounded-full overflow-hidden border border-[#27272a] bg-[#27272a] flex items-center justify-center text-[11px] font-semibold text-zinc-300 shrink-0"><img src="https://lh3.googleusercontent.com/aida/AEtjO1WgO7cxcs-t_Ja_NMPfJXxDGBvCHNuqN_9OSAl28DxKteX1TnNImU4WIDTJ9NHG4g9xl_ja6FJ3jkTer8U2CKAQ-nMszA-ot37saov9f5CciCeOtpwCPeZMkiuDJDz75nNJCp74qQXxTApjFdJdNAQItpX1hwp36Ij2ruZO4FkOdFgBvR6ZK5S_eU2DTNvEYdCNNqTLtx5fIStypsGFiWf1mPwRIpY3_ewDZeqwyiTNZMIxV1Dg3DNRpF4" alt="Avatar" class="w-full h-full object-cover"></div>
+</div>
+</div>
+</header>
+<!-- Main Content Flow -->
+<main class="flex-1 flex flex-col pt-16 pb-36 px-4 space-y-3.5 max-w-md mx-auto w-full">
+<!-- Progress Header -->
+<div class="pt-2 flex flex-col space-y-1.5">
+<div class="flex items-center justify-between text-xs font-mono">
+<span class="text-primary font-semibold tracking-wide">Step 2 of 3</span>
+<span class="text-on-surface-variant">Voice &amp; Alignment</span>
+</div>
+<div class="w-full h-1 bg-[#27272a] rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-300" style="width: 66.6%;"></div>
+</div>
+</div>
+<!-- Voice Narrator Section -->
+<section class="space-y-2">
+<div class="flex items-center justify-between">
+<span class="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">Narrator Voice</span>
+<span class="text-[11px] font-mono text-zinc-500">2 Models Ready</span>
+</div>
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Marcus (Selected) -->
+<div class="relative p-3 rounded-xl bg-[#1c1b1f] border-2 border-primary shadow-sm flex flex-col justify-between space-y-2.5 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-semibold text-[13px] text-white leading-tight">Marcus</span>
+<span class="text-[10px] text-on-surface-variant">Tech Explainer</span>
+</div>
+<button class="w-7 h-7 rounded-full bg-primary/20 text-primary hover:bg-primary hover:text-black flex items-center justify-center transition-colors" onclick="toggleAudition(this, 'Marcus')">
+<span class="material-symbols-outlined text-[16px]">volume_up</span>
+</button>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-[#27272a]/60">
+<span class="font-mono text-[10px] text-zinc-400">Pacing: 1.05x</span>
+<span class="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">Deep &amp; Crisp</span>
+</div>
+</div>
+<!-- Nova (Unselected) -->
+<div class="relative p-3 rounded-xl bg-[#18181b] border border-[#27272a] hover:border-zinc-600 shadow-sm flex flex-col justify-between space-y-2.5 opacity-90 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-semibold text-[13px] text-white leading-tight">Nova</span>
+<span class="text-[10px] text-on-surface-variant">Viral Dynamic</span>
+</div>
+<button class="w-7 h-7 rounded-full bg-[#27272a] text-zinc-300 hover:text-white flex items-center justify-center transition-colors" onclick="toggleAudition(this, 'Nova')">
+<span class="material-symbols-outlined text-[16px]">play_arrow</span>
+</button>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-[#27272a]/60">
+<span class="font-mono text-[10px] text-zinc-400">Pacing: 1.15x</span>
+<span class="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#27272a] text-zinc-300">Upbeat</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Pacing & Modulation Controls -->
+<section class="p-3 rounded-xl bg-[#18181b] border border-[#27272a] space-y-3">
+<!-- Speed Slider -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between text-xs">
+<span class="text-zinc-300 font-medium flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-primary">speed</span> Speed / Pacing
+          </span>
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-[10px] text-zinc-400">150 WPM</span>
+<span class="font-mono text-[11px] text-primary font-bold px-1.5 py-0.5 rounded bg-[#27272a]" id="speed-val">1.05x</span>
+</div>
+</div>
+<input class="w-full accent-primary bg-[#27272a] h-1.5 rounded-lg cursor-pointer" max="1.50" min="0.80" oninput="document.getElementById('speed-val').textContent = parseFloat(this.value).toFixed(2) + 'x'" step="0.05" type="range" value="1.05">
+</div>
+<!-- Vocal Stability Slider -->
+<div class="space-y-1.5 pt-1 border-t border-[#27272a]/60">
+<div class="flex items-center justify-between text-xs">
+<span class="text-zinc-300 font-medium flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-emerald-400">graphic_eq</span> Vocal Stability
+          </span>
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-[9px] px-1 rounded bg-[#27272a] text-zinc-300">Smooth</span>
+<span class="font-mono text-[11px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-[#27272a]" id="stability-val">85%</span>
+</div>
+</div>
+<input class="w-full accent-emerald-400 bg-[#27272a] h-1.5 rounded-lg cursor-pointer" max="100" min="20" oninput="document.getElementById('stability-val').textContent = this.value + '%'" step="1" type="range" value="85">
+</div>
+</section>
+<!-- Audio & Word Synchronization Card -->
+<section class="p-3 rounded-xl bg-[#18181b] border border-[#27272a] space-y-3">
+<div class="flex items-center justify-between font-mono text-[11px]">
+<span class="uppercase tracking-wider text-on-surface-variant font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-primary">equalizer</span> AUDIO &amp; WORD SYNCHRONIZATION
+        </span>
+<span class="text-zinc-400 font-medium">00:28.40 Total</span>
+</div>
+<!-- Playback Transport Bar -->
+<div class="flex items-center justify-between bg-[#111113] p-2 rounded-lg border border-[#27272a]/80">
+<div class="flex items-center gap-2.5">
+<button class="h-9 w-9 rounded-lg bg-lime-400 text-black flex items-center justify-center active:scale-95 shadow transition-transform" id="main-play-btn" onclick="togglePlayState(this)">
+<span class="material-symbols-outlined text-[20px] font-bold">play_arrow</span>
+</button>
+<div class="flex flex-col">
+<span class="font-mono text-[13px] font-bold text-white tracking-tight">00:09.40</span>
+<span class="font-mono text-[10px] text-primary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span> Playing
+            </span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-[#27272a] flex items-center justify-center active:scale-95 transition-all" title="Replay 5s">
+<span class="material-symbols-outlined text-[18px]">replay_5</span>
+</button>
+<button class="w-8 h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-[#27272a] flex items-center justify-center active:scale-95 transition-all" title="Skip 5s">
+<span class="material-symbols-outlined text-[18px]">forward_5</span>
+</button>
+</div>
+</div>
+<!-- Audio Waveform -->
+<div class="relative w-full h-11 bg-[#0e0e10] rounded-lg px-2 flex items-center overflow-hidden border border-[#27272a]/60">
+<svg class="w-full h-full" fill="none" preserveAspectRatio="none" viewBox="0 0 300 40">
+<!-- Played Portion (Lime) -->
+<rect fill="#84cc16" height="14" opacity="0.95" rx="1" width="3" x="0" y="13"></rect>
+<rect fill="#84cc16" height="22" opacity="0.95" rx="1" width="3" x="6" y="9"></rect>
+<rect fill="#84cc16" height="10" opacity="0.95" rx="1" width="3" x="12" y="15"></rect>
+<rect fill="#84cc16" height="26" opacity="0.95" rx="1" width="3" x="18" y="7"></rect>
+<rect fill="#84cc16" height="32" opacity="0.95" rx="1" width="3" x="24" y="4"></rect>
+<rect fill="#84cc16" height="16" opacity="0.95" rx="1" width="3" x="30" y="12"></rect>
+<rect fill="#84cc16" height="20" opacity="0.95" rx="1" width="3" x="36" y="10"></rect>
+<rect fill="#84cc16" height="28" opacity="0.95" rx="1" width="3" x="42" y="6"></rect>
+<rect fill="#84cc16" height="12" opacity="0.95" rx="1" width="3" x="48" y="14"></rect>
+<rect fill="#84cc16" height="34" opacity="0.95" rx="1" width="3" x="54" y="3"></rect>
+<rect fill="#84cc16" height="22" opacity="0.95" rx="1" width="3" x="60" y="9"></rect>
+<rect fill="#84cc16" height="14" opacity="0.95" rx="1" width="3" x="66" y="13"></rect>
+<rect fill="#84cc16" height="30" opacity="0.95" rx="1" width="3" x="72" y="5"></rect>
+<rect fill="#84cc16" height="20" opacity="0.95" rx="1" width="3" x="78" y="10"></rect>
+<rect fill="#84cc16" height="8" opacity="0.95" rx="1" width="3" x="84" y="16"></rect>
+<rect fill="#84cc16" height="28" opacity="0.95" rx="1" width="3" x="90" y="6"></rect>
+<rect fill="#84cc16" height="16" opacity="0.95" rx="1" width="3" x="96" y="12"></rect>
+<!-- Playhead Needle -->
+<line stroke="#ffffff" stroke-width="2" x1="102" x2="102" y1="2" y2="38"></line>
+<circle cx="102" cy="6" fill="#84cc16" r="3"></circle>
+<!-- Remaining Portion (Muted Gray) -->
+<rect fill="#2e2e33" height="12" rx="1" width="3" x="108" y="14"></rect>
+<rect fill="#2e2e33" height="20" rx="1" width="3" x="114" y="10"></rect>
+<rect fill="#2e2e33" height="26" rx="1" width="3" x="120" y="7"></rect>
+<rect fill="#2e2e33" height="6" rx="1" width="3" x="126" y="17"></rect>
+<rect fill="#2e2e33" height="14" rx="1" width="3" x="132" y="13"></rect>
+<rect fill="#2e2e33" height="30" rx="1" width="3" x="138" y="5"></rect>
+<rect fill="#2e2e33" height="16" rx="1" width="3" x="144" y="12"></rect>
+<rect fill="#2e2e33" height="22" rx="1" width="3" x="150" y="9"></rect>
+<rect fill="#2e2e33" height="28" rx="1" width="3" x="156" y="6"></rect>
+<rect fill="#2e2e33" height="8" rx="1" width="3" x="162" y="16"></rect>
+<rect fill="#2e2e33" height="20" rx="1" width="3" x="168" y="10"></rect>
+<rect fill="#2e2e33" height="30" rx="1" width="3" x="174" y="5"></rect>
+<rect fill="#2e2e33" height="14" rx="1" width="3" x="180" y="13"></rect>
+<rect fill="#2e2e33" height="24" rx="1" width="3" x="186" y="8"></rect>
+<rect fill="#2e2e33" height="22" rx="1" width="3" x="192" y="9"></rect>
+<rect fill="#2e2e33" height="10" rx="1" width="3" x="198" y="15"></rect>
+<rect fill="#2e2e33" height="28" rx="1" width="3" x="204" y="6"></rect>
+<rect fill="#2e2e33" height="16" rx="1" width="3" x="210" y="12"></rect>
+<rect fill="#2e2e33" height="30" rx="1" width="3" x="216" y="5"></rect>
+<rect fill="#2e2e33" height="18" rx="1" width="3" x="222" y="11"></rect>
+<rect fill="#2e2e33" height="8" rx="1" width="3" x="228" y="16"></rect>
+<rect fill="#2e2e33" height="24" rx="1" width="3" x="234" y="8"></rect>
+<rect fill="#2e2e33" height="14" rx="1" width="3" x="240" y="13"></rect>
+<rect fill="#2e2e33" height="22" rx="1" width="3" x="246" y="9"></rect>
+<rect fill="#2e2e33" height="28" rx="1" width="3" x="252" y="6"></rect>
+<rect fill="#2e2e33" height="16" rx="1" width="3" x="258" y="12"></rect>
+<rect fill="#2e2e33" height="10" rx="1" width="3" x="264" y="15"></rect>
+<rect fill="#2e2e33" height="30" rx="1" width="3" x="270" y="5"></rect>
+<rect fill="#2e2e33" height="18" rx="1" width="3" x="276" y="11"></rect>
+<rect fill="#2e2e33" height="8" rx="1" width="3" x="282" y="16"></rect>
+<rect fill="#2e2e33" height="16" rx="1" width="3" x="288" y="12"></rect>
+<rect fill="#2e2e33" height="12" rx="1" width="3" x="294" y="14"></rect>
+</svg>
+</div>
+<!-- Sub-word Timestamp Sync Chips -->
+<div class="flex flex-wrap gap-1.5 p-2 rounded-lg bg-[#0e0e10] border border-[#27272a]/60">
+<span class="px-2 py-0.5 rounded bg-[#1f1f23] text-zinc-300 font-mono text-[11px] border border-[#27272a]">
+          Ever <span class="text-zinc-500 text-[10px]">0.00s</span>
+</span>
+<span class="px-2 py-0.5 rounded bg-[#1f1f23] text-zinc-300 font-mono text-[11px] border border-[#27272a]">
+          wonder <span class="text-zinc-500 text-[10px]">0.32s</span>
+</span>
+<span class="px-2 py-0.5 rounded-full bg-lime-400 text-black font-mono text-[11px] font-bold shadow-sm flex items-center gap-0.5">
+          why <span class="text-[9px]">★</span>
+</span>
+<span class="px-2 py-0.5 rounded-full bg-lime-400 text-black font-mono text-[11px] font-bold shadow-sm flex items-center gap-0.5">
+          fresh bread aroma <span class="text-[9px]">★</span>
+</span>
+<span class="px-2 py-0.5 rounded bg-[#1f1f23] text-zinc-300 font-mono text-[11px] border border-[#27272a]">
+          hits you <span class="text-zinc-500 text-[10px]">2.10s</span>
+</span>
+<span class="px-2 py-0.5 rounded-full bg-lime-400 text-black font-mono text-[11px] font-bold shadow-sm flex items-center gap-0.5">
+          dopamine? <span class="text-[9px]">★</span>
+</span>
+</div>
+</section>
+<!-- Background Music (BGM) Deck -->
+<section class="p-3 rounded-xl bg-[#18181b] border border-[#27272a] flex items-center justify-between">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-[#27272a] flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">music_note</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="text-xs font-semibold text-white truncate">Lo-Fi Chill Beats #04</span>
+<span class="font-mono text-[10px] text-zinc-400 truncate">Volume: 35% • Auto-Ducking -12dB</span>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="w-7 h-7 rounded-lg text-zinc-400 hover:text-white flex items-center justify-center hover:bg-[#27272a] transition-colors" title="Change Music">
+<span class="material-symbols-outlined text-[16px]">shuffle</span>
+</button>
+<!-- Active Green Toggle Switch -->
+<button class="w-9 h-5 rounded-full bg-lime-500 p-0.5 flex items-center justify-end transition-colors cursor-pointer" onclick="this.classList.toggle('bg-lime-500'); this.classList.toggle('bg-zinc-700'); this.classList.toggle('justify-end'); this.classList.toggle('justify-start');">
+<div class="w-4 h-4 rounded-full bg-white shadow-sm"></div>
+</button>
+</div>
+</section>
+</main>
+<!-- Sticky Bottom Action Bar -->
+<div class="fixed bottom-16 inset-x-0 z-40 bg-[#131315]/95 backdrop-blur-md px-4 py-2 border-t border-[#27272a]/60">
+<div class="max-w-md mx-auto w-full">
+<a class="w-full h-11 rounded-xl bg-lime-400 hover:bg-lime-300 text-black text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md active:scale-[0.99] transition-all" data-path="studio-preview" href="#">
+<span class="">Continue to Studio</span>
+<span class="font-bold">→</span>
+</a>
+</div>
+</div>
+<!-- Persistent Bottom Navigation Bar -->
+<nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-[#131315] border-t border-[#27272a]">
+<div class="max-w-md mx-auto flex justify-around items-center h-16 px-2">
+<!-- Script Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-white transition-colors" data-path="script-editor" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+</svg>
+<span class="font-mono text-[10px]">Script</span>
+</a>
+<!-- Voice Tab (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] py-1 text-lime-400 transition-colors" data-path="voice-synthesizer" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+<line x1="12" x2="12" y1="19" y2="22"></line>
+</svg>
+<span class="font-mono text-[10px] font-semibold text-lime-400">Voice</span>
+</a>
+<!-- Studio Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-white transition-colors" data-path="studio-preview" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="3"></rect>
+<polyline points="9 10 4 15 9 20"></polyline>
+<polyline points="20 4 4 20"></polyline>
+</svg>
+<span class="font-mono text-[10px]">Studio</span>
+</a>
+<!-- Settings Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-white transition-colors" data-path="byok-settings" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+<circle cx="12" cy="12" r="3"></circle>
+</svg>
+<span class="font-mono text-[10px]">Settings</span>
+</a>
+</div>
+</nav>
+<script>
+    function toggleAudition(btn, name) {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'volume_up' || icon.textContent === 'pause') {
+        icon.textContent = 'play_arrow';
+      } else {
+        icon.textContent = 'volume_up';
+      }
+    }
+
+    function togglePlayState(btn) {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'play_arrow') {
+        icon.textContent = 'pause';
+      } else {
+        icon.textContent = 'play_arrow';
+      }
+    }
+  </script>
+
+
+</body></html>

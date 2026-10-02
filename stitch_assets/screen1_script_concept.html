@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_tab" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+        background-color: #131315;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "background": "#131315",
+            "surface": "#131315",
+            "surface-container-lowest": "#0e0e10",
+            "surface-container-low": "#1c1b1d",
+            "surface-container": "#201f22",
+            "surface-container-high": "#27272a",
+            "surface-container-highest": "#323236",
+            "primary": "#9ee939",
+            "primary-fixed": "#acf847",
+            "primary-container": "#84cc16",
+            "on-primary": "#132300",
+            "on-surface": "#f4f4f5",
+            "on-surface-variant": "#a1a1aa",
+            "outline": "#52525b",
+            "outline-variant": "#27272a",
+            "secondary": "#4ae176",
+            "tertiary": "#ffcb8d"
+          },
+          fontFamily: {
+            "sans": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-sans antialiased flex flex-col min-h-screen select-none">
+<!-- Minimal Header -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-zinc-800/80">
+<div class="h-14 px-4 flex items-center justify-between gap-3">
+<!-- Brand & Title -->
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-zinc-700/60 bg-black flex items-center justify-center">
+<img alt="MooScript Logo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1UOBQw4TDn_IS8-snZNMARUsAojqT6BRHhnjy_0AVkUgTpSfiX7jW2eq_OASbeI2hbx38xkj4rKc_RSbwCPRDTWW3OyLzNjmVwtOed7vWTkn4-OuVGkBRvExRX5sWqrTvkxZIaI-M-KfrPkawCYG2gtUvKeQN_MF3og4bew9VjpRhQdWWn70WJA4MmJ31u0ZgwR1ZoCXjnXQwvz6GLzAxCKTVMrULbTgBk_o-1sqa0fH0sUyahwQ-nSb2E"/>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-bold text-[15px] tracking-tight text-white">MooScript</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 border border-zinc-700/60">v0.1.0</span>
+</div>
+</div>
+<!-- Actions & Status -->
+<div class="flex items-center gap-2 shrink-0">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[11px] font-mono text-zinc-300 font-medium">API Connected</span>
+</div>
+<button aria-label="Settings" class="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors" type="button">
+<span class="material-symbols-outlined text-[17px]">tune</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden shrink-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[18px]">person</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col pt-14 pb-28">
+<div class="flex flex-col gap-4 px-4 pt-3 pb-6">
+<!-- Section: Content Style -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-zinc-400">Content Style</span>
+<span class="text-[11px] font-mono text-zinc-400">Step 1 of 3</span>
+</div>
+<div class="flex items-center gap-2 overflow-x-auto py-0.5 -mx-4 px-4">
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/40 text-primary text-xs font-semibold active:scale-95 transition-all" type="button">
+<span>⚡</span>
+<span>Tech Explainer</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1c1b1d] border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs font-medium active:scale-95 transition-all" type="button">
+<span>🧠</span>
+<span>Viral Hook</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1c1b1d] border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs font-medium active:scale-95 transition-all" type="button">
+<span>☕</span>
+<span>Chill &amp; Lo-Fi</span>
+</button>
+</div>
+</div>
+<!-- Topic Card -->
+<div class="flex flex-col bg-[#1c1b1d] rounded-xl p-3.5 border border-zinc-800 shadow-sm gap-3">
+<div class="flex items-center justify-between">
+<span class="text-sm font-semibold text-white">Video Topic or Concept</span>
+<button class="flex items-center gap-1 text-zinc-400 hover:text-primary transition-colors text-xs font-medium" type="button">
+<span class="material-symbols-outlined text-[15px] text-amber-400">lightbulb</span>
+<span>Idea Prompts</span>
+</button>
+</div>
+<div class="bg-[#0e0e10] rounded-lg p-2.5 flex flex-col gap-2 border border-zinc-800/80">
+<textarea class="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 resize-none focus:outline-none leading-relaxed" id="prompt-input" placeholder="3 supermarket psychology tricks that make you spend 40% more without noticing..." rows="3">3 supermarket psychology tricks that make you spend 40% more without noticing...</textarea>
+<div class="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-[11px] font-mono">
+<span class="text-zinc-500">82 characters</span>
+<span class="flex items-center gap-1 text-zinc-500">
+<span class="w-1.5 h-1.5 rounded-full bg-primary/70"></span>
+              Auto-saved
+            </span>
+</div>
+</div>
+<!-- Controls: Duration & Visual -->
+<div class="flex flex-col gap-2.5 pt-0.5">
+<!-- Duration -->
+<div class="flex items-center justify-between gap-2">
+<span class="text-xs text-zinc-400">Target Duration</span>
+<div class="inline-flex p-0.5 rounded-lg bg-[#0e0e10] border border-zinc-800">
+<button class="px-2.5 py-0.5 rounded text-xs font-mono text-zinc-400 hover:text-white transition-colors" type="button">15s</button>
+<button class="px-2.5 py-0.5 rounded text-xs font-mono font-semibold bg-primary text-on-primary shadow-sm" type="button">30s</button>
+<button class="px-2.5 py-0.5 rounded text-xs font-mono text-zinc-400 hover:text-white transition-colors" type="button">60s</button>
+</div>
+</div>
+<!-- Visual Style -->
+<div class="flex items-center justify-between gap-2">
+<span class="text-xs text-zinc-400">Visual Style</span>
+<div class="flex items-center gap-1.5 overflow-x-auto">
+<button class="px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 border border-primary/50 text-primary" type="button">Dark Minimal</button>
+<button class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200" type="button">Cinematic</button>
+<button class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200" type="button">Bold Punch</button>
+</div>
+</div>
+</div>
+<!-- Generate Button -->
+<button class="w-full h-10 flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary-fixed text-on-primary text-sm font-semibold active:scale-[0.98] transition-all shadow-sm" id="btn-generate" type="button">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+<span>Generate Script</span>
+</button>
+</div>
+<!-- Storyboard Section -->
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="text-sm font-semibold text-white">Scene List</span>
+<span class="px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700/60 font-mono text-[10px] text-zinc-300 font-medium">2 Scenes</span>
+</div>
+<span class="text-[11px] text-zinc-400 font-mono">Tap word to highlight</span>
+</div>
+<!-- Scene 01 Card -->
+<div class="flex flex-col bg-[#1c1b1d] rounded-xl p-3 border border-zinc-800 gap-3 shadow-sm">
+<div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-primary/10 border border-primary/30 font-mono text-[10px] font-semibold text-primary">SCENE 01</span>
+<span class="font-mono text-[11px] text-zinc-400">00:00 - 00:08</span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-mono">
+<span class="text-[12px]">🔍</span>
+<span>Zoom In</span>
+</div>
+</div>
+<!-- Preview Banner -->
+<div class="w-full h-24 rounded-lg overflow-hidden relative border border-zinc-800/80">
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD0w6RBpiStkdXyDXQY9JJCh-ECk42T3SjpypNp-3fup6B1lfYVfzzKlxvqbNe8s-oRciURxwhCSfFBf9ZDYcN3bHE_pqO5cIr3-HBb6kK4g8ViwKSUZjkv3D8_P9kWPkjG5qTg-zyLMtZswNNVJ8jhDEmZz7ek3SCiUKzypRJu0TX4ACOYn8ayA8Bc4g1fBruXCznlEhjqGmmm1AnU1vU8z1qDpDeZxDbXPQsSnXcHIzs0E30nJTcPWg')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex items-end p-2.5">
+<span class="px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[11px] font-mono text-zinc-200 border border-zinc-800">Visual: Aesthetic bakery aisle</span>
+</div>
+</div>
+<!-- Words -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[10px] font-mono uppercase tracking-wider font-semibold text-zinc-400">Script &amp; Keywords</span>
+<div class="flex flex-wrap gap-1.5 pt-0.5">
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">Ever</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">wondered</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">why</button>
+<button class="kinetic-word active-keyframe px-2.5 py-1 rounded-md bg-primary text-on-primary font-semibold text-xs inline-flex items-center gap-1 shadow-sm active:scale-95 transition-all" type="button">
+<span>★</span>
+<span>fresh bread aroma</span>
+</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">hits you</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">when entering</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">a supermarket?</button>
+</div>
+</div>
+</div>
+<!-- Scene 02 Card -->
+<div class="flex flex-col bg-[#1c1b1d] rounded-xl p-3 border border-zinc-800 gap-3 shadow-sm">
+<div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 font-mono text-[10px] font-semibold text-emerald-400">SCENE 02</span>
+<span class="font-mono text-[11px] text-zinc-400">00:08 - 00:18</span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-mono">
+<span class="text-[12px]">⬚</span>
+<span>Slide Transition</span>
+</div>
+</div>
+<!-- Preview Banner -->
+<div class="w-full h-24 rounded-lg overflow-hidden relative border border-zinc-800/80">
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBlzbDuYLBUcyVVHmpe43akO3PkSLI0R0KiTp90_uqIrS5sZGiOSEgAHMxdSiknbKB2psGk8hLj1uoGn9FmIiOVtCq9czT_QRbHIHRbmOxD1faATHSaPt0Dn5PfhNCgxvwZn7Mm6iqZalZOdoTkw_uhnCijcPesKoVGLXyt9OS9dM5dS07SuZwEsJywVm0JzB_TmG4TxvlFWDMd4O6N0VT5cjkdstBC_ZjI3QvOVEbOM-gRnt5v_vM9uA')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex items-end p-2.5">
+<span class="px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[11px] font-mono text-zinc-200 border border-zinc-800">Visual: Brain dopamine reaction</span>
+</div>
+</div>
+<!-- Words -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[10px] font-mono uppercase tracking-wider font-semibold text-zinc-400">Script &amp; Keywords</span>
+<div class="flex flex-wrap gap-1.5 pt-0.5">
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">It triggers</button>
+<button class="kinetic-word active-keyframe px-2.5 py-1 rounded-md bg-primary text-on-primary font-semibold text-xs inline-flex items-center gap-1 shadow-sm active:scale-95 transition-all" type="button">
+<span>⚡</span>
+<span>dopamine</span>
+</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">before you even</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">grab a cart,</button>
+<button class="kinetic-word px-2.5 py-1 rounded-md bg-[#27272a] hover:bg-zinc-700 text-zinc-200 text-xs active:scale-95 transition-all" type="button">making your brain</button>
+<button class="kinetic-word active-keyframe px-2.5 py-1 rounded-md bg-primary text-on-primary font-semibold text-xs inline-flex items-center gap-1 shadow-sm active:scale-95 transition-all" type="button">
+<span>★</span>
+<span>ready to spend.</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Add Scene Button -->
+<button class="w-full h-10 rounded-xl bg-transparent hover:bg-zinc-900 border border-dashed border-zinc-700 text-zinc-400 hover:text-zinc-200 flex items-center justify-center gap-1.5 text-xs font-medium active:scale-[0.99] transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Add New Scene</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Sticky Bottom Action Bar -->
+<div class="fixed bottom-14 left-0 right-0 z-40 px-4 py-2 bg-gradient-to-t from-surface via-surface/95 to-transparent backdrop-blur-md">
+<div class="max-w-md mx-auto flex items-center gap-2">
+<button aria-label="Preview Audio" class="h-11 w-11 rounded-xl bg-[#1c1b1d] border border-zinc-800 hover:border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white shrink-0 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">volume_up</span>
+</button>
+<button class="flex-1 h-11 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center gap-1.5 text-sm font-semibold shadow-md active:scale-[0.98] transition-all" type="button">
+<span>Continue to Audio</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Persistent Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-[#131315]/95 backdrop-blur-xl border-t border-zinc-800/80">
+<div class="flex justify-around items-center h-14 max-w-md mx-auto px-2">
+<!-- Script Tab (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] py-1 text-primary" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 3l1.912 5.885h6.19l-5.008 3.638 1.913 5.886-5.007-3.638-5.007 3.638 1.913-5.886-5.008-3.638h6.19z"></path>
+</svg>
+<span class="text-[10px] font-medium tracking-tight">Script</span>
+</a>
+<!-- Voice Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-zinc-200 transition-colors" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 2v20M17 5v14M7 5v14M2 9v6M22 9v6"></path>
+</svg>
+<span class="text-[10px] font-medium tracking-tight">Voice</span>
+</a>
+<!-- Studio Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-zinc-200 transition-colors" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect>
+<path d="m10 9 5 3-5 3V9z"></path>
+<line x1="2" x2="22" y1="21" y2="21"></line>
+</svg>
+<span class="text-[10px] font-medium tracking-tight">Studio</span>
+</a>
+<!-- Settings / BYOK Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] py-1 text-zinc-400 hover:text-zinc-200 transition-colors" href="#">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span class="text-[10px] font-medium tracking-tight">Settings</span>
+</a>
+</div>
+</nav>
+<script>
+    // Kinetic word highlight toggle
+    document.querySelectorAll('.kinetic-word').forEach(button => {
+      button.addEventListener('click', () => {
+        const isKeyframe = button.classList.contains('active-keyframe');
+        if (isKeyframe) {
+          button.classList.remove('active-keyframe', 'bg-primary', 'text-on-primary', 'font-semibold');
+          button.classList.add('bg-[#27272a]', 'hover:bg-zinc-700', 'text-zinc-200');
+          const star = button.querySelector('span:first-child');
+          if (star && (star.textContent === '★' || star.textContent === '⚡')) {
+            star.remove();
+          }
+        } else {
+          button.classList.remove('bg-[#27272a]', 'hover:bg-zinc-700', 'text-zinc-200');
+          button.classList.add('active-keyframe', 'bg-primary', 'text-on-primary', 'font-semibold');
+          const star = document.createElement('span');
+          star.textContent = '★';
+          button.prepend(star);
+        }
+      });
+    });
+
+    // Mock generate button action
+    const generateBtn = document.getElementById('btn-generate');
+    if (generateBtn) {
+      generateBtn.addEventListener('click', () => {
+        const icon = generateBtn.querySelector('.material-symbols-outlined');
+        if (icon) icon.classList.add('animate-spin');
+        setTimeout(() => {
+          if (icon) icon.classList.remove('animate-spin');
+        }, 900);
+      });
+    }
+  </script>
+</body></html>
