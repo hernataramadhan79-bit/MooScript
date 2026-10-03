@@ -26,7 +26,10 @@ const TEST_PROJ_1: MooProject = {
   scenes: [
     {
       id: 'sc-1',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'Alpha scene one',
       text: 'Alpha scene one',
+      visualData: { title: 'Alpha', focusWords: ['alpha'] },
       focusWords: ['alpha'],
       motionPreset: 'punch_zoom',
       durationInSeconds: 2.0,
@@ -55,7 +58,10 @@ const TEST_PROJ_2: MooProject = {
   scenes: [
     {
       id: 'sc-2',
+      layout: 'TERMINAL_MOCKUP',
+      narrationText: 'Beta scene one',
       text: 'Beta scene one',
+      visualData: { title: 'Beta Terminal', codeSnippet: 'echo "beta"' },
       focusWords: ['beta'],
       motionPreset: 'slide_split',
       durationInSeconds: 3.5,

@@ -9,7 +9,11 @@ import type {
   CaptionPosition,
   BgmPreset,
   ToastNotification,
-  TTSProvider
+  TTSProvider,
+  LayoutType,
+  VisualData,
+  CameraMovement,
+  AspectRatio
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
@@ -44,12 +48,20 @@ export interface ProjectSlice {
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<string>;
   updateTitle: (title: string) => void;
+  updateResolution: (res: '1080p' | '720p') => void;
+  toggleGlobalSubtitles: () => void;
   updateThemeFont: (font: 'Jakarta' | 'Mono' | 'Impact') => void;
   updateThemeHighlight: (color: string) => void;
+  updateThemePrimary: (color: string) => void;
   updateThemeBg: (color: string) => void;
+  updateProjectAspectRatio: (aspectRatio: AspectRatio) => void;
   updateThemeCaptionStyle: (style: CaptionStyle) => void;
   updateThemeCaptionPosition: (position: CaptionPosition) => void;
   updateSceneText: (id: string, text: string) => void;
+  updateSceneLayout: (sceneId: string, layout: LayoutType) => void;
+  updateSceneVisualData: (sceneId: string, visualData: Partial<VisualData>) => void;
+  updateSceneCamera: (sceneId: string, camera: CameraMovement) => void;
+  toggleSceneSubtitles: (sceneId: string) => void;
   toggleWordFocus: (sceneId: string, word: string) => void;
   setSceneMotionPreset: (sceneId: string, preset: MotionPreset) => void;
   setSceneTransition: (sceneId: string, transition: SceneTransition) => void;

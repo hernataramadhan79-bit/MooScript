@@ -1,118 +1,121 @@
 import React, { useState } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import { ProjectManagerModal } from './ProjectManagerModal';
+import { IconButton } from './ui/IconButton';
+import { Button } from './ui/Button';
 
-export const Header: React.FC = () => {
-  const { project, settings, setSettingsOpen, previewMode, setPreviewMode } = useMooStore();
+interface HeaderProps {
+  onOpenExport?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
+  const { project, settings, setSettingsOpen, updateTitle } = useMooStore();
+
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(project.title);
 
-  const hasApiKey = Boolean(settings.apiKeys.gemini || settings.apiKeys.openai || settings.apiKeys.groq);
+  const hasApiKey = Boolean(
+    settings.apiKeys.gemini ||
+    settings.apiKeys.openai ||
+    settings.apiKeys.groq ||
+    settings.apiKeys.anthropic ||
+    settings.apiKeys.openrouter
+  );
+
+  const handleTitleSubmit = () => {
+    setEditingTitle(false);
+    if (titleInput.trim() && titleInput !== project.title) {
+      updateTitle(titleInput.trim());
+    }
+  };
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-40 h-11 sm:h-14 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/[0.08] select-none">
-        <div className="h-full px-2.5 sm:px-4 max-w-7xl mx-auto flex items-center justify-between gap-2">
-          {/* Brand & Mascot */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <div className="relative flex items-center justify-center">
-              <img
-                alt="MooScript Logo"
-                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-lg shadow-sm"
-                src="/logo.svg"
-              />
-              <div className="absolute -inset-0.5 rounded-lg bg-primary/20 blur-sm -z-10" />
+      <header className="fixed top-0 inset-x-0 z-40 h-14 bg-surface-1/95 backdrop-blur-xl border-b border-border select-none">
+        <div className="h-full px-4 max-w-[1920px] mx-auto flex items-center justify-between gap-3">
+          {/* Sisi Kiri: Logo + Judul Proyek */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <img alt="MooScript Logo" className="w-7 h-7 rounded-lg" src="/logo.svg" />
+              <span className="font-extrabold text-[15px] tracking-tight text-on-surface hidden sm:inline">
+                MooScript<span className="text-accent ml-0.5">Studio</span>
+              </span>
             </div>
 
-            <div className="flex items-center gap-1">
-              <span className="font-extrabold text-[13px] sm:text-[15px] tracking-tight text-white font-sans">
-                MooScript
-              </span>
-              <span className="px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-mono font-bold bg-primary/10 text-primary border border-primary/25 uppercase tracking-wider hidden sm:inline">
-                Studio
-              </span>
+            <div className="h-4 w-[1px] bg-border hidden sm:block shrink-0" />
+
+            {/* Title Renamer & Switcher */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              {editingTitle ? (
+                <input
+                  type="text"
+                  autoFocus
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onBlur={handleTitleSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTitleSubmit();
+                    if (e.key === 'Escape') {
+                      setTitleInput(project.title);
+                      setEditingTitle(false);
+                    }
+                  }}
+                  className="bg-surface-2 border border-accent rounded-lg px-2.5 h-8 text-[13px] font-semibold text-on-surface focus:outline-none w-[160px] sm:w-[220px]"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleInput(project.title);
+                    setEditingTitle(true);
+                  }}
+                  title="Klik untuk mengubah nama proyek"
+                  className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg hover:bg-surface-2 text-[13px] font-semibold text-on-surface transition-colors truncate max-w-[140px] sm:max-w-[220px]"
+                >
+                  <span className="truncate">{project.title}</span>
+                  <span className="material-symbols-outlined text-[14px] text-text-faint shrink-0">edit</span>
+                </button>
+              )}
+
+              <IconButton
+                icon="folder_open"
+                aria-label="Kelola Proyek"
+                size="sm"
+                onClick={() => setShowProjectModal(true)}
+              />
             </div>
           </div>
 
-          {/* Project Switcher Trigger */}
-          <button
-            type="button"
-            onClick={() => setShowProjectModal(true)}
-            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.14] text-[11px] sm:text-xs font-semibold text-zinc-200 transition-all shrink min-w-0 active:scale-95 shadow-sm"
-            title="Kelola & pindah proyek"
-          >
-            <span className="material-symbols-outlined text-[14px] sm:text-[16px] text-primary shrink-0">
-              video_library
-            </span>
-            <span className="truncate max-w-[100px] sm:max-w-[200px] md:max-w-[280px]">
-              {project.title}
-            </span>
-            <span className="material-symbols-outlined text-[13px] sm:text-[15px] text-zinc-400 shrink-0">
-              unfold_more
-            </span>
-          </button>
-
-          {/* Status, Mobile Preview Switcher & Settings Drawer Trigger */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Mobile Viewport Mode Switcher */}
-            <button
-              type="button"
-              onClick={() => {
-                setPreviewMode(
-                  previewMode === 'compact'
-                    ? 'theater'
-                    : previewMode === 'theater'
-                    ? 'ticker'
-                    : 'compact'
-                );
-              }}
-              className="lg:hidden flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.05] border border-white/[0.1] text-[10px] font-mono text-zinc-300 hover:text-white transition-all active:scale-95"
-              title={`Mode Pratinjau: ${previewMode}. Ketuk untuk ganti.`}
-            >
-              <span className="material-symbols-outlined text-[13px] text-primary">
-                {previewMode === 'theater'
-                  ? 'fullscreen_exit'
-                  : previewMode === 'compact'
-                  ? 'aspect_ratio'
-                  : 'visibility_off'}
-              </span>
-              <span className="capitalize">{previewMode}</span>
-            </button>
-
-            {/* BYOK Connection Pill */}
+          {/* Sisi Kanan: Status & Aksi Utama */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* BYOK Status Badge */}
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] hover:bg-white/[0.08] transition-all cursor-pointer"
-              title="Klik untuk membuka Pengaturan & BYOK Keys"
+              className="hidden md:flex items-center gap-2 px-3 h-8 rounded-lg bg-surface-2 border border-border text-[12px] font-medium text-text-muted hover:text-on-surface transition-colors"
             >
-              <span
-                className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
-                  hasApiKey ? 'bg-primary shadow-[0_0_8px_#9ee939] animate-pulse' : 'bg-amber-400 shadow-[0_0_6px_#f59e0b]'
-                }`}
-              />
-              <span className="text-[10px] sm:text-[11px] font-mono text-zinc-300 font-medium hidden md:inline">
-                {hasApiKey ? 'BYOK Connected' : 'Offline / BGM'}
-              </span>
+              <span className={`w-2 h-2 rounded-full ${hasApiKey ? 'bg-accent' : 'bg-amber-400'}`} />
+              <span>{hasApiKey ? 'BYOK Terhubung' : 'Offline / Local'}</span>
             </button>
 
-            {/* Settings Drawer Button */}
-            <button
-              type="button"
-              aria-label="Settings"
+            {onOpenExport && (
+              <Button variant="primary" size="sm" icon="file_download" onClick={onOpenExport}>
+                Ekspor
+              </Button>
+            )}
+
+            <IconButton
+              icon="tune"
+              aria-label="Pengaturan API & Studio"
+              size="sm"
               onClick={() => setSettingsOpen(true)}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-primary/40 text-zinc-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
-              title="Open Settings"
-            >
-              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">tune</span>
-            </button>
+            />
           </div>
         </div>
       </header>
 
-      <ProjectManagerModal
-        isOpen={showProjectModal}
-        onClose={() => setShowProjectModal(false)}
-      />
+      <ProjectManagerModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} />
     </>
   );
 };

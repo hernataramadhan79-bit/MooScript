@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { Scene, MooProject } from '../../types';
+import type { Scene, MooProject, LayoutType, VisualData } from '../../types';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { saveProjectToDb } from '../../db/mooDb';
@@ -77,7 +77,11 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
             ? settings.geminiModel
             : provider === 'openai'
               ? settings.openaiModel
-              : settings.groqModel,
+              : provider === 'groq'
+                ? settings.groqModel
+                : provider === 'anthropic'
+                  ? settings.anthropicModel
+                  : settings.openrouterModel,
         prompt: scriptPrompt,
         skill: activeSkill,
         language: settings.outputLanguage || 'id',
@@ -85,15 +89,27 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       });
 
       const newScenes: Scene[] = storyboard.scenes.map((s, idx) => {
-        const dur = calculateFallbackSceneDuration(s.text);
+        const text = (s as any).narrationText || s.text || '';
+        const dur = calculateFallbackSceneDuration(text);
+        const layout: LayoutType = (s as any).layout || 'KINETIC_QUOTE';
+        const visualData: VisualData = (s as any).visualData || {
+          title: `Scene #${idx + 1}`,
+          focusWords: s.focusWords || [],
+          accentIcon: s.icon || 'zap'
+        };
         return {
           id: `sc-ai-${Date.now()}-${idx}`,
-          text: s.text,
+          layout,
+          narrationText: text,
+          text,
+          visualData,
           focusWords: s.focusWords || [],
           motionPreset: s.motionPreset || 'punch_zoom',
+          camera: 'push_in',
           icon: s.icon || 'zap',
           durationInSeconds: dur,
-          wordTimestamps: computeDeterministicWordAlignment(s.text, dur)
+          wordTimestamps: computeDeterministicWordAlignment(text, dur),
+          showSubtitles: false
         };
       });
 

@@ -120,15 +120,16 @@ export function generateSubtitleCues(
     const sceneDuration = Math.max(0.1, scene.durationInSeconds || 2.0);
     const hasWordTimestamps = Array.isArray(scene.wordTimestamps) && scene.wordTimestamps.length > 0;
 
+    const sceneText = (scene.narrationText || scene.text || '').trim();
+
     if (mode === 'scene' || !hasWordTimestamps) {
       // Scene mode: 1 cue covering the scene duration
-      const text = scene.text.trim();
-      if (text.length > 0) {
+      if (sceneText.length > 0) {
         cues.push({
           index: cueIndex++,
           startTime: sceneOffset,
           endTime: sceneOffset + sceneDuration,
-          text
+          text: sceneText
         });
       }
     } else if (mode === 'word') {
@@ -158,13 +159,13 @@ export function generateSubtitleCues(
             text: p.text
           });
         }
-      } else if (scene.text.trim().length > 0) {
+      } else if (sceneText.length > 0) {
         // Fallback if phrase chunking produced nothing
         cues.push({
           index: cueIndex++,
           startTime: sceneOffset,
           endTime: sceneOffset + sceneDuration,
-          text: scene.text.trim()
+          text: sceneText
         });
       }
     }

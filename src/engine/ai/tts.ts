@@ -511,7 +511,7 @@ export async function generateSceneAudio(params: {
     signal
   } = params;
 
-  const rawText = scene.text.trim();
+  const rawText = (scene.narrationText || scene.text || '').trim();
   const cacheKey = `${provider}:${voiceId}:${speed}:${stability}:${rawText}`;
 
   // 1. Check IndexedDB cache first

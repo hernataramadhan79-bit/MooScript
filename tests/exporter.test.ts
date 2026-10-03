@@ -226,7 +226,13 @@ const TEST_PROJECT: MooProject = {
   scenes: [
     {
       id: 'sc-1',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'One second test',
       text: 'One second test',
+      visualData: {
+        title: 'Test Scene',
+        focusWords: ['test']
+      },
       focusWords: ['test'],
       motionPreset: 'punch_zoom',
       durationInSeconds: 1.0,

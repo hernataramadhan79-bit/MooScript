@@ -395,7 +395,10 @@ describe('Local TTS Engine (Prompt 8.1)', () => {
   describe('Pipeline Integration: generateSceneAudio & Project Pipeline with Local Provider', () => {
     const mockScene: Scene = {
       id: 'sc-1',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'MooScript Studio engine video deterministik.',
       text: 'MooScript Studio engine video deterministik.',
+      visualData: { title: 'Local TTS', focusWords: ['MooScript', 'deterministik'] },
       focusWords: ['MooScript', 'deterministik'],
       motionPreset: 'punch_zoom',
       durationInSeconds: 3.0,
@@ -437,7 +440,10 @@ describe('Local TTS Engine (Prompt 8.1)', () => {
         scenes: [
           {
             id: 'sc-1',
+            layout: 'KINETIC_QUOTE',
+            narrationText: 'Adegan pertama narasi lokal.',
             text: 'Adegan pertama narasi lokal.',
+            visualData: { title: 'Adegan 1', focusWords: ['pertama'] },
             focusWords: ['pertama'],
             motionPreset: 'punch_zoom',
             durationInSeconds: 2.0,
@@ -445,7 +451,10 @@ describe('Local TTS Engine (Prompt 8.1)', () => {
           },
           {
             id: 'sc-2',
+            layout: 'KINETIC_QUOTE',
+            narrationText: 'Adegan kedua berjalan offline.',
             text: 'Adegan kedua berjalan offline.',
+            visualData: { title: 'Adegan 2', focusWords: ['offline'] },
             focusWords: ['offline'],
             motionPreset: 'fade_float',
             durationInSeconds: 2.0,
@@ -506,7 +515,10 @@ describe('Local TTS Engine (Prompt 8.1)', () => {
         scenes: [
           {
             id: 'sc-1',
+            layout: 'KINETIC_QUOTE',
+            narrationText: 'MooScript Studio 100 persen offline.',
             text: 'MooScript Studio 100 persen offline.',
+            visualData: { title: 'Offline Accept', focusWords: ['offline'] },
             focusWords: ['offline'],
             motionPreset: 'punch_zoom',
             durationInSeconds: 1.0,

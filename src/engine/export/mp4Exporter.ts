@@ -9,6 +9,7 @@ import {
 } from 'mediabunny';
 import type { MooProject } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
+import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
 
 export interface ExportProgress {
   percent: number;
@@ -160,6 +161,16 @@ export async function exportMooProjectToMP4(
   const canvasRenderer = new CanvasRenderer(undefined, width, height);
   const rawCanvas = canvasRenderer.getCanvas();
 
+  const isCompositionMode =
+    (project.renderMode || 'composition') === 'composition' &&
+    !!project.composition?.scenes?.length;
+
+  let compRenderer: FrameRenderer | null = null;
+  if (isCompositionMode) {
+    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Initializing composition headless sandbox...' });
+    compRenderer = await createCompositionFrameRenderer(project, width, height);
+  }
+
   const videoSource = new CanvasSource(rawCanvas as HTMLCanvasElement, {
     codec: 'avc',
     bitrate
@@ -202,10 +213,14 @@ export async function exportMooProjectToMP4(
       }
 
       // 1. Draw frame deterministically: RenderState = f(currentFrame, fps, project)
-      canvasRenderer.draw(frame, totalFrames, project, {
-        hud: opts?.hud ?? false,
-        watermark: opts?.watermark ?? false
-      });
+      if (compRenderer) {
+        await compRenderer.renderFrame(frame, frame / fps, rawCanvas as HTMLCanvasElement);
+      } else {
+        canvasRenderer.draw(frame, totalFrames, project, {
+          hud: opts?.hud ?? false,
+          watermark: opts?.watermark ?? false
+        });
+      }
 
       // 2. Add canvas frame to Mediabunny (auto-encodes, respects dequeue backpressure, and closes frame)
       await videoSource.add(frame / fps, 1 / fps);
@@ -254,5 +269,9 @@ export async function exportMooProjectToMP4(
     }
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`VideoEncoder error during export: ${message}`);
+  } finally {
+    if (compRenderer) {
+      compRenderer.cleanup();
+    }
   }
 }

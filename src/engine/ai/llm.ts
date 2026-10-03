@@ -4,8 +4,43 @@ import type { PersonaSkill, LLMProvider } from '../../types';
 export const MotionPresetEnum = z.enum(['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake']);
 export const IconEnum = z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']);
 
+export const LayoutTypeEnum = z.enum([
+  'KINETIC_QUOTE',
+  'METRIC_COUNTER',
+  'TERMINAL_MOCKUP',
+  'VS_COMPARISON',
+  'LIST_STAGGER'
+]);
+
+export const CameraMovementEnum = z.enum([
+  'steady_drift',
+  'push_in',
+  'pull_out',
+  'snap_zoom',
+  'whip_pan'
+]);
+
+export const VisualDataSchema = z
+  .object({
+    title: z.string().optional(),
+    metricValue: z.string().optional(),
+    metricLabel: z.string().optional(),
+    codeSnippet: z.string().optional(),
+    codeLanguage: z.string().optional(),
+    leftTitle: z.string().optional(),
+    leftDesc: z.string().optional(),
+    rightTitle: z.string().optional(),
+    rightDesc: z.string().optional(),
+    bulletItems: z.array(z.string()).optional()
+  })
+  .default({});
+
 export const StoryboardSceneSchema = z.object({
+  layout: LayoutTypeEnum.catch('KINETIC_QUOTE'),
   text: z.string().min(1, 'Scene text cannot be empty').max(500, 'Scene text too long'),
+  narrationText: z.string().optional(),
+  visualData: VisualDataSchema.default({}),
+  camera: CameraMovementEnum.catch('steady_drift'),
   focusWords: z.array(z.string()).default([]),
   motionPreset: MotionPresetEnum.catch('punch_zoom'),
   icon: IconEnum.catch('mascot'),
@@ -26,11 +61,41 @@ const OPENAI_STORYBOARD_SCHEMA = {
     title: { type: 'string', description: 'Short catchy video title' },
     scenes: {
       type: 'array',
-      description: 'List of 3 to 6 concise storyboard scenes',
+      description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
       items: {
         type: 'object',
         properties: {
+          layout: {
+            type: 'string',
+            enum: ['KINETIC_QUOTE', 'METRIC_COUNTER', 'TERMINAL_MOCKUP', 'VS_COMPARISON', 'LIST_STAGGER'],
+            description: 'Component layout type matching the scene visual concept'
+          },
           text: { type: 'string', description: 'Punchy spoken script text for this scene (10-25 words max)' },
+          camera: {
+            type: 'string',
+            enum: ['steady_drift', 'push_in', 'pull_out', 'snap_zoom', 'whip_pan'],
+            description: 'Camera motion transform'
+          },
+          visualData: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Card title or header' },
+              metricValue: { type: 'string', description: 'Key metric number e.g. +400%, 99.9%, 10x' },
+              metricLabel: { type: 'string', description: 'Metric subtitle label e.g. YoY Growth' },
+              codeSnippet: { type: 'string', description: 'Code snippet or CLI command' },
+              codeLanguage: { type: 'string', description: 'Syntax language e.g. bash, js, ts, python' },
+              leftTitle: { type: 'string', description: 'Left / problem title for comparison' },
+              leftDesc: { type: 'string', description: 'Left / problem description' },
+              rightTitle: { type: 'string', description: 'Right / solution title for comparison' },
+              rightDesc: { type: 'string', description: 'Right / solution description' },
+              bulletItems: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Key takeaways or staggered points'
+              }
+            },
+            additionalProperties: false
+          },
           focusWords: {
             type: 'array',
             items: { type: 'string' },
@@ -47,7 +112,7 @@ const OPENAI_STORYBOARD_SCHEMA = {
             description: 'Icon identifier matching the concept'
           }
         },
-        required: ['text', 'focusWords', 'motionPreset', 'icon'],
+        required: ['layout', 'text', 'focusWords', 'motionPreset', 'icon'],
         additionalProperties: false
       }
     }
@@ -63,11 +128,34 @@ const GEMINI_ENGINE_SCHEMA = {
     title: { type: 'STRING', description: 'Short catchy video title' },
     scenes: {
       type: 'ARRAY',
-      description: 'List of 3 to 6 concise storyboard scenes for a 15-30s short video',
+      description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
       items: {
         type: 'OBJECT',
         properties: {
+          layout: {
+            type: 'STRING',
+            enum: ['KINETIC_QUOTE', 'METRIC_COUNTER', 'TERMINAL_MOCKUP', 'VS_COMPARISON', 'LIST_STAGGER']
+          },
           text: { type: 'STRING', description: 'Punchy spoken script text for this scene (10-25 words max)' },
+          camera: {
+            type: 'STRING',
+            enum: ['steady_drift', 'push_in', 'pull_out', 'snap_zoom', 'whip_pan']
+          },
+          visualData: {
+            type: 'OBJECT',
+            properties: {
+              title: { type: 'STRING' },
+              metricValue: { type: 'STRING' },
+              metricLabel: { type: 'STRING' },
+              codeSnippet: { type: 'STRING' },
+              codeLanguage: { type: 'STRING' },
+              leftTitle: { type: 'STRING' },
+              leftDesc: { type: 'STRING' },
+              rightTitle: { type: 'STRING' },
+              rightDesc: { type: 'STRING' },
+              bulletItems: { type: 'ARRAY', items: { type: 'STRING' } }
+            }
+          },
           focusWords: {
             type: 'ARRAY',
             items: { type: 'STRING' },
@@ -84,7 +172,7 @@ const GEMINI_ENGINE_SCHEMA = {
             description: 'Icon identifier matching the concept'
           }
         },
-        required: ['text', 'focusWords', 'motionPreset', 'icon']
+        required: ['layout', 'text', 'focusWords', 'motionPreset', 'icon']
       }
     }
   },
@@ -127,10 +215,17 @@ function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' =
 
   return `You are MooScript Engine's Motion Graphics Storyboard Director.
 
-=== MANDATORY ENGINE SPECIFICATIONS (Highest Priority - Immutable) ===
+=== MANDATORY MOTION DESIGN SPECIFICATIONS ===
 - Format: Return strictly valid JSON conforming to the schema.
-- Number of scenes: 3 to 6 scenes for a 15-30s video.
+- Number of scenes: 3 to 6 scenes for a 15-30s high-velocity video.
 - Length per scene: 10 to 25 words per scene.
+- Motion Component Selection (MANDATORY):
+  * For numbers, statistics, growth, time, or ROI -> layout: "METRIC_COUNTER" (populate visualData.metricValue and visualData.metricLabel).
+  * For code snippets, CLI tools, libraries, or terminal commands -> layout: "TERMINAL_MOCKUP" (populate visualData.codeSnippet and visualData.codeLanguage).
+  * For before vs after, pros vs cons, or competitive comparisons -> layout: "VS_COMPARISON" (populate visualData.leftTitle, leftDesc, rightTitle, rightDesc).
+  * For step-by-step points, bullet takeaways, or feature lists -> layout: "LIST_STAGGER" (populate visualData.bulletItems).
+  * For high-energy spoken quotes, philosophies, or dynamic typography punch -> layout: "KINETIC_QUOTE".
+- Camera movement: Select from "steady_drift", "push_in", "pull_out", "snap_zoom", "whip_pan".
 - Keyframes: 1 to 3 punchy focus words per scene selected from the scene text.
 - Valid motion presets: "punch_zoom", "slide_split", "fade_float", "kinetic_shake".
 - Valid icons: "mascot", "zap", "brain", "sparkles", "flame", "code".
@@ -290,6 +385,16 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
     { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', description: 'Blazing Fast' },
     { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B', description: 'Reasoning Engine' },
     { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', description: 'MoE Fast' }
+  ],
+  anthropic: [
+    { id: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
+    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', description: 'Exceptional Coding' },
+    { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', description: 'Ultra Fast' }
+  ],
+  openrouter: [
+    { id: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet (Router)', description: 'Recommended', isRecommended: true },
+    { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Router)', description: 'Fast' },
+    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (Router)', description: 'Reasoning' }
   ]
 };
 
@@ -299,7 +404,11 @@ export function sanitizeModelName(provider: LLMProvider, model?: string): string
       ? 'gemini-2.5-flash'
       : provider === 'openai'
         ? 'gpt-4o-mini'
-        : 'llama-3.3-70b-versatile';
+        : provider === 'anthropic'
+          ? 'claude-3-7-sonnet-20250219'
+          : provider === 'openrouter'
+            ? 'anthropic/claude-3.7-sonnet'
+            : 'llama-3.3-70b-versatile';
   }
   const clean = model.trim().replace(/^models\//, '');
   if (provider === 'gemini' && (clean.includes('gemini-1.0') || clean === 'gemini-pro')) {
@@ -496,6 +605,12 @@ async function executeProviderRequest(opts: {
   if (provider === 'groq') {
     return await generateWithGroq(apiKey, model, systemPrompt, userPrompt, signal);
   }
+  if (provider === 'anthropic') {
+    return await generateWithAnthropic(apiKey, model, systemPrompt, userPrompt, signal);
+  }
+  if (provider === 'openrouter') {
+    return await generateWithOpenRouter(apiKey, model, systemPrompt, userPrompt, signal);
+  }
   throw new Error(`Unsupported LLM provider: ${provider}`);
 }
 
@@ -647,6 +762,259 @@ async function generateWithGroq(
   return textContent;
 }
 
+async function generateWithAnthropic(
+  apiKey: string,
+  model?: string,
+  systemPrompt: string = '',
+  userPrompt: string = '',
+  signal?: AbortSignal
+): Promise<string> {
+  const cleanModel = sanitizeModelName('anthropic', model);
+  const url = 'https://api.anthropic.com/v1/messages';
+
+  const payload = {
+    model: cleanModel,
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: `User Script / Concept:\n${userPrompt}` }]
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(payload),
+    signal
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw handleApiError('Anthropic', res.status, errorText);
+  }
+
+  const data = await res.json();
+  const textContent = data.content?.[0]?.text;
+  if (!textContent) {
+    throw new Error('Anthropic returned an empty response.');
+  }
+  return textContent;
+}
+
+async function generateWithOpenRouter(
+  apiKey: string,
+  model?: string,
+  systemPrompt: string = '',
+  userPrompt: string = '',
+  signal?: AbortSignal
+): Promise<string> {
+  const cleanModel = sanitizeModelName('openrouter', model);
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
+
+  const payload = {
+    model: cleanModel,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
+    ],
+    temperature: 0.7
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://mooscript.app',
+      'X-Title': 'MooScript Studio'
+    },
+    body: JSON.stringify(payload),
+    signal
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw handleApiError('OpenRouter', res.status, errorText);
+  }
+
+  const data = await res.json();
+  const textContent = data.choices?.[0]?.message?.content;
+  if (!textContent) {
+    throw new Error('OpenRouter returned an empty response.');
+  }
+  return textContent;
+}
+
+/**
+ * Freeform LLM text/code generation without JSON-schema constraint.
+ * Used for AI Director code generation (HTML/CSS/GSAP) and custom scripting.
+ */
+export async function callRawLLM(opts: {
+  provider: LLMProvider;
+  apiKey: string;
+  model?: string;
+  systemPrompt: string;
+  userPrompt: string;
+  signal?: AbortSignal;
+  temperature?: number;
+}): Promise<string> {
+  const { provider, apiKey, model, systemPrompt, userPrompt, signal, temperature = 0.7 } = opts;
+  const cleanKey = apiKey.trim();
+
+  if (!cleanKey) {
+    throw new Error(`API Key untuk ${provider.toUpperCase()} belum diisi. Silakan isi di Pengaturan terlebih dahulu.`);
+  }
+
+  const cleanModel = sanitizeModelName(provider, model);
+
+  if (provider === 'gemini') {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': cleanKey
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+          }
+        ],
+        generationConfig: {
+          temperature
+        }
+      }),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw handleApiError('Google Gemini', res.status, errText);
+    }
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  if (provider === 'openai') {
+    const url = 'https://api.openai.com/v1/chat/completions';
+    const isReasoning = cleanModel.startsWith('o1') || cleanModel.startsWith('o3');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      },
+      body: JSON.stringify({
+        model: cleanModel,
+        messages: [
+          { role: isReasoning ? 'user' : 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        ...(!isReasoning ? { temperature } : {})
+      }),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw handleApiError('OpenAI', res.status, errText);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  if (provider === 'groq') {
+    const url = 'https://api.groq.com/openai/v1/chat/completions';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`
+      },
+      body: JSON.stringify({
+        model: cleanModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature
+      }),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw handleApiError('Groq', res.status, errText);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  if (provider === 'anthropic') {
+    const url = 'https://api.anthropic.com/v1/messages';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': cleanKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: cleanModel,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        temperature
+      }),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw handleApiError('Anthropic', res.status, errText);
+    }
+    const data = await res.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  if (provider === 'openrouter') {
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`,
+        'HTTP-Referer': 'https://mooscript.studio',
+        'X-Title': 'MooScript Studio'
+      },
+      body: JSON.stringify({
+        model: cleanModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature
+      }),
+      signal
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw handleApiError('OpenRouter', res.status, errText);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  throw new Error(`Unsupported LLM provider: ${provider}`);
+}
+
 /**
  * Lightweight test connection to verify API key validity and fetch available models.
  */
@@ -676,6 +1044,21 @@ export async function testProviderApiKey(
       });
     } else if (provider === 'groq') {
       res = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${trimmedKey}` },
+        signal: controller.signal
+      });
+    } else if (provider === 'anthropic') {
+      // Lightweight models call or test message
+      res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': trimmedKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        signal: controller.signal
+      });
+    } else if (provider === 'openrouter') {
+      res = await fetch('https://openrouter.ai/api/v1/models', {
         headers: { Authorization: `Bearer ${trimmedKey}` },
         signal: controller.signal
       });

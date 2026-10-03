@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#131315" />
     <meta name="description" content="Zero-server client-side motion graphics and short video studio." />
@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.groq.com https://api.elevenlabs.io https://huggingface.co https://*.huggingface.co blob: data:; worker-src 'self' blob:;"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.groq.com https://api.anthropic.com https://openrouter.ai https://api.elevenlabs.io https://huggingface.co https://*.huggingface.co blob: data:; worker-src 'self' blob:;"
     />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="apple-touch-icon" href="/logo.svg" />
@@ -79,7 +79,7 @@
       }
     </style>
   </head>
-  <body class="bg-surface text-on-surface font-sans antialiased flex flex-col min-h-screen select-none">
+  <body class="bg-surface text-on-surface font-sans antialiased flex flex-col min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

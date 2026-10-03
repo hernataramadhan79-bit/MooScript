@@ -1,0 +1,58 @@
+@layer reset, base, tokens, components, utilities;
+
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    /* Surfaces - Minimalis 4 tingkatan tanpa noise/slop */
+    --bg: #09090b;
+    --surface-1: #111116;
+    --surface-2: #181820;
+    --surface-3: #22222d;
+    --surface-hover: #292936;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    /* Text */
+    --text: #f4f4f6;
+    --text-muted: #a1a1aa;
+    --text-faint: #71717a;
+
+    /* Accent & Semantic */
+    --accent: #84cc16;
+    --accent-hover: #9ee939;
+    --accent-muted: rgba(132, 204, 22, 0.15);
+    --on-accent: #0e1e00;
+    --danger: #ef4444;
+    --danger-muted: rgba(239, 68, 68, 0.15);
+    --warning: #f59e0b;
+    --warning-muted: rgba(245, 158, 11, 0.15);
+    --success: #22c55e;
+
+    /* Geometry & Spacing */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-full: 9999px;
+
+    --tap: 44px; /* Minimum touch target WCAG / Mobile */
+
+    /* Typography hierarchy (minimum 13px untuk kenyamanan mata) */
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Motion easing */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-fast: 150ms;
+    --dur-base: 220ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --dur-fast: 0ms;
+      --dur-base: 0ms;
+    }
+  }
+}

@@ -10,6 +10,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     gemini: '',
     openai: '',
     groq: '',
+    anthropic: '',
+    openrouter: '',
     elevenlabs: ''
   },
   apiKeyStorage: 'persistent',
@@ -19,6 +21,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   geminiModel: 'gemini-2.5-flash',
   openaiModel: 'gpt-4o-mini',
   groqModel: 'llama-3.3-70b-versatile',
+  anthropicModel: 'claude-3-7-sonnet-20250219',
+  openrouterModel: 'anthropic/claude-3.7-sonnet',
   voiceIds: {
     openai: 'alloy',
     elevenlabs: '21m00Tcm4TlvDq8ikWAM',

@@ -165,12 +165,16 @@ export const SettingsDrawer: React.FC = () => {
   const [providerModels, setProviderModels] = useState<Record<LLMProvider, ProviderModelInfo[]>>({
     gemini: DEFAULT_PROVIDER_MODELS.gemini,
     openai: DEFAULT_PROVIDER_MODELS.openai,
-    groq: DEFAULT_PROVIDER_MODELS.groq
+    groq: DEFAULT_PROVIDER_MODELS.groq,
+    anthropic: DEFAULT_PROVIDER_MODELS.anthropic,
+    openrouter: DEFAULT_PROVIDER_MODELS.openrouter
   });
   const [scanningModels, setScanningModels] = useState<Record<LLMProvider, boolean>>({
     gemini: false,
     openai: false,
-    groq: false
+    groq: false,
+    anthropic: false,
+    openrouter: false
   });
 
   // New Skill form state
@@ -186,7 +190,7 @@ export const SettingsDrawer: React.FC = () => {
       getCachedLocalModelsSizeBytes().then(setLocalModelsSizeBytes);
 
       // Lazily inspect models from configured keys if available
-      (['gemini', 'openai', 'groq'] as LLMProvider[]).forEach((prov) => {
+      (['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).forEach((prov) => {
         const key = settings.apiKeys[prov];
         if (key && key.trim()) {
           fetchAvailableModels(prov, key).then((models) => {
@@ -396,21 +400,29 @@ export const SettingsDrawer: React.FC = () => {
             {/* Primary Scripting Engine */}
             <div className="flex flex-col gap-1">
               <span className="text-[10px] sm:text-[11px] font-medium text-zinc-400">Primary Scripting Engine</span>
-              <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
-                {(['gemini', 'openai', 'groq'] as LLMProvider[]).map((prov) => {
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-1.5">
+                {(['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).map((prov) => {
                   const isSelected = settings.selectedLLMProvider === prov;
                   return (
                     <button
                       key={prov}
                       type="button"
                       onClick={() => updateSettings({ selectedLLMProvider: prov })}
-                      className={`py-1 sm:py-1.5 px-2 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold border capitalize transition-all ${
+                      className={`py-1 sm:py-1.5 px-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold border capitalize transition-all truncate ${
                         isSelected
                           ? 'bg-primary/10 text-primary border-primary/40'
                           : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
                       }`}
                     >
-                      {prov === 'gemini' ? 'Gemini' : prov === 'openai' ? 'OpenAI' : 'Groq'}
+                      {prov === 'gemini'
+                        ? 'Gemini'
+                        : prov === 'openai'
+                          ? 'OpenAI'
+                          : prov === 'groq'
+                            ? 'Groq'
+                            : prov === 'anthropic'
+                              ? 'Anthropic'
+                              : 'OpenRouter'}
                     </button>
                   );
                 })}
@@ -611,6 +623,136 @@ export const SettingsDrawer: React.FC = () => {
                     addToast(`Model Groq diubah ke ${modelId}`, 'info');
                   }}
                   onScan={() => handleScanModels('groq')}
+                />
+              </div>
+
+              {/* Anthropic */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-300 font-medium">Anthropic API Key (Claude 3.7)</span>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    Dapatkan Kunci ↗
+                  </a>
+                </div>
+                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
+                  <input
+                    type={visibleKeys.anthropic ? 'text' : 'password'}
+                    value={settings.apiKeys.anthropic || ''}
+                    onChange={(e) => updateApiKey('anthropic', e.target.value)}
+                    placeholder="sk-ant-api03-..."
+                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleVisibility('anthropic')}
+                    className="p-1 text-zinc-400 hover:text-white"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      {visibleKeys.anthropic ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    disabled={testingKey.anthropic || !settings.apiKeys.anthropic}
+                    onClick={() => handleTestKey('anthropic')}
+                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
+                  >
+                    <span className={`material-symbols-outlined text-[12px] ${testingKey.anthropic ? 'animate-spin' : ''}`}>
+                      {testingKey.anthropic ? 'progress_activity' : 'network_check'}
+                    </span>
+                    <span>{testingKey.anthropic ? 'Verifying...' : 'Test Key'}</span>
+                  </button>
+                  {testResults.anthropic && (
+                    <span className={`text-[10px] font-mono ${testResults.anthropic.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
+                      {testResults.anthropic.success ? '✓ Valid' : '✗ ' + testResults.anthropic.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Anthropic Model Selector Pills */}
+                <ProviderModelSelector
+                  provider="anthropic"
+                  apiKey={settings.apiKeys.anthropic || ''}
+                  currentModel={settings.anthropicModel || 'claude-3-7-sonnet-20250219'}
+                  models={providerModels.anthropic}
+                  isScanning={scanningModels.anthropic}
+                  onSelectModel={(modelId) => {
+                    updateSettings({ anthropicModel: modelId });
+                    addToast(`Model Anthropic diubah ke ${modelId}`, 'info');
+                  }}
+                  onScan={() => handleScanModels('anthropic')}
+                />
+              </div>
+
+              {/* OpenRouter */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-300 font-medium">OpenRouter API Key (Multi-Model)</span>
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    Dapatkan Kunci ↗
+                  </a>
+                </div>
+                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
+                  <input
+                    type={visibleKeys.openrouter ? 'text' : 'password'}
+                    value={settings.apiKeys.openrouter || ''}
+                    onChange={(e) => updateApiKey('openrouter', e.target.value)}
+                    placeholder="sk-or-v1-..."
+                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleVisibility('openrouter')}
+                    className="p-1 text-zinc-400 hover:text-white"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      {visibleKeys.openrouter ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    disabled={testingKey.openrouter || !settings.apiKeys.openrouter}
+                    onClick={() => handleTestKey('openrouter')}
+                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
+                  >
+                    <span className={`material-symbols-outlined text-[12px] ${testingKey.openrouter ? 'animate-spin' : ''}`}>
+                      {testingKey.openrouter ? 'progress_activity' : 'network_check'}
+                    </span>
+                    <span>{testingKey.openrouter ? 'Verifying...' : 'Test Key'}</span>
+                  </button>
+                  {testResults.openrouter && (
+                    <span className={`text-[10px] font-mono ${testResults.openrouter.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
+                      {testResults.openrouter.success ? '✓ Valid' : '✗ ' + testResults.openrouter.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* OpenRouter Model Selector Pills */}
+                <ProviderModelSelector
+                  provider="openrouter"
+                  apiKey={settings.apiKeys.openrouter || ''}
+                  currentModel={settings.openrouterModel || 'anthropic/claude-3.7-sonnet'}
+                  models={providerModels.openrouter}
+                  isScanning={scanningModels.openrouter}
+                  onSelectModel={(modelId) => {
+                    updateSettings({ openrouterModel: modelId });
+                    addToast(`Model OpenRouter diubah ke ${modelId}`, 'info');
+                  }}
+                  onScan={() => handleScanModels('openrouter')}
                 />
               </div>
 

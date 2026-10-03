@@ -68,6 +68,16 @@ export class MooDatabase extends Dexie {
       settings: 'id',
       sceneAudioCache: 'cacheKey, updatedAt'
     });
+
+    // Version 4: Asset storage & Composition history
+    this.version(4).stores({
+      projects: 'id, title, renderMode, updatedAt',
+      audioBlobs: 'projectId, updatedAt',
+      skills: 'id, name, isBuiltin',
+      settings: 'id',
+      sceneAudioCache: 'cacheKey, updatedAt',
+      assets: 'id, projectId, name, mimeType, createdAt'
+    });
   }
 }
 
@@ -104,6 +114,46 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
   }
 }
 
+export function normalizeProject(project: MooProject): MooProject {
+  if (!project.aspectRatio) {
+    project.aspectRatio = '9:16';
+  }
+  if (!project.renderMode) {
+    // If it has existing composition, use composition, otherwise legacy-canvas
+    project.renderMode = project.composition ? 'composition' : 'legacy-canvas';
+  }
+  if (!project.scenes) project.scenes = [];
+  project.scenes = project.scenes.map((s) => {
+    const narrationText = s.narrationText || (s as any).text || '';
+    const layout = s.layout || 'KINETIC_QUOTE';
+    const visualData = s.visualData || {
+      focusWords: s.focusWords || [],
+      accentIcon: s.icon
+    };
+    return {
+      ...s,
+      layout,
+      narrationText,
+      visualData,
+      text: s.text || narrationText,
+      focusWords: s.focusWords || visualData.focusWords || [],
+      icon: s.icon || visualData.accentIcon
+    };
+  });
+  if (!project.theme) {
+    project.theme = {
+      bg: '#09090b',
+      textPrimary: '#f4f4f5',
+      textHighlight: '#84cc16',
+      fontFamily: 'Jakarta',
+      captionStyle: 'boxed',
+      captionPosition: 'center',
+      showSubtitles: false
+    };
+  }
+  return project;
+}
+
 export async function loadProjectFromDb(id: string): Promise<MooProject | null> {
   try {
     const project = await db.projects.get(id);
@@ -113,7 +163,7 @@ export async function loadProjectFromDb(id: string): Promise<MooProject | null> 
       project.audioBlob = storedAudio.blob;
       lastSavedAudioBlobRef = storedAudio.blob;
     }
-    return project;
+    return normalizeProject(project);
   } catch (err: unknown) {
     console.warn('Failed to load project from IndexedDB', err);
     return null;
@@ -123,7 +173,7 @@ export async function loadProjectFromDb(id: string): Promise<MooProject | null> 
 export async function listProjectsFromDb(): Promise<MooProject[]> {
   try {
     const projects = await db.projects.toArray();
-    return projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return projects.map((p) => normalizeProject(p)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   } catch (err) {
     console.warn('Failed to list projects from IndexedDB', err);
     return [];

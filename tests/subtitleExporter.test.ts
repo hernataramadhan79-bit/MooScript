@@ -32,7 +32,10 @@ const SAMPLE_PROJECT: MooProject = {
   scenes: [
     {
       id: 'sc-1',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'Zero server rendering directly inside browser.',
       text: 'Zero server rendering directly inside browser.',
+      visualData: { title: 'Zero Server', focusWords: ['zero', 'browser'] },
       focusWords: ['zero', 'browser'],
       motionPreset: 'punch_zoom',
       durationInSeconds: 3.0,
@@ -47,7 +50,10 @@ const SAMPLE_PROJECT: MooProject = {
     },
     {
       id: 'sc-2',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'Hardware acceleration with WebCodecs.',
       text: 'Hardware acceleration with WebCodecs.',
+      visualData: { title: 'WebCodecs', focusWords: ['hardware', 'webcodecs'] },
       focusWords: ['hardware', 'webcodecs'],
       motionPreset: 'slide_split',
       durationInSeconds: 2.5,
@@ -139,7 +145,10 @@ describe('generateSubtitleCues', () => {
       scenes: [
         {
           id: 'sc-fallback',
+          layout: 'KINETIC_QUOTE',
+          narrationText: 'Fallback scene without word alignment',
           text: 'Fallback scene without word alignment',
+          visualData: { title: 'Fallback' },
           focusWords: [],
           motionPreset: 'punch_zoom',
           durationInSeconds: 4.0,

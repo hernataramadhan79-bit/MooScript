@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CanvasRenderer } from '../src/engine/renderer/canvasRenderer';
+import { CanvasRenderer, interpolateMetricValue, tokenizeCodeLine } from '../src/engine/renderer/canvasRenderer';
 import { createMockCanvas } from './mocks/mockCanvas';
 import type { MooProject } from '../src/types';
 
@@ -21,7 +21,14 @@ const SAMPLE_PROJECT: MooProject = {
   scenes: [
     {
       id: 'sc-1',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'First scene with kinetic typography',
       text: 'First scene with kinetic typography',
+      visualData: {
+        title: 'Typography Scene',
+        focusWords: ['kinetic', 'typography'],
+        accentIcon: 'zap'
+      },
       focusWords: ['kinetic', 'typography'],
       motionPreset: 'punch_zoom',
       icon: 'zap',
@@ -36,7 +43,14 @@ const SAMPLE_PROJECT: MooProject = {
     },
     {
       id: 'sc-2',
+      layout: 'KINETIC_QUOTE',
+      narrationText: 'Second scene sliding split animation',
       text: 'Second scene sliding split animation',
+      visualData: {
+        title: 'Sliding Scene',
+        focusWords: ['sliding', 'animation'],
+        accentIcon: 'sparkles'
+      },
       focusWords: ['sliding', 'animation'],
       motionPreset: 'slide_split',
       transition: 'fade',
@@ -144,7 +158,13 @@ describe('Deterministic CanvasRenderer', () => {
 describe('Caption Style Presets (golden-frame determinism)', () => {
   const sceneWithTimestamps: MooProject['scenes'][0] = {
     id: 'cap-sc',
+    layout: 'KINETIC_QUOTE',
+    narrationText: 'Bold kinetic captions for social video',
     text: 'Bold kinetic captions for social video',
+    visualData: {
+      title: 'Social Video',
+      focusWords: ['kinetic', 'social']
+    },
     focusWords: ['kinetic', 'social'],
     motionPreset: 'punch_zoom',
     durationInSeconds: 4.0,
@@ -268,3 +288,182 @@ describe('Caption Style Presets (golden-frame determinism)', () => {
     expect(topYs[0]).not.toBe(bottomYs[0]);
   });
 });
+
+// ── Motion Graphics Primitives & Layout Tests ───────────────────────────────
+
+describe('Motion Graphics Primitives & Layouts', () => {
+  it('interpolateMetricValue correctly interpolates values with prefix/suffix', () => {
+    expect(interpolateMetricValue('+400%', 0)).toBe('+0%');
+    expect(interpolateMetricValue('+400%', 0.5)).toBe('+200%');
+    expect(interpolateMetricValue('+400%', 1)).toBe('+400%');
+    expect(interpolateMetricValue('$12.5M', 0.5)).toBe('$6.3M');
+    expect(interpolateMetricValue('99.9%', 1)).toBe('99.9%');
+    expect(interpolateMetricValue('NO_NUMBERS', 0.5)).toBe('NO_NUMBERS');
+  });
+
+  it('tokenizeCodeLine parses bash prompts, keywords, strings, and numbers', () => {
+    const tokens = tokenizeCodeLine('$ npm install mooscript');
+    expect(tokens.some((t) => t.text === '$ ' && t.color === '#84cc16')).toBe(true);
+    expect(tokens.some((t) => t.text === 'npm' && t.color === '#38bdf8')).toBe(true);
+
+    const commentTokens = tokenizeCodeLine('// this is a comment');
+    expect(commentTokens[0].color).toBe('#71717a');
+
+    const jsTokens = tokenizeCodeLine('const count = 42;');
+    expect(jsTokens.some((t) => t.text === 'const' && t.color === '#38bdf8')).toBe(true);
+    expect(jsTokens.some((t) => t.text === '42' && t.color === '#fb923c')).toBe(true);
+  });
+
+  it('METRIC_COUNTER layout renders counter value and label deterministically', () => {
+    const metricProject: MooProject = {
+      ...SAMPLE_PROJECT,
+      scenes: [
+        {
+          id: 'sc-metric',
+          layout: 'METRIC_COUNTER',
+          narrationText: 'Growing revenue by four hundred percent',
+          visualData: {
+            title: 'Revenue Spike',
+            metricValue: '+400%',
+            metricLabel: 'YoY Growth Rate'
+          },
+          durationInSeconds: 3.0,
+          motionPreset: 'punch_zoom',
+          wordTimestamps: []
+        }
+      ]
+    };
+
+    const mock1 = createMockCanvas();
+    new CanvasRenderer(mock1.canvas as any).draw(45, 90, metricProject, { hud: false });
+
+    const mock2 = createMockCanvas();
+    new CanvasRenderer(mock2.canvas as any).draw(45, 90, metricProject, { hud: false });
+
+    expect(mock1.calls).toEqual(mock2.calls);
+    const fills = mock1.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fills.some((t) => t.includes('REVENUE SPIKE'))).toBe(true);
+    expect(fills.some((t) => t.includes('YoY Growth Rate'))).toBe(true);
+  });
+
+  it('TERMINAL_MOCKUP layout renders title bar, code lines and cursor', () => {
+    const terminalProject: MooProject = {
+      ...SAMPLE_PROJECT,
+      scenes: [
+        {
+          id: 'sc-term',
+          layout: 'TERMINAL_MOCKUP',
+          narrationText: 'Install the package with a single command',
+          visualData: {
+            codeSnippet: '$ npm install mooscript\n$ npx mooscript build',
+            codeLanguage: 'bash'
+          },
+          durationInSeconds: 3.0,
+          motionPreset: 'slide_split',
+          wordTimestamps: []
+        }
+      ]
+    };
+
+    const mock = createMockCanvas();
+    new CanvasRenderer(mock.canvas as any).draw(30, 90, terminalProject, { hud: false });
+
+    const fills = mock.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fills.some((t) => t.includes('mooscript-term'))).toBe(true);
+    expect(fills.some((t) => t.includes('01'))).toBe(true); // Line gutter
+  });
+
+  it('VS_COMPARISON layout renders comparison cards and VS badge', () => {
+    const vsProject: MooProject = {
+      ...SAMPLE_PROJECT,
+      scenes: [
+        {
+          id: 'sc-vs',
+          layout: 'VS_COMPARISON',
+          narrationText: 'Legacy video editors vs modern zero server motion graphics',
+          visualData: {
+            leftTitle: 'Traditional Workflows',
+            leftDesc: 'Clunky timelines & slow renders',
+            rightTitle: 'MooScript Studio',
+            rightDesc: 'Real-time WebCodecs hardware export'
+          },
+          durationInSeconds: 3.0,
+          motionPreset: 'punch_zoom',
+          wordTimestamps: []
+        }
+      ]
+    };
+
+    const mock = createMockCanvas();
+    new CanvasRenderer(mock.canvas as any).draw(30, 90, vsProject, { hud: false });
+
+    const fills = mock.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fills.some((t) => t.includes('TRADITIONAL WORKFLOWS'))).toBe(true);
+    expect(fills.some((t) => t.includes('MOOSCRIPT STUDIO'))).toBe(true);
+    expect(fills.includes('VS')).toBe(true);
+  });
+
+  it('LIST_STAGGER layout renders staggered bullet items', () => {
+    const listProject: MooProject = {
+      ...SAMPLE_PROJECT,
+      scenes: [
+        {
+          id: 'sc-list',
+          layout: 'LIST_STAGGER',
+          narrationText: 'Key features of the new engine',
+          visualData: {
+            title: 'Core Architecture',
+            bulletItems: ['Deterministic Spring Physics', 'Zero-Server WebCodecs MP4', 'Dexie IndexedDB Storage']
+          },
+          durationInSeconds: 3.0,
+          motionPreset: 'fade_float',
+          wordTimestamps: []
+        }
+      ]
+    };
+
+    const mock = createMockCanvas();
+    new CanvasRenderer(mock.canvas as any).draw(60, 90, listProject, { hud: false });
+
+    const fills = mock.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fills.some((t) => t.includes('CORE ARCHITECTURE'))).toBe(true);
+    expect(fills.some((t) => t.includes('Deterministic Spring Physics'))).toBe(true);
+    expect(fills.some((t) => t.includes('Zero-Server WebCodecs MP4'))).toBe(true);
+    expect(fills.some((t) => t.includes('01'))).toBe(true);
+  });
+
+  it('optional subtitles: omitted when showSubtitles is false, rendered when true', () => {
+    const baseScene = {
+      id: 'sc-sub-test',
+      layout: 'METRIC_COUNTER' as const,
+      narrationText: 'Speed increased significantly today',
+      visualData: { metricValue: '10x', metricLabel: 'Speedup' },
+      durationInSeconds: 3.0,
+      motionPreset: 'punch_zoom' as const,
+      wordTimestamps: []
+    };
+
+    // 1. Without subtitles
+    const projWithout: MooProject = {
+      ...SAMPLE_PROJECT,
+      theme: { ...SAMPLE_PROJECT.theme, showSubtitles: false },
+      scenes: [{ ...baseScene, showSubtitles: false }]
+    };
+    const mockWithout = createMockCanvas();
+    new CanvasRenderer(mockWithout.canvas as any).draw(30, 90, projWithout, { hud: false });
+    const fillsWithout = mockWithout.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fillsWithout.includes('Speed')).toBe(false);
+
+    // 2. With subtitles
+    const projWith: MooProject = {
+      ...SAMPLE_PROJECT,
+      theme: { ...SAMPLE_PROJECT.theme, showSubtitles: true },
+      scenes: [{ ...baseScene, showSubtitles: true }]
+    };
+    const mockWith = createMockCanvas();
+    new CanvasRenderer(mockWith.canvas as any).draw(30, 90, projWith, { hud: false });
+    const fillsWith = mockWith.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fillsWith.includes('Speed')).toBe(true);
+  });
+});
+

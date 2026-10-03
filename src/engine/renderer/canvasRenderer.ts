@@ -1,4 +1,4 @@
-import type { MooProject, Scene, SceneTransition, CaptionStyle, CaptionPosition } from '../../types';
+import type { MooProject, Scene, SceneTransition, CaptionStyle, CaptionPosition, CameraMovement } from '../../types';
 import { spring, easeOutExpo, easeInOutQuad, clamp, lerp } from '../physics/spring';
 import { drawIcon } from '../assets/icons';
 import { cleanWord } from '../../utils/textUtils';
@@ -24,6 +24,57 @@ export interface MemoizedSceneLayout {
   readonly lineHeight: number;
   readonly words: readonly MemoizedWord[];
   readonly totalLines: number;
+}
+
+/**
+ * Deterministic helper to count up or format animated metric string
+ */
+export function interpolateMetricValue(target: string, progress: number): string {
+  if (progress >= 1) return target;
+  const match = target.match(/^([^\d]*)(\d+(?:\.\d+)?)(.*)$/);
+  if (!match) return target;
+  const prefix = match[1];
+  const numStr = match[2];
+  const suffix = match[3];
+  const isDecimal = numStr.includes('.');
+  const decimals = isDecimal ? numStr.split('.')[1].length : 0;
+  const targetNum = parseFloat(numStr);
+  const currentNum = targetNum * progress;
+  return `${prefix}${currentNum.toFixed(decimals)}${suffix}`;
+}
+
+/**
+ * Deterministic syntax tokenizer for code mockup cards
+ */
+export function tokenizeCodeLine(line: string): Array<{ text: string; color: string }> {
+  if (line.trim().startsWith('//') || line.trim().startsWith('#')) {
+    return [{ text: line, color: '#71717a' }];
+  }
+  const tokens: Array<{ text: string; color: string }> = [];
+  let remaining = line;
+  if (remaining.startsWith('$ ') || remaining.startsWith('> ')) {
+    tokens.push({ text: remaining.slice(0, 2), color: '#84cc16' });
+    remaining = remaining.slice(2);
+  }
+  const parts = remaining.split(/(\s+|[(),.;={}[\]]|"[^"]*"|'[^']*')/);
+  const keywords = new Set([
+    'const', 'let', 'var', 'import', 'from', 'export', 'default',
+    'function', 'return', 'async', 'await', 'npm', 'npx', 'run',
+    'git', 'install', 'add', 'true', 'false', 'if', 'else', 'class'
+  ]);
+  for (const part of parts) {
+    if (!part) continue;
+    if (keywords.has(part)) {
+      tokens.push({ text: part, color: '#38bdf8' });
+    } else if (part.startsWith('"') || part.startsWith("'")) {
+      tokens.push({ text: part, color: '#a3e635' });
+    } else if (/^\d+$/.test(part)) {
+      tokens.push({ text: part, color: '#fb923c' });
+    } else {
+      tokens.push({ text: part, color: '#f4f4f5' });
+    }
+  }
+  return tokens;
 }
 
 export class CanvasRenderer {
@@ -126,20 +177,23 @@ export class CanvasRenderer {
     const sceneTotalFrames = Math.max(1, Math.round(sceneDuration * fps));
     const frameInScene = Math.max(0, Math.round(sceneElapsed * fps));
 
-    // 2. Clear & Render Background (pre-rendered cached grid + vignette + deterministic pulse)
-    this.renderBackground(ctx, width, height, project, sceneProgress);
+    // 2. Clear & Render Background (Kinetic grid + vignette + deterministic pulse)
+    this.drawKineticBackground(ctx, width, height, t, project, sceneProgress);
 
     if (!activeScene) {
       this.renderEmptyState(ctx, width, height);
       return;
     }
 
-    // 3. Motion Preset, Camera Push & Scene Transitions
+    // 3. Camera Movement, Motion Preset, and Scene Transitions
     ctx.save();
+    ctx.translate(width / 2, height / 2);
+
+    // Apply Camera Transform
+    this.applyCameraMovement(ctx, activeScene.camera, sceneElapsed, sceneDuration, width, height);
 
     // Camera Push: subtle scale increment
     const cameraScale = 1.0 + (frameInScene / sceneTotalFrames) * 0.05;
-    ctx.translate(width / 2, height / 2);
     ctx.scale(cameraScale, cameraScale);
 
     // Preset-specific motion transform with guaranteed non-zero scale floor
@@ -183,13 +237,59 @@ export class CanvasRenderer {
       this.renderHeader(ctx, width, sceneIndex + 1, project.scenes.length, project);
     }
 
-    // Scene Center Icon
-    if (activeScene.icon) {
+    // Scene Center Icon (rendered if layout is KINETIC_QUOTE)
+    const layout = activeScene.layout || 'KINETIC_QUOTE';
+    if (activeScene.icon && layout === 'KINETIC_QUOTE') {
       this.renderSceneIcon(ctx, width, activeScene.icon, project.theme.textHighlight, sceneElapsed);
     }
 
-    // Dynamic Kinetic Typography with Layout Memoization & Auto-fit
-    this.renderKineticTypography(ctx, width, height, activeScene, sceneElapsed, project);
+    // Dispatch rendering based on LayoutType
+    const springProgress = clamp(spring(sceneElapsed, { stiffness: 200, damping: 16 }), 0, 1);
+
+    switch (layout) {
+      case 'METRIC_COUNTER': {
+        const val = activeScene.visualData?.metricValue || '100%';
+        const lbl = activeScene.visualData?.metricLabel || activeScene.narrationText || activeScene.text || 'Performance';
+        const title = activeScene.visualData?.title;
+        this.drawMetricCounter(ctx, 80, 420, width - 160, height * 0.46, val, lbl, springProgress, project.theme, title);
+        break;
+      }
+      case 'TERMINAL_MOCKUP': {
+        const code = activeScene.visualData?.codeSnippet || activeScene.narrationText || activeScene.text || 'npm install mooscript';
+        const lang = activeScene.visualData?.codeLanguage || 'terminal';
+        this.drawTerminalMockup(ctx, 70, 380, width - 140, height * 0.46, code, lang, springProgress, project.theme, sceneElapsed);
+        break;
+      }
+      case 'VS_COMPARISON': {
+        const lTitle = activeScene.visualData?.leftTitle || 'BEFORE';
+        const lDesc = activeScene.visualData?.leftDesc || 'Slow, manual editing';
+        const rTitle = activeScene.visualData?.rightTitle || 'AFTER';
+        const rDesc = activeScene.visualData?.rightDesc || activeScene.narrationText || activeScene.text || 'Fast automated rendering';
+        this.drawVsComparison(ctx, 80, 360, width - 160, height * 0.50, lTitle, lDesc, rTitle, rDesc, springProgress, project.theme);
+        break;
+      }
+      case 'LIST_STAGGER': {
+        let items = activeScene.visualData?.bulletItems;
+        if (!items || items.length === 0) {
+          const text = (activeScene.narrationText || activeScene.text || '').trim();
+          items = text.split(/[.,;]\s+/).filter((s) => s.length > 0);
+          if (items.length === 0 && text) items = [text];
+        }
+        const title = activeScene.visualData?.title;
+        this.drawStaggeredList(ctx, 80, 360, width - 160, height * 0.50, items || [], sceneElapsed, project.theme, title);
+        break;
+      }
+      case 'KINETIC_QUOTE':
+      default:
+        this.renderKineticTypography(ctx, width, height, activeScene, sceneElapsed, project);
+        break;
+    }
+
+    // Optional Bottom Subtitles Layer (Auxiliary layer when enabled on visual components)
+    const shouldShowSubtitles = activeScene.showSubtitles ?? project.theme.showSubtitles ?? false;
+    if (shouldShowSubtitles && layout !== 'KINETIC_QUOTE') {
+      this.renderBottomSubtitleOverlay(ctx, width, height, activeScene, sceneElapsed, project);
+    }
 
     ctx.restore();
 
@@ -202,6 +302,633 @@ export class CanvasRenderer {
     if (showWatermark) {
       this.renderWatermark(ctx, width, height);
     }
+  }
+
+  /**
+   * Deterministic Camera Transform (Push In, Pull Out, Pan Left/Right, Drift)
+   */
+  public applyCameraMovement(
+    ctx: CanvasRenderingContext2D,
+    camera: CameraMovement | undefined,
+    sceneElapsed: number,
+    sceneDuration: number,
+    _width: number,
+    _height: number
+  ): void {
+    const cam: CameraMovement = camera || 'steady_drift';
+    const normTime = clamp(sceneDuration > 0 ? sceneElapsed / sceneDuration : 0, 0, 1);
+
+    switch (cam) {
+      case 'push_in': {
+        const s = lerp(1.0, 1.08, normTime);
+        ctx.scale(s, s);
+        break;
+      }
+      case 'pull_out': {
+        const s = lerp(1.08, 1.0, normTime);
+        ctx.scale(s, s);
+        break;
+      }
+      case 'snap_zoom': {
+        const snap = spring(sceneElapsed, { stiffness: 320, damping: 14 });
+        const s = lerp(0.88, 1.0, clamp(snap, 0, 1.15));
+        ctx.scale(s, s);
+        break;
+      }
+      case 'whip_pan': {
+        const whip = spring(sceneElapsed, { stiffness: 280, damping: 16 });
+        const tx = lerp(120, 0, clamp(whip, 0, 1.1));
+        ctx.translate(tx, 0);
+        break;
+      }
+      case 'steady_drift':
+      default: {
+        const tx = Math.sin(sceneElapsed * 1.4) * 8;
+        const ty = Math.cos(sceneElapsed * 1.1) * 6;
+        ctx.translate(tx, ty);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Living Kinetic Background with deterministic moving grid & subtle vignette
+   */
+  public drawKineticBackground(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    t: number,
+    project: MooProject,
+    progress: number
+  ): void {
+    const bg = project.theme.bg || '#131315';
+    const highlight = project.theme.textHighlight || '#84cc16';
+    const cachedBg = this.getOrCreateBgCanvas(width, height, bg, highlight);
+
+    if ((cachedBg as any).getContext) {
+      ctx.drawImage(cachedBg as any, 0, 0);
+    } else {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // Dynamic subtle grid drift (deterministic closed-form)
+    const gridSize = 90;
+    const gridOffsetY = (t * 22) % gridSize;
+    ctx.save();
+    ctx.strokeStyle = '#27272a18';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let y = gridOffsetY; y <= height; y += gridSize) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+
+    // Intersection dots for high-tech aesthetic
+    ctx.fillStyle = '#3f3f462a';
+    const dotSpacing = 180;
+    const dotOffsetY = (t * 18) % dotSpacing;
+    for (let x = 90; x < width; x += dotSpacing) {
+      for (let y = dotOffsetY; y < height; y += dotSpacing) {
+        ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      }
+    }
+    ctx.restore();
+
+    // Dynamic subtle pulse based on sceneProgress
+    if (progress > 0) {
+      const pulse = Math.sin(progress * Math.PI); // 0 -> 1 -> 0
+      if (pulse > 0.05) {
+        ctx.save();
+        const glowX = width / 2;
+        const glowY = height * 0.45;
+        const pulseRadius = width * (0.6 + 0.25 * pulse);
+        const pulseGrad = ctx.createRadialGradient(glowX, glowY, 20, glowX, glowY, pulseRadius);
+        const alphaHex = Math.round(pulse * 26)
+          .toString(16)
+          .padStart(2, '0');
+        pulseGrad.addColorStop(0, `${highlight}${alphaHex}`);
+        pulseGrad.addColorStop(0.7, 'transparent');
+        ctx.fillStyle = pulseGrad;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    }
+  }
+
+  /**
+   * Modular Card Container Primitive
+   */
+  public drawCardContainer(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    radius = 20,
+    progress = 1,
+    options?: { bg?: string; borderColor?: string; accentGlow?: string }
+  ): void {
+    ctx.save();
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+
+    const scale = lerp(0.92, 1.0, clamp(progress, 0, 1.15));
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+
+    ctx.globalAlpha = clamp(ctx.globalAlpha * clamp(progress * 1.5, 0, 1), 0, 1);
+
+    // Subtle glow if requested
+    if (options?.accentGlow) {
+      ctx.shadowColor = options.accentGlow;
+      ctx.shadowBlur = 32;
+    }
+
+    // Card background
+    ctx.fillStyle = options?.bg || '#18181be6';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, radius);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+    ctx.fill();
+
+    // Reset shadow before border
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    // Card 1px crisp border
+    ctx.strokeStyle = options?.borderColor || '#27272a';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Top edge specular sheen (1px highlight)
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /**
+   * Layout Primitive: METRIC_COUNTER
+   */
+  public drawMetricCounter(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    valueStr: string,
+    labelStr: string,
+    progress: number,
+    theme: MooProject['theme'],
+    title?: string
+  ): void {
+    this.drawCardContainer(ctx, x, y, w, h, 24, progress, {
+      bg: '#141416f0',
+      borderColor: '#27272ae6',
+      accentGlow: `${theme.textHighlight || '#84cc16'}22`
+    });
+
+    ctx.save();
+    const cx = x + w / 2;
+    const highlight = theme.textHighlight || '#84cc16';
+    const textPrimary = theme.textPrimary || '#f4f4f5';
+
+    // Header Title Badge
+    const headerTitle = title || 'KEY METRIC';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#71717a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(headerTitle.toUpperCase(), cx, y + 42);
+
+    // Circular Progress Arc Gauge
+    const gaugeY = y + h * 0.44;
+    const radius = Math.min(w * 0.28, 140);
+
+    // Background track
+    ctx.beginPath();
+    ctx.arc(cx, gaugeY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#27272a88';
+    ctx.lineWidth = 12;
+    ctx.stroke();
+
+    // Active animated arc
+    const arcAngle = clamp(progress, 0, 1) * Math.PI * 1.8;
+    ctx.beginPath();
+    ctx.arc(cx, gaugeY, radius, -Math.PI * 0.9, -Math.PI * 0.9 + arcAngle);
+    ctx.strokeStyle = highlight;
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Animated Value String
+    const displayVal = interpolateMetricValue(valueStr, clamp(progress, 0, 1));
+    ctx.font = '800 84px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = highlight;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(displayVal, cx, gaugeY);
+
+    // Sub-Label
+    ctx.font = '600 28px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = textPrimary;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    // Word wrap label if wide
+    const maxLabelWidth = w - 60;
+    if (ctx.measureText(labelStr).width > maxLabelWidth) {
+      ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+    }
+    ctx.fillText(labelStr, cx, y + h - 50);
+
+    // Trend Indicator Pill
+    ctx.beginPath();
+    const pillW = 120;
+    const pillH = 32;
+    const pillX = cx - pillW / 2;
+    const pillY = y + h - 110;
+    if (ctx.roundRect) {
+      ctx.roundRect(pillX, pillY, pillW, pillH, 16);
+    } else {
+      ctx.rect(pillX, pillY, pillW, pillH);
+    }
+    ctx.fillStyle = `${highlight}22`;
+    ctx.fill();
+    ctx.strokeStyle = `${highlight}66`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.font = '700 14px "JetBrains Mono", monospace';
+    ctx.fillStyle = highlight;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('▲ VERIFIED', cx, pillY + pillH / 2);
+
+    ctx.restore();
+  }
+
+  /**
+   * Layout Primitive: TERMINAL_MOCKUP
+   */
+  public drawTerminalMockup(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    codeStr: string,
+    language: string,
+    progress: number,
+    theme: MooProject['theme'],
+    sceneElapsed = 0
+  ): void {
+    this.drawCardContainer(ctx, x, y, w, h, 20, progress, {
+      bg: '#0f0f11fa',
+      borderColor: '#27272a',
+      accentGlow: 'rgba(56, 189, 248, 0.12)'
+    });
+
+    ctx.save();
+    const highlight = theme.textHighlight || '#84cc16';
+
+    // 1. macOS Titlebar Header
+    const titleBarH = 54;
+    ctx.fillStyle = '#18181be6';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, titleBarH, [20, 20, 0, 0]);
+    } else {
+      ctx.rect(x, y, w, titleBarH);
+    }
+    ctx.fill();
+
+    // Divider
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + titleBarH);
+    ctx.lineTo(x + w, y + titleBarH);
+    ctx.stroke();
+
+    // 3 Dots (Traffic Lights)
+    const dotY = y + titleBarH / 2;
+    const dotRadius = 6.5;
+    const colors = ['#ef4444', '#eab308', '#22c55e'];
+    colors.forEach((col, idx) => {
+      ctx.beginPath();
+      ctx.arc(x + 28 + idx * 20, dotY, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+    });
+
+    // Window Title
+    ctx.font = '600 16px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#71717a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${language.toLowerCase()} — mooscript-term`, x + w / 2, dotY);
+
+    // 2. Monospace Code Area with Typewriter animation
+    const codeAreaX = x + 36;
+    const codeAreaY = y + titleBarH + 34;
+    const maxVisibleChars = Math.floor(clamp(progress * 1.25, 0, 1) * codeStr.length);
+    const visibleCode = codeStr.slice(0, maxVisibleChars);
+
+    const lines = visibleCode.split('\n');
+    const lineHeight = 36;
+    ctx.font = '500 23px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'top';
+
+    let lastX = codeAreaX;
+    let lastY = codeAreaY;
+
+    lines.forEach((line, lineIdx) => {
+      const lineY = codeAreaY + lineIdx * lineHeight;
+      if (lineY + lineHeight > y + h - 20) return; // Prevent card overflow
+
+      // Line number gutter
+      ctx.fillStyle = '#3f3f46';
+      ctx.textAlign = 'right';
+      ctx.fillText(String(lineIdx + 1).padStart(2, '0'), codeAreaX - 12, lineY);
+
+      // Syntax colored tokens
+      ctx.textAlign = 'left';
+      let currentX = codeAreaX + 16;
+      const tokens = tokenizeCodeLine(line);
+      tokens.forEach((tok) => {
+        ctx.fillStyle = tok.color === '#84cc16' ? highlight : tok.color;
+        ctx.fillText(tok.text, currentX, lineY);
+        currentX += ctx.measureText(tok.text).width;
+      });
+
+      lastX = currentX;
+      lastY = lineY;
+    });
+
+    // 3. Typing Cursor (blinks deterministically based on sceneElapsed)
+    const isCursorBlink = Math.floor(sceneElapsed * 3) % 2 === 0;
+    if (progress < 1 || isCursorBlink) {
+      ctx.fillStyle = highlight;
+      ctx.fillRect(lastX + 4, lastY + 2, 10, 24);
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Layout Primitive: VS_COMPARISON
+   */
+  public drawVsComparison(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    leftTitle: string,
+    leftDesc: string,
+    rightTitle: string,
+    rightDesc: string,
+    progress: number,
+    theme: MooProject['theme']
+  ): void {
+    ctx.save();
+    const highlight = theme.textHighlight || '#84cc16';
+    const textPrimary = theme.textPrimary || '#f4f4f5';
+    const cardH = (h - 70) / 2;
+
+    // Card 1: Top (Old / Problem / Left)
+    const topY = y;
+    this.drawCardContainer(ctx, x, topY, w, cardH, 18, progress, {
+      bg: '#141416f5',
+      borderColor: '#ef444444',
+      accentGlow: 'rgba(239, 68, 68, 0.1)'
+    });
+
+    // Tag for Top Card
+    ctx.font = '700 16px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#ef4444';
+    ctx.textAlign = 'left';
+    ctx.fillText('✕ ' + leftTitle.toUpperCase(), x + 32, topY + 36);
+
+    ctx.font = '600 28px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#a1a1aa';
+    ctx.fillText(leftDesc, x + 32, topY + 84);
+
+    // VS Circle Badge in Center
+    const vsY = y + cardH + 35;
+    const vsRadius = 30;
+    const vsSpring = spring(progress, { stiffness: 300, damping: 12 });
+    const vsScale = lerp(0.8, 1.0, clamp(vsSpring, 0, 1.2));
+
+    ctx.save();
+    ctx.translate(x + w / 2, vsY);
+    ctx.scale(vsScale, vsScale);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, vsRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#09090b';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#27272a';
+    ctx.stroke();
+
+    ctx.font = '800 18px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VS', 0, 0);
+    ctx.restore();
+
+    // Card 2: Bottom (New / Solution / Right)
+    const bottomY = y + cardH + 70;
+    this.drawCardContainer(ctx, x, bottomY, w, cardH, 18, progress, {
+      bg: '#141416f5',
+      borderColor: `${highlight}88`,
+      accentGlow: `${highlight}22`
+    });
+
+    // Tag for Bottom Card
+    ctx.font = '700 16px "JetBrains Mono", monospace';
+    ctx.fillStyle = highlight;
+    ctx.textAlign = 'left';
+    ctx.fillText('✓ ' + rightTitle.toUpperCase(), x + 32, bottomY + 36);
+
+    ctx.font = '700 30px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = textPrimary;
+    ctx.fillText(rightDesc, x + 32, bottomY + 84);
+
+    ctx.restore();
+  }
+
+  /**
+   * Layout Primitive: LIST_STAGGER
+   */
+  public drawStaggeredList(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    items: string[],
+    sceneElapsed: number,
+    theme: MooProject['theme'],
+    title?: string
+  ): void {
+    ctx.save();
+    const highlight = theme.textHighlight || '#84cc16';
+    const textPrimary = theme.textPrimary || '#f4f4f5';
+
+    // Header Title
+    if (title) {
+      ctx.font = '700 22px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#71717a';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(title.toUpperCase(), x + 10, y - 40);
+    }
+
+    const maxItems = Math.min(items.length, 5);
+    const itemGap = 18;
+    const rowH = Math.min(84, (h - (maxItems - 1) * itemGap) / maxItems);
+
+    items.slice(0, maxItems).forEach((itemText, idx) => {
+      const delay = idx * 0.28;
+      const itemAge = Math.max(0, sceneElapsed - delay);
+      const rowSpring = spring(itemAge, { stiffness: 240, damping: 16 });
+      const rowProgress = clamp(rowSpring, 0, 1);
+
+      const slideX = lerp(-40, 0, rowProgress);
+      const rowY = y + idx * (rowH + itemGap);
+
+      ctx.save();
+      ctx.translate(slideX, 0);
+      ctx.globalAlpha = clamp(rowProgress, 0, 1);
+
+      // Card container per item
+      this.drawCardContainer(ctx, x, rowY, w, rowH, 14, rowProgress, {
+        bg: '#18181bf0',
+        borderColor: '#27272ae6'
+      });
+
+      // Number badge
+      const badgeSize = 36;
+      const badgeX = x + 20;
+      const badgeY = rowY + (rowH - badgeSize) / 2;
+
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(badgeX, badgeY, badgeSize, badgeSize, 8);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeSize, badgeSize);
+      }
+      ctx.fillStyle = `${highlight}22`;
+      ctx.fill();
+      ctx.strokeStyle = `${highlight}66`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.font = '700 16px "JetBrains Mono", monospace';
+      ctx.fillStyle = highlight;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(idx + 1).padStart(2, '0'), badgeX + badgeSize / 2, badgeY + badgeSize / 2);
+
+      // Item text
+      ctx.font = '600 24px "Plus Jakarta Sans", sans-serif';
+      ctx.fillStyle = textPrimary;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(itemText, badgeX + badgeSize + 20, rowY + rowH / 2);
+
+      ctx.restore();
+    });
+
+    ctx.restore();
+  }
+
+  /**
+   * Auxiliary Subtitle Layer for Visual Components (when showSubtitles is true)
+   */
+  public renderBottomSubtitleOverlay(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    scene: Scene,
+    sceneElapsed: number,
+    project: MooProject
+  ): void {
+    const text = (scene.narrationText || scene.text || '').trim();
+    if (!text) return;
+
+    ctx.save();
+    const safeBottom = Math.round(height * (220 / 1920));
+    const subY = height - safeBottom - 70;
+    const subW = width - 160;
+    const subX = 80;
+    const subH = 68;
+
+    // Semi-transparent pill
+    ctx.fillStyle = '#09090be6';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(subX, subY, subW, subH, 16);
+    } else {
+      ctx.rect(subX, subY, subW, subH);
+    }
+    ctx.fill();
+
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Determine active word
+    let activeWordIndex = -1;
+    const timestamps = scene.wordTimestamps;
+    if (timestamps && timestamps.length > 0) {
+      for (let i = 0; i < timestamps.length; i++) {
+        if (sceneElapsed >= timestamps[i].start && sceneElapsed <= timestamps[i].end) {
+          activeWordIndex = i;
+          break;
+        }
+      }
+    }
+
+    ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+    ctx.textBaseline = 'middle';
+
+    const words = text.split(/\s+/);
+    const spaceW = ctx.measureText(' ').width;
+    let totalTextW = 0;
+    for (const w of words) totalTextW += ctx.measureText(w).width + spaceW;
+
+    let curX = Math.max(subX + 24, (width - totalTextW) / 2);
+    const highlight = project.theme.textHighlight || '#84cc16';
+    const textPrimary = project.theme.textPrimary || '#f4f4f5';
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      const wWidth = ctx.measureText(w).width;
+      if (curX + wWidth > subX + subW - 24) break; // Keep inside pill
+
+      ctx.fillStyle = i === activeWordIndex ? highlight : textPrimary;
+      ctx.globalAlpha = i === activeWordIndex ? 1.0 : 0.65;
+      ctx.fillText(w, curX, subY + subH / 2);
+      curX += wWidth + spaceW;
+    }
+
+    ctx.restore();
   }
 
   private renderWatermark(ctx: CanvasRenderingContext2D, width: number, height: number): void {
@@ -285,45 +1012,6 @@ export class CanvasRenderer {
     }
     this.bgCache.set(cacheKey, offscreen);
     return offscreen;
-  }
-
-  private renderBackground(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    project: MooProject,
-    progress: number
-  ): void {
-    const bg = project.theme.bg || '#131315';
-    const highlight = project.theme.textHighlight || '#84cc16';
-    const cachedBg = this.getOrCreateBgCanvas(width, height, bg, highlight);
-
-    if ((cachedBg as any).getContext) {
-      ctx.drawImage(cachedBg as any, 0, 0);
-    } else {
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    // Dynamic subtle pulse based on sceneProgress
-    if (progress > 0) {
-      const pulse = Math.sin(progress * Math.PI); // 0 -> 1 -> 0
-      if (pulse > 0.05) {
-        ctx.save();
-        const glowX = width / 2;
-        const glowY = height * 0.45;
-        const pulseRadius = width * (0.6 + 0.25 * pulse);
-        const pulseGrad = ctx.createRadialGradient(glowX, glowY, 20, glowX, glowY, pulseRadius);
-        const alphaHex = Math.round(pulse * 26)
-          .toString(16)
-          .padStart(2, '0');
-        pulseGrad.addColorStop(0, `${highlight}${alphaHex}`);
-        pulseGrad.addColorStop(0.7, 'transparent');
-        ctx.fillStyle = pulseGrad;
-        ctx.fillRect(0, 0, width, height);
-        ctx.restore();
-      }
-    }
   }
 
   private applyMotionPresetTransform(
@@ -440,8 +1128,8 @@ export class CanvasRenderer {
     maxLineWidth: number,
     captionPosition: CaptionPosition = 'center'
   ): MemoizedSceneLayout {
-    const rawWords = scene.text
-      .trim()
+    const textToRender = (scene.narrationText || scene.text || '').trim();
+    const rawWords = textToRender
       .split(/\s+/)
       .filter((w) => w.length > 0);
     if (rawWords.length === 0) {
@@ -451,7 +1139,7 @@ export class CanvasRenderer {
     const focusSet = new Set((scene.focusWords || []).map((w) => cleanWord(w)));
     const maxAllowedHeight = scene.icon ? height * 0.48 : height * 0.62;
 
-    // Auto-fit font sizing: step down from 74 to min 44 (or lower down to 24 if long words require it)
+    // Auto-fit font sizing: step down from 74 to min 24
     let chosenFontSize = 74;
     const minFontSize = 24;
 
@@ -560,13 +1248,12 @@ export class CanvasRenderer {
 
     const totalBlockHeight = lines.length * lineHeight;
 
-    // Safe zone constants (absolute px at 1920 height; scale proportionally)
-    const safeTop = Math.round(height * (120 / 1920));    // ~120px: TikTok/Reels top bar
-    const safeBottom = Math.round(height * (220 / 1920)); // ~220px: TikTok/Reels bottom nav
+    // Safe zone constants
+    const safeTop = Math.round(height * (120 / 1920));
+    const safeBottom = Math.round(height * (220 / 1920));
 
     let startY: number;
     if (scene.icon) {
-      // Icon occupies top ~550px; always center below icon
       const availableTop = 550;
       const availableBottom = height - safeBottom;
       const centerY = (availableTop + availableBottom) / 2;
@@ -574,12 +1261,10 @@ export class CanvasRenderer {
     } else {
       switch (captionPosition) {
         case 'top': {
-          // Anchor top edge of text block just below top safe zone
           startY = safeTop + lineHeight / 2 + Math.round(height * 0.04);
           break;
         }
         case 'bottom': {
-          // Anchor bottom edge of text block just above bottom safe zone
           startY = height - safeBottom - totalBlockHeight + lineHeight / 2;
           break;
         }
@@ -648,8 +1333,8 @@ export class CanvasRenderer {
     const captionPosition: CaptionPosition = project.theme.captionPosition || 'center';
     const maxLineWidth = width - 180;
 
-    // Cache key includes style+position for full determinism
-    const cacheKey = `${scene.id}:${scene.text}:${fontFamily}:${maxLineWidth}x${height}:${(scene.focusWords || []).join(',')}:${captionStyle}:${captionPosition}`;
+    const textForCache = scene.narrationText || scene.text || '';
+    const cacheKey = `${scene.id}:${textForCache}:${fontFamily}:${maxLineWidth}x${height}:${(scene.focusWords || []).join(',')}:${captionStyle}:${captionPosition}`;
     let layout = this.layoutCache.get(cacheKey);
     if (!layout) {
       layout = this.computeSceneLayout(ctx, scene, fontFamily, width, height, maxLineWidth, captionPosition);
@@ -687,7 +1372,7 @@ export class CanvasRenderer {
     // Dispatch to the correct style renderer
     switch (captionStyle) {
       case 'karaoke':
-        this.renderCaptionKaraoke(ctx, layout, fontSize, fontFamily, activeWordIndex, timestamps, sceneElapsed, highlightColor, primaryTextColor);
+        this.renderCaptionKaraoke(ctx, layout, fontSize, fontFamily, activeWordIndex, highlightColor, primaryTextColor);
         break;
       case 'bold-pop':
         this.renderCaptionBoldPop(ctx, layout, fontSize, fontFamily, activeWordIndex, timestamps, sceneElapsed, highlightColor, primaryTextColor);
@@ -704,7 +1389,6 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
-  // ── Caption Style: BOXED (original pill badge) ──────────────────────────────
   private renderCaptionBoxed(
     ctx: CanvasRenderingContext2D,
     layout: MemoizedSceneLayout,
@@ -773,15 +1457,12 @@ export class CanvasRenderer {
     }
   }
 
-  // ── Caption Style: KARAOKE (active word changes color, no badge) ─────────────
   private renderCaptionKaraoke(
     ctx: CanvasRenderingContext2D,
     layout: MemoizedSceneLayout,
     fontSize: number,
     fontFamily: string,
     activeWordIndex: number,
-    _timestamps: MooProject['scenes'][0]['wordTimestamps'] | undefined,
-    _sceneElapsed: number,
     highlightColor: string,
     primaryTextColor: string
   ): void {
@@ -794,19 +1475,16 @@ export class CanvasRenderer {
       ctx.textAlign = 'left';
 
       if (wObj.wordIndex === activeWordIndex) {
-        // Active: highlight color, full opacity, slight glow
         ctx.fillStyle = highlightColor;
         ctx.globalAlpha = 1.0;
         ctx.shadowColor = highlightColor;
         ctx.shadowBlur = Math.round(fontSize * 0.3);
         ctx.fillText(wObj.word, wObj.x, wObj.y);
       } else if (wObj.wordIndex < activeWordIndex) {
-        // Already spoken: faded highlight
         ctx.fillStyle = highlightColor;
         ctx.globalAlpha = 0.38;
         ctx.fillText(wObj.word, wObj.x, wObj.y);
       } else {
-        // Not yet spoken: primary text
         ctx.fillStyle = primaryTextColor;
         ctx.globalAlpha = 0.55;
         ctx.fillText(wObj.word, wObj.x, wObj.y);
@@ -816,7 +1494,6 @@ export class CanvasRenderer {
     }
   }
 
-  // ── Caption Style: BOLD-POP (active word scales up + thick stroke) ───────────
   private renderCaptionBoldPop(
     ctx: CanvasRenderingContext2D,
     layout: MemoizedSceneLayout,
@@ -852,7 +1529,6 @@ export class CanvasRenderer {
         ctx.font = `900 ${fontSize}px ${fontFamily}`;
         ctx.textAlign = 'left';
 
-        // Thick stroke (outline)
         ctx.strokeStyle = highlightColor;
         ctx.lineWidth = Math.round(fontSize * 0.08);
         ctx.lineJoin = 'round';
@@ -877,7 +1553,6 @@ export class CanvasRenderer {
     }
   }
 
-  // ── Caption Style: MINIMAL (no badge, subtle dimming for inactive) ────────────
   private renderCaptionMinimal(
     ctx: CanvasRenderingContext2D,
     layout: MemoizedSceneLayout,

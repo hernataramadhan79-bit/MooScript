@@ -5,39 +5,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#09090b',
-        surface: '#0e0e12',
+        background: 'var(--bg)',
+        surface: 'var(--surface-1)',
+        'surface-1': 'var(--surface-1)',
+        'surface-2': 'var(--surface-2)',
+        'surface-3': 'var(--surface-3)',
+        'surface-hover': 'var(--surface-hover)',
         'surface-container-lowest': '#050507',
-        'surface-container-low': '#121217',
-        'surface-container': '#181820',
-        'surface-container-high': '#20202a',
-        'surface-container-highest': '#2a2a36',
-        primary: '#9ee939',
-        'primary-fixed': '#acf847',
-        'primary-container': '#84cc16',
-        'on-primary': '#132300',
-        'on-surface': '#f4f4f5',
-        'on-surface-variant': '#a1a1aa',
-        outline: '#3f3f46',
-        'outline-variant': '#27272a',
-        secondary: '#4ae176',
-        tertiary: '#ffcb8d',
+        'surface-container-low': 'var(--surface-1)',
+        'surface-container': 'var(--surface-2)',
+        'surface-container-high': 'var(--surface-3)',
+        'surface-container-highest': 'var(--surface-hover)',
+        primary: 'var(--accent)',
+        'primary-fixed': 'var(--accent-hover)',
+        'primary-container': 'var(--accent)',
+        'on-primary': 'var(--on-accent)',
+        'on-surface': 'var(--text)',
+        'on-surface-variant': 'var(--text-muted)',
+        outline: 'var(--border)',
+        'outline-variant': 'var(--border-subtle)',
+        border: 'var(--border)',
+        'border-strong': 'var(--border-strong)',
         accent: {
-          lime: '#9ee939',
-          cyan: '#38bdf8',
-          amber: '#f59e0b',
-          rose: '#fb7185',
-          violet: '#a855f7'
+          lime: 'var(--accent)',
+          danger: 'var(--danger)',
+          warning: 'var(--warning)',
+          success: 'var(--success)'
         }
       },
-      boxShadow: {
-        glow: '0 0 25px rgba(158, 233, 57, 0.25)',
-        'glow-sm': '0 0 12px rgba(158, 233, 57, 0.2)',
-        'glow-cyan': '0 0 20px rgba(56, 189, 248, 0.2)'
-      },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace']
+      },
+      minHeight: {
+        tap: 'var(--tap)'
+      },
+      minWidth: {
+        tap: 'var(--tap)'
       }
     }
   },

@@ -44,16 +44,38 @@ export interface WordTimestamp {
   end: number; // in seconds
 }
 
-export type MotionPreset = 'punch_zoom' | 'slide_split' | 'fade_float' | 'kinetic_shake';
+export type LayoutType = 
+  | 'KINETIC_QUOTE'     // Dynamic typography with focus word punch & bounce
+  | 'METRIC_COUNTER'    // Animated rolling numbers + label + circular progress
+  | 'TERMINAL_MOCKUP'   // macOS terminal card + syntax typewriter animation
+  | 'VS_COMPARISON'     // Side-by-side battle card split
+  | 'LIST_STAGGER';     // Staggered bullet points appearing sequentially
+
+export interface VisualData {
+  title?: string;
+  metricValue?: string;      // e.g. "+400%", "99.9%"
+  metricLabel?: string;      // e.g. "User Growth", "Uptime"
+  codeSnippet?: string;      // Shell or JS code
+  codeLanguage?: string;
+  leftTitle?: string;        // For VS_COMPARISON
+  leftDesc?: string;
+  rightTitle?: string;
+  rightDesc?: string;
+  bulletItems?: string[];    // For LIST_STAGGER
+  accentIcon?: string;
+  focusWords?: string[];
+}
 
 export interface Scene {
   id: string;
-  text: string;
-  focusWords: string[];
-  motionPreset: MotionPreset;
-  icon?: string;
+  layout: LayoutType;
+  narrationText: string;     // Text fed to TTS
+  visualData: VisualData;
   durationInSeconds: number;
   wordTimestamps: WordTimestamp[];
+  motionPreset: MotionPreset;
+  camera?: 'push_in' | 'pull_out' | 'snap_zoom' | 'whip_pan' | 'steady_drift';
+  showSubtitles?: boolean;
 }
 
 export interface MooProject {
@@ -68,6 +90,9 @@ export interface MooProject {
     textPrimary: string;
     textHighlight: string;
     fontFamily: string;
+    captionStyle: string;
+    captionPosition: string;
+    showSubtitles?: boolean;
   };
   scenes: Scene[];
   audioBlob?: Blob;
