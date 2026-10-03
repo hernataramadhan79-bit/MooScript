@@ -126,6 +126,7 @@ export interface MooProject {
   title: string;
   renderMode?: RenderMode;
   aspectRatio: AspectRatio;
+  resolution?: '1080p' | '720p';
   fps: number; // default 30
   width: number;
   height: number;

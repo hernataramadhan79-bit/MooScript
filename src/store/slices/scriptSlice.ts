@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { Scene, MooProject, LayoutType, VisualData } from '../../types';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
+import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb } from '../../db/mooDb';
 import type { MooStoreState, ScriptSlice } from '../types';
 
@@ -32,14 +33,15 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       scenes: snapshot,
       audioDuration: totalDur
     };
+    const syncedProject = syncComposition(updatedProject);
 
     set({
-      project: updatedProject,
+      project: syncedProject,
       previousScenesSnapshot: null,
       audioStale: !!get().project.audioBlob
     });
 
-    await saveProjectToDb(updatedProject);
+    await saveProjectToDb(syncedProject);
     get().addToast('Restored previous storyboard scenes!', 'success');
   },
 
@@ -121,14 +123,15 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         scenes: newScenes,
         audioDuration: totalDur
       };
+      const syncedProject = syncComposition(updatedProject);
 
       set({
-        project: updatedProject,
+        project: syncedProject,
         previousScenesSnapshot: currentScenes,
         isGeneratingScript: false,
         audioStale: !!get().project.audioBlob
       });
-      await saveProjectToDb(updatedProject);
+      await saveProjectToDb(syncedProject);
       addToast('AI Storyboard generated successfully!', 'success');
     } catch (err: unknown) {
       set({ isGeneratingScript: false });

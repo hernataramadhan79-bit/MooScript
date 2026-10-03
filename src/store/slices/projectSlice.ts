@@ -9,6 +9,7 @@ import {
 } from '../../db/mooDb';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
 import { stopPlaybackAudio } from './playbackSlice';
+import { applySize, syncComposition } from '../../engine/composition/sync';
 import type { MooStoreState, ProjectSlice } from '../types';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
@@ -73,7 +74,8 @@ export const DEFAULT_COMPOSITION: Composition = {
   .from(root.querySelectorAll(".sc1-word"), { y: 60, opacity: 0, scale: 0.9, stagger: 0.18, duration: 0.7, ease: "power3.out" }, "-=0.3")
   .from(root.querySelector(".sc1-sub"), { opacity: 0, y: 20, duration: 0.6 }, "-=0.2");`,
       status: 'ok',
-      version: 1
+      version: 1,
+      userEdited: true
     },
     {
       beatId: 'sc-2',
@@ -123,7 +125,8 @@ export const DEFAULT_COMPOSITION: Composition = {
       buildJs: `tl.from(root.querySelector(".sc2-terminal"), { scale: 0.85, opacity: 0, y: 50, duration: 0.8, ease: "power3.out" })
   .from(root.querySelectorAll(".sc2-line"), { opacity: 0, x: -20, stagger: 0.15, duration: 0.5, ease: "power2.out" }, "-=0.3");`,
       status: 'ok',
-      version: 1
+      version: 1,
+      userEdited: true
     },
     {
       beatId: 'sc-3',
@@ -157,12 +160,13 @@ export const DEFAULT_COMPOSITION: Composition = {
   margin-top: 36px; font-family: 'JetBrains Mono', monospace; font-size: 20px;
   font-weight: 700; color: #a1a1aa; letter-spacing: 0.12em;
   background: rgba(255,255,255,0.06); padding: 10px 24px; border-radius: 9999px;
-}`,
+} `,
       buildJs: `tl.from(root.querySelector(".sc3-card"), { scale: 0.7, opacity: 0, duration: 0.8, ease: "back.out(1.8)" })
   .from(root.querySelector(".sc3-metric-val"), { scale: 1.3, opacity: 0, duration: 0.6, ease: "power3.out" }, "-=0.4")
   .from(root.querySelector(".sc3-metric-lbl"), { y: 20, opacity: 0, duration: 0.5 }, "-=0.2");`,
       status: 'ok',
-      version: 1
+      version: 1,
+      userEdited: true
     }
   ],
   createdAt: 1700000000000
@@ -172,6 +176,7 @@ export const INITIAL_PROJECT: MooProject = {
   id: DEFAULT_PROJECT_ID,
   title: 'WebCodecs Architecture',
   aspectRatio: '9:16',
+  resolution: '1080p',
   renderMode: 'composition',
   fps: 30,
   width: 1080,
@@ -402,8 +407,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         createdAt: now,
         updatedAt: now
       };
+      const syncedProject = syncComposition(newProject);
 
-      await saveProjectToDb(newProject);
+      await saveProjectToDb(syncedProject);
 
       const oldUrl = get().audioBlobUrl;
       if (oldUrl) {
@@ -411,7 +417,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
 
       set({
-        project: newProject,
+        project: syncedProject,
         audioBlobUrl: null,
         audioStale: false,
         currentFrame: 0,
@@ -429,7 +435,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
 
       await get().refreshProjectsList();
-      get().addToast(`Created "${newProject.title}"`, 'success');
+      get().addToast(`Created "${syncedProject.title}"`, 'success');
       return newId;
     },
 
@@ -439,10 +445,14 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (get().project.id === id) return;
       await flushPendingSave();
 
-      const target = await loadProjectFromDb(id);
+      let target = await loadProjectFromDb(id);
       if (!target) {
         get().addToast('Project not found in storage', 'error');
         return;
+      }
+
+      if (!target.composition) {
+        target = syncComposition(target);
       }
 
       if (!target.theme?.captionStyle || !target.theme?.captionPosition) {
@@ -549,66 +559,49 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeFont: (fontFamily) => {
-      const updated = {
+      const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, fontFamily }
-      };
+      });
       set({ project: updated });
       triggerSave(updated);
     },
 
     updateThemeHighlight: (textHighlight) => {
-      const updated = {
+      const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textHighlight }
-      };
+      });
       set({ project: updated });
       triggerSave(updated);
     },
 
     updateThemeBg: (bg) => {
-      const updated = {
+      const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, bg }
-      };
+      });
       set({ project: updated });
       triggerSave(updated);
     },
 
     updateThemePrimary: (textPrimary) => {
-      const updated = {
+      const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textPrimary }
-      };
+      });
       set({ project: updated });
       triggerSave(updated);
     },
 
     updateProjectAspectRatio: (aspectRatio: AspectRatio) => {
-      let width = 1080;
-      let height = 1920;
-      if (aspectRatio === '16:9') {
-        width = 1920;
-        height = 1080;
-      } else if (aspectRatio === '1:1') {
-        width = 1080;
-        height = 1080;
-      }
-      const currentComp = get().project.composition;
-      const updated: MooProject = {
-        ...get().project,
-        aspectRatio,
-        width,
-        height,
-        composition: currentComp
-          ? {
-              ...currentComp,
-              width,
-              height
-            }
-          : undefined
-      };
-      set({ project: updated });
+      const currentTier = get().project.resolution || '1080p';
+      const sized = applySize(get().project, aspectRatio, currentTier);
+      const updated = syncComposition(sized);
+      const updatedList = get().projectsList.map((p) =>
+        p.id === updated.id ? { ...p, aspectRatio, width: updated.width, height: updated.height } : p
+      );
+      set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
     },
 
@@ -631,16 +624,15 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateResolution: (res: '1080p' | '720p') => {
-      const is1080p = res === '1080p';
-      const width = is1080p ? 1080 : 720;
-      const height = is1080p ? 1920 : 1280;
-      const updated = { ...get().project, width, height };
+      const aspect = get().project.aspectRatio;
+      const sized = applySize(get().project, aspect, res);
+      const updated = syncComposition(sized);
       const updatedList = get().projectsList.map((p) =>
-        p.id === updated.id ? { ...p, width, height } : p
+        p.id === updated.id ? { ...p, width: updated.width, height: updated.height } : p
       );
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
-      get().addToast(`Resolution set to ${res} (${width}×${height})`, 'info');
+      get().addToast(`Resolution set to ${res} (${updated.width}×${updated.height})`, 'info');
     },
 
     toggleGlobalSubtitles: () => {
@@ -659,6 +651,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const hasAudio = !!current.audioBlob;
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== id) return s;
+        if (hasAudio) {
+          return {
+            ...s,
+            narrationText: text,
+            text
+          };
+        }
         const readingDuration = calculateFallbackSceneDuration(text);
         const alignedWords = computeDeterministicWordAlignment(text, readingDuration);
         return {
@@ -671,11 +670,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       });
 
       const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
-      const updated: MooProject = {
+      const updatedProject: MooProject = {
         ...current,
         scenes: updatedScenes,
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
+      const updated = syncComposition(updatedProject);
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale
@@ -685,7 +685,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     updateSceneLayout: (sceneId: string, layout: LayoutType) => {
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, layout } : s));
-      const updated = { ...get().project, scenes: updatedScenes };
+      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
       set({ project: updated });
       triggerSave(updated);
     },
@@ -701,7 +701,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
           icon: mergedVisual.accentIcon || s.icon
         };
       });
-      const updated = { ...get().project, scenes: updatedScenes };
+      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
       set({ project: updated });
       triggerSave(updated);
     },
@@ -731,7 +731,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         const nextFocus = has ? current.filter((fw) => cleanWord(fw) !== cleanTarget) : [...current, word];
         return { ...s, focusWords: nextFocus };
       });
-      const updated = { ...get().project, scenes: updatedScenes };
+      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
       set({ project: updated });
       triggerSave(updated);
     },
@@ -752,7 +752,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     setSceneIcon: (sceneId, icon) => {
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, icon } : s));
-      const updated = { ...get().project, scenes: updatedScenes };
+      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
       set({ project: updated });
       triggerSave(updated);
     },
@@ -760,6 +760,10 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     setSceneDuration: (sceneId, durationInSeconds) => {
       const current = get().project;
       const hasAudio = !!current.audioBlob;
+      if (hasAudio) {
+        set({ audioStale: true });
+        return;
+      }
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         return {
@@ -772,12 +776,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updated: MooProject = {
         ...current,
         scenes: updatedScenes,
-        audioDuration: hasAudio ? current.audioDuration : totalDur
+        audioDuration: totalDur
       };
-      set({
-        project: updated,
-        audioStale: hasAudio ? true : get().audioStale
-      });
+      set({ project: updated });
       triggerSave(updated);
     },
 
@@ -807,29 +808,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updatedScenes = [...current.scenes, newScene];
       const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
 
-      const newModule: SceneModule = {
-        beatId: newId,
-        html: `<div class="scene-box"><h1 class="headline">Kinetic Scene</h1><p class="caption">${defaultText}</p></div>`,
-        css: `.scene-box { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: ${current.theme.bg || '#09090b'}; color: ${current.theme.textPrimary || '#f4f4f5'}; text-align: center; padding: 48px; } .headline { font-size: 72px; font-weight: 800; color: ${current.theme.textHighlight || '#84cc16'}; } .caption { margin-top: 24px; font-size: 28px; color: #a1a1aa; }`,
-        buildJs: `tl.from(root.querySelector(".headline"), { y: 40, opacity: 0, scale: 0.9, duration: 0.7, ease: "back.out(1.7)" })
-  .from(root.querySelector(".caption"), { y: 20, opacity: 0, duration: 0.5 }, "-=0.2");`,
-        status: 'ok',
-        version: 1
-      };
-
-      const updatedComposition = current.composition
-        ? {
-            ...current.composition,
-            scenes: [...current.composition.scenes, newModule]
-          }
-        : undefined;
-
-      const updated: MooProject = {
+      const updatedProject: MooProject = {
         ...current,
         scenes: updatedScenes,
-        composition: updatedComposition,
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
+      const updated = syncComposition(updatedProject);
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale
@@ -843,19 +827,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updatedScenes = current.scenes.filter((s) => s.id !== id);
       const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
 
-      const updatedComposition = current.composition
-        ? {
-            ...current.composition,
-            scenes: current.composition.scenes.filter((s) => s.beatId !== id)
-          }
-        : undefined;
-
-      const updated: MooProject = {
+      const updatedProject: MooProject = {
         ...current,
         scenes: updatedScenes,
-        composition: updatedComposition,
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
+      const updated = syncComposition(updatedProject);
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale
@@ -884,32 +861,31 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       let updatedComposition = current.composition;
       if (current.composition) {
         const sourceModule = current.composition.scenes.find((s) => s.beatId === id);
-        const newModule: SceneModule = sourceModule
-          ? { ...sourceModule, beatId: newId, version: 1 }
-          : {
-              beatId: newId,
-              html: `<div class="scene-box"><h1 class="headline">${source.visualData?.title || 'Scene'}</h1></div>`,
-              css: `.scene-box { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; } .headline { font-size: 72px; color: #84cc16; }`,
-              buildJs: `tl.from(root.querySelector(".headline"), { scale: 0.8, opacity: 0, duration: 0.6 });`,
-              status: 'ok',
-              version: 1
-            };
-        const compScenes = [...current.composition.scenes];
-        const compIdx = compScenes.findIndex((s) => s.beatId === id);
-        if (compIdx >= 0) {
-          compScenes.splice(compIdx + 1, 0, newModule);
-        } else {
-          compScenes.push(newModule);
+        if (sourceModule?.userEdited) {
+          const duplicatedModule: SceneModule = {
+            ...sourceModule,
+            beatId: newId,
+            userEdited: true,
+            version: 1
+          };
+          const compScenes = [...current.composition.scenes];
+          const compIdx = compScenes.findIndex((s) => s.beatId === id);
+          if (compIdx >= 0) {
+            compScenes.splice(compIdx + 1, 0, duplicatedModule);
+          } else {
+            compScenes.push(duplicatedModule);
+          }
+          updatedComposition = { ...current.composition, scenes: compScenes };
         }
-        updatedComposition = { ...current.composition, scenes: compScenes };
       }
 
-      const updated: MooProject = {
+      const updatedProject: MooProject = {
         ...current,
         scenes: list,
         composition: updatedComposition,
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
+      const updated = syncComposition(updatedProject);
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale
@@ -924,29 +900,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const [moved] = list.splice(fromIndex, 1);
       list.splice(toIndex, 0, moved);
 
-      let updatedComposition = current.composition;
-      if (current.composition) {
-        // Reorder composition modules to match the new scenes order
-        const moduleMap = new Map(current.composition.scenes.map((m) => [m.beatId, m]));
-        const reorderedModules: SceneModule[] = [];
-        for (const s of list) {
-          const mod = moduleMap.get(s.id);
-          if (mod) reorderedModules.push(mod);
-        }
-        // Include any remaining modules not in scenes list
-        for (const m of current.composition.scenes) {
-          if (!reorderedModules.some((rm) => rm.beatId === m.beatId)) {
-            reorderedModules.push(m);
-          }
-        }
-        updatedComposition = { ...current.composition, scenes: reorderedModules };
-      }
-
-      const updated: MooProject = {
+      const updatedProject: MooProject = {
         ...current,
-        scenes: list,
-        composition: updatedComposition
+        scenes: list
       };
+      const updated = syncComposition(updatedProject);
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale

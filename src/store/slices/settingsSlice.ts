@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { EngineSettings } from '../../types';
 import { db, getCacheSize, clearAllCache, loadProjectFromDb, listProjectsFromDb, saveProjectToDb } from '../../db/mooDb';
 import { BUILTIN_SKILLS, getAllSkills, initializeSkills } from '../../engine/skills/skillManager';
+import { syncComposition } from '../../engine/composition/sync';
 import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
 import type { MooStoreState, SettingsSlice } from '../types';
 
@@ -180,6 +181,10 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
         ...project,
         bgm: { preset: 'none', level: 0.18, duckRatio: 0.15 }
       };
+    }
+
+    if (!project.composition) {
+      project = syncComposition(project);
     }
 
     let blobUrl: string | null = null;
