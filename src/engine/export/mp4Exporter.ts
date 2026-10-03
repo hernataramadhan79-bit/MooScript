@@ -1,4 +1,12 @@
-import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import {
+  Output,
+  BufferTarget,
+  Mp4OutputFormat,
+  CanvasSource,
+  AudioBufferSource,
+  canEncodeAudio,
+  canEncodeVideo
+} from 'mediabunny';
 import type { MooProject } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 
@@ -14,20 +22,77 @@ export interface ExportResult {
   objectUrl: string;
   fileSizeBytes: number;
   durationSeconds: number;
+  hasAudio: boolean;
+  warnings: string[];
+}
+
+export interface ExportOptions {
+  hud?: boolean;
+  watermark?: boolean;
+}
+
+async function yieldOrSleep(ms = 4): Promise<void> {
+  const scheduler = (globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (typeof scheduler?.yield === 'function') {
+    await scheduler.yield();
+  } else {
+    await new Promise((r) => setTimeout(r, ms));
+  }
+}
+
+async function resampleAudioBuffer(audioBuffer: AudioBuffer, targetSampleRate = 48000): Promise<AudioBuffer> {
+  if (audioBuffer.sampleRate === targetSampleRate) return audioBuffer;
+  const numChannels = Math.min(2, audioBuffer.numberOfChannels);
+  const targetLength = Math.ceil(audioBuffer.duration * targetSampleRate);
+  const offlineCtx = new OfflineAudioContext(numChannels, targetLength, targetSampleRate);
+  const bufferSource = offlineCtx.createBufferSource();
+  bufferSource.buffer = audioBuffer;
+  bufferSource.connect(offlineCtx.destination);
+  bufferSource.start(0);
+  return await offlineCtx.startRendering();
 }
 
 export async function exportMooProjectToMP4(
   project: MooProject,
   onProgress: (progress: ExportProgress) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  opts?: ExportOptions
 ): Promise<ExportResult> {
   const fps = project.fps || 30;
   const width = project.width || 1080;
   const height = project.height || 1920;
+  const warnings: string[] = [];
+  let hasAudio = false;
 
-  // 1. Verify WebCodecs VideoEncoder availability
-  if (typeof VideoEncoder === 'undefined') {
-    throw new Error('WebCodecs VideoEncoder is not supported in this browser. Please use Chrome, Edge, or Safari 16.4+');
+  // 1. Verify WebCodecs VideoEncoder availability via mediabunny
+  const isVideoSupported = await canEncodeVideo('avc');
+  if (!isVideoSupported && typeof VideoEncoder === 'undefined') {
+    throw new Error(
+      'WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.'
+    );
+  }
+
+  // Calculate adaptive bitrate based on resolution and fps
+  const basePixels = 1080 * 1920 * 30;
+  const currentPixels = width * height * fps;
+  const calculatedBitrate = Math.round((currentPixels / basePixels) * 6_000_000);
+  const bitrate = Math.max(2_000_000, Math.min(12_000_000, calculatedBitrate));
+
+  // Pre-load fonts and check availability
+  if (typeof document !== 'undefined' && document.fonts) {
+    try {
+      await document.fonts.ready;
+      await Promise.allSettled([
+        document.fonts.load('800 74px "Plus Jakarta Sans"'),
+        document.fonts.load('600 32px "JetBrains Mono"')
+      ]);
+      const hasJakarta = document.fonts.check('800 74px "Plus Jakarta Sans"');
+      if (!hasJakarta) {
+        warnings.push('Font "Plus Jakarta Sans" tidak dapat dimuat; rendering menggunakan font fallback sistem.');
+      }
+    } catch {
+      warnings.push('Pemeriksaan kesiapan font sistem dilewati.');
+    }
   }
 
   onProgress({ percent: 2, currentFrame: 0, totalFrames: 0, statusText: 'Initializing audio buffer...' });
@@ -38,13 +103,15 @@ export async function exportMooProjectToMP4(
 
   if (project.audioBlob && project.audioBlob.size > 0) {
     try {
-      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const audioCtx = new (
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
       const arrayBuffer = await project.audioBlob.arrayBuffer();
       audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       totalDuration = audioBuffer.duration;
       await audioCtx.close();
-    } catch (err) {
-      console.warn('Failed to decode audioBlob, falling back to scene durations', err);
+    } catch {
+      warnings.push('Audio file gagal didecode, durasi ditentukan berdasarkan durasi scene.');
     }
   }
 
@@ -58,150 +125,92 @@ export async function exportMooProjectToMP4(
 
   const totalFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
-  onProgress({ percent: 5, currentFrame: 0, totalFrames, statusText: 'Setting up MP4 muxer & codecs...' });
+  onProgress({ percent: 5, currentFrame: 0, totalFrames, statusText: 'Setting up Mediabunny MP4 muxer & codecs...' });
 
-  // 3. Test AudioEncoder capability
+  // 3. Test AudioEncoder capability & Resample if necessary
   let hasAudioTrack = false;
-  let audioEncoder: AudioEncoder | null = null;
+  let targetAudioBuffer = audioBuffer;
 
-  if (audioBuffer && typeof AudioEncoder !== 'undefined') {
-    try {
-      const config = {
-        codec: 'mp4a.40.2',
-        sampleRate: audioBuffer.sampleRate,
-        numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
-        bitrate: 128_000
-      };
-      const support = await AudioEncoder.isConfigSupported(config);
-      if (support.supported) {
-        hasAudioTrack = true;
+  if (audioBuffer) {
+    const isAudioSupported = await canEncodeAudio('aac');
+    if (!isAudioSupported && typeof AudioEncoder === 'undefined') {
+      warnings.push('AudioEncoder tidak didukung oleh browser Anda. Video diekspor tanpa audio.');
+    } else {
+      // Ensure 48kHz for broad compatibility
+      if (audioBuffer.sampleRate !== 48000) {
+        try {
+          targetAudioBuffer = await resampleAudioBuffer(audioBuffer, 48000);
+        } catch (e) {
+          console.warn('Audio resampling failed, proceeding with original buffer:', e);
+          targetAudioBuffer = audioBuffer;
+        }
       }
-    } catch (e) {
-      console.warn('AudioEncoder config test skipped or unsupported:', e);
+      hasAudioTrack = true;
     }
   }
 
-  // 4. Initialize mp4-muxer
-  const target = new ArrayBufferTarget();
-  const muxer = new Muxer({
+  // 4. Initialize Mediabunny Output with in-memory fastStart
+  const target = new BufferTarget();
+  const output = new Output({
     target,
-    video: {
-      codec: 'avc' as const,
-      width,
-      height
-    },
-    ...(hasAudioTrack && audioBuffer ? {
-      audio: {
-        codec: 'aac' as const,
-        sampleRate: audioBuffer.sampleRate,
-        numberOfChannels: Math.min(2, audioBuffer.numberOfChannels)
-      }
-    } : {}),
-    fastStart: 'in-memory'
+    format: new Mp4OutputFormat({ fastStart: 'in-memory' })
   });
 
-  // 5. Initialize VideoEncoder
-  // Codec: 'avc1.4d002a' (H.264 Main Profile Level 4.2 at 1080p, supported across mobile Safari and Chromium)
-  const videoEncoder = new VideoEncoder({
-    output: (chunk, meta) => {
-      muxer.addVideoChunk(chunk, meta);
-    },
-    error: (e) => {
-      console.error('VideoEncoder error:', e);
-    }
-  });
-
-  videoEncoder.configure({
-    codec: 'avc1.4d002a',
-    width,
-    height,
-    bitrate: 6_000_000, // 6 Mbps
-    hardwareAcceleration: 'prefer-hardware'
-  });
-
-  // 6. Encode Audio Chunks if enabled
-  if (hasAudioTrack && audioBuffer) {
-    try {
-      audioEncoder = new AudioEncoder({
-        output: (chunk, meta) => {
-          muxer.addAudioChunk(chunk, meta);
-        },
-        error: (e) => {
-          console.error('AudioEncoder error:', e);
-        }
-      });
-
-      audioEncoder.configure({
-        codec: 'mp4a.40.2',
-        sampleRate: audioBuffer.sampleRate,
-        numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
-        bitrate: 128_000
-      });
-
-      // Feed AudioData in chunks (e.g. 1024 samples per frame)
-      const numChannels = Math.min(2, audioBuffer.numberOfChannels);
-      const sampleRate = audioBuffer.sampleRate;
-      const totalSamples = audioBuffer.length;
-      const chunkSize = 2048;
-
-      for (let offset = 0; offset < totalSamples; offset += chunkSize) {
-        if (abortSignal?.aborted) break;
-
-        const currentChunkSize = Math.min(chunkSize, totalSamples - offset);
-        const planarData = new Float32Array(currentChunkSize * numChannels);
-
-        for (let ch = 0; ch < numChannels; ch++) {
-          const chData = audioBuffer.getChannelData(ch);
-          planarData.set(chData.subarray(offset, offset + currentChunkSize), ch * currentChunkSize);
-        }
-
-        const audioTimestampUs = Math.round((offset / sampleRate) * 1_000_000);
-        const audioData = new AudioData({
-          format: 'f32-planar',
-          sampleRate,
-          numberOfFrames: currentChunkSize,
-          numberOfChannels: numChannels,
-          timestamp: audioTimestampUs,
-          data: planarData
-        });
-
-        audioEncoder.encode(audioData);
-        audioData.close();
-      }
-
-      await audioEncoder.flush();
-    } catch (audioErr) {
-      console.warn('Audio encoding failed, falling back to video-only track', audioErr);
-    }
-  }
-
-  // 7. Setup Dedicated Offline Canvas
-  const canvasRenderer = new CanvasRenderer();
+  // 5. Setup Dedicated Offline Canvas Renderer
+  const canvasRenderer = new CanvasRenderer(undefined, width, height);
   const rawCanvas = canvasRenderer.getCanvas();
 
-  // 8. Deterministic Render Loop
+  const videoSource = new CanvasSource(rawCanvas as HTMLCanvasElement, {
+    codec: 'avc',
+    bitrate
+  });
+  output.addVideoTrack(videoSource);
+
+  let audioSource: AudioBufferSource | null = null;
+  if (hasAudioTrack && targetAudioBuffer) {
+    audioSource = new AudioBufferSource({
+      codec: 'aac',
+      bitrate: 128_000
+    });
+    output.addAudioTrack(audioSource);
+  }
+
   try {
+    await output.start();
+
+    // 6. Encode Audio Track if enabled
+    if (audioSource && targetAudioBuffer) {
+      try {
+        await audioSource.add(targetAudioBuffer);
+        hasAudio = true;
+      } catch (audioErr) {
+        if (abortSignal?.aborted || (audioErr instanceof DOMException && audioErr.name === 'AbortError')) {
+          throw audioErr;
+        }
+        warnings.push(
+          `Encoding audio gagal (${audioErr instanceof Error ? audioErr.message : String(audioErr)}). Video diekspor tanpa audio.`
+        );
+        hasAudio = false;
+      }
+    }
+
+    // 7. Deterministic Render Loop
     for (let frame = 0; frame < totalFrames; frame++) {
       if (abortSignal?.aborted) {
-        throw new Error('Export was cancelled by user');
+        await output.cancel().catch(() => {});
+        throw new DOMException('Export was cancelled by user', 'AbortError');
       }
 
-      // 1. Draw frame deterministically: RenderState = f(currentFrame, fps)
-      canvasRenderer.draw(frame, totalFrames, project);
-
-      // 2. Create VideoFrame from Canvas
-      const timestampMicroseconds = Math.round((frame / fps) * 1_000_000);
-      const videoFrame = new VideoFrame(rawCanvas as CanvasImageSource, {
-        timestamp: timestampMicroseconds,
-        duration: Math.round((1 / fps) * 1_000_000)
+      // 1. Draw frame deterministically: RenderState = f(currentFrame, fps, project)
+      canvasRenderer.draw(frame, totalFrames, project, {
+        hud: opts?.hud ?? false,
+        watermark: opts?.watermark ?? false
       });
 
-      // 3. Encode & Close immediately to guarantee ZERO memory leaks
-      const isKeyFrame = frame % (fps * 2) === 0;
-      videoEncoder.encode(videoFrame, { keyFrame: isKeyFrame });
-      videoFrame.close(); // MANDATORY: Prevent mobile out-of-memory crashes!
+      // 2. Add canvas frame to Mediabunny (auto-encodes, respects dequeue backpressure, and closes frame)
+      await videoSource.add(frame / fps, 1 / fps);
 
-      // 4. Report Progress to UI
+      // 3. Report Progress to UI
       const percent = Math.min(99, Math.round(((frame + 1) / totalFrames) * 95) + 5);
       onProgress({
         percent,
@@ -210,19 +219,21 @@ export async function exportMooProjectToMP4(
         statusText: `Encoding frame ${frame + 1}/${totalFrames} (${percent}%)`
       });
 
-      // 5. Thermal & Backgrounding Yield:
-      // Yield the thread briefly every 30 frames to prevent iOS WebKit from terminating worker/tab
+      // 4. Yield periodically
       if (frame % 30 === 0) {
-        await new Promise((r) => setTimeout(r, 0));
+        await yieldOrSleep(0);
       }
     }
 
     onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: 'Finalizing MP4 container...' });
 
-    await videoEncoder.flush();
-    muxer.finalize();
+    await output.finalize();
 
     const buffer = target.buffer;
+    if (!buffer) {
+      throw new Error('Mediabunny output buffer is empty.');
+    }
+
     const blob = new Blob([buffer], { type: 'video/mp4' });
     const objectUrl = URL.createObjectURL(blob);
 
@@ -232,17 +243,16 @@ export async function exportMooProjectToMP4(
       blob,
       objectUrl,
       fileSizeBytes: blob.size,
-      durationSeconds: totalDuration
+      durationSeconds: totalDuration,
+      hasAudio,
+      warnings
     };
-  } finally {
-    // Memory cleanup
-    try {
-      videoEncoder.close();
-      if (audioEncoder && audioEncoder.state !== 'closed') {
-        audioEncoder.close();
-      }
-    } catch (e) {
-      console.warn('Error during encoder closure cleanup', e);
+  } catch (err: unknown) {
+    await output.cancel().catch(() => {});
+    if (abortSignal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+      throw new DOMException('Export was cancelled by user', 'AbortError');
     }
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`VideoEncoder error during export: ${message}`);
   }
 }

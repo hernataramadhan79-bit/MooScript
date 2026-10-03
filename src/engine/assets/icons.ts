@@ -19,16 +19,28 @@ export const ICONS: Record<string, IconDefinition> = {
       // Horns
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.moveTo(22, 24); ctx.lineTo(38, 32); ctx.lineTo(34, 42); ctx.lineTo(20, 34); ctx.closePath();
+      ctx.moveTo(22, 24);
+      ctx.lineTo(38, 32);
+      ctx.lineTo(34, 42);
+      ctx.lineTo(20, 34);
+      ctx.closePath();
       ctx.fill();
 
       ctx.beginPath();
-      ctx.moveTo(78, 24); ctx.lineTo(62, 32); ctx.lineTo(66, 42); ctx.lineTo(80, 34); ctx.closePath();
+      ctx.moveTo(78, 24);
+      ctx.lineTo(62, 32);
+      ctx.lineTo(66, 42);
+      ctx.lineTo(80, 34);
+      ctx.closePath();
       ctx.fill();
 
       // Head structure
       ctx.beginPath();
-      ctx.moveTo(30, 36); ctx.lineTo(70, 36); ctx.lineTo(74, 54); ctx.lineTo(26, 54); ctx.closePath();
+      ctx.moveTo(30, 36);
+      ctx.lineTo(70, 36);
+      ctx.lineTo(74, 54);
+      ctx.lineTo(26, 54);
+      ctx.closePath();
       ctx.fill();
 
       // Muzzle Block
@@ -140,9 +152,14 @@ export const ICONS: Record<string, IconDefinition> = {
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(7, 8); ctx.lineTo(3, 12); ctx.lineTo(7, 16);
-      ctx.moveTo(17, 8); ctx.lineTo(21, 12); ctx.lineTo(17, 16);
-      ctx.moveTo(14, 4); ctx.lineTo(10, 20);
+      ctx.moveTo(7, 8);
+      ctx.lineTo(3, 12);
+      ctx.lineTo(7, 16);
+      ctx.moveTo(17, 8);
+      ctx.lineTo(21, 12);
+      ctx.lineTo(17, 16);
+      ctx.moveTo(14, 4);
+      ctx.lineTo(10, 20);
       ctx.stroke();
       ctx.restore();
     }

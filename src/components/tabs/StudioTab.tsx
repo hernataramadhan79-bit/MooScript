@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { CanvasRenderer } from '../../engine/renderer/canvasRenderer';
-import type { MotionPreset } from '../../types';
+import type { MotionPreset, CaptionStyle, CaptionPosition } from '../../types';
+import { downloadSubtitleFile, type SubtitleCueMode } from '../../engine/export/subtitleExporter';
 
 export const StudioTab: React.FC = () => {
   const {
@@ -12,17 +13,26 @@ export const StudioTab: React.FC = () => {
     seekFrame,
     updateThemeFont,
     updateThemeHighlight,
+    updateThemeCaptionStyle,
+    updateThemeCaptionPosition,
     setSceneMotionPreset,
     isExporting,
     exportProgress,
     exportResult,
+    audioStale,
     startExport,
-    cancelExport
+    cancelExport,
+    revokeExportResult,
+    addToast
   } = useMooStore();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const [showSafeZone, setShowSafeZone] = useState(false);
+  const [showDebugHud, setShowDebugHud] = useState(false);
+  const [exportWatermark, setExportWatermark] = useState(false);
+  const [exportHud, setExportHud] = useState(false);
+  const [subtitleMode, setSubtitleMode] = useState<SubtitleCueMode>('phrase');
 
   const fps = project.fps || 30;
   const totalDuration = project.audioDuration || 10;
@@ -38,9 +48,19 @@ export const StudioTab: React.FC = () => {
   // Re-draw canvas whenever frame or project changes
   useEffect(() => {
     if (rendererRef.current) {
-      rendererRef.current.draw(currentFrame, totalFrames, project);
+      rendererRef.current.draw(currentFrame, totalFrames, project, {
+        hud: showDebugHud,
+        watermark: false
+      });
     }
-  }, [currentFrame, totalFrames, project]);
+  }, [currentFrame, totalFrames, project, showDebugHud]);
+
+  // Revoke export Object URL on unmount to prevent leaks
+  useEffect(() => {
+    return () => {
+      revokeExportResult();
+    };
+  }, [revokeExportResult]);
 
   const formatSeconds = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -64,12 +84,7 @@ export const StudioTab: React.FC = () => {
       {/* 9:16 Canvas Viewport & Safe Zone */}
       <div className="relative flex justify-center items-center py-1">
         <div className="relative aspect-[9/16] w-full max-w-[340px] rounded-2xl overflow-hidden shadow-2xl border-2 border-zinc-800 bg-[#09090b] flex items-center justify-center">
-          <canvas
-            ref={canvasRef}
-            width={1080}
-            height={1920}
-            className="w-full h-full object-contain"
-          />
+          <canvas ref={canvasRef} width={1080} height={1920} className="w-full h-full object-contain" />
 
           {/* Optional Instagram/TikTok Safe Zone Overlay */}
           {showSafeZone && (
@@ -83,7 +98,21 @@ export const StudioTab: React.FC = () => {
             </div>
           )}
 
-          {/* Quick Safe Zone Toggle Button */}
+          {/* Quick HUD & Safe Zone Toggle Buttons */}
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
+            <button
+              className={`px-2 py-1 rounded-md text-[10px] font-mono border backdrop-blur-md transition-all ${
+                showDebugHud
+                  ? 'bg-lime-500/20 text-lime-300 border-lime-500/50'
+                  : 'bg-black/60 text-zinc-400 border-zinc-700/60 hover:text-white'
+              }`}
+              onClick={() => setShowDebugHud(!showDebugHud)}
+              type="button"
+            >
+              Debug HUD: {showDebugHud ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
           <button
             className={`absolute top-3 right-3 px-2 py-1 rounded-md text-[10px] font-mono border backdrop-blur-md transition-all ${
               showSafeZone
@@ -136,9 +165,7 @@ export const StudioTab: React.FC = () => {
             onClick={togglePlay}
             type="button"
           >
-            <span className="material-symbols-outlined text-[22px]">
-              {isPlaying ? 'pause' : 'play_arrow'}
-            </span>
+            <span className="material-symbols-outlined text-[22px]">{isPlaying ? 'pause' : 'play_arrow'}</span>
             <span className="text-xs uppercase tracking-wider">{isPlaying ? 'Pause' : 'Play'}</span>
           </button>
 
@@ -187,6 +214,69 @@ export const StudioTab: React.FC = () => {
           </div>
         </div>
 
+        {/* Caption Style Preset Picker */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-zinc-400">Caption Style</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(
+              [
+                { id: 'boxed', label: 'Boxed Pill', icon: 'title' },
+                { id: 'karaoke', label: 'Karaoke', icon: 'lyrics' },
+                { id: 'bold-pop', label: 'Bold Pop', icon: 'format_bold' },
+                { id: 'minimal', label: 'Minimal', icon: 'text_fields' }
+              ] as { id: CaptionStyle; label: string; icon: string }[]
+            ).map(({ id, label, icon }) => {
+              const isSelected = (project.theme.captionStyle || 'boxed') === id;
+              return (
+                <button
+                  key={id}
+                  className={`h-8 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+                    isSelected
+                      ? 'bg-zinc-800 text-primary border-primary/50'
+                      : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                  onClick={() => updateThemeCaptionStyle(id)}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[14px]">{icon}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Caption Position Picker */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-zinc-400">Caption Position</span>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(
+              [
+                { id: 'top', label: 'Top', icon: 'vertical_align_top' },
+                { id: 'center', label: 'Center', icon: 'vertical_align_center' },
+                { id: 'bottom', label: 'Bottom', icon: 'vertical_align_bottom' }
+              ] as { id: CaptionPosition; label: string; icon: string }[]
+            ).map(({ id, label, icon }) => {
+              const isSelected = (project.theme.captionPosition || 'center') === id;
+              return (
+                <button
+                  key={id}
+                  className={`h-8 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1 active:scale-95 transition-all ${
+                    isSelected
+                      ? 'bg-zinc-800 text-primary border-primary/50'
+                      : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                  onClick={() => updateThemeCaptionPosition(id)}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[14px]">{icon}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Highlight Color & Global Motion Preset */}
         <div className="grid grid-cols-2 gap-2.5 pt-1">
           {/* Highlight Color */}
@@ -205,7 +295,9 @@ export const StudioTab: React.FC = () => {
                     key={c.hex}
                     aria-label={c.label}
                     className={`w-6 h-6 rounded-full transition-all ${
-                      isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-zinc-900 scale-110' : 'hover:scale-105'
+                      isSelected
+                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-zinc-900 scale-110'
+                        : 'hover:scale-105'
                     }`}
                     style={{ backgroundColor: c.hex }}
                     onClick={() => updateThemeHighlight(c.hex)}
@@ -243,13 +335,118 @@ export const StudioTab: React.FC = () => {
           </div>
           <span className="text-zinc-300">WebCodecs Hardware</span>
         </div>
+
+        {/* Export Configuration Toggles */}
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/70 border border-zinc-800/80 text-xs">
+          <label className="flex items-center gap-2 cursor-pointer text-zinc-300 select-none">
+            <input
+              type="checkbox"
+              checked={exportWatermark}
+              onChange={(e) => setExportWatermark(e.target.checked)}
+              className="rounded border-zinc-700 bg-zinc-900 text-primary focus:ring-0 cursor-pointer"
+            />
+            <span>Watermark</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-zinc-400 text-[11px] select-none">
+            <input
+              type="checkbox"
+              checked={exportHud}
+              onChange={(e) => setExportHud(e.target.checked)}
+              className="rounded border-zinc-700 bg-zinc-900 text-primary focus:ring-0 cursor-pointer"
+            />
+            <span>Include Debug HUD</span>
+          </label>
+        </div>
       </div>
+
+      {/* Subtitles & Captions Export Card */}
+      <section className="p-3.5 rounded-xl bg-[#18181b] border border-zinc-800 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between font-mono text-[11px]">
+          <span className="uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[15px] text-primary">closed_caption</span>
+            CAPTIONS & SUBTITLES (.SRT / .VTT)
+          </span>
+          <span className="text-zinc-500 font-mono text-[10px]">Client-side • Standalone</span>
+        </div>
+
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-zinc-400 text-[11px]">Cue Pacing Mode:</span>
+          <div className="flex rounded-lg bg-zinc-950 p-0.5 border border-zinc-800">
+            {(
+              [
+                { id: 'phrase', label: 'Phrase' },
+                { id: 'scene', label: 'Scene' },
+                { id: 'word', label: 'Word' }
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`px-2 py-0.5 text-[11px] rounded-md font-medium transition-all ${
+                  subtitleMode === m.id
+                    ? 'bg-zinc-800 text-primary shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                onClick={() => setSubtitleMode(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="h-9 px-3 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+            disabled={project.scenes.length === 0}
+            onClick={() => {
+              downloadSubtitleFile(project, 'srt', { mode: subtitleMode });
+              addToast('SubRip (.srt) file downloaded', 'success');
+            }}
+          >
+            <span className="material-symbols-outlined text-[16px] text-amber-400">subtitles</span>
+            <span>Download .SRT</span>
+          </button>
+          <button
+            type="button"
+            className="h-9 px-3 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+            disabled={project.scenes.length === 0}
+            onClick={() => {
+              downloadSubtitleFile(project, 'vtt', { mode: subtitleMode });
+              addToast('WebVTT (.vtt) file downloaded', 'success');
+            }}
+          >
+            <span className="material-symbols-outlined text-[16px] text-sky-400">closed_caption</span>
+            <span>Download .VTT</span>
+          </button>
+        </div>
+      </section>
+
+      {/* Outdated Audio Warning Banner */}
+      {audioStale && (
+        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs shadow-sm">
+          <span className="material-symbols-outlined text-[20px] text-amber-400 shrink-0">warning</span>
+          <span className="flex-1 font-medium leading-relaxed">
+            Audio is outdated because script or scene timings were edited. Audio in exported video may be
+            desynchronized.
+          </span>
+        </div>
+      )}
 
       {/* Main Export CTA */}
       <button
         className="w-full h-12 text-sm font-bold rounded-xl bg-primary text-black hover:bg-lime-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(132,204,22,0.25)] disabled:opacity-50"
         disabled={isExporting}
-        onClick={startExport}
+        onClick={() => {
+          if (audioStale) {
+            const confirmed = window.confirm(
+              'Audio is outdated because scenes were edited after audio generation. Export anyway with old audio?'
+            );
+            if (!confirmed) return;
+          }
+          startExport({ hud: exportHud, watermark: exportWatermark });
+        }}
         type="button"
       >
         <span className="material-symbols-outlined text-[20px]">
@@ -296,33 +493,95 @@ export const StudioTab: React.FC = () => {
               </div>
               <h3 className="text-xs font-bold text-white">Video Ready to Download</h3>
             </div>
-            <span className="text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
-              {(exportResult.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                  exportResult.hasAudio
+                    ? 'text-lime-400 bg-lime-950/40 border-lime-800/60'
+                    : 'text-amber-400 bg-amber-950/40 border-amber-800/60'
+                }`}
+              >
+                {exportResult.hasAudio ? 'AVC + AAC' : 'Video Only'}
+              </span>
+              <span className="text-[11px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                {(exportResult.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
+              </span>
+            </div>
           </div>
 
+          {/* Warning Banner if any warning occurred during export */}
+          {exportResult.warnings && exportResult.warnings.length > 0 && (
+            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
+              <div className="font-semibold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">warning</span>
+                <span>Catatan Ekspor:</span>
+              </div>
+              <ul className="list-disc list-inside text-[11px] text-amber-200/90 space-y-0.5">
+                {exportResult.warnings.map((w, idx) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Compiled with WebCodecs at 1080×1920 (6 Mbps AVC/H.264) directly on your device. Ready for TikTok, Reels, or YouTube Shorts.
+            Compiled with WebCodecs at {project.width || 1080}×{project.height || 1920} directly on your device. Ready
+            for TikTok, Reels, or YouTube Shorts.
           </p>
 
           {/* Quick Preview Player */}
           <div className="aspect-[9/16] max-h-56 mx-auto rounded-lg overflow-hidden border border-zinc-800 bg-black">
-            <video
-              className="w-full h-full object-contain"
-              controls
-              playsInline
-              src={exportResult.objectUrl}
-            />
+            <video className="w-full h-full object-contain" controls playsInline src={exportResult.objectUrl} />
           </div>
 
-          <button
-            className="w-full h-10 rounded-lg bg-primary text-black font-bold text-xs flex items-center justify-center gap-2 hover:bg-lime-300 active:scale-95 transition-all shadow-md shadow-primary/20"
-            onClick={handleDownload}
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[16px]">download</span>
-            <span>Download MP4 File</span>
-          </button>
+          {/* Subtitles Download Options in Result */}
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 text-xs">
+            <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-primary">closed_caption</span>
+              Also need captions?
+            </span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                className="px-2.5 py-1 rounded-md bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono text-amber-400 hover:text-amber-300 transition-colors"
+                onClick={() => {
+                  downloadSubtitleFile(project, 'srt', { mode: subtitleMode });
+                  addToast('SubRip (.srt) downloaded', 'success');
+                }}
+              >
+                .SRT
+              </button>
+              <button
+                type="button"
+                className="px-2.5 py-1 rounded-md bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono text-sky-400 hover:text-sky-300 transition-colors"
+                onClick={() => {
+                  downloadSubtitleFile(project, 'vtt', { mode: subtitleMode });
+                  addToast('WebVTT (.vtt) downloaded', 'success');
+                }}
+              >
+                .VTT
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              className="flex-1 h-10 rounded-lg bg-primary text-black font-bold text-xs flex items-center justify-center gap-2 hover:bg-lime-300 active:scale-95 transition-all shadow-md shadow-primary/20"
+              onClick={handleDownload}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">download</span>
+              <span>Download MP4 File</span>
+            </button>
+            <button
+              className="px-3 h-10 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 text-xs transition-colors"
+              onClick={revokeExportResult}
+              title="Dismiss & free memory"
+              type="button"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
     </div>

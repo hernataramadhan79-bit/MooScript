@@ -6,6 +6,8 @@ import { ScriptTab } from './components/tabs/ScriptTab';
 import { VoiceTab } from './components/tabs/VoiceTab';
 import { StudioTab } from './components/tabs/StudioTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
+import { ToastContainer } from './components/ToastContainer';
+import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 
 export const App: React.FC = () => {
   const { activeTab, initStore } = useMooStore();
@@ -29,6 +31,12 @@ export const App: React.FC = () => {
 
       {/* Mobile Safe Bottom Navigation */}
       <BottomNav />
+
+      {/* Global Toast Notifications */}
+      <ToastContainer />
+
+      {/* PWA Version Update & Offline Ready Prompt */}
+      <PwaReloadPrompt />
     </div>
   );
 };

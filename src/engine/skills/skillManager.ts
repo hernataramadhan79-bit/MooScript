@@ -89,6 +89,20 @@ export async function deleteSkill(id: string): Promise<void> {
   await db.skills.delete(id);
 }
 
+import { z } from 'zod';
+
+const SkillImportSchema = z
+  .object({
+    name: z.string().min(1, 'Skill name is required').max(100, 'Skill name cannot exceed 100 characters'),
+    icon: z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']).catch('sparkles'),
+    description: z.string().max(500, 'Description cannot exceed 500 characters').default('Imported custom skill'),
+    systemPrompt: z
+      .string()
+      .min(1, 'System prompt is required')
+      .max(8192, 'System prompt cannot exceed 8KB (8192 characters)')
+  })
+  .strip();
+
 export function exportSkillToJson(skill: PersonaSkill): string {
   const exportable = {
     name: skill.name,
@@ -102,15 +116,24 @@ export function exportSkillToJson(skill: PersonaSkill): string {
 }
 
 export async function importSkillFromJson(jsonString: string): Promise<PersonaSkill> {
-  const parsed = JSON.parse(jsonString);
-  if (!parsed.name || !parsed.systemPrompt) {
-    throw new Error('Invalid Skill JSON: "name" and "systemPrompt" fields are required.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch {
+    throw new Error('Invalid JSON format.');
   }
 
+  const result = SkillImportSchema.safeParse(parsed);
+  if (!result.success) {
+    const errorMsg = result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+    throw new Error(`Skill validation failed: ${errorMsg}`);
+  }
+
+  const valid = result.data;
   return await addCustomSkill({
-    name: parsed.name,
-    icon: parsed.icon || 'sparkles',
-    description: parsed.description || 'Imported custom skill',
-    systemPrompt: parsed.systemPrompt
+    name: valid.name,
+    icon: valid.icon,
+    description: valid.description,
+    systemPrompt: valid.systemPrompt
   });
 }

@@ -1,17 +1,19 @@
 # MooScript — Zero-Server Motion Graphics Generator Specification
 
 ## 1. Architectural Philosophy & Constraints
+
 - **Pure Client-Side Execution**: Zero proprietary backend. All LLM calls, TTS generation, audio decoding, canvas rasterization, and MP4 muxing must execute directly on the client device (desktop & mobile browsers).
 - **Deterministic Frame Evaluation**: Rendering must NEVER rely on real-time playback (`requestAnimationFrame` or `setTimeout`). All animations must be computed strictly as a function of the discrete frame index: `RenderState = f(currentFrame, fps)`.
-- **Hardware Video Acceleration**: Use browser native WebCodecs (`VideoEncoder`) paired with `mp4-muxer`. Strictly avoid heavy WASM FFmpeg binaries to ensure instant encoding without crashing low-memory mobile browser tabs.
+- **Hardware Video Acceleration**: Use browser native WebCodecs (`VideoEncoder`) paired with `mediabunny`. Strictly avoid heavy WASM FFmpeg binaries to ensure instant encoding without crashing low-memory mobile browser tabs.
 - **Memory Safety & Zero Leaks**: Explicitly close every `VideoFrame` instance immediately after encoding. Clear all canvas buffers and release audio buffer references after rendering runs.
 
 ---
 
 ## 2. Tech Stack & Library Specifications
+
 - **Framework**: React 18 / Vite / TypeScript with Tailwind CSS for high-performance reactive UI.
 - **State Management**: `zustand` with persistence adapter via `dexie` (IndexedDB) for caching large audio Blobs and project state.
-- **Video Muxing**: `mp4-muxer` (via `ArrayBufferTarget`).
+- **Video Muxing**: `mediabunny` (via `BufferTarget` and `Mp4OutputFormat`).
 - **Motion Physics & Easing**: Custom spring interpolation helper functions and a headless timeline evaluator (interpolating position, scale, opacity, and blur per frame).
 - **Iconography / Assets**: Lightweight SVG string parser for local static icons (no remote network fetching during frame loops).
 - **Design System**: Tailored from Stitch design tokens with `#84cc16` lime accents, dark `#131315` surface, `Plus Jakarta Sans` & `JetBrains Mono` fonts, and Material Symbols.
@@ -21,6 +23,7 @@
 ## 3. Core Modules & Implementation Details
 
 ### Module 1: BYOK API Adapters (LLM & TTS)
+
 1. **LLM Adapter (`src/engine/ai/llm.ts`)**:
    - Direct browser-compatible fetch wrapper for Gemini (`v1beta`), OpenAI (`v1/chat/completions`), and Groq.
    - Enforce Structured Outputs via native JSON Schema mode.
@@ -33,11 +36,12 @@
      `durationSeconds = (wordCount / 130) * 60 + 1.2`
 
 ### Module 2: State Store & Data Contracts (`src/store/useMooStore.ts`)
+
 ```typescript
 export interface WordTimestamp {
   word: string;
   start: number; // in seconds
-  end: number;   // in seconds
+  end: number; // in seconds
 }
 
 export type MotionPreset = 'punch_zoom' | 'slide_split' | 'fade_float' | 'kinetic_shake';
@@ -57,7 +61,7 @@ export interface MooProject {
   title: string;
   aspectRatio: '9:16';
   fps: number; // default 30
-  width: number;  // 1080
+  width: number; // 1080
   height: number; // 1920
   theme: {
     bg: string;
@@ -72,6 +76,7 @@ export interface MooProject {
 ```
 
 ### Module 3: Deterministic Canvas Mograph Renderer (`src/engine/renderer/canvasRenderer.ts`)
+
 - **Canvas Context**: OffscreenCanvas (fallback to standard `<canvas>`) configured at 1080x1920.
 - **Dynamic Kinetic Typography Engine**:
   - For any given frame:
@@ -86,11 +91,11 @@ export interface MooProject {
   - Camera pushes: `scale = 1.0 + (frameInScene / totalSceneFrames) * 0.05`.
 
 ### Module 4: WebCodecs + MP4 Muxer Pipeline (`src/engine/export/mp4Exporter.ts`)
+
 - **Decode Audio**: Decode `audioBlob` into `AudioBuffer` via browser `AudioContext`.
-- **Frame Calculation**: `totalFrames = Math.ceil(audioBuffer.duration * fps)`.
-- **Muxer Setup**: `mp4-muxer` targeting `ArrayBufferTarget`.
-  - Video Track: `{ codec: 'avc', width: 1080, height: 1920 }`.
-  - Audio Track: `{ codec: 'aac', sampleRate: audioBuffer.sampleRate, numberOfChannels: 2 }` (or audio chunk encoder).
+- **Muxer Setup**: `mediabunny` `Output` targeting `BufferTarget` with `Mp4OutputFormat({ fastStart: 'in-memory' })`.
+  - Video Track: `CanvasSource` `{ codec: 'avc', bitrate }`.
+  - Audio Track: `AudioBufferSource` `{ codec: 'aac', bitrate: 128_000 }`.
 - **VideoEncoder Setup**:
   - Codec: `'avc1.4d002a'` (H.264 Baseline/Main profile at 1080p, supported across mobile Safari and Chromium).
   - Bitrate: 6,000,000 bps (6 Mbps), Hardware Acceleration: `'prefer-hardware'`.
@@ -104,7 +109,7 @@ export interface MooProject {
     const timestampMicroseconds = Math.round((frame / fps) * 1_000_000);
     const videoFrame = new VideoFrame(canvasElement, {
       timestamp: timestampMicroseconds,
-      duration: Math.round((1 / fps) * 1_000_000),
+      duration: Math.round((1 / fps) * 1_000_000)
     });
 
     // 3. Encode & Close immediately
@@ -117,7 +122,7 @@ export interface MooProject {
 
     // 5. Thermal & background yield
     if (frame % 30 === 0) {
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
     }
   }
   await videoEncoder.flush();
@@ -126,6 +131,7 @@ export interface MooProject {
 - **Emit Output**: Wrap ArrayBuffer into `Blob(['video/mp4'])` and create Object URL for instant mobile/desktop download.
 
 ### Module 5: Persona Skills Engine (`src/engine/skills/skillManager.ts`)
+
 - CRUD manager persisted in IndexedDB.
 - 3 built-in default presets:
   1. `⚡ Tech Explainer`: Fast tempo, punchy words, concise logic.
@@ -136,6 +142,7 @@ export interface MooProject {
 ---
 
 ## 4. Edge Cases & Resilience
+
 - **Mobile Thermal & Backgrounding**: Yield the main thread every 30 frames with `setTimeout(0)`.
 - **Safari MP4 Profile Compatibility**: Strict AVC level parameter `avc1.4d002a` (H.264 Main Profile level 4.2).
 - **Fallback Audio Muxing**: Gracefully handles lack of native `AudioEncoder` by muxing AAC data or synthesizing audio frames safely.

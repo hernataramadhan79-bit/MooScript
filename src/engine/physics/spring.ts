@@ -1,7 +1,7 @@
 export interface SpringConfig {
   stiffness?: number; // k
-  damping?: number;   // c
-  mass?: number;      // m
+  damping?: number; // c
+  mass?: number; // m
 }
 
 /**

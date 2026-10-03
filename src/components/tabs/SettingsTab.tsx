@@ -1,22 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { exportSkillToJson, importSkillFromJson, addCustomSkill, deleteSkill } from '../../engine/skills/skillManager';
+import { checkStoragePersistence, requestPersistentStorage } from '../../db/mooDb';
+import { testProviderApiKey } from '../../engine/ai/llm';
+import {
+  checkDeviceCapabilities,
+  getCachedLocalModelsSizeBytes,
+  purgeAllLocalModels,
+  type DeviceCapabilities
+} from '../../engine/ai/localTts';
 import type { LLMProvider, PersonaSkill } from '../../types';
 
 export const SettingsTab: React.FC = () => {
-  const {
-    settings,
-    updateSettings,
-    updateApiKey,
-    skills,
-    refreshSkills,
-    cacheSizeBytes,
-    clearCache
-  } = useMooStore();
+  const { settings, updateSettings, updateApiKey, skills, refreshSkills, cacheSizeBytes, clearCache, addToast } =
+    useMooStore();
 
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [testingKey, setTestingKey] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showAddSkillModal, setShowAddSkillModal] = useState(false);
+  const [persistenceStatus, setPersistenceStatus] = useState<{ persisted: boolean; supported: boolean } | null>(null);
+  const [deviceCaps, setDeviceCaps] = useState<DeviceCapabilities | null>(null);
+  const [localModelsSizeBytes, setLocalModelsSizeBytes] = useState<number>(0);
+
+  useEffect(() => {
+    checkStoragePersistence().then(setPersistenceStatus);
+    checkDeviceCapabilities().then(setDeviceCaps);
+    getCachedLocalModelsSizeBytes().then(setLocalModelsSizeBytes);
+  }, []);
+
+  const handlePurgeLocalModels = async () => {
+    if (confirm('Hapus semua cache model suara lokal dari browser?')) {
+      await purgeAllLocalModels();
+      setLocalModelsSizeBytes(0);
+      addToast('Semua cache model suara lokal berhasil dihapus!', 'info');
+    }
+  };
+
+  const handleTestKey = async (provider: LLMProvider | 'elevenlabs') => {
+    const key = settings.apiKeys[provider] || '';
+    if (!key.trim()) {
+      addToast(`Please enter an API Key for ${provider.toUpperCase()} before testing.`, 'warning');
+      return;
+    }
+    setTestingKey((prev) => ({ ...prev, [provider]: true }));
+    const result = await testProviderApiKey(provider, key);
+    setTestingKey((prev) => ({ ...prev, [provider]: false }));
+    setTestResults((prev) => ({ ...prev, [provider]: result }));
+    addToast(result.message, result.success ? 'success' : 'error');
+  };
+
+  const handleRequestPersistence = async () => {
+    const result = await requestPersistentStorage();
+    setPersistenceStatus(result);
+    if (result.persisted) {
+      addToast('Persistent storage granted by browser!', 'success');
+    } else if (!result.supported) {
+      addToast('Storage persistence API is not supported in this browser.', 'warning');
+    } else {
+      addToast('Browser denied persistent storage request.', 'warning');
+    }
+  };
 
   // New Skill form state
   const [newSkillName, setNewSkillName] = useState('');
@@ -30,6 +75,7 @@ export const SettingsTab: React.FC = () => {
 
   const handleSave = () => {
     setSaveSuccess(true);
+    addToast('Settings saved to local IndexedDB!', 'success');
     setTimeout(() => setSaveSuccess(false), 2000);
   };
 
@@ -53,10 +99,10 @@ export const SettingsTab: React.FC = () => {
         const text = evt.target?.result as string;
         await importSkillFromJson(text);
         await refreshSkills();
-        alert('Custom skill imported successfully!');
+        addToast('Custom skill imported successfully!', 'success');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        alert(`Failed to import skill: ${msg}`);
+        addToast(`Failed to import skill: ${msg}`, 'error');
       }
     };
     reader.readAsText(file);
@@ -64,7 +110,7 @@ export const SettingsTab: React.FC = () => {
 
   const handleCreateSkill = async () => {
     if (!newSkillName.trim() || !newSkillPrompt.trim()) {
-      alert('Skill Name and System Prompt are required.');
+      addToast('Skill Name and System Prompt are required.', 'warning');
       return;
     }
     await addCustomSkill({
@@ -74,6 +120,7 @@ export const SettingsTab: React.FC = () => {
       systemPrompt: newSkillPrompt.trim()
     });
     await refreshSkills();
+    addToast('Custom skill created successfully!', 'success');
     setShowAddSkillModal(false);
     setNewSkillName('');
     setNewSkillDesc('');
@@ -103,6 +150,53 @@ export const SettingsTab: React.FC = () => {
           <span className="text-[10px] font-mono text-zinc-500">Zero Server</span>
         </div>
 
+        {/* API Key Storage Security Mode */}
+        <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-[#111113] border border-zinc-800">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-zinc-300">Key Storage Security Mode</span>
+            <span className="text-[10px] font-mono text-zinc-500">
+              {settings.apiKeyStorage === 'session' ? '🔒 Session Only' : '💾 Persistent'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                settings.apiKeyStorage !== 'session'
+                  ? 'bg-zinc-800 text-primary border-primary/50'
+                  : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+              }`}
+              onClick={() => updateSettings({ apiKeyStorage: 'persistent' })}
+              type="button"
+            >
+              Persistent (IndexedDB)
+            </button>
+            <button
+              className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                settings.apiKeyStorage === 'session'
+                  ? 'bg-zinc-800 text-primary border-primary/50'
+                  : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+              }`}
+              onClick={() => updateSettings({ apiKeyStorage: 'session' })}
+              type="button"
+            >
+              Session Only (RAM/Session)
+            </button>
+          </div>
+          <p className="text-[10px] text-zinc-400 pt-1 leading-relaxed">
+            {settings.apiKeyStorage === 'session' ? (
+              <span className="text-emerald-400">
+                🔒 Keys are held in memory/sessionStorage during this active tab session and will be cleared when the
+                tab is closed. Nothing is written to permanent IndexedDB storage.
+              </span>
+            ) : (
+              <span className="text-amber-400">
+                ⚠️ Notice: Keys are saved in your browser&apos;s local IndexedDB for your convenience. Do not use on
+                public or shared computers.
+              </span>
+            )}
+          </p>
+        </div>
+
         {/* Active LLM Provider Selector */}
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-zinc-400">Primary Scripting Engine</span>
@@ -128,9 +222,9 @@ export const SettingsTab: React.FC = () => {
         </div>
 
         {/* Key Inputs */}
-        <div className="space-y-3 pt-1">
+        <div className="space-y-3.5 pt-1">
           {/* Gemini API Key */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-300 font-medium">Gemini API Key</span>
               <a
@@ -160,10 +254,30 @@ export const SettingsTab: React.FC = () => {
                 </span>
               </button>
             </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <button
+                className="px-2.5 py-1 text-[11px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1 disabled:opacity-50"
+                disabled={testingKey.gemini || !settings.apiKeys.gemini}
+                onClick={() => handleTestKey('gemini')}
+                type="button"
+              >
+                <span className={`material-symbols-outlined text-[13px] ${testingKey.gemini ? 'animate-spin' : ''}`}>
+                  {testingKey.gemini ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{testingKey.gemini ? 'Verifying...' : 'Test Key'}</span>
+              </button>
+              {testResults.gemini && (
+                <span
+                  className={`text-[10px] font-mono ${testResults.gemini.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[300px]`}
+                >
+                  {testResults.gemini.success ? '✓ Valid' : '✗ ' + testResults.gemini.message}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* OpenAI API Key */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-300 font-medium">OpenAI API Key (GPT & TTS)</span>
               <a
@@ -193,10 +307,30 @@ export const SettingsTab: React.FC = () => {
                 </span>
               </button>
             </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <button
+                className="px-2.5 py-1 text-[11px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1 disabled:opacity-50"
+                disabled={testingKey.openai || !settings.apiKeys.openai}
+                onClick={() => handleTestKey('openai')}
+                type="button"
+              >
+                <span className={`material-symbols-outlined text-[13px] ${testingKey.openai ? 'animate-spin' : ''}`}>
+                  {testingKey.openai ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{testingKey.openai ? 'Verifying...' : 'Test Key'}</span>
+              </button>
+              {testResults.openai && (
+                <span
+                  className={`text-[10px] font-mono ${testResults.openai.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[300px]`}
+                >
+                  {testResults.openai.success ? '✓ Valid' : '✗ ' + testResults.openai.message}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Groq API Key */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-300 font-medium">Groq API Key (Ultra-Fast)</span>
               <a
@@ -226,10 +360,30 @@ export const SettingsTab: React.FC = () => {
                 </span>
               </button>
             </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <button
+                className="px-2.5 py-1 text-[11px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1 disabled:opacity-50"
+                disabled={testingKey.groq || !settings.apiKeys.groq}
+                onClick={() => handleTestKey('groq')}
+                type="button"
+              >
+                <span className={`material-symbols-outlined text-[13px] ${testingKey.groq ? 'animate-spin' : ''}`}>
+                  {testingKey.groq ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{testingKey.groq ? 'Verifying...' : 'Test Key'}</span>
+              </button>
+              {testResults.groq && (
+                <span
+                  className={`text-[10px] font-mono ${testResults.groq.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[300px]`}
+                >
+                  {testResults.groq.success ? '✓ Valid' : '✗ ' + testResults.groq.message}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* ElevenLabs API Key */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-300 font-medium">ElevenLabs API Key (Word Timestamps)</span>
               <a
@@ -259,6 +413,28 @@ export const SettingsTab: React.FC = () => {
                 </span>
               </button>
             </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <button
+                className="px-2.5 py-1 text-[11px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1 disabled:opacity-50"
+                disabled={testingKey.elevenlabs || !settings.apiKeys.elevenlabs}
+                onClick={() => handleTestKey('elevenlabs')}
+                type="button"
+              >
+                <span
+                  className={`material-symbols-outlined text-[13px] ${testingKey.elevenlabs ? 'animate-spin' : ''}`}
+                >
+                  {testingKey.elevenlabs ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{testingKey.elevenlabs ? 'Verifying...' : 'Test Key'}</span>
+              </button>
+              {testResults.elevenlabs && (
+                <span
+                  className={`text-[10px] font-mono ${testResults.elevenlabs.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[300px]`}
+                >
+                  {testResults.elevenlabs.success ? '✓ Valid' : '✗ ' + testResults.elevenlabs.message}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -268,9 +444,7 @@ export const SettingsTab: React.FC = () => {
         <div className="flex items-center justify-between pb-1 border-b border-zinc-800/80">
           <div className="flex items-center gap-1.5">
             <span className="material-symbols-outlined text-primary text-[18px]">tune</span>
-            <span className="text-xs font-semibold text-white uppercase tracking-wider">
-              Engine Defaults
-            </span>
+            <span className="text-xs font-semibold text-white uppercase tracking-wider">Engine Defaults</span>
           </div>
         </div>
 
@@ -315,9 +489,7 @@ export const SettingsTab: React.FC = () => {
         <div className="flex items-center justify-between pb-1 border-b border-zinc-800/80">
           <div className="flex items-center gap-1.5">
             <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
-            <span className="text-xs font-semibold text-white uppercase tracking-wider">
-              Persona Skills Engine
-            </span>
+            <span className="text-xs font-semibold text-white uppercase tracking-wider">Persona Skills Engine</span>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer flex items-center gap-0.5">
@@ -346,9 +518,7 @@ export const SettingsTab: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-white truncate">{s.name}</span>
                   {s.isBuiltin && (
-                    <span className="text-[9px] font-mono px-1 rounded bg-zinc-800 text-zinc-400">
-                      Built-in
-                    </span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-zinc-800 text-zinc-400">Built-in</span>
                   )}
                 </div>
                 <span className="text-[10px] text-zinc-400 truncate">{s.description}</span>
@@ -406,11 +576,99 @@ export const SettingsTab: React.FC = () => {
           <span className="text-[11px] text-zinc-500">Audio Blobs & Synthesized Previews</span>
           <button
             className="h-8 px-3 text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
-            onClick={clearCache}
+            onClick={async () => {
+              await clearCache();
+              addToast('Storage cache cleared successfully!', 'info');
+            }}
             type="button"
           >
             <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
             <span>Clear Cache</span>
+          </button>
+        </div>
+
+        {/* Browser Persistent Storage Status */}
+        <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-zinc-400">verified_user</span>
+            <span className="text-zinc-300 text-[11px]">Storage Eviction Protection</span>
+          </div>
+          {persistenceStatus?.persisted ? (
+            <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded">
+              Persisted (Safari/Disk Safe)
+            </span>
+          ) : (
+            <button
+              className="text-[10px] font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2.5 py-1 rounded transition-colors flex items-center gap-1"
+              onClick={handleRequestPersistence}
+              type="button"
+            >
+              <span>Enable Persistent Mode</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Client Hardware & AI Capabilities Card */}
+      <section className="p-3.5 rounded-xl bg-[#18181b] border border-zinc-800 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between pb-1 border-b border-zinc-800/80">
+          <div className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-primary text-[18px]">memory</span>
+            <span className="text-xs font-semibold text-white uppercase tracking-wider">
+              Client Hardware & AI Engine
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500">100% Client-Side</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 flex flex-col items-center">
+            <span className="text-[10px] text-zinc-400">Acceleration</span>
+            <span
+              className={`text-xs font-mono font-semibold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-amber-400'}`}
+            >
+              {deviceCaps?.hasWebGpu ? 'WebGPU' : 'WASM'}
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 flex flex-col items-center">
+            <span className="text-[10px] text-zinc-400">RAM Perangkat</span>
+            <span className="text-xs font-mono font-semibold text-zinc-200 mt-0.5">
+              {deviceCaps?.deviceMemoryGb ? `~${deviceCaps.deviceMemoryGb} GB` : 'Standard'}
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 flex flex-col items-center">
+            <span className="text-[10px] text-zinc-400">CPU Threads</span>
+            <span className="text-xs font-mono font-semibold text-zinc-200 mt-0.5">
+              {deviceCaps?.hardwareConcurrency || 4} Cores
+            </span>
+          </div>
+        </div>
+
+        {deviceCaps?.isLowEnd && deviceCaps.warningMessage && (
+          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2">
+            <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0 mt-0.5">warning</span>
+            <span>{deviceCaps.warningMessage}</span>
+          </div>
+        )}
+
+        {/* Local TTS Models Cache Storage */}
+        <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
+          <div>
+            <div className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-zinc-400">offline_bolt</span>
+              <span>Local TTS Model Cache</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">
+              Disk Usage: {(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB
+            </span>
+          </div>
+          <button
+            className="h-7 px-2.5 text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 active:scale-95 transition-all flex items-center gap-1"
+            onClick={handlePurgeLocalModels}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[14px]">delete</span>
+            <span>Purge Model Cache</span>
           </button>
         </div>
       </section>
@@ -423,9 +681,7 @@ export const SettingsTab: React.FC = () => {
             onClick={handleSave}
             type="button"
           >
-            <span className="material-symbols-outlined text-[18px]">
-              {saveSuccess ? 'done_all' : 'check'}
-            </span>
+            <span className="material-symbols-outlined text-[18px]">{saveSuccess ? 'done_all' : 'check'}</span>
             <span>{saveSuccess ? 'Settings Saved to Local IndexedDB!' : 'Save Settings'}</span>
           </button>
         </div>
@@ -455,6 +711,26 @@ export const SettingsTab: React.FC = () => {
                   value={newSkillName}
                   onChange={(e) => setNewSkillName(e.target.value)}
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-zinc-400">Skill Icon</label>
+                <div className="flex gap-2 pt-1">
+                  {['sparkles', 'zap', 'brain', 'flame', 'code', 'mascot'].map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setNewSkillIcon(icon)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center border text-sm transition-colors ${
+                        newSkillIcon === icon
+                          ? 'border-primary bg-primary/20 text-primary'
+                          : 'border-zinc-800 bg-[#111113] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">{icon}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
