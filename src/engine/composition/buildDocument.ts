@@ -1,4 +1,4 @@
-import type { Composition, MooProject } from '../../types';
+import type { Composition, MooProject, SceneModule } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 
@@ -17,11 +17,29 @@ export function buildCompositionDocument(project: MooProject): string {
   const height = comp.height || 1920;
   const aspectRatio = `${width} / ${height}`;
 
+  // Order modules according to project.scenes, then append leftover comp.scenes
+  const orderedModules: SceneModule[] = [];
+  const usedBeatIds = new Set<string>();
+
+  for (const projScene of project.scenes || []) {
+    const mod = comp.scenes.find((m) => m.beatId === projScene.id);
+    if (mod) {
+      orderedModules.push(mod);
+      usedBeatIds.add(mod.beatId);
+    }
+  }
+
+  for (const mod of comp.scenes) {
+    if (!usedBeatIds.has(mod.beatId)) {
+      orderedModules.push(mod);
+    }
+  }
+
   // Assemble scene CSS
-  const scenesCss = comp.scenes.map((s, idx) => `/* Scene ${idx + 1} (${s.beatId}) */\n${s.css || ''}`).join('\n\n');
+  const scenesCss = orderedModules.map((s, idx) => `/* Scene ${idx + 1} (${s.beatId}) */\n${s.css || ''}`).join('\n\n');
 
   // Assemble scene JS module definitions
-  const scenesJs = comp.scenes
+  const scenesJs = orderedModules
     .map((s, idx) => {
       return `
 // Register Scene ${idx + 1}

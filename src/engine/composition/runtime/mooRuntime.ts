@@ -60,7 +60,7 @@ export function getRuntimeScript(): string {
     for (let i = 0; i < scenes.length; i++) {
       const sceneItem = scenes[i];
       const def = sceneItem.definition;
-      const meta = (compositionMeta && compositionMeta.scenes && compositionMeta.scenes[i]) || {};
+      const meta = (compositionMeta?.scenes || []).find(function(m) { return m.id === sceneItem.id; }) || {};
       const duration = meta.duration || 3.0;
 
       // Create container for scene
@@ -114,9 +114,11 @@ export function getRuntimeScript(): string {
       accumulatedTime += duration;
     }
 
-    // Wait for fonts & images
+    // Wait for fonts & images (with 2500ms timeout fallback)
     if (document.fonts) {
-      try { await document.fonts.ready; } catch(e) {}
+      try {
+        await Promise.race([document.fonts.ready, new Promise(function(r) { setTimeout(r, 2500); })]);
+      } catch(e) {}
     }
 
     // Initial render at frame 0
@@ -166,12 +168,15 @@ export function getRuntimeScript(): string {
         const stageContainer = document.getElementById('moo-stage') || document.getElementById('moo-viewport') || document.body;
         const clone = stageContainer ? stageContainer.cloneNode(true) : document.createElement('div');
 
+        const serialized = new XMLSerializer().serializeToString(clone);
+        const wrapperXmlns = serialized.indexOf('xmlns="http://www.w3.org/1999/xhtml"') !== -1 ? '' : ' xmlns="http://www.w3.org/1999/xhtml"';
+
         const svgString = 
           '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-          '<style>' + styles + '</style>' +
+          '<style><![CDATA[' + styles + ']]></style>' +
           '<foreignObject width="100%" height="100%">' +
-          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;position:relative;background:#09090b;color:#f4f4f6;overflow:hidden;">' +
-          clone.outerHTML +
+          '<div' + wrapperXmlns + ' style="width:100%;height:100%;position:relative;background:#09090b;color:#f4f4f6;overflow:hidden;">' +
+          serialized +
           '</div>' +
           '</foreignObject>' +
           '</svg>';
@@ -201,4 +206,38 @@ export function getRuntimeScript(): string {
   });
 })();
 `;
+}
+
+/**
+ * Serializes a DOM node and CSS into an SVG string compatible with foreignObject rendering.
+ */
+export function serializeSvgFrame(
+  clone: Element,
+  width: number,
+  height: number,
+  styles: string
+): string {
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const wrapperXmlns = serialized.includes('xmlns="http://www.w3.org/1999/xhtml"')
+    ? ''
+    : ' xmlns="http://www.w3.org/1999/xhtml"';
+
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+    width +
+    '" height="' +
+    height +
+    '">' +
+    '<style><![CDATA[' +
+    styles +
+    ']]></style>' +
+    '<foreignObject width="100%" height="100%">' +
+    '<div' +
+    wrapperXmlns +
+    ' style="width:100%;height:100%;position:relative;background:#09090b;color:#f4f4f6;overflow:hidden;">' +
+    serialized +
+    '</div>' +
+    '</foreignObject>' +
+    '</svg>'
+  );
 }

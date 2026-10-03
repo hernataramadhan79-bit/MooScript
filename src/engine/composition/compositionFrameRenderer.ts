@@ -33,9 +33,10 @@ export async function createCompositionFrameRenderer(
         cleanup();
         resolve(null);
       }
-    }, 4000);
+    }, 15000);
 
     const handleMessage = (e: MessageEvent) => {
+      if (!iframe || e.source !== iframe.contentWindow) return;
       const data = e.data;
       if (!data || !data.type) return;
 
@@ -45,17 +46,16 @@ export async function createCompositionFrameRenderer(
         resolve({
           renderFrame: async (frame: number, timeSec: number, targetCanvas: HTMLCanvasElement): Promise<void> => {
             const targetIframe = iframe;
-            if (!targetIframe) return;
+            if (!targetIframe) throw new Error(`Iframe unavailable for frame ${frame}`);
             const contentWindow = targetIframe.contentWindow;
-            if (!contentWindow) return;
+            if (!contentWindow) throw new Error(`contentWindow unavailable for frame ${frame}`);
 
-            return new Promise((res) => {
+            return new Promise((res, rej) => {
               const frameTimeout = setTimeout(() => {
                 pendingCallback = null;
                 pendingErrorCallback = null;
                 pendingFrameId = null;
-                // Gracefully continue even if single frame capture times out
-                res();
+                rej(new Error(`Frame capture timed out for frame ${frame}`));
               }, 3000);
 
               pendingFrameId = frame;
@@ -69,15 +69,15 @@ export async function createCompositionFrameRenderer(
                   }
                   res();
                 };
-                img.onerror = () => {
-                  res();
+                img.onerror = (err) => {
+                  rej(new Error(`Image render error for frame ${frame}: ${String(err)}`));
                 };
                 img.src = dataUrl;
               };
 
-              pendingErrorCallback = (_errMsg: string) => {
+              pendingErrorCallback = (errMsg: string) => {
                 clearTimeout(frameTimeout);
-                res();
+                rej(new Error(`Frame capture error for frame ${frame}: ${errMsg}`));
               };
 
               contentWindow.postMessage(

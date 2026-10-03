@@ -30,6 +30,7 @@ export interface ExportResult {
 export interface ExportOptions {
   hud?: boolean;
   watermark?: boolean;
+  useAudioDuration?: boolean;
 }
 
 async function yieldOrSleep(ms = 4): Promise<void> {
@@ -100,7 +101,16 @@ export async function exportMooProjectToMP4(
 
   // 2. Decode Audio if present
   let audioBuffer: AudioBuffer | null = null;
+  let audioDuration = 0;
   let totalDuration = 0;
+
+  const scenesDurationSum = project.scenes.reduce(
+    (acc, s) => acc + (s.durationInSeconds > 0 ? s.durationInSeconds : 3),
+    0
+  );
+
+  const isAudioStale = (project as { audioStale?: boolean }).audioStale;
+  const useAudioDuration = opts?.useAudioDuration ?? (isAudioStale !== undefined ? !isAudioStale : true);
 
   if (project.audioBlob && project.audioBlob.size > 0) {
     try {
@@ -109,18 +119,24 @@ export async function exportMooProjectToMP4(
       )();
       const arrayBuffer = await project.audioBlob.arrayBuffer();
       audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      totalDuration = audioBuffer.duration;
+      audioDuration = audioBuffer.duration;
       await audioCtx.close();
+
+      if (Math.abs(audioDuration - scenesDurationSum) > 0.5) {
+        warnings.push(
+          `Durasi audio (${audioDuration.toFixed(2)}s) berbeda dari total durasi scene (${scenesDurationSum.toFixed(2)}s) lebih dari 0.5s.`
+        );
+      }
     } catch {
       warnings.push('Audio file gagal didecode, durasi ditentukan berdasarkan durasi scene.');
     }
   }
 
-  // Fallback duration based on scene durations
-  if (totalDuration <= 0) {
-    totalDuration = project.scenes.reduce((acc, s) => acc + (s.durationInSeconds > 0 ? s.durationInSeconds : 3), 0);
-  }
-  if (totalDuration <= 0) {
+  if (useAudioDuration && audioDuration > 0) {
+    totalDuration = audioDuration;
+  } else if (scenesDurationSum > 0) {
+    totalDuration = scenesDurationSum;
+  } else {
     totalDuration = 5; // Default 5 seconds if completely empty
   }
 
@@ -169,6 +185,9 @@ export async function exportMooProjectToMP4(
   if (isCompositionMode) {
     onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Initializing composition headless sandbox...' });
     compRenderer = await createCompositionFrameRenderer(project, width, height);
+    if (!compRenderer) {
+      throw new Error('Composition renderer gagal diinisialisasi untuk mode komposisi.');
+    }
   }
 
   const videoSource = new CanvasSource(rawCanvas as HTMLCanvasElement, {
@@ -206,6 +225,9 @@ export async function exportMooProjectToMP4(
     }
 
     // 7. Deterministic Render Loop
+    let consecutiveFrameFailures = 0;
+    let failedFrameCount = 0;
+
     for (let frame = 0; frame < totalFrames; frame++) {
       if (abortSignal?.aborted) {
         await output.cancel().catch(() => {});
@@ -214,7 +236,18 @@ export async function exportMooProjectToMP4(
 
       // 1. Draw frame deterministically: RenderState = f(currentFrame, fps, project)
       if (compRenderer) {
-        await compRenderer.renderFrame(frame, frame / fps, rawCanvas as HTMLCanvasElement);
+        try {
+          await compRenderer.renderFrame(frame, frame / fps, rawCanvas as HTMLCanvasElement);
+          consecutiveFrameFailures = 0;
+        } catch (frameErr) {
+          consecutiveFrameFailures++;
+          failedFrameCount++;
+          if (consecutiveFrameFailures >= 3) {
+            throw new Error(
+              `Ekspor komposisi gagal: 3 kegagalan frame berturut-turut pada frame ${frame + 1} (${frameErr instanceof Error ? frameErr.message : String(frameErr)})`
+            );
+          }
+        }
       } else {
         canvasRenderer.draw(frame, totalFrames, project, {
           hud: opts?.hud ?? false,
@@ -238,6 +271,10 @@ export async function exportMooProjectToMP4(
       if (frame % 30 === 0) {
         await yieldOrSleep(0);
       }
+    }
+
+    if (failedFrameCount > 0) {
+      warnings.push(`Terdapat ${failedFrameCount} frame yang gagal dirender saat ekspor komposisi.`);
     }
 
     onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: 'Finalizing MP4 container...' });
@@ -268,6 +305,13 @@ export async function exportMooProjectToMP4(
       throw new DOMException('Export was cancelled by user', 'AbortError');
     }
     const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes('Composition renderer') ||
+      message.includes('kegagalan frame') ||
+      message.includes('Ekspor komposisi')
+    ) {
+      throw err instanceof Error ? err : new Error(message);
+    }
     throw new Error(`VideoEncoder error during export: ${message}`);
   } finally {
     if (compRenderer) {

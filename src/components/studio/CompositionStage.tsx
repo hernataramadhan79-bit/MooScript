@@ -7,22 +7,38 @@ interface CompositionStageProps {
 }
 
 export const CompositionStage: React.FC<CompositionStageProps> = ({ className = '' }) => {
-  const { project, currentFrame } = useMooStore();
+  const composition = useMooStore((s) => s.project.composition);
+  const scenes = useMooStore((s) => s.project.scenes);
+  const width = useMooStore((s) => s.project.composition?.width || s.project.width || 1080);
+  const height = useMooStore((s) => s.project.composition?.height || s.project.height || 1920);
+  const fps = useMooStore((s) => s.project.fps || 30);
+  const projectId = useMooStore((s) => s.project.id);
+  const currentFrame = useMooStore((s) => s.currentFrame);
+
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [scale, setScale] = useState(1);
   const [isReady, setIsReady] = useState(false);
 
-  const fps = project.fps || 30;
   const currentTime = currentFrame / fps;
+  const latestTimeRef = useRef(currentTime);
+  latestTimeRef.current = currentTime;
+  const latestFrameRef = useRef(currentFrame);
+  latestFrameRef.current = currentFrame;
 
-  const width = project.composition?.width || project.width || 1080;
-  const height = project.composition?.height || project.height || 1920;
-  // Build srcdoc when project composition or scenes change
+  // Build srcdoc when minimal composition or scenes properties change
   const srcDoc = React.useMemo(() => {
-    return buildCompositionDocument(project);
-  }, [project]);
+    const minimalProject = {
+      id: projectId,
+      width,
+      height,
+      fps,
+      scenes,
+      composition
+    } as any;
+    return buildCompositionDocument(minimalProject);
+  }, [composition, scenes, width, height, fps, projectId]);
 
   // Adjust container scale to fit responsive viewport smoothly
   useEffect(() => {
@@ -46,11 +62,20 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   // Handle postMessage communication from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return;
       const data = e.data;
       if (!data || !data.type) return;
 
       if (data.type === 'ready') {
         setIsReady(true);
+        iframeRef.current?.contentWindow?.postMessage(
+          {
+            type: 'seek',
+            time: latestTimeRef.current,
+            id: latestFrameRef.current
+          },
+          '*'
+        );
       }
     };
 
@@ -88,8 +113,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       >
         <iframe
           key={
-            project.composition
-              ? `${project.composition.id}-${project.composition.updatedAt || ''}-${project.composition.scenes?.length || 0}`
+            composition
+              ? `${composition.id}-${composition.updatedAt || ''}-${composition.scenes?.length || 0}`
               : 'comp-default'
           }
           ref={iframeRef}
@@ -101,8 +126,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               iframeRef.current.contentWindow.postMessage(
                 {
                   type: 'seek',
-                  time: currentTime,
-                  id: currentFrame
+                  time: latestTimeRef.current,
+                  id: latestFrameRef.current
                 },
                 '*'
               );
