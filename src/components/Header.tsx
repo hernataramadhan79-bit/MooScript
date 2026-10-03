@@ -13,12 +13,10 @@ export const Header: React.FC = () => {
       <header className="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-zinc-800/80">
         <div className="h-14 px-4 max-w-5xl mx-auto flex items-center justify-between gap-3">
           {/* Brand & Mascot */}
-          <div className="flex items-center gap-2.5 shrink-0 cursor-pointer" onClick={() => setActiveTab('studio')}>
-            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-zinc-700/60 bg-black flex items-center justify-center shadow-sm hover:border-primary transition-colors">
-              <img alt="MooScript Logo" className="w-full h-full object-cover" src="/logo.svg" />
-            </div>
+          <div className="flex items-center gap-2 shrink-0 cursor-pointer" onClick={() => setActiveTab('studio')}>
+            <img alt="MooScript Logo" className="w-8 h-8 shrink-0 rounded-lg shadow-sm" src="/logo.svg" />
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-[15px] tracking-tight text-white hidden xs:inline">MooScript</span>
+              <span className="font-bold text-[15px] tracking-tight text-white">MooScript</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 border border-zinc-700/60 hidden sm:inline">
                 v0.1.0
               </span>
