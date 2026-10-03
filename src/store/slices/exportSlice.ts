@@ -12,6 +12,12 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
   startExport: async (opts?: ExportOptions) => {
     get().pause();
 
+    const scenes = get().project.scenes;
+    if (!scenes || scenes.length === 0) {
+      get().addToast('Cannot export: project has no scenes.', 'warning');
+      return;
+    }
+
     // Revoke previous export URL if present to prevent memory leaks
     if (get().exportResult?.objectUrl) {
       URL.revokeObjectURL(get().exportResult!.objectUrl);
@@ -60,7 +66,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     const currentResult = get().exportResult;
     if (currentResult?.objectUrl) {
       URL.revokeObjectURL(currentResult.objectUrl);
-      set({ exportResult: null });
     }
+    set({ exportResult: null });
   }
 });

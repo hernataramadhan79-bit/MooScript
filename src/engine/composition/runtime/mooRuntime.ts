@@ -134,7 +134,16 @@ export function getRuntimeScript(): string {
     }, '*');
   }
 
+  function seekTo(t) {
+    t = Number(t) || 0;
+    virtualTimeSeconds = t;
+    if (masterTl) {
+      masterTl.seek(t, false);
+    }
+  }
+
   window.__MOO_INIT__ = initMasterTimeline;
+  window.__MOO_SEEK__ = seekTo;
 
   // 5. Host Communication Protocol
   window.addEventListener('message', async function(ev) {
@@ -145,17 +154,11 @@ export function getRuntimeScript(): string {
       await initMasterTimeline(data.meta);
     } else if (data.type === 'seek') {
       const t = Number(data.time) || 0;
-      virtualTimeSeconds = t;
-      if (masterTl) {
-        masterTl.seek(t, false);
-      }
+      seekTo(t);
       window.parent.postMessage({ type: 'seeked', id: data.id, time: t }, '*');
     } else if (data.type === 'capture') {
       const t = Number(data.time) || 0;
-      virtualTimeSeconds = t;
-      if (masterTl) {
-        masterTl.seek(t, false);
-      }
+      seekTo(t);
 
       // ForeignObject serialization for zero-server frame rasterization
       try {

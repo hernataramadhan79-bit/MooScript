@@ -1,23 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
-import { exportMooProjectToMP4, type ExportProgress } from '../../engine/export/mp4Exporter';
 import { generateSrt } from '../../engine/export/subtitleExporter';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
+import { syncComposition } from '../../engine/composition/sync';
+
+export function safeFileName(title?: string): string {
+  if (!title) return 'mooscript';
+  const cleaned = title.replace(/[\\/:*?"<>|]+/g, '-').trim();
+  return cleaned || 'mooscript';
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 interface ExportViewProps {
   onBackStep?: () => void;
 }
 
 export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
-  const { project, addToast } = useMooStore();
+  const project = useMooStore((s) => s.project);
+  const addToast = useMooStore((s) => s.addToast);
+  const isExporting = useMooStore((s) => s.isExporting);
+  const exportProgress = useMooStore((s) => s.exportProgress);
+  const exportResult = useMooStore((s) => s.exportResult);
+  const startExport = useMooStore((s) => s.startExport);
+  const cancelExport = useMooStore((s) => s.cancelExport);
+  const revokeExportResult = useMooStore((s) => s.revokeExportResult);
 
   const [exportFormat, setExportFormat] = useState<'mp4' | 'html' | 'srt'>('mp4');
-  const [isExporting, setIsExporting] = useState(false);
-  const [progress, setProgress] = useState<ExportProgress | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  const projectId = project.id;
+  useEffect(() => {
+    if (!isExporting) {
+      revokeExportResult();
+    }
+  }, [projectId, isExporting, revokeExportResult]);
+
+  useEffect(() => {
+    return () => {
+      if (!useMooStore.getState().isExporting) {
+        useMooStore.getState().revokeExportResult();
+      }
+    };
+  }, []);
 
   const formatOptions = [
     { value: 'mp4' as const, label: 'MP4 Video (WebCodecs)', icon: 'movie' },
@@ -27,55 +61,57 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
 
   const handleExport = async () => {
     if (exportFormat === 'html') {
-      // Export single-file HTML bundle
-      const htmlContent = buildCompositionDocument(project);
+      let projectToExport = project;
+      if (!projectToExport.composition) {
+        projectToExport = syncComposition(projectToExport);
+      }
+
+      let audioDataUrl: string | undefined;
+      if (project.audioBlob) {
+        try {
+          audioDataUrl = await blobToDataUrl(project.audioBlob);
+        } catch {
+          // Proceed without embedded audio if reading fails
+        }
+      }
+
+      const htmlContent = buildCompositionDocument(projectToExport, {
+        standalone: true,
+        audioDataUrl
+      });
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${project.title || 'mooscript'}.html`;
+      a.download = `${safeFileName(project.title)}.html`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
       addToast('HTML Standalone berhasil diunduh!', 'success');
       return;
     }
 
     if (exportFormat === 'srt') {
-      // Export SRT subtitle
       const srtContent = generateSrt(project);
       const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${project.title || 'mooscript'}.srt`;
+      a.download = `${safeFileName(project.title)}.srt`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
       addToast('Subtitle SRT berhasil diunduh!', 'success');
       return;
     }
 
-    // Export MP4 via zero-server WebCodecs
-    setIsExporting(true);
-    setProgress({ percent: 1, currentFrame: 0, totalFrames: 0, statusText: 'Memulai pipeline WebCodecs...' });
-
-    try {
-      const result = await exportMooProjectToMP4(project, (p) => {
-        setProgress(p);
-      });
-
-      setDownloadUrl(result.objectUrl);
+    // Export MP4 via zero-server WebCodecs store slice
+    await startExport();
+    const result = useMooStore.getState().exportResult;
+    if (result && result.objectUrl) {
       addToast('MP4 Video berhasil diekspor langsung di browser!', 'success');
-
-      // Trigger instant download
       const a = document.createElement('a');
       a.href = result.objectUrl;
-      a.download = `${project.title || 'mooscript'}.mp4`;
+      a.download = `${safeFileName(project.title)}.mp4`;
       a.click();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Ekspor MP4 gagal: ${msg}`, 'error');
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -104,7 +140,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
           )}
           {exportFormat === 'html' && (
             <p>
-              Satu berkas HTML mandiri berisi seluruh GSAP timeline, CSS, dan aset visual. Dapat dibuka langsung dengan klik ganda di browser apa pun tanpa koneksi server.
+              Satu berkas HTML mandiri berisi seluruh GSAP timeline, CSS, aset visual, dan kontrol pemutar audio terintegrasi. Dapat dibuka langsung dengan klik ganda di browser apa pun tanpa server.
             </p>
           )}
           {exportFormat === 'srt' && (
@@ -115,33 +151,60 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
         </div>
 
         {/* Progress Bar when exporting */}
-        {isExporting && progress && (
+        {isExporting && exportProgress && (
           <div className="flex flex-col gap-2 p-4 rounded-xl bg-surface-2 border border-border">
             <div className="flex items-center justify-between text-[13px]">
-              <span className="font-medium text-on-surface">{progress.statusText}</span>
-              <span className="font-mono text-accent font-semibold">{progress.percent}%</span>
+              <span className="font-medium text-on-surface">{exportProgress.statusText}</span>
+              <span className="font-mono text-accent font-semibold">{exportProgress.percent}%</span>
             </div>
             <div className="w-full h-2 rounded-full bg-surface-3 overflow-hidden">
               <div
                 className="h-full bg-accent transition-all duration-150 rounded-full"
-                style={{ width: `${progress.percent}%` }}
+                style={{ width: `${exportProgress.percent}%` }}
               />
             </div>
-            <span className="text-[11px] text-text-faint text-center mt-1">
-              Mohon biarkan tab ini tetap terbuka sampai render frame selesai.
-            </span>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-[11px] text-text-faint">
+                Mohon biarkan tab ini tetap terbuka sampai render frame selesai.
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="close"
+                onClick={cancelExport}
+                className="text-error hover:text-error hover:bg-error/10"
+              >
+                Batalkan
+              </Button>
+            </div>
           </div>
         )}
 
-        {downloadUrl && !isExporting && (
+        {/* Export Warnings List */}
+        {exportResult?.warnings && exportResult.warnings.length > 0 && !isExporting && (
+          <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[13px] text-amber-200">
+            <span className="font-semibold flex items-center gap-1.5 text-amber-400">
+              <span className="material-symbols-outlined text-[16px]">warning</span>
+              Peringatan Ekspor:
+            </span>
+            <ul className="list-disc list-inside space-y-1 text-xs text-amber-300/90 pl-1">
+              {exportResult.warnings.map((warn, i) => (
+                <li key={i}>{warn}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Download Ready Banner */}
+        {exportResult?.objectUrl && !isExporting && (
           <div className="flex items-center justify-between p-3 rounded-xl bg-accent-muted border border-accent/40 text-[13px] text-on-surface">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-accent text-[18px]">check_circle</span>
               <span>Video siap diunduh</span>
             </span>
             <a
-              href={downloadUrl}
-              download={`${project.title || 'mooscript'}.mp4`}
+              href={exportResult.objectUrl}
+              download={`${safeFileName(project.title)}.mp4`}
               className="font-semibold text-accent hover:underline"
             >
               Unduh Lagi
@@ -149,16 +212,28 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
           </div>
         )}
 
-        <Button
-          variant="primary"
-          icon="download"
-          isLoading={isExporting}
-          disabled={isExporting}
-          onClick={handleExport}
-          className="w-full mt-1"
-        >
-          {isExporting ? 'Mengekspor Frame Video...' : `Ekspor ${exportFormat.toUpperCase()}`}
-        </Button>
+        <div className="flex items-center gap-2 mt-1">
+          <Button
+            variant="primary"
+            icon="download"
+            isLoading={isExporting}
+            disabled={isExporting}
+            onClick={handleExport}
+            className="flex-1"
+          >
+            {isExporting ? 'Mengekspor Frame Video...' : `Ekspor ${exportFormat.toUpperCase()}`}
+          </Button>
+          {isExporting && (
+            <Button
+              variant="secondary"
+              icon="cancel"
+              onClick={cancelExport}
+              className="text-error hover:text-error"
+            >
+              Batalkan
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Navigasi Langkah */}
