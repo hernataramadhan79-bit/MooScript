@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   outputLanguage: 'id',
   selectedLLMProvider: 'gemini',
   selectedTTSProvider: 'fallback',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-2.5-flash',
   openaiModel: 'gpt-4o-mini',
   groqModel: 'llama-3.3-70b-versatile',
   voiceIds: {
@@ -104,9 +104,16 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
         ...raw,
         voiceIds
       };
-      if (!raw.voiceIds) {
-        await db.settings.put({ id: 'current', data: settings });
+
+      // Sanitize obsolete / deprecated models from previous sessions
+      if (settings.geminiModel && (settings.geminiModel.includes('gemini-1.0') || settings.geminiModel === 'gemini-pro')) {
+        settings.geminiModel = 'gemini-2.5-flash';
       }
+      if (settings.groqModel && (settings.groqModel === 'llama3-70b-8192' || settings.groqModel === 'llama3-8b-8192')) {
+        settings.groqModel = 'llama-3.3-70b-versatile';
+      }
+
+      await db.settings.put({ id: 'current', data: settings });
     }
 
     // Restore session keys from sessionStorage if present

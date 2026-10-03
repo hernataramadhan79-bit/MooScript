@@ -14,9 +14,21 @@ import type {
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
 
+export type DeckTab = 'storyboard' | 'audio' | 'style' | 'export';
+
+export type PreviewMode = 'compact' | 'theater' | 'ticker';
+
 export interface UiSlice {
-  activeTab: 'script' | 'voice' | 'studio' | 'settings';
-  setActiveTab: (tab: 'script' | 'voice' | 'studio' | 'settings') => void;
+  activeTab: 'script' | 'voice' | 'studio' | 'settings' | DeckTab;
+  setActiveTab: (tab: 'script' | 'voice' | 'studio' | 'settings' | DeckTab) => void;
+  deckTab: DeckTab;
+  setDeckTab: (tab: DeckTab) => void;
+  previewMode: PreviewMode;
+  setPreviewMode: (mode: PreviewMode) => void;
+  isSettingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+  activeSceneId: string | null;
+  setActiveSceneId: (id: string | null) => void;
   toasts: ToastNotification[];
   addToast: (message: string, type?: ToastNotification['type'], durationMs?: number) => void;
   removeToast: (id: string) => void;
@@ -44,6 +56,7 @@ export interface ProjectSlice {
   setSceneIcon: (sceneId: string, icon: string) => void;
   setSceneDuration: (sceneId: string, duration: number) => void;
   addScene: () => void;
+  duplicateScene: (id: string) => void;
   removeScene: (id: string) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
 }

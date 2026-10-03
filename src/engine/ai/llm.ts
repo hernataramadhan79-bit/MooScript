@@ -263,6 +263,220 @@ function tryParseAndValidate(
   }
 }
 
+export interface ProviderModelInfo {
+  id: string;
+  label: string;
+  description?: string;
+  isRecommended?: boolean;
+}
+
+export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> = {
+  gemini: [
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Recommended • Fast & Smart', isRecommended: true },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Ultra Fast' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Deep Reasoning' },
+    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', description: 'Cost Efficient' },
+    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Stable Legacy' }
+  ],
+  openai: [
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Recommended • Fast & Affordable', isRecommended: true },
+    { id: 'gpt-4o', label: 'GPT-4o', description: 'Flagship Multimodal' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', description: 'Next-Gen Mini' },
+    { id: 'gpt-4.1', label: 'GPT-4.1', description: 'Next-Gen Flagship' },
+    { id: 'o3-mini', label: 'o3-mini', description: 'STEM Fast Reasoning' }
+  ],
+  groq: [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', description: 'Recommended • 131k ctx', isRecommended: true },
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', description: 'Blazing Fast' },
+    { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B', description: 'Reasoning Engine' },
+    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', description: 'MoE Fast' }
+  ]
+};
+
+export function sanitizeModelName(provider: LLMProvider, model?: string): string {
+  if (!model || model.trim() === '') {
+    return provider === 'gemini'
+      ? 'gemini-2.5-flash'
+      : provider === 'openai'
+        ? 'gpt-4o-mini'
+        : 'llama-3.3-70b-versatile';
+  }
+  const clean = model.trim().replace(/^models\//, '');
+  if (provider === 'gemini' && (clean.includes('gemini-1.0') || clean === 'gemini-pro')) {
+    return 'gemini-2.5-flash';
+  }
+  if (provider === 'groq' && (clean === 'llama3-70b-8192' || clean === 'llama3-8b-8192')) {
+    return 'llama-3.3-70b-versatile';
+  }
+  return clean;
+}
+
+export function parseGeminiModelsList(rawList: Array<{ name?: string; displayName?: string; description?: string; supportedGenerationMethods?: string[] }>): ProviderModelInfo[] {
+  const filtered = rawList.filter((m) => {
+    const methods = m.supportedGenerationMethods || [];
+    if (!methods.includes('generateContent')) return false;
+    const name = m.name || '';
+    if (
+      name.includes('embedding') ||
+      name.includes('imagen') ||
+      name.includes('aqa') ||
+      name.includes('bison') ||
+      name.includes('gemini-1.0') ||
+      name.includes('learnlm')
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const models: ProviderModelInfo[] = filtered.map((m) => {
+    const cleanId = (m.name || '').replace(/^models\//, '');
+    const displayName = m.displayName || cleanId;
+    const isRecommended = cleanId === 'gemini-2.5-flash' || cleanId === 'gemini-2.0-flash';
+    return {
+      id: cleanId,
+      label: displayName.replace(/^models\//, ''),
+      description: m.description ? m.description.slice(0, 60) + '...' : undefined,
+      isRecommended
+    };
+  });
+
+  models.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    const score = (id: string) => (id.includes('2.5') ? 3 : id.includes('2.0') ? 2 : id.includes('1.5') ? 1 : 0);
+    return score(b.id) - score(a.id);
+  });
+
+  return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.gemini;
+}
+
+export function parseOpenAIModelsList(rawList: Array<{ id?: string }>): ProviderModelInfo[] {
+  const filtered = rawList.filter((m) => {
+    const id = m.id || '';
+    if (
+      id.includes('audio') ||
+      id.includes('realtime') ||
+      id.includes('transcription') ||
+      id.includes('tts') ||
+      id.includes('embedding') ||
+      id.includes('instruct') ||
+      id.includes('davinci') ||
+      id.includes('babbage') ||
+      id.includes('moderation') ||
+      id.includes('dall-e') ||
+      id.includes('whisper')
+    ) {
+      return false;
+    }
+    return id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3');
+  });
+
+  // Omit dated snapshot duplicates if base model exists
+  const curated = filtered.filter((m) => {
+    const id = m.id || '';
+    const hasBase = filtered.some((other) => other.id && other.id !== id && id.startsWith(other.id + '-20'));
+    return !hasBase;
+  });
+
+  const models: ProviderModelInfo[] = curated.map((m) => {
+    const id = m.id || '';
+    const isRecommended = id === 'gpt-4o-mini' || id === 'gpt-4.1-mini';
+    return {
+      id,
+      label: id,
+      isRecommended
+    };
+  });
+
+  models.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.openai;
+}
+
+export function parseGroqModelsList(rawList: Array<{ id?: string; active?: boolean }>): ProviderModelInfo[] {
+  const filtered = rawList.filter((m) => {
+    if (m.active === false) return false;
+    const id = m.id || '';
+    if (
+      id.includes('whisper') ||
+      id.includes('guard') ||
+      id.includes('safeguard') ||
+      id.includes('distil-whisper') ||
+      id.includes('tool-use-preview')
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const models: ProviderModelInfo[] = filtered.map((m) => {
+    const id = m.id || '';
+    const isRecommended = id === 'llama-3.3-70b-versatile';
+    return {
+      id,
+      label: id,
+      isRecommended
+    };
+  });
+
+  models.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.groq;
+}
+
+export async function fetchAvailableModels(
+  provider: LLMProvider,
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<ProviderModelInfo[]> {
+  if (!apiKey || apiKey.trim() === '') {
+    return DEFAULT_PROVIDER_MODELS[provider] || [];
+  }
+  const trimmed = apiKey.trim();
+  try {
+    if (provider === 'gemini') {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: { 'x-goog-api-key': trimmed },
+        signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return parseGeminiModelsList(json.models || []);
+      }
+    } else if (provider === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${trimmed}` },
+        signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return parseOpenAIModelsList(json.data || []);
+      }
+    } else if (provider === 'groq') {
+      const res = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${trimmed}` },
+        signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return parseGroqModelsList(json.data || []);
+      }
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch models for ${provider}:`, err);
+  }
+  return DEFAULT_PROVIDER_MODELS[provider] || [];
+}
+
 async function executeProviderRequest(opts: {
   provider: LLMProvider;
   apiKey: string;
@@ -274,26 +488,27 @@ async function executeProviderRequest(opts: {
   const { provider, apiKey, model, systemPrompt, userPrompt, signal } = opts;
 
   if (provider === 'gemini') {
-    return await generateWithGemini(apiKey, model || 'gemini-2.0-flash', systemPrompt, userPrompt, signal);
+    return await generateWithGemini(apiKey, model, systemPrompt, userPrompt, signal);
   }
   if (provider === 'openai') {
-    return await generateWithOpenAI(apiKey, model || 'gpt-4o-mini', systemPrompt, userPrompt, signal);
+    return await generateWithOpenAI(apiKey, model, systemPrompt, userPrompt, signal);
   }
   if (provider === 'groq') {
-    return await generateWithGroq(apiKey, model || 'llama-3.3-70b-versatile', systemPrompt, userPrompt, signal);
+    return await generateWithGroq(apiKey, model, systemPrompt, userPrompt, signal);
   }
   throw new Error(`Unsupported LLM provider: ${provider}`);
 }
 
 async function generateWithGemini(
   apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userPrompt: string,
+  model?: string,
+  systemPrompt: string = '',
+  userPrompt: string = '',
   signal?: AbortSignal
 ): Promise<string> {
+  const cleanModel = sanitizeModelName('gemini', model);
   // SECURITY: Use 'x-goog-api-key' header instead of URL query string
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent`;
 
   const payload = {
     contents: [
@@ -334,18 +549,23 @@ async function generateWithGemini(
 
 async function generateWithOpenAI(
   apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userPrompt: string,
+  model?: string,
+  systemPrompt: string = '',
+  userPrompt: string = '',
   signal?: AbortSignal
 ): Promise<string> {
+  const cleanModel = sanitizeModelName('openai', model);
   const url = `https://api.openai.com/v1/chat/completions`;
+  const isReasoning = cleanModel.startsWith('o1') || cleanModel.startsWith('o3');
 
-  const payload = {
-    model: model || 'gpt-4o-mini',
+  const payload: Record<string, unknown> = {
+    model: cleanModel,
     messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
+      {
+        role: isReasoning ? 'user' : 'system',
+        content: isReasoning ? `${systemPrompt}\n\nUser Script / Concept:\n${userPrompt}` : systemPrompt
+      },
+      ...(isReasoning ? [] : [{ role: 'user', content: `User Script / Concept:\n${userPrompt}` }])
     ],
     response_format: {
       type: 'json_schema',
@@ -354,9 +574,12 @@ async function generateWithOpenAI(
         strict: true,
         schema: OPENAI_STORYBOARD_SCHEMA
       }
-    },
-    temperature: 0.7
+    }
   };
+
+  if (!isReasoning) {
+    payload.temperature = 0.7;
+  }
 
   const res = await fetch(url, {
     method: 'POST',
@@ -383,15 +606,16 @@ async function generateWithOpenAI(
 
 async function generateWithGroq(
   apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userPrompt: string,
+  model?: string,
+  systemPrompt: string = '',
+  userPrompt: string = '',
   signal?: AbortSignal
 ): Promise<string> {
+  const cleanModel = sanitizeModelName('groq', model);
   const url = `https://api.groq.com/openai/v1/chat/completions`;
 
   const payload = {
-    model: model || 'llama-3.3-70b-versatile',
+    model: cleanModel,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
@@ -424,12 +648,12 @@ async function generateWithGroq(
 }
 
 /**
- * Lightweight test connection to verify API key validity without high token consumption.
+ * Lightweight test connection to verify API key validity and fetch available models.
  */
 export async function testProviderApiKey(
   provider: LLMProvider | 'elevenlabs',
   apiKey: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; models?: ProviderModelInfo[] }> {
   if (!apiKey || apiKey.trim() === '') {
     return { success: false, message: 'API Key is empty.' };
   }
@@ -441,7 +665,7 @@ export async function testProviderApiKey(
   try {
     let res: Response;
     if (provider === 'gemini') {
-      res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+      res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
         headers: { 'x-goog-api-key': trimmedKey },
         signal: controller.signal
       });
@@ -465,7 +689,26 @@ export async function testProviderApiKey(
     }
 
     if (res.ok) {
-      return { success: true, message: 'API Key verified successfully! Connection established.' };
+      let models: ProviderModelInfo[] | undefined;
+      try {
+        const json = await res.json();
+        if (provider === 'gemini') {
+          models = parseGeminiModelsList(json.models || []);
+        } else if (provider === 'openai') {
+          models = parseOpenAIModelsList(json.data || []);
+        } else if (provider === 'groq') {
+          models = parseGroqModelsList(json.data || []);
+        }
+      } catch {
+        // Models parsing error should not invalidate an otherwise valid API key
+      }
+
+      const countMsg = models && models.length > 0 ? ` (${models.length} model aktif terdeteksi)` : '';
+      return {
+        success: true,
+        message: `API Key verified!${countMsg}`,
+        models
+      };
     }
 
     const err = handleApiError(provider.toUpperCase(), res.status, await res.text());

@@ -518,6 +518,33 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updated);
     },
 
+    duplicateScene: (id: string) => {
+      const current = get().project;
+      const hasAudio = !!current.audioBlob;
+      const idx = current.scenes.findIndex((s) => s.id === id);
+      if (idx === -1) return;
+      const source = current.scenes[idx];
+      const newScene: Scene = {
+        ...source,
+        id: `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        focusWords: [...(source.focusWords || [])],
+        wordTimestamps: source.wordTimestamps ? source.wordTimestamps.map((w) => ({ ...w })) : []
+      };
+      const list = [...current.scenes];
+      list.splice(idx + 1, 0, newScene);
+      const totalDur = list.reduce((acc, s) => acc + s.durationInSeconds, 0);
+      const updated: MooProject = {
+        ...current,
+        scenes: list,
+        audioDuration: hasAudio ? current.audioDuration : totalDur
+      };
+      set({
+        project: updated,
+        audioStale: hasAudio ? true : get().audioStale
+      });
+      triggerSave(updated);
+    },
+
     reorderScenes: (fromIndex, toIndex) => {
       const current = get().project;
       const hasAudio = !!current.audioBlob;
