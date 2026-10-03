@@ -55,7 +55,7 @@ export const StoryboardSchema = z.object({
 export type GeneratedStoryboard = z.infer<typeof StoryboardSchema>;
 
 // OpenAI Strict JSON Schema representation
-const OPENAI_STORYBOARD_SCHEMA = {
+export const OPENAI_STORYBOARD_SCHEMA = {
   type: 'object',
   properties: {
     title: { type: 'string', description: 'Short catchy video title' },
@@ -79,21 +79,33 @@ const OPENAI_STORYBOARD_SCHEMA = {
           visualData: {
             type: 'object',
             properties: {
-              title: { type: 'string', description: 'Card title or header' },
-              metricValue: { type: 'string', description: 'Key metric number e.g. +400%, 99.9%, 10x' },
-              metricLabel: { type: 'string', description: 'Metric subtitle label e.g. YoY Growth' },
-              codeSnippet: { type: 'string', description: 'Code snippet or CLI command' },
-              codeLanguage: { type: 'string', description: 'Syntax language e.g. bash, js, ts, python' },
-              leftTitle: { type: 'string', description: 'Left / problem title for comparison' },
-              leftDesc: { type: 'string', description: 'Left / problem description' },
-              rightTitle: { type: 'string', description: 'Right / solution title for comparison' },
-              rightDesc: { type: 'string', description: 'Right / solution description' },
+              title: { type: ['string', 'null'], description: 'Card title or header' },
+              metricValue: { type: ['string', 'null'], description: 'Key metric number e.g. +400%, 99.9%, 10x' },
+              metricLabel: { type: ['string', 'null'], description: 'Metric subtitle label e.g. YoY Growth' },
+              codeSnippet: { type: ['string', 'null'], description: 'Code snippet or CLI command' },
+              codeLanguage: { type: ['string', 'null'], description: 'Syntax language e.g. bash, js, ts, python' },
+              leftTitle: { type: ['string', 'null'], description: 'Left / problem title for comparison' },
+              leftDesc: { type: ['string', 'null'], description: 'Left / problem description' },
+              rightTitle: { type: ['string', 'null'], description: 'Right / solution title for comparison' },
+              rightDesc: { type: ['string', 'null'], description: 'Right / solution description' },
               bulletItems: {
-                type: 'array',
+                type: ['array', 'null'],
                 items: { type: 'string' },
                 description: 'Key takeaways or staggered points'
               }
             },
+            required: [
+              'title',
+              'metricValue',
+              'metricLabel',
+              'codeSnippet',
+              'codeLanguage',
+              'leftTitle',
+              'leftDesc',
+              'rightTitle',
+              'rightDesc',
+              'bulletItems'
+            ],
             additionalProperties: false
           },
           focusWords: {
@@ -112,7 +124,7 @@ const OPENAI_STORYBOARD_SCHEMA = {
             description: 'Icon identifier matching the concept'
           }
         },
-        required: ['layout', 'text', 'focusWords', 'motionPreset', 'icon'],
+        required: ['layout', 'text', 'camera', 'visualData', 'focusWords', 'motionPreset', 'icon'],
         additionalProperties: false
       }
     }
@@ -191,6 +203,43 @@ export function cleanJsonFence(raw: string): string {
     cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
   return cleaned.trim();
+}
+
+/**
+ * Extracts a JSON object string from raw text if it is surrounded by prose.
+ */
+export function extractJsonObject(raw: string): string {
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return raw.substring(firstBrace, lastBrace + 1);
+  }
+  return raw;
+}
+
+/**
+ * Recursively strips null values from objects and arrays (converting nulls to undefined/omitting them).
+ */
+export function stripNulls<T>(value: T): unknown {
+  if (value === null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== null && item !== undefined)
+      .map(stripNulls);
+  }
+  if (typeof value === 'object' && value !== null) {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      const stripped = stripNulls(v);
+      if (stripped !== undefined) {
+        result[k] = stripped;
+      }
+    }
+    return result;
+  }
+  return value;
 }
 
 /**
@@ -329,22 +378,30 @@ ${prompt}`;
     if (parseResult2.success) {
       return parseResult2.data;
     }
-    throw new Error(`LLM output validation failed after retry: ${parseResult2.error}`);
+    throw new Error(`Storyboard generation failed validation: ${parseResult2.error}`);
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof Error && err.message.startsWith('Storyboard generation failed validation:')) {
       throw err;
     }
-    throw new Error(`Storyboard generation failed validation: ${parseResult1.error}`);
+    // Rethrow real errors as-is (401/429/network/Abort)
+    throw err;
   }
 }
 
-function tryParseAndValidate(
+export function tryParseAndValidate(
   rawText: string
 ): { success: true; data: GeneratedStoryboard } | { success: false; error: string } {
   try {
     const cleaned = cleanJsonFence(rawText);
-    const parsed = JSON.parse(cleaned);
-    const result = StoryboardSchema.safeParse(parsed);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      const extracted = extractJsonObject(cleaned);
+      parsed = JSON.parse(extracted);
+    }
+    const stripped = stripNulls(parsed);
+    const result = StoryboardSchema.safeParse(stripped);
     if (result.success) {
       return { success: true, data: result.data };
     }
@@ -387,12 +444,12 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
     { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', description: 'MoE Fast' }
   ],
   anthropic: [
-    { id: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
-    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', description: 'Exceptional Coding' },
-    { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', description: 'Ultra Fast' }
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Ultra Fast' }
   ],
   openrouter: [
-    { id: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet (Router)', description: 'Recommended', isRecommended: true },
+    { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Router)', description: 'Recommended', isRecommended: true },
+    { id: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet (Router)', description: 'Legacy' },
     { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Router)', description: 'Fast' },
     { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (Router)', description: 'Reasoning' }
   ]
@@ -405,9 +462,9 @@ export function sanitizeModelName(provider: LLMProvider, model?: string): string
       : provider === 'openai'
         ? 'gpt-4o-mini'
         : provider === 'anthropic'
-          ? 'claude-3-7-sonnet-20250219'
+          ? 'claude-sonnet-4-6'
           : provider === 'openrouter'
-            ? 'anthropic/claude-3.7-sonnet'
+            ? 'anthropic/claude-sonnet-4.6'
             : 'llama-3.3-70b-versatile';
   }
   const clean = model.trim().replace(/^models\//, '');

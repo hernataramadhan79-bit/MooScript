@@ -21,8 +21,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   geminiModel: 'gemini-2.5-flash',
   openaiModel: 'gpt-4o-mini',
   groqModel: 'llama-3.3-70b-versatile',
-  anthropicModel: 'claude-3-7-sonnet-20250219',
-  openrouterModel: 'anthropic/claude-3.7-sonnet',
+  anthropicModel: 'claude-sonnet-4-6',
+  openrouterModel: 'anthropic/claude-sonnet-4.6',
   voiceIds: {
     openai: 'alloy',
     elevenlabs: '21m00Tcm4TlvDq8ikWAM',
@@ -115,6 +115,10 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
       }
       if (settings.groqModel && (settings.groqModel === 'llama3-70b-8192' || settings.groqModel === 'llama3-8b-8192')) {
         settings.groqModel = 'llama-3.3-70b-versatile';
+      }
+      const retiredAnthropic = ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'];
+      if (settings.anthropicModel && retiredAnthropic.includes(settings.anthropicModel)) {
+        settings.anthropicModel = 'claude-sonnet-4-6';
       }
 
       await db.settings.put({ id: 'current', data: settings });

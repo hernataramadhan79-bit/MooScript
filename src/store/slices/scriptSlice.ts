@@ -54,19 +54,20 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       return;
     }
 
-    // Save previous snapshot for undo
+    // Save previous snapshot for undo upon success
     const currentScenes = [...get().project.scenes];
     set({
-      isGeneratingScript: true,
-      previousScenesSnapshot: currentScenes
+      isGeneratingScript: true
     });
 
+    let timedOut = false;
     scriptAbortController = new AbortController();
     const timeoutId = setTimeout(() => {
       if (scriptAbortController) {
-        scriptAbortController.abort(new DOMException('LLM generation timed out after 30s', 'TimeoutError'));
+        timedOut = true;
+        scriptAbortController.abort(new DOMException('LLM generation timed out after 60s', 'TimeoutError'));
       }
-    }, 30000);
+    }, 60000);
 
     try {
       const storyboard = await generateStoryboard({
@@ -123,6 +124,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
 
       set({
         project: updatedProject,
+        previousScenesSnapshot: currentScenes,
         isGeneratingScript: false,
         audioStale: !!get().project.audioBlob
       });
@@ -130,16 +132,19 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       addToast('AI Storyboard generated successfully!', 'success');
     } catch (err: unknown) {
       set({ isGeneratingScript: false });
-      const isAborted =
-        scriptAbortController?.signal.aborted ||
-        (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')) ||
-        (err instanceof Error && err.message.toLowerCase().includes('cancel'));
-
-      if (isAborted) {
-        addToast('AI Script generation cancelled', 'info');
+      if (timedOut) {
+        addToast('AI Script Generation timeout (60s). Coba model lebih cepat.', 'error');
       } else {
-        const message = err instanceof Error ? err.message : String(err);
-        addToast(`AI Script Generation failed: ${message}`, 'error');
+        const isUserCancelled =
+          (err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && err.message.toLowerCase().includes('user cancelled'));
+
+        if (isUserCancelled) {
+          addToast('AI Script generation cancelled', 'info');
+        } else {
+          const message = err instanceof Error ? err.message : String(err);
+          addToast(`AI Script Generation failed: ${message}`, 'error');
+        }
       }
     } finally {
       clearTimeout(timeoutId);
