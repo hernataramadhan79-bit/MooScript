@@ -41,7 +41,7 @@ export interface UiSlice {
 export interface ProjectSlice {
   project: MooProject;
   projectsList: MooProject[];
-  setProject: (project: MooProject) => void;
+  setProject: (project: MooProject, options?: { keepStale?: boolean }) => void;
   refreshProjectsList: () => Promise<void>;
   createNewProject: (title?: string) => Promise<string>;
   switchProject: (id: string) => Promise<void>;

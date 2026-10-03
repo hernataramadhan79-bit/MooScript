@@ -83,7 +83,7 @@ export class MooDatabase extends Dexie {
 
 export const db = new MooDatabase();
 
-let lastSavedAudioBlobRef: Blob | null | undefined = undefined;
+export const lastSavedAudioBlobByProject = new Map<string, Blob | null>();
 
 export async function saveProjectToDb(project: MooProject): Promise<void> {
   try {
@@ -91,11 +91,12 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
     // Store project data without blob in the project record
     const { audioBlob, ...cleanProject } = project;
     cleanProject.createdAt = cleanProject.createdAt || now;
-    cleanProject.updatedAt = project.updatedAt !== undefined ? project.updatedAt : now;
+    cleanProject.updatedAt = now;
     await db.projects.put(cleanProject as MooProject);
 
-    // Only write audioBlob if reference has actually changed
-    if (audioBlob !== undefined && audioBlob !== lastSavedAudioBlobRef) {
+    // Only write audioBlob if reference has actually changed for this project
+    const lastSaved = lastSavedAudioBlobByProject.get(project.id);
+    if (audioBlob !== undefined && audioBlob !== lastSaved) {
       if (audioBlob && audioBlob.size > 0) {
         await db.audioBlobs.put({
           projectId: project.id,
@@ -105,7 +106,7 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
       } else {
         await db.audioBlobs.delete(project.id);
       }
-      lastSavedAudioBlobRef = audioBlob;
+      lastSavedAudioBlobByProject.set(project.id, audioBlob);
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -161,7 +162,7 @@ export async function loadProjectFromDb(id: string): Promise<MooProject | null> 
     const storedAudio = await db.audioBlobs.get(id);
     if (storedAudio) {
       project.audioBlob = storedAudio.blob;
-      lastSavedAudioBlobRef = storedAudio.blob;
+      lastSavedAudioBlobByProject.set(id, storedAudio.blob);
     }
     return normalizeProject(project);
   } catch (err: unknown) {
@@ -184,6 +185,7 @@ export async function deleteProjectFromDb(id: string): Promise<void> {
   try {
     await db.projects.delete(id);
     await db.audioBlobs.delete(id);
+    lastSavedAudioBlobByProject.delete(id);
   } catch (err) {
     console.warn('Failed to delete project from IndexedDB', err);
   }
@@ -209,10 +211,6 @@ export async function putCachedSceneAudio(item: CachedSceneAudio): Promise<void>
 export async function getCacheSize(): Promise<number> {
   let size = 0;
   try {
-    const audios = await db.audioBlobs.toArray();
-    for (const a of audios) {
-      if (a.blob) size += a.blob.size;
-    }
     const sceneCaches = await db.sceneAudioCache.toArray();
     for (const sc of sceneCaches) {
       if (sc.blob) size += sc.blob.size;
@@ -225,9 +223,7 @@ export async function getCacheSize(): Promise<number> {
 
 export async function clearAllCache(): Promise<void> {
   try {
-    await db.audioBlobs.clear();
     await db.sceneAudioCache.clear();
-    lastSavedAudioBlobRef = null;
   } catch (err) {
     console.warn('Error clearing audio cache', err);
   }

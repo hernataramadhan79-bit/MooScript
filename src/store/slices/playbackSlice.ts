@@ -14,6 +14,21 @@ function cancelPlaybackRaf() {
   }
 }
 
+export function stopPlaybackAudio(): void {
+  cancelPlaybackRaf();
+  isAudioMasterActive = false;
+  if (playbackAudioElement) {
+    try {
+      playbackAudioElement.pause();
+      playbackAudioElement.currentTime = 0;
+      playbackAudioElement.src = '';
+    } catch (err) {
+      console.warn('Error resetting playbackAudioElement:', err);
+    }
+    playbackAudioElement = null;
+  }
+}
+
 export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSlice> = (set, get) => ({
   currentFrame: 0,
   isPlaying: false,

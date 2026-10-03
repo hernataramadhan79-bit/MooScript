@@ -89,8 +89,9 @@ describe('Multi-Project Database Operations (IndexedDB)', () => {
   });
 
   it('lists all projects sorted by updatedAt descending', async () => {
-    await saveProjectToDb({ ...TEST_PROJ_1, updatedAt: 1000 });
-    await saveProjectToDb({ ...TEST_PROJ_2, updatedAt: 2000 });
+    await saveProjectToDb(TEST_PROJ_1);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await saveProjectToDb(TEST_PROJ_2);
 
     const list = await listProjectsFromDb();
     expect(list.length).toBe(2);

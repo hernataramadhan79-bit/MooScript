@@ -886,7 +886,7 @@ export const SettingsDrawer: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Audio Blobs & Project Cache:</span>
+              <span className="text-zinc-400">Cache Audio Per-Scene (voiceover project tidak dihapus):</span>
               <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
             </div>
 

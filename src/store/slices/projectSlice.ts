@@ -8,6 +8,7 @@ import {
   deleteProjectFromDb
 } from '../../db/mooDb';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
+import { stopPlaybackAudio } from './playbackSlice';
 import type { MooStoreState, ProjectSlice } from '../types';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
@@ -335,8 +336,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     project: INITIAL_PROJECT,
     projectsList: [INITIAL_PROJECT],
 
-    setProject: (project) => {
-      set({ project, audioStale: false });
+    setProject: (project, options) => {
+      set({
+        project,
+        audioStale: options?.keepStale ? get().audioStale : false
+      });
       triggerSave(project);
     },
 
@@ -350,6 +354,8 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     createNewProject: async (title?: string) => {
+      get().pause();
+      stopPlaybackAudio();
       await flushPendingSave();
       const now = Date.now();
       const newId = `proj-${now}-${Math.random().toString(36).slice(2, 7)}`;
@@ -409,7 +415,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         audioBlobUrl: null,
         audioStale: false,
         currentFrame: 0,
-        isPlaying: false
+        isPlaying: false,
+        previousScenesSnapshot: null,
+        activeSceneId: null
       });
 
       try {
@@ -426,6 +434,8 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     switchProject: async (id: string) => {
+      get().pause();
+      stopPlaybackAudio();
       if (get().project.id === id) return;
       await flushPendingSave();
 
@@ -461,7 +471,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         audioBlobUrl: newBlobUrl,
         audioStale: false,
         currentFrame: 0,
-        isPlaying: false
+        isPlaying: false,
+        previousScenesSnapshot: null,
+        activeSceneId: null
       });
 
       try {
@@ -505,6 +517,8 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     deleteProject: async (id: string) => {
+      get().pause();
+      stopPlaybackAudio();
       await flushPendingSave();
       const list = get().projectsList;
       if (list.length <= 1) {

@@ -133,9 +133,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         composition: newComp
       };
 
-      useMooStore.setState({ project: updatedProject });
-      const { saveProjectToDb } = await import('../../db/mooDb');
-      await saveProjectToDb(updatedProject);
+      useMooStore.getState().setProject(updatedProject, { keepStale: true });
 
       addToast('Mograph custom HTML/GSAP berhasil dibuat dan dipasang!', 'success');
       if (onNextStep) onNextStep();

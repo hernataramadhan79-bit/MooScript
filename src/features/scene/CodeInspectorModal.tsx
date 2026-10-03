@@ -90,9 +90,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       }
     };
 
-    useMooStore.setState({ project: updatedProject });
-    const { saveProjectToDb } = await import('../../db/mooDb');
-    await saveProjectToDb(updatedProject);
+    useMooStore.getState().setProject(updatedProject, { keepStale: true });
 
     addToast('Perubahan kode mograph berhasil diterapkan!', 'success');
     onClose();
