@@ -197,6 +197,7 @@ export const SettingsDrawer: React.FC = () => {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSettingsOpen]);
 
   if (!isSettingsOpen) return null;
