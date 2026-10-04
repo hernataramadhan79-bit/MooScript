@@ -9,11 +9,11 @@ import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 import { IdeaView } from './features/idea/IdeaView';
 import { StyleView } from './features/style/StyleView';
-import { VoiceView } from './features/voice/VoiceView';
+import { VisualEditorView } from './features/editor/VisualEditorView';
 import { ExportView } from './features/export/ExportView';
 import { CodeInspectorModal } from './features/scene/CodeInspectorModal';
 
-export type StudioStep = 'ide' | 'gaya' | 'suara' | 'ekspor';
+export type StudioStep = 'ide' | 'mograph' | 'edit' | 'ekspor';
 
 export const App: React.FC = () => {
   const { initStore, togglePlay } = useMooStore();
@@ -44,8 +44,8 @@ export const App: React.FC = () => {
 
   const studioSteps: { id: StudioStep; label: string; icon: string }[] = [
     { id: 'ide', label: '1. Ide', icon: 'lightbulb' },
-    { id: 'gaya', label: '2. Gaya', icon: 'palette' },
-    { id: 'suara', label: '3. Suara', icon: 'graphic_eq' },
+    { id: 'mograph', label: '2. Mograph', icon: 'movie_filter' },
+    { id: 'edit', label: '3. Edit', icon: 'tune' },
     { id: 'ekspor', label: '4. Ekspor', icon: 'download' }
   ];
 
@@ -58,7 +58,7 @@ export const App: React.FC = () => {
       <main className="flex-1 pt-14 flex flex-col lg:flex-row overflow-hidden">
         {/* Kolom Kiri: Workflow Alur Kerja (45% Desktop, Bawah di Mobile) */}
         <section className="order-2 lg:order-1 flex-1 lg:flex-none lg:w-[48%] xl:w-[44%] max-w-[680px] lg:border-r border-border flex flex-col min-h-0 bg-surface-1 overflow-hidden">
-          {/* Segmented Flow Bar: Ide -> Gaya -> Suara -> Ekspor */}
+          {/* Segmented Flow Bar: Ide -> Mograph -> Edit -> Ekspor */}
           <div className="sticky top-0 z-20 px-4 py-2.5 bg-surface-1/95 backdrop-blur-md border-b border-border">
             <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
               {studioSteps.map((step) => {
@@ -86,24 +86,25 @@ export const App: React.FC = () => {
           <div className="flex-1 overflow-y-auto">
             {currentStep === 'ide' && (
               <IdeaView
-                onNextStep={() => setCurrentStep('gaya')}
+                onNextStep={() => setCurrentStep('mograph')}
                 onOpenCodeInspector={(id) => setInspectingBeatId(id)}
               />
             )}
-            {currentStep === 'gaya' && (
+            {currentStep === 'mograph' && (
               <StyleView
                 onBackStep={() => setCurrentStep('ide')}
-                onNextStep={() => setCurrentStep('suara')}
+                onNextStep={() => setCurrentStep('edit')}
               />
             )}
-            {currentStep === 'suara' && (
-              <VoiceView
-                onBackStep={() => setCurrentStep('gaya')}
+            {currentStep === 'edit' && (
+              <VisualEditorView
+                onBackStep={() => setCurrentStep('mograph')}
                 onNextStep={() => setCurrentStep('ekspor')}
+                onOpenCodeInspector={(id) => setInspectingBeatId(id)}
               />
             )}
             {currentStep === 'ekspor' && (
-              <ExportView onBackStep={() => setCurrentStep('suara')} />
+              <ExportView onBackStep={() => setCurrentStep('edit')} />
             )}
           </div>
         </section>

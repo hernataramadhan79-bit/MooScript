@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useMooStore } from '../src/store/useMooStore';
-import type { LayoutType, CaptionStyle, CaptionPosition } from '../src/types';
+import type { CaptionStyle, CaptionPosition } from '../src/types';
 
 describe('Wizard Reconnected Features & Actions (Phase 8)', () => {
   beforeEach(() => {
@@ -16,13 +16,34 @@ describe('Wizard Reconnected Features & Actions (Phase 8)', () => {
           captionStyle: 'boxed',
           captionPosition: 'bottom'
         },
+        composition: {
+          id: 'comp-test',
+          width: 1080,
+          height: 1920,
+          fps: 30,
+          duration: 3.5,
+          scenes: [
+            {
+              id: 'scene-test-1',
+              beatId: 'scene-test-1',
+              duration: 3.5,
+              html: '<div data-moo-layer="title">Test</div>',
+              css: '',
+              buildJs: '',
+              status: 'ok',
+              version: 1,
+              userEdited: false
+            }
+          ],
+          createdAt: Date.now()
+        },
         scenes: [
           {
             id: 'scene-test-1',
-            layout: 'KINETIC_QUOTE',
             text: 'Hello world typography punch',
             narrationText: 'Hello world typography punch',
-            visualData: { title: 'Initial Title' },
+            visualIntent: 'Initial visual intent for punch typography',
+            visualConcept: 'Initial visual concept',
             focusWords: ['punch'],
             motionPreset: 'punch_zoom',
             durationInSeconds: 3.5,
@@ -33,43 +54,36 @@ describe('Wizard Reconnected Features & Actions (Phase 8)', () => {
     });
   });
 
-  it('updates scene layout and re-syncs composition', () => {
-    const newLayout: LayoutType = 'METRIC_COUNTER';
-    useMooStore.getState().updateSceneLayout('scene-test-1', newLayout);
+  it('updates scene visualIntent and visualConcept', () => {
+    const newIntent = 'Display airplane airflow vectors flowing over wing curvature';
+    useMooStore.getState().updateSceneVisualIntent('scene-test-1', newIntent);
 
     const scene = useMooStore.getState().project.scenes.find((s) => s.id === 'scene-test-1');
-    expect(scene?.layout).toBe(newLayout);
-    // composition should also be synced
-    expect(useMooStore.getState().project.composition?.scenes.length).toBe(1);
+    expect(scene?.visualIntent).toBe(newIntent);
+
+    const newConcept = 'Curved streamlines with color gradient from blue to orange';
+    useMooStore.getState().updateSceneVisualConcept('scene-test-1', newConcept);
+    const updatedScene = useMooStore.getState().project.scenes.find((s) => s.id === 'scene-test-1');
+    expect(updatedScene?.visualConcept).toBe(newConcept);
   });
 
-  it('updates scene visualData fields (metric, terminal, comparison, list)', () => {
-    // 1. Metric counter fields
-    useMooStore.getState().updateSceneVisualData('scene-test-1', {
-      title: 'Performance Benchmark',
-      metricValue: '+400%',
-      metricLabel: 'Throughput Growth'
+  it('updates scene layer overrides and palette', () => {
+    useMooStore.getState().updateLayerOverride('scene-test-1', 'title', {
+      x: 10,
+      scale: 1.2,
+      opacity: 0.8
     });
-    let scene = useMooStore.getState().project.scenes.find((s) => s.id === 'scene-test-1');
-    expect(scene?.visualData?.title).toBe('Performance Benchmark');
-    expect(scene?.visualData?.metricValue).toBe('+400%');
-    expect(scene?.visualData?.metricLabel).toBe('Throughput Growth');
+    const comp = useMooStore.getState().project.composition;
+    const sceneMod = comp?.scenes.find((s) => s.id === 'scene-test-1' || s.beatId === 'scene-test-1');
+    expect(sceneMod?.overrides?.['title']?.x).toBe(10);
+    expect(sceneMod?.overrides?.['title']?.scale).toBe(1.2);
+    expect(sceneMod?.overrides?.['title']?.opacity).toBe(0.8);
 
-    // 2. Terminal mockup fields
-    useMooStore.getState().updateSceneVisualData('scene-test-1', {
-      codeSnippet: 'npm run build',
-      codeLanguage: 'bash'
+    useMooStore.getState().updateScenePalette('scene-test-1', {
+      accent: '#84cc16'
     });
-    scene = useMooStore.getState().project.scenes.find((s) => s.id === 'scene-test-1');
-    expect(scene?.visualData?.codeSnippet).toBe('npm run build');
-    expect(scene?.visualData?.codeLanguage).toBe('bash');
-
-    // 3. Stagger list fields
-    useMooStore.getState().updateSceneVisualData('scene-test-1', {
-      bulletItems: ['Fast', 'Deterministic', 'Local']
-    });
-    scene = useMooStore.getState().project.scenes.find((s) => s.id === 'scene-test-1');
-    expect(scene?.visualData?.bulletItems).toEqual(['Fast', 'Deterministic', 'Local']);
+    const updatedSceneMod = useMooStore.getState().project.composition?.scenes.find((s) => s.id === 'scene-test-1' || s.beatId === 'scene-test-1');
+    expect(updatedSceneMod?.palette?.accent).toBe('#84cc16');
   });
 
   it('duplicates scene correctly with a fresh ID', () => {

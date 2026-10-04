@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
+import { getRuntimeScript } from '../src/engine/composition/runtime/mooRuntime';
 import type { MooProject } from '../src/types';
 
 describe('Composition Document Builder', () => {
@@ -60,5 +61,10 @@ describe('Composition Document Builder', () => {
     expect(doc).toContain('Hello');
     expect(doc).toContain('.test { color: #84cc16; }');
     expect(doc).toContain('moo-stage');
+  });
+
+  it('ensures getRuntimeScript() compiles without syntax or regex errors', () => {
+    const script = getRuntimeScript();
+    expect(() => new Function(script)).not.toThrow();
   });
 });

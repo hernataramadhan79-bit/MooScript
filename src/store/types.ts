@@ -10,8 +10,6 @@ import type {
   BgmPreset,
   ToastNotification,
   TTSProvider,
-  LayoutType,
-  VisualData,
   CameraMovement,
   AspectRatio
 } from '../types';
@@ -58,8 +56,10 @@ export interface ProjectSlice {
   updateThemeCaptionStyle: (style: CaptionStyle) => void;
   updateThemeCaptionPosition: (position: CaptionPosition) => void;
   updateSceneText: (id: string, text: string) => void;
-  updateSceneLayout: (sceneId: string, layout: LayoutType) => void;
-  updateSceneVisualData: (sceneId: string, visualData: Partial<VisualData>) => void;
+  updateSceneVisualIntent: (sceneId: string, visualIntent: string) => void;
+  updateSceneVisualConcept: (sceneId: string, visualConcept: string) => void;
+  updateLayerOverride: (sceneId: string, layerId: string, override: Partial<import('../types').LayerOverride>) => void;
+  updateScenePalette: (sceneId: string, palette: Partial<import('../types').ScenePalette>) => void;
   updateSceneCamera: (sceneId: string, camera: CameraMovement) => void;
   toggleSceneSubtitles: (sceneId: string) => void;
   toggleWordFocus: (sceneId: string, word: string) => void;

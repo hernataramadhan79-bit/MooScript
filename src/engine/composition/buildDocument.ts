@@ -1,5 +1,6 @@
-import type { Composition, MooProject, SceneModule } from '../../types';
+import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
+import { compileOverridesCss, compilePaletteVars } from './layers';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 
 export interface BuildDocumentOptions {
@@ -7,15 +8,56 @@ export interface BuildDocumentOptions {
   audioDataUrl?: string;
 }
 
-export function buildCompositionDocument(
-  project: MooProject,
-  options?: BuildDocumentOptions
-): string {
+const FONT_BY_THEME: Record<string, string> = {
+  Jakarta: "'Plus Jakarta Sans', system-ui, sans-serif",
+  Mono: "'JetBrains Mono', ui-monospace, monospace",
+  Impact: "'Syne', 'Plus Jakarta Sans', system-ui, sans-serif"
+};
+
+/** Palette exposed to generated scenes as --moo-* CSS variables. */
+export function getProjectPalette(project: Pick<MooProject, 'theme'>): ScenePalette {
+  const theme = project.theme;
+  return {
+    bg: theme?.bg || '#09090b',
+    primary: theme?.textPrimary || '#f4f4f5',
+    accent: theme?.textHighlight || '#84cc16',
+    text: theme?.textPrimary || '#f4f4f5'
+  };
+}
+
+/** JSON that is safe to embed inside an inline <script> element. */
+function safeJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
+
+function toDomId(sceneId: string): string {
+  return `scene-${sceneId}`;
+}
+
+/** Neutral status surface for scenes that have not been generated (or failed). This is NOT a visual template. */
+function statusPlaceholder(scene: GeneratedScene): { html: string; css: string; buildJs: string } {
+  const label =
+    scene.status === 'generating'
+      ? 'Generating motion graphics…'
+      : scene.status === 'error'
+        ? 'Scene generation failed'
+        : 'Not generated yet';
+  const detail = scene.status === 'error' && scene.errors?.length ? scene.errors[0] : 'Run Generate Mograph or Regenerate Scene';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return {
+    html: `<div class="moo-status-card" data-moo-placeholder="${scene.status}"><div class="moo-status-title">${esc(label)}</div><div class="moo-status-detail">${esc(detail.slice(0, 160))}</div></div>`,
+    css: `.moo-status-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:64px;text-align:center;background:var(--moo-bg,#09090b);color:var(--moo-text,#f4f4f5);font-family:var(--moo-font-body,sans-serif)}.moo-status-title{font-size:44px;font-weight:700;opacity:.9}.moo-status-detail{font-size:26px;opacity:.55;max-width:80%}`,
+    buildJs: ''
+  };
+}
+
+export function buildCompositionDocument(project: MooProject, options?: BuildDocumentOptions): string {
   const comp: Composition = project.composition || {
     id: `comp-${project.id}`,
     width: project.width || 1080,
     height: project.height || 1920,
     fps: project.fps || 30,
+    duration: 0,
     globalCss: '',
     scenes: [],
     createdAt: Date.now()
@@ -24,42 +66,56 @@ export function buildCompositionDocument(
   const width = comp.width || 1080;
   const height = comp.height || 1920;
   const aspectRatio = `${width} / ${height}`;
+  const timelineScenes = project.scenes || [];
 
-  // Order modules according to project.scenes, then append leftover comp.scenes
-  const orderedModules: SceneModule[] = [];
-  const usedBeatIds = new Set<string>();
-
-  for (const projScene of project.scenes || []) {
+  // Order generated scenes according to the timeline, then append leftovers.
+  const orderedModules: GeneratedScene[] = [];
+  const used = new Set<string>();
+  for (const projScene of timelineScenes) {
     const mod = comp.scenes.find((m) => m.beatId === projScene.id);
     if (mod) {
       orderedModules.push(mod);
-      usedBeatIds.add(mod.beatId);
+      used.add(mod.beatId);
     }
   }
-
   for (const mod of comp.scenes) {
-    if (!usedBeatIds.has(mod.beatId)) {
-      orderedModules.push(mod);
-    }
+    if (!used.has(mod.beatId)) orderedModules.push(mod);
   }
 
-  // Assemble scene CSS
-  const scenesCss = orderedModules.map((s, idx) => `/* Scene ${idx + 1} (${s.beatId}) */\n${s.css || ''}`).join('\n\n');
+  const durationOf = (mod: GeneratedScene): number => {
+    const ts = timelineScenes.find((s) => s.id === mod.beatId);
+    return ts?.durationInSeconds || mod.duration || 3;
+  };
 
-  // Assemble scene JS module definitions
-  const scenesJs = orderedModules
-    .map((s, idx) => {
+  const resolved = orderedModules.map((mod) => {
+    const needsPlaceholder = mod.status !== 'ok' || !(mod.html || '').trim();
+    const src = needsPlaceholder ? statusPlaceholder(mod) : { html: mod.html, css: mod.css, buildJs: mod.buildJs };
+    return { mod, ...src };
+  });
+
+  const palette = getProjectPalette(project);
+  const fontDisplay = FONT_BY_THEME[project.theme?.fontFamily || 'Jakarta'] || FONT_BY_THEME.Jakarta;
+
+  // Assemble scene CSS (+ per-scene palette variables and non-destructive layer overrides)
+  const scenesCss = resolved
+    .map(({ mod, css }, idx) => {
+      const domId = toDomId(mod.beatId);
+      const paletteVars = compilePaletteVars(mod.palette);
+      const paletteRule = paletteVars ? `#${domId} { ${paletteVars}; }` : '';
+      const overrides = compileOverridesCss(domId, mod.overrides);
+      return `/* Scene ${idx + 1} (${mod.beatId}) */\n${css || ''}\n${paletteRule}\n${overrides}`;
+    })
+    .join('\n\n');
+
+  // Scene modules are registered as DATA (JSON strings). The runtime compiles each buildJs inside
+  // its own try/catch so a syntax error in one scene can never take down the whole composition.
+  const scenesJs = resolved
+    .map(({ mod, html, buildJs }, idx) => {
       return `
 // Register Scene ${idx + 1}
-MOO.scene('${s.beatId}', {
-  html: ${JSON.stringify(s.html || '')},
-  build: function(tl, root, ctx) {
-    try {
-      ${s.buildJs || ''}
-    } catch (err) {
-      console.error('Scene ${s.beatId} build runtime error:', err);
-    }
-  }
+MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
+  html: ${safeJson(html || '')},
+  buildSrc: ${safeJson(buildJs || '')}
 });
 `;
     })
@@ -67,10 +123,7 @@ MOO.scene('${s.beatId}', {
 
   const runtimeScript = getRuntimeScript();
 
-  const totalDuration = (project.scenes || []).reduce(
-    (sum, s) => sum + (s.durationInSeconds || 3),
-    0
-  ) || 1;
+  const totalDuration = resolved.reduce((sum, r) => sum + durationOf(r.mod), 0) || 1;
 
   const standaloneController = options?.standalone
     ? `
@@ -165,6 +218,17 @@ MOO.scene('${s.beatId}', {
   </script>`
     : '';
 
+  const meta = {
+    scenes: resolved.map(({ mod }) => {
+      const ts = timelineScenes.find((s) => s.id === mod.beatId);
+      return {
+        id: mod.beatId,
+        duration: durationOf(mod),
+        wordTimestamps: ts?.wordTimestamps || []
+      };
+    })
+  };
+
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -198,12 +262,21 @@ MOO.scene('${s.beatId}', {
       -webkit-font-smoothing: antialiased;
     }
 
+    :root {
+      --moo-bg: ${palette.bg};
+      --moo-primary: ${palette.primary};
+      --moo-accent: ${palette.accent};
+      --moo-text: ${palette.text};
+      --moo-font-display: ${fontDisplay};
+      --moo-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+
     #moo-viewport {
       position: relative;
       width: ${width}px;
       height: ${height}px;
       aspect-ratio: ${aspectRatio};
-      background: #09090b;
+      background: var(--moo-bg);
       overflow: hidden;
       transform-origin: center center;
     }
@@ -216,7 +289,7 @@ MOO.scene('${s.beatId}', {
       overflow: hidden;
     }
 
-    /* Global user styles */
+    /* Global styles */
     ${comp.globalCss || ''}
 
     /* Scenes scoped styles */
@@ -239,15 +312,7 @@ MOO.scene('${s.beatId}', {
 
     // Auto initialize master timeline
     (function() {
-      const meta = {
-        scenes: ${JSON.stringify(
-          project.scenes.map((s) => ({
-            id: s.id,
-            duration: s.durationInSeconds || 3,
-            wordTimestamps: s.wordTimestamps || []
-          }))
-        )}
-      };
+      const meta = ${safeJson(meta)};
 
       function triggerInit() {
         if (typeof window.__MOO_INIT__ === 'function') {

@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, LayoutType, VisualData, CameraMovement, AspectRatio, Composition, SceneModule } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette } from '../../types';
+import { CURRENT_SCHEMA_VERSION } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 import {
   saveProjectToDb,
@@ -19,12 +20,15 @@ export const DEFAULT_COMPOSITION: Composition = {
   width: 1080,
   height: 1920,
   fps: 30,
+  duration: 10.0,
   globalCss: `
     @keyframes pulseGlow { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.05); } }
   `,
   scenes: [
     {
+      id: 'sc-1',
       beatId: 'sc-1',
+      duration: 3.2,
       html: `<div class="sc1-container">
   <div class="sc1-grid-bg"></div>
   <div class="sc1-badge">MOOSCRIPT ZERO-SERVER</div>
@@ -78,7 +82,9 @@ export const DEFAULT_COMPOSITION: Composition = {
       userEdited: true
     },
     {
+      id: 'sc-2',
       beatId: 'sc-2',
+      duration: 3.6,
       html: `<div class="sc2-container">
   <div class="sc2-terminal">
     <div class="sc2-bar">
@@ -129,7 +135,9 @@ export const DEFAULT_COMPOSITION: Composition = {
       userEdited: true
     },
     {
+      id: 'sc-3',
       beatId: 'sc-3',
+      duration: 3.2,
       html: `<div class="sc3-container">
   <div class="sc3-card">
     <div class="sc3-metric-val">60 FPS</div>
@@ -175,6 +183,7 @@ export const DEFAULT_COMPOSITION: Composition = {
 export const INITIAL_PROJECT: MooProject = {
   id: DEFAULT_PROJECT_ID,
   title: 'WebCodecs Architecture',
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   aspectRatio: '9:16',
   resolution: '1080p',
   renderMode: 'composition',
@@ -194,14 +203,12 @@ export const INITIAL_PROJECT: MooProject = {
   scenes: [
     {
       id: 'sc-1',
-      layout: 'KINETIC_QUOTE',
       narrationText: 'Zero server rendering directly inside your browser tabs',
       text: 'Zero server rendering directly inside your browser tabs',
-      visualData: {
-        title: 'Zero-Server Architecture',
-        focusWords: ['zero', 'server', 'browser'],
-        accentIcon: 'mascot'
-      },
+      visualIntent: 'Demonstrate zero-server web architecture with pulsating grid and high-tech typography',
+      visualConcept: 'Dark background with neon grid and floating badges',
+      visualElements: ['badge', 'headline', 'grid-lines', 'sub-label'],
+      motionIntent: 'Badge drops with elastic bounce, typography scales up sequentially',
       focusWords: ['zero', 'server', 'browser'],
       motionPreset: 'punch_zoom',
       camera: 'snap_zoom',
@@ -220,16 +227,12 @@ export const INITIAL_PROJECT: MooProject = {
     },
     {
       id: 'sc-2',
-      layout: 'TERMINAL_MOCKUP',
       narrationText: 'WebCodecs Hardware acceleration with deterministic canvas math',
       text: 'WebCodecs Hardware acceleration with deterministic canvas math',
-      visualData: {
-        title: 'engine.ts',
-        codeSnippet: 'const encoder = new VideoEncoder({\n  output: (chunk) => muxer.add(chunk),\n  error: (e) => console.error(e)\n});\nencoder.configure({ codec: "avc1.4d002a", width: 1080, height: 1920 });',
-        codeLanguage: 'typescript',
-        focusWords: ['webcodecs', 'hardware', 'deterministic'],
-        accentIcon: 'zap'
-      },
+      visualIntent: 'Display raw hardware encoding loop in a developer terminal environment',
+      visualConcept: 'Floating IDE window with syntax highlighting and glowing status bar',
+      visualElements: ['terminal-window', 'code-lines', 'traffic-dots'],
+      motionIntent: 'Terminal scales in with spring physics, code lines slide in with stagger',
       focusWords: ['webcodecs', 'hardware', 'deterministic'],
       motionPreset: 'slide_split',
       camera: 'push_in',
@@ -247,16 +250,12 @@ export const INITIAL_PROJECT: MooProject = {
     },
     {
       id: 'sc-3',
-      layout: 'METRIC_COUNTER',
       narrationText: 'Instant 1080p MP4 exports with zero memory leaks',
       text: 'Instant 1080p MP4 exports with zero memory leaks',
-      visualData: {
-        title: 'Render Performance',
-        metricValue: '60 FPS',
-        metricLabel: 'Hardware Export Throughput',
-        focusWords: ['1080p', 'mp4', 'instant'],
-        accentIcon: 'sparkles'
-      },
+      visualIntent: 'Highlight the massive 60 FPS performance benchmark in glassmorphism HUD card',
+      visualConcept: 'Translucent glass card floating in a radial glow with giant counter',
+      visualElements: ['stat-card', 'fps-counter', 'assurance-badge'],
+      motionIntent: 'Glass card zooms into focus with back.out spring, metric scales dramatically',
       focusWords: ['1080p', 'mp4', 'instant'],
       motionPreset: 'kinetic_shake',
       camera: 'pull_out',
@@ -368,7 +367,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const newProject: MooProject = {
         id: newId,
         title: title || `Untitled Project #${existingCount + 1}`,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         aspectRatio: '9:16',
+        renderMode: 'composition',
         fps: 30,
         width: 1080,
         height: 1920,
@@ -384,13 +385,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         scenes: [
           {
             id: `sc-1-${now}`,
-            layout: 'KINETIC_QUOTE',
             narrationText: 'New kinetic visual scene.',
             text: 'New kinetic visual scene.',
-            visualData: {
-              title: 'Kinetic Scene',
-              focusWords: ['kinetic', 'scene']
-            },
+            visualIntent: 'New kinetic visual scene with dynamic motion typography',
+            visualConcept: 'Modern minimalist backdrop with focal statement',
+            visualElements: ['headline', 'accent-shape'],
             focusWords: ['kinetic', 'scene'],
             motionPreset: 'punch_zoom',
             camera: 'push_in',
@@ -683,27 +682,75 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updated);
     },
 
-    updateSceneLayout: (sceneId: string, layout: LayoutType) => {
-      const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, layout } : s));
-      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
+    updateSceneVisualIntent: (sceneId: string, visualIntent: string) => {
+      const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, visualIntent } : s));
+      const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
       triggerSave(updated);
     },
 
-    updateSceneVisualData: (sceneId: string, visualData: Partial<VisualData>) => {
-      const updatedScenes = get().project.scenes.map((s) => {
-        if (s.id !== sceneId) return s;
-        const mergedVisual = { ...(s.visualData || {}), ...visualData };
-        return {
-          ...s,
-          visualData: mergedVisual,
-          focusWords: mergedVisual.focusWords || s.focusWords || [],
-          icon: mergedVisual.accentIcon || s.icon
-        };
-      });
-      const updated = syncComposition({ ...get().project, scenes: updatedScenes });
+    updateSceneVisualConcept: (sceneId: string, visualConcept: string) => {
+      const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, visualConcept } : s));
+      const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
       triggerSave(updated);
+    },
+
+    updateLayerOverride: (sceneId: string, layerId: string, override: Partial<LayerOverride>) => {
+      const comp = get().project.composition;
+      if (!comp) return;
+      const updatedScenes = comp.scenes.map((mod) => {
+        if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+        const currentOverrides = mod.overrides || {};
+        const existingLayerOverride = currentOverrides[layerId] || {};
+        const mergedOverride = { ...existingLayerOverride, ...override };
+        return {
+          ...mod,
+          userEdited: true,
+          overrides: {
+            ...currentOverrides,
+            [layerId]: mergedOverride
+          }
+        };
+      });
+      const updatedComp: Composition = {
+        ...comp,
+        scenes: updatedScenes,
+        updatedAt: Date.now()
+      };
+      const updatedProject: MooProject = {
+        ...get().project,
+        composition: updatedComp
+      };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+    },
+
+    updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => {
+      const comp = get().project.composition;
+      if (!comp) return;
+      const updatedScenes = comp.scenes.map((mod) => {
+        if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+        return {
+          ...mod,
+          userEdited: true,
+          palette: {
+            ...(mod.palette || {}),
+            ...palette
+          }
+        };
+      });
+      const updatedComp: Composition = {
+        ...comp,
+        scenes: updatedScenes,
+        updatedAt: Date.now()
+      };
+      const updatedProject: MooProject = {
+        ...get().project,
+        composition: updatedComp
+      };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
     },
 
     updateSceneCamera: (sceneId: string, camera: CameraMovement) => {
@@ -790,13 +837,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const dur = calculateFallbackSceneDuration(defaultText);
       const newScene: Scene = {
         id: newId,
-        layout: 'KINETIC_QUOTE',
         narrationText: defaultText,
         text: defaultText,
-        visualData: {
-          title: 'Kinetic Scene',
-          focusWords: ['kinetic', 'scene']
-        },
+        visualIntent: 'Kinetic motion scene with bold visual emphasis',
+        visualConcept: 'Dynamic layout with fluid text animation',
+        visualElements: ['headline', 'supporting-detail'],
         focusWords: ['kinetic', 'scene'],
         motionPreset: 'punch_zoom',
         camera: 'push_in',
@@ -850,7 +895,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const newScene: Scene = {
         ...source,
         id: newId,
-        visualData: JSON.parse(JSON.stringify(source.visualData || {})),
+        visualElements: source.visualElements ? [...source.visualElements] : undefined,
         focusWords: [...(source.focusWords || [])],
         wordTimestamps: source.wordTimestamps ? source.wordTimestamps.map((w) => ({ ...w })) : []
       };

@@ -1,4 +1,13 @@
-import type { Scene, MooProject, SceneModule } from '../../types';
+/**
+ * FROZEN LEGACY TEMPLATE BUILDER.
+ *
+ * This file exists solely so that projects saved before the generative rebuild
+ * (which only stored a layout enum + visualData) can be converted ONCE into a
+ * regular GeneratedScene by `migrateLegacyProject()`. It is not part of any
+ * generation, sync, fallback or editing path and must never be imported from them.
+ * No new templates may be added here.
+ */
+import type { Scene, MooProject, GeneratedScene } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 
 export function escapeHtml(str: string = ''): string {
@@ -479,11 +488,11 @@ tl.from(root.querySelector(".${prefix}-title"), { y: -20, opacity: 0, duration: 
   return { html, css, buildJs };
 }
 
-export function buildSceneModule(
+export function buildLegacySceneModule(
   scene: Scene,
   theme: MooProject['theme'],
   size: { width: number; height: number }
-): SceneModule {
+): GeneratedScene {
   const prefix = `m_${scene.id.replace(/[^a-zA-Z0-9]/g, '')}`;
   let rendered: { html: string; css: string; buildJs: string };
 
@@ -507,11 +516,15 @@ export function buildSceneModule(
   }
 
   return {
+    id: scene.id,
     beatId: scene.id,
+    duration: scene.durationInSeconds || 3,
     html: rendered.html,
     css: rendered.css,
     buildJs: rendered.buildJs,
+    generatorVersion: 'legacy-migration',
     status: 'ok',
-    version: 1
+    version: 1,
+    userEdited: false
   };
 }

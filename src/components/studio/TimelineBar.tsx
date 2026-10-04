@@ -68,20 +68,9 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
 
   const playheadPercent = Math.min(100, Math.max(0, (currentFrame / totalFrames) * 100));
 
-  const getLayoutShortName = (layout?: string) => {
-    switch (layout) {
-      case 'METRIC_COUNTER':
-        return 'Metric';
-      case 'TERMINAL_MOCKUP':
-        return 'Code';
-      case 'VS_COMPARISON':
-        return 'VS';
-      case 'LIST_STAGGER':
-        return 'List';
-      case 'KINETIC_QUOTE':
-      default:
-        return 'Quote';
-    }
+  const getSceneLabel = (scene?: { visualIntent?: string }) => {
+    if (!scene?.visualIntent) return '';
+    return scene.visualIntent.length > 14 ? scene.visualIntent.slice(0, 14) + '...' : scene.visualIntent;
   };
 
   // 1. COMPACT MODE (Docked horizontally or used on mobile screens)
@@ -99,8 +88,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
 
         <div className="flex items-center gap-1.5">
           {currentSceneIndex >= 0 && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/20 truncate max-w-[120px]">
-              Shot #{currentSceneIndex + 1} {getLayoutShortName(sceneBoundaries[currentSceneIndex]?.layout)}
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/20 truncate max-w-[140px]">
+              Shot #{currentSceneIndex + 1} {getSceneLabel(sceneBoundaries[currentSceneIndex])}
             </span>
           )}
 
@@ -238,14 +227,14 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
             {sceneBoundaries.map((scene, idx) => {
               const isCurrentPlaying = idx === currentSceneIndex;
               const isSelected = activeSceneId === scene.id;
-              const layoutName = getLayoutShortName(scene.layout);
+              const sceneLabel = getSceneLabel(scene);
 
               return (
                 <div
                   key={scene.id}
                   onClick={() => handleSceneClick(scene.id, scene.startSec)}
                   style={{ width: `${scene.widthPct}%` }}
-                  title={`Shot #${idx + 1} [${layoutName}] (${scene.durationInSeconds.toFixed(1)}s): ${scene.narrationText || scene.text || ''}`}
+                  title={`Shot #${idx + 1} ${sceneLabel ? `[${sceneLabel}] ` : ''}(${scene.durationInSeconds.toFixed(1)}s): ${scene.narrationText || scene.text || ''}`}
                   className={`relative h-full flex flex-col justify-between p-1 border-r border-white/[0.06] transition-colors cursor-pointer group ${
                     isSelected
                       ? 'bg-[#84cc16]/15 ring-1 ring-inset ring-[#84cc16]'
@@ -257,11 +246,11 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
                   {/* Top Scene Tag */}
                   <div className="flex items-center justify-between text-[9px] font-mono leading-none">
                     <span
-                      className={`font-bold ${
+                      className={`font-bold truncate max-w-[120px] ${
                         isSelected || isCurrentPlaying ? 'text-[#84cc16]' : 'text-zinc-400 group-hover:text-zinc-200'
                       }`}
                     >
-                      #{idx + 1} {layoutName}
+                      #{idx + 1} {sceneLabel}
                     </span>
                     <span className="text-[9px] text-zinc-500 hidden sm:inline">
                       {scene.durationInSeconds.toFixed(1)}s

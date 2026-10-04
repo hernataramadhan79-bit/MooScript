@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { Scene, MooProject, LayoutType, VisualData } from '../../types';
+import type { Scene, MooProject } from '../../types';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { syncComposition } from '../../engine/composition/sync';
@@ -62,14 +62,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       isGeneratingScript: true
     });
 
-    let timedOut = false;
     scriptAbortController = new AbortController();
-    const timeoutId = setTimeout(() => {
-      if (scriptAbortController) {
-        timedOut = true;
-        scriptAbortController.abort(new DOMException('LLM generation timed out after 60s', 'TimeoutError'));
-      }
-    }, 60000);
 
     try {
       const storyboard = await generateStoryboard({
@@ -92,24 +85,22 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       });
 
       const newScenes: Scene[] = storyboard.scenes.map((s, idx) => {
-        const text = (s as any).narrationText || s.text || '';
-        const dur = calculateFallbackSceneDuration(text);
-        const layout: LayoutType = (s as any).layout || 'KINETIC_QUOTE';
-        const visualData: VisualData = (s as any).visualData || {
-          title: `Scene #${idx + 1}`,
-          focusWords: s.focusWords || [],
-          accentIcon: s.icon || 'zap'
-        };
+        const text = s.narration || (s as any).narrationText || (s as any).text || '';
+        const visualIntent = s.visualIntent || text || `Scene ${idx + 1}`;
+        const dur = s.durationHint && s.durationHint > 0 ? s.durationHint : calculateFallbackSceneDuration(text);
+        const focusWords = s.emphasis || (s as any).focusWords || [];
         return {
           id: `sc-ai-${Date.now()}-${idx}`,
-          layout,
           narrationText: text,
           text,
-          visualData,
-          focusWords: s.focusWords || [],
-          motionPreset: s.motionPreset || 'punch_zoom',
-          camera: 'push_in',
-          icon: s.icon || 'zap',
+          visualIntent,
+          visualConcept: s.visualConcept,
+          visualElements: s.visualElements || [],
+          motionIntent: s.motionIntent,
+          cameraIntent: s.cameraIntent,
+          transitionIntent: s.transitionIntent,
+          emphasis: focusWords,
+          focusWords,
           durationInSeconds: dur,
           wordTimestamps: computeDeterministicWordAlignment(text, dur),
           showSubtitles: false
@@ -135,22 +126,17 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       addToast('AI Storyboard generated successfully!', 'success');
     } catch (err: unknown) {
       set({ isGeneratingScript: false });
-      if (timedOut) {
-        addToast('AI Script Generation timeout (60s). Coba model lebih cepat.', 'error');
-      } else {
-        const isUserCancelled =
-          (err instanceof DOMException && err.name === 'AbortError') ||
-          (err instanceof Error && err.message.toLowerCase().includes('user cancelled'));
+      const isUserCancelled =
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.message.toLowerCase().includes('user cancelled'));
 
-        if (isUserCancelled) {
-          addToast('AI Script generation cancelled', 'info');
-        } else {
-          const message = err instanceof Error ? err.message : String(err);
-          addToast(`AI Script Generation failed: ${message}`, 'error');
-        }
+      if (isUserCancelled) {
+        addToast('AI Script generation cancelled', 'info');
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        addToast(`AI Script Generation failed: ${message}`, 'error');
       }
     } finally {
-      clearTimeout(timeoutId);
       scriptAbortController = null;
     }
   }

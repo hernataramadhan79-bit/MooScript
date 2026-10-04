@@ -106,4 +106,38 @@ describe('Composition Code Validator', () => {
     expect(res.valid).toBe(false);
     expect(res.errors.some((e) => e.includes('performance.now'))).toBe(true);
   });
+
+  it('allows harmless DOM variables named parent or top without false positive security rejection', () => {
+    const validDOMCode = {
+      html: '<div class="parent"><div class="card"></div></div>',
+      css: '.parent { width: 100%; height: 100%; }',
+      buildJs: `
+        const parent = root.querySelector('.parent');
+        const card = document.createElement('div');
+        parent.appendChild(card);
+        const topBar = root.querySelector('.top');
+        const top = 50;
+        tl.to(parent, { opacity: 1, duration: 0.5 });
+      `
+    };
+    const res = validateSceneCode(validDOMCode);
+    expect(res.valid).toBe(true);
+    expect(res.errors.length).toBe(0);
+  });
+
+  it('tolerates accidental redeclarations of tl or root without throwing identifier already declared syntax error', () => {
+    const codeWithRedecl = {
+      html: '<div class="box"></div>',
+      css: '.box { width: 50px; height: 50px; }',
+      buildJs: `
+        const tl = gsap.timeline();
+        const root = document.querySelector('.box');
+        tl.to(root, { scale: 1.5, duration: 0.8 });
+      `
+    };
+    const res = validateSceneCode(codeWithRedecl);
+    expect(res.valid).toBe(true);
+    expect(res.errors.length).toBe(0);
+  });
 });
+

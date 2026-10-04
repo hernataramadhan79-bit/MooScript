@@ -1,5 +1,18 @@
-import type { MooProject, AspectRatio, Composition, SceneModule } from '../../types';
-import { buildSceneModule } from './sceneTemplates';
+import type { MooProject, AspectRatio, Composition, GeneratedScene } from '../../types';
+
+export function createPendingSceneModule(beatId: string, duration = 3): GeneratedScene {
+  return {
+    id: beatId,
+    beatId,
+    duration,
+    html: '',
+    css: '',
+    buildJs: '',
+    status: 'pending',
+    version: 1,
+    userEdited: false
+  };
+}
 
 export function applySize(
   project: MooProject,
@@ -39,6 +52,14 @@ export function applySize(
   };
 }
 
+/**
+ * Pure metadata and sequence synchronization for Composition.
+ * 
+ * CRITICAL RULE:
+ * `syncComposition` NEVER builds visual templates or invokes fallback templates.
+ * If a storyboard scene lacks a generated module, its module status is marked 'pending'.
+ * User-edited and AI-generated modules are strictly preserved.
+ */
 export function syncComposition(project: MooProject): MooProject {
   const width = project.width || 1080;
   const height = project.height || 1920;
@@ -46,27 +67,36 @@ export function syncComposition(project: MooProject): MooProject {
   const now = Date.now();
 
   const existingComp = project.composition;
-  const existingModulesByBeatId = new Map<string, SceneModule>();
+  const existingModulesByBeatId = new Map<string, GeneratedScene>();
   if (existingComp?.scenes) {
     for (const mod of existingComp.scenes) {
       existingModulesByBeatId.set(mod.beatId, mod);
     }
   }
 
-  // Map each scene in project.scenes order; drop modules whose beatId is no longer present
-  const syncedScenes: SceneModule[] = project.scenes.map((scene) => {
+  // Map each scene in project.scenes order; preserve existing modules or mark pending
+  const syncedScenes: GeneratedScene[] = (project.scenes || []).map((scene) => {
     const existing = existingModulesByBeatId.get(scene.id);
-    if (existing && existing.userEdited === true) {
-      return existing;
+    if (existing) {
+      return {
+        ...existing,
+        id: scene.id,
+        beatId: scene.id,
+        duration: scene.durationInSeconds || existing.duration || 3
+      };
     }
-    return buildSceneModule(scene, project.theme, { width, height });
+    // New scene without generated module -> pending (NOT a template!)
+    return createPendingSceneModule(scene.id, scene.durationInSeconds || 3);
   });
+
+  const totalDuration = syncedScenes.reduce((acc, s) => acc + (s.duration || 3), 0);
 
   const composition: Composition = {
     id: existingComp?.id || `comp-${project.id}`,
     width,
     height,
     fps,
+    duration: totalDuration,
     globalCss: existingComp?.globalCss || '',
     globalBuildJs: existingComp?.globalBuildJs,
     scenes: syncedScenes,

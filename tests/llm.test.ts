@@ -6,7 +6,12 @@ import {
   tryParseAndValidate,
   DEFAULT_PROVIDER_MODELS,
   sanitizeModelName,
-  generateStoryboard
+  generateStoryboard,
+  callRawLLM,
+  parseGeminiModelsList,
+  parseOpenAIModelsList,
+  parseAnthropicModelsList,
+  parseOpenRouterModelsList
 } from '../src/engine/ai/llm';
 import { DEFAULT_SETTINGS } from '../src/store/slices/settingsSlice';
 
@@ -45,31 +50,25 @@ describe('OpenAI Strict JSON Schema (Phase 1a)', () => {
     verifyStrictSchema(OPENAI_STORYBOARD_SCHEMA);
   });
 
-  it('ensures scene required has all expected fields', () => {
+  it('ensures scene required has all expected generative storyboard fields', () => {
     const sceneSchema = OPENAI_STORYBOARD_SCHEMA.properties.scenes.items;
     expect(sceneSchema.required).toEqual([
-      'layout',
-      'text',
-      'camera',
-      'visualData',
-      'focusWords',
-      'motionPreset',
-      'icon'
+      'narration',
+      'visualIntent',
+      'visualConcept',
+      'visualElements',
+      'motionIntent',
+      'cameraIntent',
+      'transitionIntent',
+      'emphasis',
+      'durationHint'
     ]);
   });
 
-  it('ensures visualData.required lists all its properties as nullable', () => {
-    const visualData = OPENAI_STORYBOARD_SCHEMA.properties.scenes.items.properties.visualData;
-    const propKeys = Object.keys(visualData.properties);
-    expect(visualData.required).toEqual(propKeys);
-
-    for (const key of propKeys) {
-      const prop = (visualData.properties as any)[key];
-      expect(Array.isArray(prop.type)).toBe(true);
-      expect(prop.type).toContain('null');
-    }
-
-    expect(visualData.properties.bulletItems.type).toEqual(['array', 'null']);
+  it('ensures generative storyboard schema forbids legacy layout templates', () => {
+    const sceneProps = OPENAI_STORYBOARD_SCHEMA.properties.scenes.items.properties as any;
+    expect(sceneProps.layout).toBeUndefined();
+    expect(sceneProps.visualData).toBeUndefined();
   });
 });
 
@@ -183,6 +182,91 @@ describe('Anthropic & OpenRouter Model Configurations (Phase 1b)', () => {
   });
 });
 
+describe('Dynamic Model Resolution & BYOK Independence', () => {
+  it('preserves user-selected and custom model names without hardcoded overrides', () => {
+    // Gemini: any valid ID or preview model must not be reverted to 2.0-flash
+    expect(sanitizeModelName('gemini', 'gemini-2.5-flash')).toBe('gemini-2.5-flash');
+    expect(sanitizeModelName('gemini', 'gemini-3.0-flash-preview')).toBe('gemini-3.0-flash-preview');
+    expect(sanitizeModelName('gemini', 'gemini-1.5-pro')).toBe('gemini-1.5-pro');
+    expect(sanitizeModelName('gemini', 'models/gemini-2.5-pro')).toBe('gemini-2.5-pro');
+
+    // Groq: custom or legacy IDs must be preserved as selected
+    expect(sanitizeModelName('groq', 'llama3-70b-8192')).toBe('llama3-70b-8192');
+    expect(sanitizeModelName('groq', 'deepseek-r1-distill-llama-70b')).toBe('deepseek-r1-distill-llama-70b');
+
+    // OpenAI: non-standard prefixes like chatgpt-4o-latest or fine-tuned models
+    expect(sanitizeModelName('openai', 'chatgpt-4o-latest')).toBe('chatgpt-4o-latest');
+    expect(sanitizeModelName('openai', 'ft:gpt-4o-mini:custom-org:version-1')).toBe('ft:gpt-4o-mini:custom-org:version-1');
+
+    // Anthropic: real API model IDs preserved
+    expect(sanitizeModelName('anthropic', 'claude-3-7-sonnet-20250219')).toBe('claude-3-7-sonnet-20250219');
+    expect(sanitizeModelName('anthropic', 'claude-3-5-sonnet-20241022')).toBe('claude-3-5-sonnet-20241022');
+
+    // OpenRouter: any provider route preserved
+    expect(sanitizeModelName('openrouter', 'deepseek/deepseek-r1')).toBe('deepseek/deepseek-r1');
+    expect(sanitizeModelName('openrouter', 'qwen/qwen-2.5-72b-instruct')).toBe('qwen/qwen-2.5-72b-instruct');
+  });
+
+  it('dynamically parses Gemini models supporting generateContent without version blacklisting', () => {
+    const rawGemini = [
+      { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3.0-ultra', displayName: 'Gemini 3.0 Ultra', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/text-embedding-004', displayName: 'Embedding', supportedGenerationMethods: ['embedContent'] },
+      { name: 'models/imagen-3.0-generate-002', displayName: 'Imagen 3', supportedGenerationMethods: ['generateImages'] }
+    ];
+
+    const parsed = parseGeminiModelsList(rawGemini);
+    expect(parsed.some((m) => m.id === 'gemini-2.5-flash')).toBe(true);
+    expect(parsed.some((m) => m.id === 'gemini-3.0-ultra')).toBe(true);
+    expect(parsed.some((m) => m.id.includes('embedding'))).toBe(false);
+    expect(parsed.some((m) => m.id.includes('imagen'))).toBe(false);
+  });
+
+  it('dynamically parses OpenAI models allowing chatgpt-4o-latest and fine-tunes', () => {
+    const rawOpenAI = [
+      { id: 'chatgpt-4o-latest' },
+      { id: 'gpt-4o' },
+      { id: 'ft:gpt-4o-mini:user:123' },
+      { id: 'text-embedding-3-small' },
+      { id: 'whisper-1' },
+      { id: 'dall-e-3' }
+    ];
+
+    const parsed = parseOpenAIModelsList(rawOpenAI);
+    expect(parsed.some((m) => m.id === 'chatgpt-4o-latest')).toBe(true);
+    expect(parsed.some((m) => m.id === 'gpt-4o')).toBe(true);
+    expect(parsed.some((m) => m.id === 'ft:gpt-4o-mini:user:123')).toBe(true);
+    expect(parsed.some((m) => m.id === 'text-embedding-3-small')).toBe(false);
+    expect(parsed.some((m) => m.id === 'whisper-1')).toBe(false);
+  });
+
+  it('dynamically parses Anthropic models directly from API format', () => {
+    const rawAnthropic = [
+      { id: 'claude-3-7-sonnet-20250219', display_name: 'Claude 3.7 Sonnet', type: 'model' },
+      { id: 'claude-3-5-haiku-20241022', display_name: 'Claude 3.5 Haiku', type: 'model' }
+    ];
+
+    const parsed = parseAnthropicModelsList(rawAnthropic);
+    expect(parsed.length).toBe(2);
+    expect(parsed[0].id).toBe('claude-3-7-sonnet-20250219');
+    expect(parsed[0].label).toBe('Claude 3.7 Sonnet');
+    expect(parsed[0].isRecommended).toBe(true);
+  });
+
+  it('dynamically parses OpenRouter models without vendor prefix whitelisting', () => {
+    const rawOpenRouter = [
+      { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B', description: 'Powerful OSS model' },
+      { id: 'x-ai/grok-2', name: 'Grok 2', description: 'xAI flagship' },
+      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', description: 'Reasoning model' }
+    ];
+
+    const parsed = parseOpenRouterModelsList(rawOpenRouter);
+    expect(parsed.some((m) => m.id === 'qwen/qwen-2.5-72b-instruct')).toBe(true);
+    expect(parsed.some((m) => m.id === 'x-ai/grok-2')).toBe(true);
+    expect(parsed.some((m) => m.id === 'deepseek/deepseek-r1')).toBe(true);
+  });
+});
+
 describe('generateStoryboard Error Handling (Phase 1d)', () => {
   const dummySkill = {
     id: 'test-skill',
@@ -227,4 +311,36 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
       })
     ).rejects.toThrow(/401 Unauthorized/);
   });
+
+  it('callRawLLM automatically falls back to gemini-2.0-flash if configured model returns 404', async () => {
+    const urlsCalled: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      urlsCalled.push(String(url));
+      if (String(url).includes('models/gemini-2.5-flash:generateContent')) {
+        return {
+          ok: false,
+          status: 404,
+          text: async () => 'models/gemini-2.5-flash is not found'
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '<div class="airflow"></div>' }] } }]
+        })
+      } as any;
+    });
+
+    const res = await callRawLLM({
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-2.5-flash',
+      systemPrompt: 'System',
+      userPrompt: 'User prompt'
+    });
+
+    expect(res).toBe('<div class="airflow"></div>');
+    expect(urlsCalled.some((u) => u.includes('gemini-2.0-flash:generateContent'))).toBe(true);
+  });
 });
+

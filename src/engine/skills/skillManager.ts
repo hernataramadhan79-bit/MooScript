@@ -13,7 +13,7 @@ Tone: Expert systems engineer breaking down a hard technical concept.
 Vocabulary: Use crisp modern tech terms (WebCodecs, zero-server, latency, memory-safety, pipeline).
 Word limit: 12-18 words per scene.
 Highlight words: Core verbs and technologies.
-Visual Layout Directives: Heavily favor TERMINAL_MOCKUP for code commands/tools, and METRIC_COUNTER for performance benchmarks. Use VS_COMPARISON for architectural tradeoffs.`,
+Motion Personality: Precise, snappy, high information density with schematic diagrams and animated vector flows.`,
     isBuiltin: true
   },
   {
@@ -27,7 +27,7 @@ Tone: Provocative, dramatic, counter-intuitive insight.
 Structure: Scene 1 MUST be an irresistible pattern interrupt.
 Word limit: 10-16 words per scene.
 Highlight words: Surprising revelations, paradoxes, numbers.
-Visual Layout Directives: Open with a punchy KINETIC_QUOTE or shocking METRIC_COUNTER. Use VS_COMPARISON to contrast traditional failures against the new paradigm.`,
+Motion Personality: Punchy camera moves, high-contrast focal points, and dramatic visual transformations.`,
     isBuiltin: true
   },
   {
@@ -40,7 +40,7 @@ Pacing: Measured and smooth with breathing room.
 Tone: Calm, aesthetic, thoughtful.
 Word limit: 14-22 words per scene.
 Highlight words: Emotional anchors and evocative metaphors.
-Visual Layout Directives: Favor poetic KINETIC_QUOTE and LIST_STAGGER for contemplative points and steady drift camera.`,
+Motion Personality: Smooth spatial drift, organic floating shapes, warm ambient lighting, and gentle parallax.`,
     isBuiltin: true
   }
 ];

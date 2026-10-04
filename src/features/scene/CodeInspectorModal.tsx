@@ -4,7 +4,7 @@ import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { validateSceneCode } from '../../engine/composition/validator';
-import type { SceneModule } from '../../types';
+import type { SceneModule, Composition } from '../../types';
 
 interface CodeInspectorModalProps {
   beatId: string | null;
@@ -51,19 +51,24 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
 
     setErrors([]);
 
-    const existingComp = project.composition || {
+    const totalCompDur = project.scenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
+    const existingComp: Composition = project.composition || {
       id: `comp-${project.id}`,
       width: project.width || 1080,
       height: project.height || 1920,
       fps: project.fps || 30,
+      duration: totalCompDur,
       globalCss: '',
       scenes: [],
       createdAt: Date.now()
     };
 
     const targetBeatId = beatId || 'default-beat';
+    const sceneDuration = project.scenes.find((s) => s.id === targetBeatId)?.durationInSeconds || 3;
     const updatedScene: SceneModule = {
+      id: currentScene?.id || targetBeatId,
       beatId: targetBeatId,
+      duration: sceneDuration,
       html: htmlCode,
       css: cssCode,
       buildJs: jsCode,
@@ -72,7 +77,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       userEdited: true
     };
 
-    const existingIdx = existingComp.scenes.findIndex((s) => s.beatId === targetBeatId);
+    const existingIdx = existingComp.scenes.findIndex((s: SceneModule) => s.beatId === targetBeatId);
     const updatedScenes = [...existingComp.scenes];
     if (existingIdx >= 0) {
       updatedScenes[existingIdx] = updatedScene;
@@ -85,6 +90,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       renderMode: 'composition' as const,
       composition: {
         ...existingComp,
+        duration: existingComp.duration || totalCompDur,
         scenes: updatedScenes,
         updatedAt: Date.now()
       }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMooStore } from '../../../store/useMooStore';
-import type { LayoutType, CameraMovement, MotionPreset, SceneTransition } from '../../../types';
+import type { CameraMovement, MotionPreset, SceneTransition } from '../../../types';
 import { cleanWord } from '../../../utils/textUtils';
 import { GlobalVoiceSelector } from '../GlobalVoiceSelector';
 
@@ -23,8 +23,8 @@ export const StoryboardPanel: React.FC = () => {
     toggleWordFocus,
     setSceneMotionPreset,
     setSceneTransition,
-    updateSceneLayout,
-    updateSceneVisualData,
+    updateSceneVisualIntent,
+    updateSceneVisualConcept,
     updateSceneCamera,
     toggleSceneSubtitles,
     addScene,
@@ -54,14 +54,6 @@ export const StoryboardPanel: React.FC = () => {
     { id: 'pull_out', label: 'Pull Out' },
     { id: 'snap_zoom', label: 'Snap Zoom' },
     { id: 'whip_pan', label: 'Whip Pan' }
-  ];
-
-  const layoutTypes: { id: LayoutType; label: string; icon: string }[] = [
-    { id: 'KINETIC_QUOTE', label: 'Kinetic Quote', icon: 'format_quote' },
-    { id: 'METRIC_COUNTER', label: 'Metric Counter', icon: 'speed' },
-    { id: 'TERMINAL_MOCKUP', label: 'Terminal Code', icon: 'terminal' },
-    { id: 'VS_COMPARISON', label: 'VS Comparison', icon: 'compare' },
-    { id: 'LIST_STAGGER', label: 'Staggered List', icon: 'format_list_bulleted' }
   ];
 
   const quickIdeas = [
@@ -213,7 +205,6 @@ export const StoryboardPanel: React.FC = () => {
             const words = rawSceneText.split(/\s+/).filter((w) => w.length > 0);
             const focusSet = new Set((scene.focusWords || []).map((w) => cleanWord(w)));
             const isCardActive = activeSceneId === scene.id;
-            const currentLayout = scene.layout || 'KINETIC_QUOTE';
             const currentCamera = scene.camera || 'steady_drift';
             const showSceneSubs = scene.showSubtitles ?? project.theme.showSubtitles ?? false;
 
@@ -235,18 +226,10 @@ export const StoryboardPanel: React.FC = () => {
                       #{idx + 1}
                     </span>
 
-                    {/* Layout Type Dropdown */}
-                    <select
-                      value={currentLayout}
-                      onChange={(e) => updateSceneLayout(scene.id, e.target.value as LayoutType)}
-                      className="bg-[#0e0e11] text-zinc-200 border border-white/[0.08] rounded h-6 px-1.5 text-[10px] font-medium focus:outline-none focus:border-[#84cc16]/50 cursor-pointer shrink-0"
-                    >
-                      {layoutTypes.map((lt) => (
-                        <option key={lt.id} value={lt.id}>
-                          {lt.label}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Visual Intent Indicator */}
+                    <span className="text-[10px] font-mono text-zinc-300 font-semibold truncate max-w-[140px]" title={scene.visualIntent}>
+                      {scene.visualIntent || `Scene #${idx + 1}`}
+                    </span>
 
                     {/* Camera Movement Dropdown */}
                     <select
@@ -355,229 +338,108 @@ export const StoryboardPanel: React.FC = () => {
                   />
                 </div>
 
-                {/* Dynamic Parameter Fields based on LayoutType */}
+                {/* Visual Intent & Concept */}
                 <div className="p-2 rounded bg-black/40 border border-white/[0.05] space-y-1.5">
-                  {currentLayout === 'METRIC_COUNTER' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-[#84cc16]">
-                        <span className="material-symbols-outlined text-[12px]">speed</span>
-                        <span>METRIC COUNTER SETTINGS</span>
+                  <div>
+                    <label className="text-[9px] text-zinc-400 block mb-0.5">Visual Intent (What is shown):</label>
+                    <input
+                      type="text"
+                      value={scene.visualIntent || ''}
+                      onChange={(e) => updateSceneVisualIntent(scene.id, e.target.value)}
+                      placeholder="e.g. Airplane enters while airflow lines stream over the wing"
+                      className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-zinc-400 block mb-0.5">Visual Concept (Metaphor / Details):</label>
+                    <input
+                      type="text"
+                      value={scene.visualConcept || ''}
+                      onChange={(e) => updateSceneVisualConcept(scene.id, e.target.value)}
+                      placeholder="e.g. Technical HUD diagram with glowing vector arrows"
+                      className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2 rounded bg-black/40 border border-white/[0.05] space-y-1.5">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-[#84cc16]">
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">motion_mode</span>
+                        <span>MOTION & EMPHASIS</span>
+                      </span>
+                    </div>
+
+                    {/* Preset and transition pills */}
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <div className="flex flex-wrap gap-1">
+                        {presets.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSceneMotionPreset(scene.id, p.id)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono flex items-center gap-1 ${
+                              scene.motionPreset === p.id
+                                ? 'bg-[#84cc16] text-black font-bold'
+                                : 'bg-white/[0.04] text-zinc-400 hover:text-zinc-200'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[10px]">{p.icon}</span>
+                            <span>{p.label}</span>
+                          </button>
+                        ))}
                       </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <div>
-                          <label className="text-[9px] text-zinc-400 block mb-0.5">Value (e.g. +400%, 99.9%):</label>
-                          <input
-                            type="text"
-                            value={scene.visualData?.metricValue || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { metricValue: e.target.value })}
-                            placeholder="+400%"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-zinc-400 block mb-0.5">Label (e.g. YoY Growth):</label>
-                          <input
-                            type="text"
-                            value={scene.visualData?.metricLabel || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { metricLabel: e.target.value })}
-                            placeholder="YoY Growth Rate"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[9px] text-zinc-400 block mb-0.5">Title Header (Optional):</label>
-                        <input
-                          type="text"
-                          value={scene.visualData?.title || ''}
-                          onChange={(e) => updateSceneVisualData(scene.id, { title: e.target.value })}
-                          placeholder="Revenue Spike"
-                          className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
-                        />
+
+                      <div className="flex gap-0.5 bg-black/40 p-0.5 rounded border border-white/[0.04]">
+                        {transitions.map((tr) => (
+                          <button
+                            key={tr.id}
+                            type="button"
+                            onClick={() => setSceneTransition(scene.id, tr.id)}
+                            className={`px-1 py-0.5 rounded text-[8px] font-mono ${
+                              (scene.transition ?? 'fade') === tr.id
+                                ? 'bg-white/20 text-white font-bold'
+                                : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                          >
+                            {tr.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
 
-                  {currentLayout === 'TERMINAL_MOCKUP' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-[#84cc16]">
-                        <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[12px]">terminal</span>
-                          <span>TERMINAL CODE MOCKUP</span>
-                        </span>
-                        <select
-                          value={scene.visualData?.codeLanguage || 'bash'}
-                          onChange={(e) => updateSceneVisualData(scene.id, { codeLanguage: e.target.value })}
-                          className="bg-[#18181c] text-zinc-300 border border-white/[0.08] rounded h-5 px-1 text-[9px] font-mono"
-                        >
-                          <option value="bash">bash</option>
-                          <option value="javascript">javascript</option>
-                          <option value="typescript">typescript</option>
-                          <option value="python">python</option>
-                          <option value="rust">rust</option>
-                        </select>
-                      </div>
-                      <textarea
-                        rows={3}
-                        value={scene.visualData?.codeSnippet || ''}
-                        onChange={(e) => updateSceneVisualData(scene.id, { codeSnippet: e.target.value })}
-                        placeholder="$ npm install mooscript&#10;$ npx mooscript build"
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded p-1.5 font-mono text-[11px] text-zinc-200 focus:outline-none focus:border-[#84cc16] resize-none"
-                      />
-                    </div>
-                  )}
-
-                  {currentLayout === 'VS_COMPARISON' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-[#84cc16]">
-                        <span className="material-symbols-outlined text-[12px]">compare</span>
-                        <span>VS BATTLE COMPARISON</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Left / Problem */}
-                        <div className="space-y-1 p-1.5 rounded bg-red-950/20 border border-red-900/30">
-                          <input
-                            type="text"
-                            value={scene.visualData?.leftTitle || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { leftTitle: e.target.value })}
-                            placeholder="BEFORE / OLD"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-5 px-1 text-[10px] font-bold text-red-400 focus:outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={scene.visualData?.leftDesc || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { leftDesc: e.target.value })}
-                            placeholder="Clunky timeline editing"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-5 px-1 text-[10px] text-zinc-300 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Right / Solution */}
-                        <div className="space-y-1 p-1.5 rounded bg-lime-950/20 border border-lime-900/30">
-                          <input
-                            type="text"
-                            value={scene.visualData?.rightTitle || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { rightTitle: e.target.value })}
-                            placeholder="AFTER / MOOSCRIPT"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-5 px-1 text-[10px] font-bold text-[#84cc16] focus:outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={scene.visualData?.rightDesc || ''}
-                            onChange={(e) => updateSceneVisualData(scene.id, { rightDesc: e.target.value })}
-                            placeholder="Zero-server hardware export"
-                            className="w-full bg-[#18181c] border border-white/[0.08] rounded h-5 px-1 text-[10px] text-zinc-300 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {currentLayout === 'LIST_STAGGER' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-[#84cc16]">
-                        <span className="material-symbols-outlined text-[12px]">format_list_bulleted</span>
-                        <span>STAGGERED BULLET LIST</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={scene.visualData?.title || ''}
-                        onChange={(e) => updateSceneVisualData(scene.id, { title: e.target.value })}
-                        placeholder="List Header Title..."
-                        className="w-full bg-[#18181c] border border-white/[0.08] rounded h-6 px-1.5 text-xs text-white focus:outline-none focus:border-[#84cc16]"
-                      />
-                      <textarea
-                        rows={3}
-                        value={(scene.visualData?.bulletItems || []).join('\n')}
-                        onChange={(e) => {
-                          const lines = e.target.value.split('\n').filter((l) => l.trim().length > 0);
-                          updateSceneVisualData(scene.id, { bulletItems: lines });
-                        }}
-                        placeholder="Bullet 1&#10;Bullet 2&#10;Bullet 3"
-                        className="w-full bg-[#18181c] border border-white/[0.08] rounded p-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[#84cc16] resize-none"
-                      />
-                    </div>
-                  )}
-
-                  {currentLayout === 'KINETIC_QUOTE' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-[#84cc16]">
-                        <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[12px]">format_quote</span>
-                          <span>TYPOGRAPHY MOTION & BOUNCE</span>
-                        </span>
-                      </div>
-
-                      {/* Preset and transition pills */}
-                      <div className="flex flex-wrap items-center justify-between gap-1">
-                        <div className="flex flex-wrap gap-1">
-                          {presets.map((p) => (
+                    {/* Word chips for focus keyframe punch */}
+                    <div className="space-y-0.5 pt-1">
+                      <span className="text-[9px] font-mono text-zinc-400 block">
+                        Tap words to punch focus badge (★):
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {words.map((w, wIdx) => {
+                          const clean = cleanWord(w);
+                          const isFocus = focusSet.has(clean);
+                          return (
                             <button
-                              key={p.id}
+                              key={`${w}-${wIdx}`}
                               type="button"
-                              onClick={() => setSceneMotionPreset(scene.id, p.id)}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono flex items-center gap-1 ${
-                                scene.motionPreset === p.id
-                                  ? 'bg-[#84cc16] text-black font-bold'
-                                  : 'bg-white/[0.04] text-zinc-400 hover:text-zinc-200'
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleWordFocus(scene.id, w);
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-all flex items-center gap-0.5 active:scale-90 ${
+                                isFocus
+                                  ? 'bg-[#84cc16] text-black font-bold shadow-sm'
+                                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300'
                               }`}
                             >
-                              <span className="material-symbols-outlined text-[10px]">{p.icon}</span>
-                              <span>{p.label}</span>
+                              {isFocus && <span className="text-[8px]">★</span>}
+                              <span>{w}</span>
                             </button>
-                          ))}
-                        </div>
-
-                        <div className="flex gap-0.5 bg-black/40 p-0.5 rounded border border-white/[0.04]">
-                          {transitions.map((tr) => (
-                            <button
-                              key={tr.id}
-                              type="button"
-                              onClick={() => setSceneTransition(scene.id, tr.id)}
-                              className={`px-1 py-0.5 rounded text-[8px] font-mono ${
-                                (scene.transition ?? 'fade') === tr.id
-                                  ? 'bg-white/20 text-white font-bold'
-                                  : 'text-zinc-500 hover:text-zinc-300'
-                              }`}
-                            >
-                              {tr.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Word chips for focus keyframe punch */}
-                      <div className="space-y-0.5 pt-1">
-                        <span className="text-[9px] font-mono text-zinc-400 block">
-                          Tap words to punch focus badge (★):
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {words.map((w, wIdx) => {
-                            const clean = cleanWord(w);
-                            const isFocus = focusSet.has(clean);
-                            return (
-                              <button
-                                key={`${w}-${wIdx}`}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleWordFocus(scene.id, w);
-                                }}
-                                className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-all flex items-center gap-0.5 active:scale-90 ${
-                                  isFocus
-                                    ? 'bg-[#84cc16] text-black font-bold shadow-sm'
-                                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300'
-                                }`}
-                              >
-                                {isFocus && <span className="text-[8px]">★</span>}
-                                <span>{w}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             );

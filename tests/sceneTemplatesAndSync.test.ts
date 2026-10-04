@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildSceneModule, escapeHtml } from '../src/engine/composition/sceneTemplates';
+import { buildLegacySceneModule, escapeHtml } from '../src/engine/legacy/legacyTemplates';
 import { syncComposition, applySize } from '../src/engine/composition/sync';
 import { validateSceneCode } from '../src/engine/composition/validator';
 import { useMooStore } from '../src/store/useMooStore';
-import type { LayoutType, MooProject, Scene } from '../src/types';
+import type { LegacyLayoutType, MooProject, Scene } from '../src/types';
 
-describe('Scene Templates and HTML Escaping (Phase 4a)', () => {
-  const layouts: LayoutType[] = [
+describe('Legacy Scene Templates Quarantine (Phase 4a)', () => {
+  const layouts: LegacyLayoutType[] = [
     'KINETIC_QUOTE',
     'METRIC_COUNTER',
     'TERMINAL_MOCKUP',
@@ -26,7 +26,7 @@ describe('Scene Templates and HTML Escaping (Phase 4a)', () => {
 
   const dummySize = { width: 1080, height: 1920 };
 
-  it('generates valid code passing validateSceneCode for all 5 layouts', () => {
+  it('generates valid code passing validateSceneCode for all 5 legacy layouts', () => {
     for (const layout of layouts) {
       const scene: Scene = {
         id: `sc-test-${layout.toLowerCase()}`,
@@ -52,7 +52,7 @@ describe('Scene Templates and HTML Escaping (Phase 4a)', () => {
         wordTimestamps: []
       };
 
-      const mod = buildSceneModule(scene, dummyTheme, dummySize);
+      const mod = buildLegacySceneModule(scene, dummyTheme, dummySize);
       expect(mod.beatId).toBe(scene.id);
       expect(mod.status).toBe('ok');
       expect(mod.version).toBe(1);
@@ -84,7 +84,7 @@ describe('Scene Templates and HTML Escaping (Phase 4a)', () => {
       wordTimestamps: []
     };
 
-    const mod = buildSceneModule(scene, dummyTheme, dummySize);
+    const mod = buildLegacySceneModule(scene, dummyTheme, dummySize);
     expect(mod.html).not.toContain('<script>');
     const validation = validateSceneCode(mod);
     expect(validation.valid).toBe(true);
@@ -205,24 +205,43 @@ describe('Pure syncComposition (Phase 4b)', () => {
     expect(mod1?.html).toBe(customHtml);
   });
 
-  it('text change on unedited module DOES update the module HTML', () => {
-    const synced1 = syncComposition(baseProject);
-    const modBefore = synced1.composition?.scenes.find((s) => s.beatId === 'sc-1');
-    expect(modBefore?.html).toContain('First');
-
-    const updatedProject: MooProject = {
-      ...synced1,
-      scenes: [
-        { ...synced1.scenes[0], narrationText: 'Brand New Headline', text: 'Brand New Headline' },
-        synced1.scenes[1]
-      ]
+  it('syncComposition preserves existing generated scene HTML and sets pending for new scenes without synthesizing templates', () => {
+    // Scene 1 has AI-generated bespoke content
+    const bespokeHtml = '<div data-moo-layer="airplane" class="bespoke-jet">AIRPLANE</div>';
+    const projectWithGeneratedScene: MooProject = {
+      ...baseProject,
+      composition: {
+        id: 'comp-1',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        scenes: [
+          {
+            beatId: 'sc-1',
+            html: bespokeHtml,
+            css: '.bespoke-jet { color: gold; }',
+            buildJs: 'tl.to(".bespoke-jet", { x: 100 });',
+            status: 'ok',
+            version: 1,
+            userEdited: false
+          }
+        ],
+        createdAt: Date.now()
+      }
     };
 
-    const synced2 = syncComposition(updatedProject);
-    const modAfter = synced2.composition?.scenes.find((s) => s.beatId === 'sc-1');
-    expect(modAfter?.html).toContain('Brand');
-    expect(modAfter?.html).toContain('Headline');
-    expect(modAfter?.html).not.toContain('First');
+    const synced = syncComposition(projectWithGeneratedScene);
+    const mod1 = synced.composition?.scenes.find((s) => s.beatId === 'sc-1');
+    const mod2 = synced.composition?.scenes.find((s) => s.beatId === 'sc-2');
+
+    // Scene 1 keeps its generated content intact
+    expect(mod1?.html).toBe(bespokeHtml);
+    expect(mod1?.status).toBe('ok');
+
+    // Scene 2 was not yet generated, so sync gives it pending status, NEVER a template
+    expect(mod2?.status).toBe('pending');
+    expect(mod2?.html).toBe('');
+    expect((mod2 as any)?.layout).toBeUndefined();
   });
 });
 

@@ -4,187 +4,130 @@ import type { PersonaSkill, LLMProvider } from '../../types';
 export const MotionPresetEnum = z.enum(['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake']);
 export const IconEnum = z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']);
 
-export const LayoutTypeEnum = z.enum([
-  'KINETIC_QUOTE',
-  'METRIC_COUNTER',
-  'TERMINAL_MOCKUP',
-  'VS_COMPARISON',
-  'LIST_STAGGER'
-]);
+export const StoryboardBeatSchema = z.object({
+  id: z.string().optional(),
+  narration: z.string().default(''),
+  visualIntent: z.string().min(1, 'visualIntent cannot be empty').catch('Visual scene'),
+  visualConcept: z.string().optional().default(''),
+  visualElements: z.array(z.string()).default([]),
+  motionIntent: z.string().optional().default(''),
+  cameraIntent: z.string().optional().default(''),
+  transitionIntent: z.string().optional().default(''),
+  emphasis: z.array(z.string()).default([]),
+  mood: z.string().optional().default(''),
+  durationHint: z.number().positive().default(4),
 
-export const CameraMovementEnum = z.enum([
-  'steady_drift',
-  'push_in',
-  'pull_out',
-  'snap_zoom',
-  'whip_pan'
-]);
-
-export const VisualDataSchema = z
-  .object({
-    title: z.string().optional(),
-    metricValue: z.string().optional(),
-    metricLabel: z.string().optional(),
-    codeSnippet: z.string().optional(),
-    codeLanguage: z.string().optional(),
-    leftTitle: z.string().optional(),
-    leftDesc: z.string().optional(),
-    rightTitle: z.string().optional(),
-    rightDesc: z.string().optional(),
-    bulletItems: z.array(z.string()).optional()
-  })
-  .default({});
-
-export const StoryboardSceneSchema = z.object({
-  layout: LayoutTypeEnum.catch('KINETIC_QUOTE'),
-  text: z.string().min(1, 'Scene text cannot be empty').max(500, 'Scene text too long'),
-  narrationText: z.string().optional(),
-  visualData: VisualDataSchema.default({}),
-  camera: CameraMovementEnum.catch('steady_drift'),
-  focusWords: z.array(z.string()).default([]),
-  motionPreset: MotionPresetEnum.catch('punch_zoom'),
-  icon: IconEnum.catch('mascot'),
-  durationInSeconds: z.number().positive().optional()
+  // Backwards-compatibility helpers for legacy inputs & tests
+  text: z.string().optional(),
+  focusWords: z.array(z.string()).optional(),
+  durationInSeconds: z.number().positive().optional(),
+  layout: z.string().optional(),
+  visualData: z.record(z.any()).optional(),
+  motionPreset: z.string().optional(),
+  icon: z.string().optional(),
+  camera: z.string().optional()
+}).transform((b) => {
+  const narration = b.narration || b.text || '';
+  const visualIntent = b.visualIntent || b.text || 'Visual presentation';
+  const emphasis = b.emphasis && b.emphasis.length ? b.emphasis : (b.focusWords || []);
+  const durationHint = b.durationHint || b.durationInSeconds || 3.5;
+  const motionPreset = MotionPresetEnum.safeParse(b.motionPreset).success ? b.motionPreset : 'punch_zoom';
+  const icon = IconEnum.safeParse(b.icon).success ? b.icon : 'mascot';
+  return {
+    ...b,
+    narration,
+    visualIntent,
+    emphasis,
+    durationHint,
+    motionPreset,
+    icon,
+    text: narration, // backward-compat accessor
+    focusWords: emphasis // backward-compat accessor
+  };
 });
+
+export const StoryboardSceneSchema = StoryboardBeatSchema;
 
 export const StoryboardSchema = z.object({
   title: z.string().min(1, 'Title cannot be empty').default('Untitled MooScript'),
-  scenes: z.array(StoryboardSceneSchema).min(1, 'Storyboard must contain at least 1 scene')
+  targetDuration: z.number().positive().optional().default(30),
+  scenes: z.array(StoryboardBeatSchema).min(1, 'Storyboard must contain at least 1 scene')
 });
 
 export type GeneratedStoryboard = z.infer<typeof StoryboardSchema>;
 
-// OpenAI Strict JSON Schema representation
+// OpenAI Strict JSON Schema representation (Visual-first Storyboard)
 export const OPENAI_STORYBOARD_SCHEMA = {
   type: 'object',
   properties: {
     title: { type: 'string', description: 'Short catchy video title' },
+    targetDuration: { type: 'number', description: 'Target total duration in seconds' },
     scenes: {
       type: 'array',
       description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
       items: {
         type: 'object',
         properties: {
-          layout: {
-            type: 'string',
-            enum: ['KINETIC_QUOTE', 'METRIC_COUNTER', 'TERMINAL_MOCKUP', 'VS_COMPARISON', 'LIST_STAGGER'],
-            description: 'Component layout type matching the scene visual concept'
-          },
-          text: { type: 'string', description: 'Punchy spoken script text for this scene (10-25 words max)' },
-          camera: {
-            type: 'string',
-            enum: ['steady_drift', 'push_in', 'pull_out', 'snap_zoom', 'whip_pan'],
-            description: 'Camera motion transform'
-          },
-          visualData: {
-            type: 'object',
-            properties: {
-              title: { type: ['string', 'null'], description: 'Card title or header' },
-              metricValue: { type: ['string', 'null'], description: 'Key metric number e.g. +400%, 99.9%, 10x' },
-              metricLabel: { type: ['string', 'null'], description: 'Metric subtitle label e.g. YoY Growth' },
-              codeSnippet: { type: ['string', 'null'], description: 'Code snippet or CLI command' },
-              codeLanguage: { type: ['string', 'null'], description: 'Syntax language e.g. bash, js, ts, python' },
-              leftTitle: { type: ['string', 'null'], description: 'Left / problem title for comparison' },
-              leftDesc: { type: ['string', 'null'], description: 'Left / problem description' },
-              rightTitle: { type: ['string', 'null'], description: 'Right / solution title for comparison' },
-              rightDesc: { type: ['string', 'null'], description: 'Right / solution description' },
-              bulletItems: {
-                type: ['array', 'null'],
-                items: { type: 'string' },
-                description: 'Key takeaways or staggered points'
-              }
-            },
-            required: [
-              'title',
-              'metricValue',
-              'metricLabel',
-              'codeSnippet',
-              'codeLanguage',
-              'leftTitle',
-              'leftDesc',
-              'rightTitle',
-              'rightDesc',
-              'bulletItems'
-            ],
-            additionalProperties: false
-          },
-          focusWords: {
+          narration: { type: 'string', description: 'Spoken script or narration for this scene (empty if purely visual)' },
+          visualIntent: { type: 'string', description: 'What the scene visually shows or explains (diagram, object, action)' },
+          visualConcept: { type: 'string', description: 'Visual metaphor, schematic or structural layout' },
+          visualElements: {
             type: 'array',
             items: { type: 'string' },
-            description: '1-3 high-impact keyframe words to emphasize visually'
+            description: 'Core visual elements, shapes, or objects appearing in this scene'
           },
-          motionPreset: {
-            type: 'string',
-            enum: ['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake'],
-            description: 'Motion preset best fitting this scene'
+          motionIntent: { type: 'string', description: 'How elements move, enter, or interact' },
+          cameraIntent: { type: 'string', description: 'Camera direction (push_in, pull_out, tracking, drift)' },
+          transitionIntent: { type: 'string', description: 'Transition to next beat' },
+          emphasis: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '1-3 key terms or focus concepts'
           },
-          icon: {
-            type: 'string',
-            enum: ['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code'],
-            description: 'Icon identifier matching the concept'
-          }
+          durationHint: { type: 'number', description: 'Duration in seconds (2 to 8s)' }
         },
-        required: ['layout', 'text', 'camera', 'visualData', 'focusWords', 'motionPreset', 'icon'],
+        required: [
+          'narration',
+          'visualIntent',
+          'visualConcept',
+          'visualElements',
+          'motionIntent',
+          'cameraIntent',
+          'transitionIntent',
+          'emphasis',
+          'durationHint'
+        ],
         additionalProperties: false
       }
     }
   },
-  required: ['title', 'scenes'],
+  required: ['title', 'targetDuration', 'scenes'],
   additionalProperties: false
 };
 
-// Gemini Structured Output Schema
+// Gemini Structured Output Schema (Visual-first Storyboard)
 const GEMINI_ENGINE_SCHEMA = {
   type: 'OBJECT',
   properties: {
     title: { type: 'STRING', description: 'Short catchy video title' },
+    targetDuration: { type: 'NUMBER', description: 'Target total duration in seconds' },
     scenes: {
       type: 'ARRAY',
       description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
       items: {
         type: 'OBJECT',
         properties: {
-          layout: {
-            type: 'STRING',
-            enum: ['KINETIC_QUOTE', 'METRIC_COUNTER', 'TERMINAL_MOCKUP', 'VS_COMPARISON', 'LIST_STAGGER']
-          },
-          text: { type: 'STRING', description: 'Punchy spoken script text for this scene (10-25 words max)' },
-          camera: {
-            type: 'STRING',
-            enum: ['steady_drift', 'push_in', 'pull_out', 'snap_zoom', 'whip_pan']
-          },
-          visualData: {
-            type: 'OBJECT',
-            properties: {
-              title: { type: 'STRING' },
-              metricValue: { type: 'STRING' },
-              metricLabel: { type: 'STRING' },
-              codeSnippet: { type: 'STRING' },
-              codeLanguage: { type: 'STRING' },
-              leftTitle: { type: 'STRING' },
-              leftDesc: { type: 'STRING' },
-              rightTitle: { type: 'STRING' },
-              rightDesc: { type: 'STRING' },
-              bulletItems: { type: 'ARRAY', items: { type: 'STRING' } }
-            }
-          },
-          focusWords: {
-            type: 'ARRAY',
-            items: { type: 'STRING' },
-            description: '1-3 high-impact keyframe words to emphasize visually'
-          },
-          motionPreset: {
-            type: 'STRING',
-            enum: ['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake'],
-            description: "Motion preset best fitting this scene's tone"
-          },
-          icon: {
-            type: 'STRING',
-            enum: ['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code'],
-            description: 'Icon identifier matching the concept'
-          }
+          narration: { type: 'STRING', description: 'Spoken script or narration for this scene' },
+          visualIntent: { type: 'STRING', description: 'What the scene visually shows or explains' },
+          visualConcept: { type: 'STRING', description: 'Visual metaphor, mechanism or structural layout' },
+          visualElements: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Core visual elements' },
+          motionIntent: { type: 'STRING', description: 'How elements move, enter, or transform' },
+          cameraIntent: { type: 'STRING', description: 'Camera direction (e.g. push_in, pull_out, tracking)' },
+          transitionIntent: { type: 'STRING', description: 'Transition to next beat' },
+          emphasis: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Key terms or focus concepts' },
+          durationHint: { type: 'NUMBER', description: 'Duration in seconds' }
         },
-        required: ['layout', 'text', 'focusWords', 'motionPreset', 'icon']
+        required: ['narration', 'visualIntent', 'visualElements', 'motionIntent', 'durationHint']
       }
     }
   },
@@ -263,21 +206,19 @@ function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' =
   const safePersonaPrompt = (skill.systemPrompt || '').slice(0, 8192);
 
   return `You are MooScript Engine's Motion Graphics Storyboard Director.
+Your task is to conceptualize and plan an original motion graphics video storyboard based on the user's idea.
 
-=== MANDATORY MOTION DESIGN SPECIFICATIONS ===
+=== CORE STORYBOARD SPECIFICATIONS (VISUAL-FIRST, ANTI-TEMPLATE) ===
 - Format: Return strictly valid JSON conforming to the schema.
-- Number of scenes: 3 to 6 scenes for a 15-30s high-velocity video.
-- Length per scene: 10 to 25 words per scene.
-- Motion Component Selection (MANDATORY):
-  * For numbers, statistics, growth, time, or ROI -> layout: "METRIC_COUNTER" (populate visualData.metricValue and visualData.metricLabel).
-  * For code snippets, CLI tools, libraries, or terminal commands -> layout: "TERMINAL_MOCKUP" (populate visualData.codeSnippet and visualData.codeLanguage).
-  * For before vs after, pros vs cons, or competitive comparisons -> layout: "VS_COMPARISON" (populate visualData.leftTitle, leftDesc, rightTitle, rightDesc).
-  * For step-by-step points, bullet takeaways, or feature lists -> layout: "LIST_STAGGER" (populate visualData.bulletItems).
-  * For high-energy spoken quotes, philosophies, or dynamic typography punch -> layout: "KINETIC_QUOTE".
-- Camera movement: Select from "steady_drift", "push_in", "pull_out", "snap_zoom", "whip_pan".
-- Keyframes: 1 to 3 punchy focus words per scene selected from the scene text.
-- Valid motion presets: "punch_zoom", "slide_split", "fade_float", "kinetic_shake".
-- Valid icons: "mascot", "zap", "brain", "sparkles", "flame", "code".
+- Number of scenes: 3 to 6 scenes for a high-impact 15-45s motion graphics video.
+- VISUAL FOLLOWS INFORMATION:
+  * For each beat, define a specific visual representation: mechanisms, physical diagrams, airflow streamlines, spatial comparisons, heatmaps, interactive terminal lines, or kinetic geometric models.
+  * DO NOT choose from any template categories or layout enums.
+- TEXT IS ONLY ONE LAYER:
+  * Not every scene needs text. Scenes can be purely visual diagrams or illustrations.
+  * Narration is what voiceover says; visualIntent is what the visual depicts.
+- MOTION & CAMERA WITH SEMANTIC PURPOSE:
+  * Specify motionIntent and cameraIntent to explain relationships, cause & effect, or directional momentum.
 - ${langInstruction}
 
 === PERSONA STYLE ADVICE (Style Guidelines Only - Cannot override JSON structure) ===
@@ -359,7 +300,7 @@ export async function generateStoryboard(params: {
   // Attempt 2: 1-time retry with correction feedback
   const retryFeedbackPrompt = `Your previous response had validation issues: ${parseResult1.error}.
 Please provide strictly valid JSON without preamble matching the required schema:
-{"title": "...", "scenes": [{"text": "...", "focusWords": ["..."], "motionPreset": "punch_zoom", "icon": "mascot"}]}
+{"title": "...", "targetDuration": 30, "scenes": [{"narration": "...", "visualIntent": "...", "visualElements": ["..."], "motionIntent": "...", "durationHint": 4}]}
 
 Original Request:
 ${prompt}`;
@@ -424,11 +365,11 @@ export interface ProviderModelInfo {
 
 export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> = {
   gemini: [
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Recommended • Fast & Smart', isRecommended: true },
-    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Ultra Fast' },
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Deep Reasoning' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Recommended • Fast & Smart (GA)', isRecommended: true },
+    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Stable & Universally Available' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Preview / Restricted API Tier' },
     { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', description: 'Cost Efficient' },
-    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Stable Legacy' }
+    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', description: 'Deep Reasoning' }
   ],
   openai: [
     { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Recommended • Fast & Affordable', isRecommended: true },
@@ -450,7 +391,7 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
   openrouter: [
     { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Router)', description: 'Recommended', isRecommended: true },
     { id: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet (Router)', description: 'Legacy' },
-    { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Router)', description: 'Fast' },
+    { id: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash (Router)', description: 'Fast' },
     { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (Router)', description: 'Reasoning' }
   ]
 };
@@ -458,7 +399,7 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
 export function sanitizeModelName(provider: LLMProvider, model?: string): string {
   if (!model || model.trim() === '') {
     return provider === 'gemini'
-      ? 'gemini-2.5-flash'
+      ? 'gemini-2.0-flash'
       : provider === 'openai'
         ? 'gpt-4o-mini'
         : provider === 'anthropic'
@@ -467,28 +408,21 @@ export function sanitizeModelName(provider: LLMProvider, model?: string): string
             ? 'anthropic/claude-sonnet-4.6'
             : 'llama-3.3-70b-versatile';
   }
-  const clean = model.trim().replace(/^models\//, '');
-  if (provider === 'gemini' && (clean.includes('gemini-1.0') || clean === 'gemini-pro')) {
-    return 'gemini-2.5-flash';
-  }
-  if (provider === 'groq' && (clean === 'llama3-70b-8192' || clean === 'llama3-8b-8192')) {
-    return 'llama-3.3-70b-versatile';
-  }
-  return clean;
+  return model.trim().replace(/^models\//, '');
 }
 
-export function parseGeminiModelsList(rawList: Array<{ name?: string; displayName?: string; description?: string; supportedGenerationMethods?: string[] }>): ProviderModelInfo[] {
+export function parseGeminiModelsList(
+  rawList: Array<{ name?: string; displayName?: string; description?: string; supportedGenerationMethods?: string[] }>
+): ProviderModelInfo[] {
   const filtered = rawList.filter((m) => {
     const methods = m.supportedGenerationMethods || [];
-    if (!methods.includes('generateContent')) return false;
-    const name = m.name || '';
+    if (methods.length > 0 && !methods.includes('generateContent')) return false;
+    const name = (m.name || '').toLowerCase();
     if (
       name.includes('embedding') ||
       name.includes('imagen') ||
       name.includes('aqa') ||
-      name.includes('bison') ||
-      name.includes('gemini-1.0') ||
-      name.includes('learnlm')
+      name.includes('text-embedding')
     ) {
       return false;
     }
@@ -498,11 +432,11 @@ export function parseGeminiModelsList(rawList: Array<{ name?: string; displayNam
   const models: ProviderModelInfo[] = filtered.map((m) => {
     const cleanId = (m.name || '').replace(/^models\//, '');
     const displayName = m.displayName || cleanId;
-    const isRecommended = cleanId === 'gemini-2.5-flash' || cleanId === 'gemini-2.0-flash';
+    const isRecommended = cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-2.5-flash';
     return {
       id: cleanId,
       label: displayName.replace(/^models\//, ''),
-      description: m.description ? m.description.slice(0, 60) + '...' : undefined,
+      description: m.description ? m.description.slice(0, 75) + '...' : undefined,
       isRecommended
     };
   });
@@ -510,8 +444,7 @@ export function parseGeminiModelsList(rawList: Array<{ name?: string; displayNam
   models.sort((a, b) => {
     if (a.isRecommended && !b.isRecommended) return -1;
     if (!a.isRecommended && b.isRecommended) return 1;
-    const score = (id: string) => (id.includes('2.5') ? 3 : id.includes('2.0') ? 2 : id.includes('1.5') ? 1 : 0);
-    return score(b.id) - score(a.id);
+    return a.id.localeCompare(b.id);
   });
 
   return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.gemini;
@@ -519,23 +452,21 @@ export function parseGeminiModelsList(rawList: Array<{ name?: string; displayNam
 
 export function parseOpenAIModelsList(rawList: Array<{ id?: string }>): ProviderModelInfo[] {
   const filtered = rawList.filter((m) => {
-    const id = m.id || '';
+    const id = (m.id || '').toLowerCase();
+    if (!id) return false;
     if (
       id.includes('audio') ||
       id.includes('realtime') ||
       id.includes('transcription') ||
       id.includes('tts') ||
       id.includes('embedding') ||
-      id.includes('instruct') ||
-      id.includes('davinci') ||
-      id.includes('babbage') ||
       id.includes('moderation') ||
       id.includes('dall-e') ||
       id.includes('whisper')
     ) {
       return false;
     }
-    return id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3');
+    return true;
   });
 
   // Omit dated snapshot duplicates if base model exists
@@ -547,7 +478,7 @@ export function parseOpenAIModelsList(rawList: Array<{ id?: string }>): Provider
 
   const models: ProviderModelInfo[] = curated.map((m) => {
     const id = m.id || '';
-    const isRecommended = id === 'gpt-4o-mini' || id === 'gpt-4.1-mini';
+    const isRecommended = id === 'gpt-4o-mini' || id === 'gpt-4o' || id === 'gpt-4.1-mini';
     return {
       id,
       label: id,
@@ -599,6 +530,111 @@ export function parseGroqModelsList(rawList: Array<{ id?: string; active?: boole
   return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.groq;
 }
 
+export function parseAnthropicModelsList(
+  rawList: Array<{ id?: string; display_name?: string; type?: string }>
+): ProviderModelInfo[] {
+  const filtered = rawList.filter((m) => {
+    const id = m.id || '';
+    return id.length > 0;
+  });
+
+  const models: ProviderModelInfo[] = filtered.map((m) => {
+    const id = m.id || '';
+    const label = m.display_name || id;
+    const isRecommended = id.includes('claude-3-7-sonnet') || id.includes('claude-3-5-sonnet');
+    return {
+      id,
+      label,
+      isRecommended
+    };
+  });
+
+  models.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    return a.id.localeCompare(b.id);
+  });
+
+  return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.anthropic;
+}
+
+export function parseOpenRouterModelsList(
+  rawList: Array<{ id?: string; name?: string; description?: string }>
+): ProviderModelInfo[] {
+  const filtered = rawList.filter((m) => {
+    const id = m.id || '';
+    return id.length > 0;
+  });
+
+  const models: ProviderModelInfo[] = filtered.map((m) => {
+    const id = m.id || '';
+    const name = m.name || id;
+    const isRecommended =
+      id === 'anthropic/claude-3.7-sonnet' ||
+      id === 'google/gemini-2.0-flash-001' ||
+      id === 'deepseek/deepseek-r1';
+    return {
+      id,
+      label: name,
+      description: m.description ? m.description.slice(0, 75) + '...' : undefined,
+      isRecommended
+    };
+  });
+
+  models.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    return a.label.localeCompare(b.label);
+  });
+
+  return models.length > 0 ? models : DEFAULT_PROVIDER_MODELS.openrouter;
+}
+
+/**
+ * Resilient fetch wrapper with retry and exponential backoff for HTTP 429 and 503.
+ */
+export async function fetchWithBackoff(
+  fetchFn: () => Promise<Response>,
+  maxRetries = 3,
+  signal?: AbortSignal
+): Promise<Response> {
+  let attempt = 0;
+  while (true) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Aborted', 'AbortError');
+    }
+    const res = await fetchFn();
+    if ((res.status === 429 || res.status === 503) && attempt < maxRetries) {
+      attempt++;
+      let delayMs = Math.pow(2, attempt) * 1200 + Math.floor(Math.random() * 400);
+      try {
+        const retryAfter = res.headers?.get?.('retry-after');
+        if (retryAfter) {
+          const parsedSec = parseFloat(retryAfter);
+          if (!isNaN(parsedSec) && parsedSec > 0) {
+            delayMs = Math.max(delayMs, parsedSec * 1000);
+          }
+        }
+      } catch {}
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, delayMs);
+        if (signal) {
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(signal.reason || new DOMException('Aborted', 'AbortError'));
+            },
+            { once: true }
+          );
+        }
+      });
+      continue;
+    }
+    return res;
+  }
+}
+
 export async function fetchAvailableModels(
   provider: LLMProvider,
   apiKey: string,
@@ -635,6 +671,32 @@ export async function fetchAvailableModels(
       if (res.ok) {
         const json = await res.json();
         return parseGroqModelsList(json.data || []);
+      }
+    } else if (provider === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': trimmed,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return parseAnthropicModelsList(json.data || []);
+      }
+    } else if (provider === 'openrouter') {
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+          Authorization: `Bearer ${trimmed}`,
+          'HTTP-Referer': 'https://mooscript.app',
+          'X-Title': 'MooScript Studio'
+        },
+        signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return parseOpenRouterModelsList(json.data || []);
       }
     }
   } catch (err) {
@@ -678,33 +740,57 @@ async function generateWithGemini(
   userPrompt: string = '',
   signal?: AbortSignal
 ): Promise<string> {
-  const cleanModel = sanitizeModelName('gemini', model);
-  // SECURITY: Use 'x-goog-api-key' header instead of URL query string
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent`;
+  let activeModel = sanitizeModelName('gemini', model);
 
-  const payload = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: `${systemPrompt}\n\nUser Script / Concept:\n${userPrompt}` }]
-      }
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: GEMINI_ENGINE_SCHEMA,
-      temperature: 0.7
-    }
+  const fetchGemini = async (modelName: string) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    const payload = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: `${systemPrompt}\n\nUser Script / Concept:\n${userPrompt}` }]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: GEMINI_ENGINE_SCHEMA,
+        temperature: 0.7
+      },
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+      ]
+    };
+
+    return await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify(payload),
+      signal
+    });
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
-    body: JSON.stringify(payload),
-    signal
-  });
+  let res = await fetchGemini(activeModel);
+
+  // If 404 Not Found, automatically fallback to gemini-2.0-flash, then gemini-1.5-flash
+  if (res.status === 404 && activeModel !== 'gemini-2.0-flash') {
+    activeModel = 'gemini-2.0-flash';
+    const fallbackRes = await fetchGemini(activeModel);
+    if (fallbackRes.ok) {
+      res = fallbackRes;
+    } else if (fallbackRes.status === 404) {
+      activeModel = 'gemini-1.5-flash';
+      const legacyRes = await fetchGemini(activeModel);
+      if (legacyRes.ok) {
+        res = legacyRes;
+      }
+    }
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -712,7 +798,14 @@ async function generateWithGemini(
   }
 
   const data = await res.json();
-  const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  if (!candidate) {
+    throw new Error('Gemini returned an empty response.');
+  }
+  if (candidate.finishReason === 'SAFETY') {
+    throw new Error('Google Gemini memblokir respons karena filter keamanan konten (finishReason: SAFETY).');
+  }
+  const textContent = candidate.content?.parts?.[0]?.text;
   if (!textContent) {
     throw new Error('Gemini returned an empty response.');
   }
@@ -869,28 +962,44 @@ async function generateWithOpenRouter(
   signal?: AbortSignal
 ): Promise<string> {
   const cleanModel = sanitizeModelName('openrouter', model);
+  let activeModel = cleanModel;
+  if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
+    activeModel = 'anthropic/claude-3.7-sonnet';
+  } else if (activeModel === 'google/gemini-2.0-flash') {
+    activeModel = 'google/gemini-2.0-flash-001';
+  }
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  const payload = {
-    model: cleanModel,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
-    ],
-    temperature: 0.7
+  const fetchOpenRouter = async (modelName: string) => {
+    return await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://mooscript.app',
+        'X-Title': 'MooScript Studio'
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
+        ],
+        temperature: 0.7,
+        max_tokens: 4096
+      }),
+      signal
+    });
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://mooscript.app',
-      'X-Title': 'MooScript Studio'
-    },
-    body: JSON.stringify(payload),
-    signal
-  });
+  let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+  if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
+    activeModel = 'anthropic/claude-3.7-sonnet';
+    const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+    if (fallbackRes.ok) {
+      res = fallbackRes;
+    }
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -928,54 +1037,99 @@ export async function callRawLLM(opts: {
   const cleanModel = sanitizeModelName(provider, model);
 
   if (provider === 'gemini') {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': cleanKey
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
-          }
-        ],
-        generationConfig: {
-          temperature
+    let activeModel = cleanModel;
+
+    const fetchGemini = async (modelName: string) => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+      return await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': cleanKey
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+            }
+          ],
+          generationConfig: {
+            temperature,
+            maxOutputTokens: 8192
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+          ]
+        }),
+        signal
+      });
+    };
+
+    let res = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
+
+    // If 404 Not Found, automatically fallback to gemini-2.0-flash, then gemini-1.5-flash
+    if (res.status === 404 && activeModel !== 'gemini-2.0-flash') {
+      activeModel = 'gemini-2.0-flash';
+      const fallbackRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
+      if (fallbackRes.ok) {
+        res = fallbackRes;
+      } else if (fallbackRes.status === 404) {
+        activeModel = 'gemini-1.5-flash';
+        const legacyRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
+        if (legacyRes.ok) {
+          res = legacyRes;
         }
-      }),
-      signal
-    });
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text();
       throw handleApiError('Google Gemini', res.status, errText);
     }
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const candidate = data.candidates?.[0];
+    if (!candidate) {
+      throw new Error('Google Gemini returned an empty response.');
+    }
+    if (candidate.finishReason === 'SAFETY') {
+      throw new Error('Google Gemini blocked generation due to safety settings.');
+    }
+    const text = candidate.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error('Google Gemini response contained no text content.');
+    }
+    return text;
   }
 
   if (provider === 'openai') {
     const url = 'https://api.openai.com/v1/chat/completions';
     const isReasoning = cleanModel.startsWith('o1') || cleanModel.startsWith('o3');
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cleanKey}`
-      },
-      body: JSON.stringify({
-        model: cleanModel,
-        messages: [
-          { role: isReasoning ? 'user' : 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        ...(!isReasoning ? { temperature } : {})
-      }),
+    const res = await fetchWithBackoff(
+      () =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanKey}`
+          },
+          body: JSON.stringify({
+            model: cleanModel,
+            messages: [
+              { role: isReasoning ? 'user' : 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            ...(!isReasoning ? { temperature } : {}),
+            max_tokens: 8192
+          }),
+          signal
+        }),
+      2,
       signal
-    });
+    );
 
     if (!res.ok) {
       const errText = await res.text();
@@ -987,22 +1141,28 @@ export async function callRawLLM(opts: {
 
   if (provider === 'groq') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cleanKey}`
-      },
-      body: JSON.stringify({
-        model: cleanModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature
-      }),
+    const res = await fetchWithBackoff(
+      () =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cleanKey}`
+          },
+          body: JSON.stringify({
+            model: cleanModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature,
+            max_tokens: 8192
+          }),
+          signal
+        }),
+      2,
       signal
-    });
+    );
 
     if (!res.ok) {
       const errText = await res.text();
@@ -1014,23 +1174,32 @@ export async function callRawLLM(opts: {
 
   if (provider === 'anthropic') {
     const url = 'https://api.anthropic.com/v1/messages';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': cleanKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: cleanModel,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-        temperature
-      }),
+    let activeModel = cleanModel;
+    if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
+      activeModel = 'claude-3-7-sonnet-20250219';
+    }
+    const res = await fetchWithBackoff(
+      () =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': cleanKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            max_tokens: 8192,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            temperature
+          }),
+          signal
+        }),
+      2,
       signal
-    });
+    );
 
     if (!res.ok) {
       const errText = await res.text();
@@ -1042,24 +1211,44 @@ export async function callRawLLM(opts: {
 
   if (provider === 'openrouter') {
     const url = 'https://openrouter.ai/api/v1/chat/completions';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cleanKey}`,
-        'HTTP-Referer': 'https://mooscript.studio',
-        'X-Title': 'MooScript Studio'
-      },
-      body: JSON.stringify({
-        model: cleanModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature
-      }),
-      signal
-    });
+    let activeModel = cleanModel;
+    if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
+      activeModel = 'anthropic/claude-3.7-sonnet';
+    } else if (activeModel === 'google/gemini-2.0-flash') {
+      activeModel = 'google/gemini-2.0-flash-001';
+    }
+
+    const fetchOpenRouter = async (modelName: string) => {
+      return await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanKey}`,
+          'HTTP-Referer': 'https://mooscript.app',
+          'X-Title': 'MooScript Studio'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature,
+          max_tokens: 8192
+        }),
+        signal
+      });
+    };
+
+    let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+
+    if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
+      activeModel = 'anthropic/claude-3.7-sonnet';
+      const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+      if (fallbackRes.ok) {
+        res = fallbackRes;
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text();
@@ -1138,6 +1327,10 @@ export async function testProviderApiKey(
           models = parseOpenAIModelsList(json.data || []);
         } else if (provider === 'groq') {
           models = parseGroqModelsList(json.data || []);
+        } else if (provider === 'anthropic') {
+          models = parseAnthropicModelsList(json.data || []);
+        } else if (provider === 'openrouter') {
+          models = parseOpenRouterModelsList(json.data || []);
         }
       } catch {
         // Models parsing error should not invalidate an otherwise valid API key

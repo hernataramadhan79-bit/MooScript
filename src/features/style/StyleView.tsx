@@ -3,8 +3,7 @@ import { useMooStore } from '../../store/useMooStore';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
-import { generateSingleSceneModule } from '../../engine/ai/director/directorPipeline';
-import { buildSceneModule } from '../../engine/composition/sceneTemplates';
+import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import type { Composition, SceneModule, CaptionStyle, CaptionPosition } from '../../types';
 
@@ -45,6 +44,11 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
 
   const [isCompilingMograph, setIsCompilingMograph] = useState(false);
   const [compilationProgress, setCompilationProgress] = useState<string>('');
+  const [generationStats, setGenerationStats] = useState<{
+    completed: number;
+    total: number;
+    sceneStatuses: Record<number, 'pending' | 'generating' | 'ok' | 'error'>;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fontOptions = [
@@ -110,8 +114,15 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
     try {
       const beats = currentProject.scenes;
       const total = beats.length;
-      const generatedScenes: SceneModule[] = [];
       let failureCount = 0;
+      let completedCount = 0;
+
+      // Track live status of each scene for visual feedback
+      const initialStatuses: Record<number, 'pending' | 'generating' | 'ok' | 'error'> = {};
+      for (let i = 0; i < total; i++) {
+        initialStatuses[i] = 'pending';
+      }
+      setGenerationStats({ completed: 0, total, sceneStatuses: initialStatuses });
 
       // Extract active skill system prompt as style advice (sliced to 2000 chars)
       const activeSkill = skills.find((s) => s.id === activeSkillId);
@@ -130,101 +141,175 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
                 ? settings.anthropicModel
                 : settings.openrouterModel;
 
-      for (let i = 0; i < total; i++) {
-        if (controller.signal.aborted) {
-          break;
-        }
+      // Initialize composition in store so canvas structure is established immediately
+      const initialCompScenes: SceneModule[] = beats.map((b) => ({
+        id: b.id,
+        beatId: b.id,
+        duration: b.durationInSeconds || 3.5,
+        html: '',
+        css: '',
+        buildJs: '',
+        status: 'pending' as const,
+        version: 1,
+        userEdited: false
+      }));
 
-        const beat = beats[i];
-        setCompilationProgress(`Mendesain dan mengoding adegan ${i + 1} dari ${total}...`);
+      let runningComp: Composition = {
+        id: currentProject.composition?.id || `comp-${Date.now()}`,
+        width: currentProject.width || 1080,
+        height: currentProject.height || 1920,
+        fps: currentProject.fps || 30,
+        duration: beats.reduce((acc, b) => acc + (b.durationInSeconds || 3.5), 0),
+        globalCss: `body { background: ${currentProject.theme.bg}; }`,
+        scenes:
+          currentProject.composition?.scenes && currentProject.composition.scenes.length === total
+            ? [...currentProject.composition.scenes]
+            : initialCompScenes,
+        createdAt: currentProject.composition?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
 
-        const projectNow = useMooStore.getState().project;
-        const existingModule = projectNow.composition?.scenes?.find((m) => m.beatId === beat.id);
-        const fallbackModule: SceneModule =
-          existingModule ||
-          buildSceneModule(beat, projectNow.theme, {
-            width: projectNow.width || 1080,
-            height: projectNow.height || 1920
-          });
+      const finalScenes: SceneModule[] = new Array(total);
 
-        // 60-second per-scene timeout linked with parent abort signal
-        const sceneTimeoutController = new AbortController();
-        const timeoutId = setTimeout(() => {
-          sceneTimeoutController.abort(new Error('Batas waktu 60 detik per-adegan terlampaui'));
-        }, 60000);
+      // Concurrency limit: 1 sequential worker to strictly stay within API rate limits (15 RPM free tier)
+      const CONCURRENCY_LIMIT = 1;
+      let nextIndex = 0;
 
-        const onParentAbort = () => {
-          sceneTimeoutController.abort(controller.signal.reason);
-        };
-        if (controller.signal.aborted) {
-          sceneTimeoutController.abort();
-        } else {
+      const worker = async () => {
+        while (nextIndex < total) {
+          if (controller.signal.aborted) break;
+          const i = nextIndex++;
+          const beat = beats[i];
+
+          // Update scene status to generating
+          setGenerationStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  sceneStatuses: { ...prev.sceneStatuses, [i]: 'generating' }
+                }
+              : null
+          );
+          setCompilationProgress(`Mendesain adegan ${i + 1} dari ${total}... (${completedCount}/${total} selesai)`);
+
+          const projectNow = useMooStore.getState().project;
+
+          // Per-scene safety timeout controller (90s) so a single hung connection never freezes the whole studio
+          const sceneAbortController = new AbortController();
+          const sceneTimeout = setTimeout(() => {
+            sceneAbortController.abort(new Error('Batas waktu 90 detik per-adegan terlampaui'));
+          }, 90000);
+
+          const onParentAbort = () => {
+            sceneAbortController.abort(controller.signal.reason);
+          };
           controller.signal.addEventListener('abort', onParentAbort, { once: true });
-        }
 
-        try {
-          const sceneModule = await generateSingleSceneModule({
-            beat: {
-              id: beat.id,
-              narration: beat.narrationText || beat.text || '',
-              visualIntent: beat.visualData?.title || beat.narrationText || `Adegan ${i + 1}`,
-              durationHint: beat.durationInSeconds || 3.5
-            },
-            index: i,
-            total,
-            styleBrief: {
-              adjectives: ['energetic', 'clean', 'cinematic'],
-              palette: {
-                bg: projectNow.theme.bg || '#09090b',
-                primary: projectNow.theme.textPrimary || '#f4f4f6',
-                accent: projectNow.theme.textHighlight || '#84cc16',
-                text: projectNow.theme.textPrimary || '#ffffff'
+          try {
+            const sceneModule = await generateCustomScene({
+              beat: {
+                id: beat.id,
+                narration: beat.narrationText || beat.text || '',
+                visualIntent: beat.visualIntent || beat.narrationText || `Adegan ${i + 1}`,
+                visualConcept: beat.visualConcept,
+                visualElements: beat.visualElements,
+                motionIntent: beat.motionIntent,
+                cameraIntent: beat.camera,
+                durationHint: beat.durationInSeconds || 3.5
               },
-              fontDisplay: mapFontDisplay(projectNow.theme.fontFamily),
-              fontBody: 'Plus Jakarta Sans',
-              backgroundLanguage: 'Subtle animated mesh gradient with floating particles',
-              motionSignature: 'Smooth camera punch-in with kinetic typography bounce'
-            },
-            styleAdvice,
-            provider,
-            apiKey,
-            model: modelToUse,
-            executeLlm: async ({ systemPrompt, userPrompt }) => {
-              return await callRawLLM({
-                provider,
-                apiKey,
-                model: modelToUse,
-                systemPrompt,
-                userPrompt,
-                signal: sceneTimeoutController.signal
-              });
-            }
-          });
-
-          if (controller.signal.aborted) {
-            break;
-          }
-
-          if (sceneModule.status === 'ok') {
-            generatedScenes.push({
-              ...sceneModule,
-              userEdited: false
+              index: i,
+              total,
+              aspectRatio: projectNow.aspectRatio || '9:16',
+              styleBrief: {
+                adjectives: ['energetic', 'clean', 'cinematic'],
+                palette: {
+                  bg: projectNow.theme.bg || '#09090b',
+                  primary: projectNow.theme.textPrimary || '#f4f4f6',
+                  accent: projectNow.theme.textHighlight || '#84cc16',
+                  text: projectNow.theme.textPrimary || '#ffffff'
+                },
+                fontDisplay: mapFontDisplay(projectNow.theme.fontFamily),
+                fontBody: 'Plus Jakarta Sans',
+                backgroundLanguage: 'Subtle animated mesh gradient with floating particles',
+                motionSignature: 'Smooth camera punch-in with kinetic typography bounce'
+              },
+              styleAdvice,
+              provider,
+              apiKey,
+              model: modelToUse,
+              executeLlm: async ({ systemPrompt, userPrompt }) => {
+                return await callRawLLM({
+                  provider,
+                  apiKey,
+                  model: modelToUse,
+                  systemPrompt,
+                  userPrompt,
+                  signal: sceneAbortController.signal
+                });
+              }
             });
-          } else {
+
+            finalScenes[i] = sceneModule;
+            if (sceneModule.status !== 'ok') {
+              failureCount++;
+            }
+          } catch (err: unknown) {
             failureCount++;
-            generatedScenes.push(fallbackModule);
+            console.error(`[MooScript] Error generating scene #${i + 1}:`, err);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            finalScenes[i] = {
+              id: beat.id,
+              beatId: beat.id,
+              duration: beat.durationInSeconds || 3.5,
+              html: '',
+              css: '',
+              buildJs: '',
+              status: 'error',
+              errors: [errMsg],
+              version: 1,
+              userEdited: false
+            };
+          } finally {
+            clearTimeout(sceneTimeout);
+            controller.signal.removeEventListener('abort', onParentAbort);
           }
-        } catch {
-          if (controller.signal.aborted) {
-            break;
-          }
-          failureCount++;
-          generatedScenes.push(fallbackModule);
-        } finally {
-          clearTimeout(timeoutId);
-          controller.signal.removeEventListener('abort', onParentAbort);
+
+          if (controller.signal.aborted) break;
+
+          completedCount++;
+          const finishedStatus = finalScenes[i]?.status === 'ok' ? 'ok' : 'error';
+          setGenerationStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  completed: completedCount,
+                  sceneStatuses: { ...prev.sceneStatuses, [i]: finishedStatus }
+                }
+              : null
+          );
+
+          // PROGRESSIVE STORE UPDATE: immediately commit completed scene into the composition
+          runningComp = {
+            ...runningComp,
+            scenes: runningComp.scenes.map((s, idx) => (idx === i && finalScenes[i] ? finalScenes[i] : s)),
+            updatedAt: Date.now()
+          };
+          useMooStore.getState().setProject(
+            {
+              ...useMooStore.getState().project,
+              renderMode: 'composition' as const,
+              composition: runningComp
+            },
+            { keepStale: true }
+          );
+
+          // Small delay between scene requests to avoid burst rate limits (HTTP 429)
+          await new Promise((r) => setTimeout(r, 200));
         }
-      }
+      };
+
+      const workerCount = Math.min(CONCURRENCY_LIMIT, total);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
       if (controller.signal.aborted) {
         addToast('Pembuatan mograph dibatalkan.', 'info');
@@ -238,19 +323,15 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         return;
       }
 
-      // Update project composition
-      const existingComp = latest.composition;
+      // Final composition duration & assembly
+      const totalCompDuration = finalScenes.reduce((acc, s) => acc + (s?.duration || 3), 0);
       const newComp: Composition = {
-        id: existingComp?.id || `comp-${Date.now()}`,
-        width: latest.width || 1080,
-        height: latest.height || 1920,
-        fps: latest.fps || 30,
-        globalCss: `body { background: ${latest.theme.bg}; }`,
-        scenes: generatedScenes,
-        createdAt: existingComp?.createdAt || Date.now()
+        ...runningComp,
+        duration: totalCompDuration,
+        scenes: finalScenes.filter(Boolean),
+        updatedAt: Date.now()
       };
 
-      // Set to store without spreading old project
       useMooStore.getState().setProject(
         {
           ...latest,
@@ -261,9 +342,12 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
       );
 
       if (failureCount > 0) {
-        addToast(`${failureCount} dari ${total} adegan gagal, dipakai template bawaan`, 'warning');
+        addToast(
+          `${failureCount} dari ${total} adegan mengalami kendala rendering. Anda dapat mengedit atau men-generate ulang di Editor.`,
+          'warning'
+        );
       } else {
-        addToast('Mograph custom HTML/GSAP berhasil dibuat dan dipasang!', 'success');
+        addToast('Mograph custom AI berhasil dihasilkan!', 'success');
         if (onNextStep) onNextStep();
       }
     } catch (err: unknown) {
@@ -279,6 +363,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
       }
       setIsCompilingMograph(false);
       setCompilationProgress('');
+      setGenerationStats(null);
     }
   };
 
@@ -457,9 +542,52 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         </div>
 
         {compilationProgress && (
-          <div className="p-3 rounded-lg bg-surface-3/80 border border-border text-[13px] text-accent flex items-center gap-2">
-            <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>
-            <span>{compilationProgress}</span>
+          <div className="p-3.5 rounded-xl bg-surface-3/80 border border-border flex flex-col gap-2.5">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-accent flex items-center gap-2 font-medium">
+                <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>
+                {compilationProgress}
+              </span>
+              {generationStats && (
+                <span className="text-[12px] font-mono text-text-muted">
+                  {Math.round((generationStats.completed / generationStats.total) * 100)}%
+                </span>
+              )}
+            </div>
+
+            {generationStats && (
+              <>
+                <div className="w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-accent h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${(generationStats.completed / generationStats.total) * 100}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {project.scenes.map((b, idx) => {
+                    const st = generationStats.sceneStatuses[idx] || 'pending';
+                    return (
+                      <span
+                        key={b.id}
+                        className={`text-[11px] px-2 py-0.5 rounded-md flex items-center gap-1 border transition-colors ${
+                          st === 'ok'
+                            ? 'bg-accent/15 border-accent/40 text-accent font-medium'
+                            : st === 'generating'
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 animate-pulse'
+                              : st === 'error'
+                                ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                                : 'bg-surface-2 border-border text-text-muted'
+                        }`}
+                      >
+                        {st === 'ok' ? '✓' : st === 'generating' ? '⟳' : st === 'error' ? '!' : '•'}
+                        Adegan {idx + 1}
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -504,7 +632,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         ) : <div />}
         {onNextStep && (
           <Button variant="primary" icon="arrow_forward" iconPosition="right" onClick={onNextStep}>
-            Lanjut ke Suara & Audio
+            Lanjut ke Edit Visual
           </Button>
         )}
       </div>

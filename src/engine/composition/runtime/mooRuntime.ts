@@ -99,6 +99,9 @@ export function getRuntimeScript(): string {
       try {
         if (typeof def.build === 'function') {
           def.build(sceneTl, sceneWrapper, ctx);
+        } else if (typeof def.buildSrc === 'string' && def.buildSrc.trim()) {
+          const fn = new Function('tl', 'root', 'ctx', 'gsap', def.buildSrc);
+          fn(sceneTl, sceneWrapper, ctx, window.gsap);
         }
       } catch (err) {
         console.error('Error in scene build(): ' + sceneItem.id, err);

@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp } from '../types';
+import { CURRENT_SCHEMA_VERSION } from '../types';
+import { migrateLegacyProject } from '../engine/composition/migrate';
 
 export interface StoredAudio {
   projectId: string;
@@ -120,25 +122,18 @@ export function normalizeProject(project: MooProject): MooProject {
     project.aspectRatio = '9:16';
   }
   if (!project.renderMode) {
-    // If it has existing composition, use composition, otherwise legacy-canvas
-    project.renderMode = project.composition ? 'composition' : 'legacy-canvas';
+    project.renderMode = 'composition';
   }
   if (!project.scenes) project.scenes = [];
-  project.scenes = project.scenes.map((s) => {
-    const narrationText = s.narrationText || (s as any).text || '';
-    const layout = s.layout || 'KINETIC_QUOTE';
-    const visualData = s.visualData || {
-      focusWords: s.focusWords || [],
-      accentIcon: s.icon
-    };
+  project.scenes = project.scenes.map((s, idx) => {
+    const narrationText = s.narrationText ?? (s as any).text ?? '';
+    const visualIntent = s.visualIntent ?? (s as any).text ?? `Scene ${idx + 1}`;
     return {
       ...s,
-      layout,
       narrationText,
-      visualData,
-      text: s.text || narrationText,
-      focusWords: s.focusWords || visualData.focusWords || [],
-      icon: s.icon || visualData.accentIcon
+      visualIntent,
+      durationInSeconds: s.durationInSeconds || 3,
+      wordTimestamps: s.wordTimestamps || []
     };
   });
   if (!project.theme) {
@@ -151,6 +146,10 @@ export function normalizeProject(project: MooProject): MooProject {
       captionPosition: 'center',
       showSubtitles: false
     };
+  }
+  // One-time migration for legacy projects
+  if (project.schemaVersion !== CURRENT_SCHEMA_VERSION || !project.composition) {
+    return migrateLegacyProject(project);
   }
   return project;
 }

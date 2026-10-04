@@ -33,6 +33,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
   const [customVal, setCustomVal] = useState('');
 
   const isKnown = models.some((m) => m.id === currentModel);
+  const quickPills = models.slice(0, 5);
 
   return (
     <div className="pt-1.5 space-y-1.5 border-t border-white/[0.04]">
@@ -45,6 +46,11 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           >
             {currentModel}
           </span>
+          {!isKnown && currentModel && (
+            <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              Custom
+            </span>
+          )}
         </div>
 
         <button
@@ -57,13 +63,42 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           <span className={`material-symbols-outlined text-[11px] ${isScanning ? 'animate-spin' : ''}`}>
             {isScanning ? 'progress_activity' : 'sync'}
           </span>
-          <span>{isScanning ? 'Memindai...' : 'Pindai API'}</span>
+          <span>
+            {isScanning
+              ? 'Memindai...'
+              : models.length > 0
+                ? `Pindai API (${models.length})`
+                : 'Pindai API'}
+          </span>
         </button>
       </div>
 
-      {/* Small pill buttons row */}
+      {/* Dropdown select for all available models */}
+      {models.length > 0 && (
+        <div className="relative">
+          <select
+            value={currentModel}
+            onChange={(e) => onSelectModel(e.target.value)}
+            className="w-full bg-black/60 rounded px-2 py-1 text-[10px] font-mono text-zinc-200 border border-white/[0.08] focus:outline-none focus:border-primary/50 cursor-pointer appearance-none pr-6"
+          >
+            {!isKnown && currentModel && (
+              <option value={currentModel}>Custom: {currentModel}</option>
+            )}
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} ({m.id}) {m.isRecommended ? '★' : ''}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-zinc-400">
+            <span className="material-symbols-outlined text-[14px]">expand_more</span>
+          </div>
+        </div>
+      )}
+
+      {/* Quick pill buttons row */}
       <div className="flex flex-wrap gap-1">
-        {models.map((m) => {
+        {quickPills.map((m) => {
           const isSelected = currentModel === m.id;
           return (
             <button
@@ -78,7 +113,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
               }`}
             >
               {isSelected && <span className="text-[7px] text-primary">●</span>}
-              <span className="truncate max-w-[140px]">{m.label}</span>
+              <span className="truncate max-w-[130px]">{m.label}</span>
               {m.isRecommended && !isSelected && (
                 <span className="text-[7px] font-sans px-1 rounded bg-primary/10 text-primary/80 uppercase tracking-tighter">
                   rec
@@ -97,9 +132,9 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
               ? 'bg-white/[0.1] text-zinc-200 border-white/[0.2]'
               : 'bg-white/[0.02] text-zinc-500 border-white/[0.04] hover:text-zinc-400'
           }`}
-          title="Gunakan model ID kustom"
+          title="Ketik manual model ID (preview / experimental / fine-tuned)"
         >
-          {showCustom ? '✕' : '+ Custom'}
+          {showCustom ? '✕ Tutup' : '+ Custom'}
         </button>
       </div>
 
@@ -108,7 +143,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
         <div className="flex items-center gap-1 pt-1 animate-fadeIn">
           <input
             type="text"
-            placeholder="ID model (misal: gemini-2.5-pro)..."
+            placeholder="ID model (misal: gemini-2.5-flash)..."
             value={customVal}
             onChange={(e) => setCustomVal(e.target.value)}
             onKeyDown={(e) => {
@@ -449,6 +484,9 @@ export const SettingsDrawer: React.FC = () => {
                     type={visibleKeys.gemini ? 'text' : 'password'}
                     value={settings.apiKeys.gemini || ''}
                     onChange={(e) => updateApiKey('gemini', e.target.value)}
+                    onBlur={() => {
+                      if (settings.apiKeys.gemini?.trim()) handleScanModels('gemini');
+                    }}
                     placeholder="AIzaSy..."
                     className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                   />
@@ -514,6 +552,9 @@ export const SettingsDrawer: React.FC = () => {
                     type={visibleKeys.openai ? 'text' : 'password'}
                     value={settings.apiKeys.openai || ''}
                     onChange={(e) => updateApiKey('openai', e.target.value)}
+                    onBlur={() => {
+                      if (settings.apiKeys.openai?.trim()) handleScanModels('openai');
+                    }}
                     placeholder="sk-proj-..."
                     className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                   />
@@ -579,6 +620,9 @@ export const SettingsDrawer: React.FC = () => {
                     type={visibleKeys.groq ? 'text' : 'password'}
                     value={settings.apiKeys.groq || ''}
                     onChange={(e) => updateApiKey('groq', e.target.value)}
+                    onBlur={() => {
+                      if (settings.apiKeys.groq?.trim()) handleScanModels('groq');
+                    }}
                     placeholder="gsk_..."
                     className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                   />
@@ -644,6 +688,9 @@ export const SettingsDrawer: React.FC = () => {
                     type={visibleKeys.anthropic ? 'text' : 'password'}
                     value={settings.apiKeys.anthropic || ''}
                     onChange={(e) => updateApiKey('anthropic', e.target.value)}
+                    onBlur={() => {
+                      if (settings.apiKeys.anthropic?.trim()) handleScanModels('anthropic');
+                    }}
                     placeholder="sk-ant-api03-..."
                     className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                   />
@@ -709,6 +756,9 @@ export const SettingsDrawer: React.FC = () => {
                     type={visibleKeys.openrouter ? 'text' : 'password'}
                     value={settings.apiKeys.openrouter || ''}
                     onChange={(e) => updateApiKey('openrouter', e.target.value)}
+                    onBlur={() => {
+                      if (settings.apiKeys.openrouter?.trim()) handleScanModels('openrouter');
+                    }}
                     placeholder="sk-or-v1-..."
                     className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                   />
