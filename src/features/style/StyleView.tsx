@@ -6,7 +6,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { generateSingleSceneModule } from '../../engine/ai/director/directorPipeline';
 import { buildSceneModule } from '../../engine/composition/sceneTemplates';
 import { callRawLLM } from '../../engine/ai/llm';
-import type { Composition, SceneModule } from '../../types';
+import type { Composition, SceneModule, CaptionStyle, CaptionPosition } from '../../types';
 
 const mapFontDisplay = (fontFamily?: string): string => {
   switch (fontFamily) {
@@ -33,6 +33,10 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
     updateThemePrimary,
     updateThemeHighlight,
     updateThemeFont,
+    updateResolution,
+    toggleGlobalSubtitles,
+    updateThemeCaptionStyle,
+    updateThemeCaptionPosition,
     skills,
     activeSkillId,
     setActiveSkillId,
@@ -48,6 +52,28 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
     { value: 'Mono', label: 'JetBrains Mono', icon: 'terminal' },
     { value: 'Impact', label: 'Syne / Bold Display', icon: 'title' }
   ];
+
+  const resolutionOptions: { value: '1080p' | '720p'; label: string; icon: string }[] = [
+    { value: '1080p', label: '1080p (Full HD)', icon: 'hd' },
+    { value: '720p', label: '720p (HD)', icon: 'sd' }
+  ];
+
+  const captionStyleOptions: { value: CaptionStyle; label: string }[] = [
+    { value: 'boxed', label: 'Boxed Pill (Badge kontras)' },
+    { value: 'karaoke', label: 'Karaoke (Highlight kata)' },
+    { value: 'bold-pop', label: 'Bold Pop (Bounce dinamis)' },
+    { value: 'minimal', label: 'Minimal Clean' }
+  ];
+
+  const captionPositionOptions: { value: CaptionPosition; label: string }[] = [
+    { value: 'top', label: 'Atas (Top)' },
+    { value: 'center', label: 'Tengah (Center)' },
+    { value: 'bottom', label: 'Bawah (Bottom)' }
+  ];
+
+  const currentResolution =
+    project.resolution ||
+    (project.width === 1080 || project.height === 1080 ? '1080p' : '720p');
 
   const handleGenerateCustomMograph = async () => {
     const currentProject = useMooStore.getState().project;
@@ -348,7 +374,77 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         </Field>
       </div>
 
-      {/* 3. AI Motion Generator Action Box */}
+      {/* 3. Resolusi & Pengaturan Teks Subtitel */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-surface-1 border border-border flex flex-col gap-4">
+        <span className="text-[13px] font-semibold text-on-surface flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[18px] text-accent">subtitles</span>
+          Resolusi & Pengaturan Subtitel
+        </span>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Resolusi Video Kanvas" hint={`Ukuran kanvas saat ini: ${project.width}×${project.height}`}>
+            <SegmentedControl<'1080p' | '720p'>
+              options={resolutionOptions}
+              value={currentResolution}
+              onChange={(val) => updateResolution(val)}
+            />
+          </Field>
+
+          <Field label="Tampilan Subtitel Global" hint="Aktifkan atau matikan teks overlay di seluruh adegan">
+            <button
+              type="button"
+              onClick={toggleGlobalSubtitles}
+              className={`w-full min-h-[44px] px-4 py-2 rounded-lg border flex items-center justify-between transition-all select-none ${
+                project.theme.showSubtitles
+                  ? 'bg-accent/15 border-accent text-accent font-semibold shadow-sm'
+                  : 'bg-surface-2 border-border text-text-muted hover:border-border-strong hover:text-on-surface'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">
+                  {project.theme.showSubtitles ? 'subtitles' : 'subtitles_off'}
+                </span>
+                <span className="text-[13px]">
+                  {project.theme.showSubtitles ? 'Subtitel Aktif' : 'Subtitel Nonaktif'}
+                </span>
+              </div>
+              <span className={`w-2.5 h-2.5 rounded-full ${project.theme.showSubtitles ? 'bg-accent' : 'bg-zinc-600'}`} />
+            </button>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <Field label="Gaya Visual Subtitel">
+            <select
+              value={project.theme.captionStyle || 'boxed'}
+              onChange={(e) => updateThemeCaptionStyle(e.target.value as CaptionStyle)}
+              className="w-full bg-surface-2 border border-border rounded-lg h-10 px-3 text-[13px] text-on-surface focus:outline-none focus:border-accent cursor-pointer"
+            >
+              {captionStyleOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Posisi Vertikal Subtitel">
+            <select
+              value={project.theme.captionPosition || 'bottom'}
+              onChange={(e) => updateThemeCaptionPosition(e.target.value as CaptionPosition)}
+              className="w-full bg-surface-2 border border-border rounded-lg h-10 px-3 text-[13px] text-on-surface focus:outline-none focus:border-accent cursor-pointer"
+            >
+              {captionPositionOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      {/* 4. AI Motion Generator Action Box */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-surface-2 to-surface-1 border border-accent/30 flex flex-col gap-3 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-accent text-[22px]">movie_filter</span>
