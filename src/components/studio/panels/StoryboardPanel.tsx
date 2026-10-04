@@ -3,6 +3,7 @@ import { useMooStore } from '../../../store/useMooStore';
 import type { CameraMovement, MotionPreset, SceneTransition } from '../../../types';
 import { cleanWord } from '../../../utils/textUtils';
 import { GlobalVoiceSelector } from '../GlobalVoiceSelector';
+import { resolveSkillIcon } from '../../../engine/skills/skillManager';
 
 export const StoryboardPanel: React.FC = () => {
   const {
@@ -107,13 +108,16 @@ export const StoryboardPanel: React.FC = () => {
                 key={skill.id}
                 type="button"
                 onClick={() => setActiveSkillId(skill.id)}
-                className={`px-2 py-0.5 rounded text-[10px] font-mono border shrink-0 transition-colors ${
+                className={`px-2 py-0.5 rounded text-[10px] font-mono border shrink-0 transition-colors flex items-center gap-1 ${
                   isSelected
                     ? 'bg-[#84cc16]/15 border-[#84cc16] text-[#84cc16] font-bold'
                     : 'bg-white/[0.03] border-white/[0.06] text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                {skill.name}
+                <span className="material-symbols-outlined text-[12px]">
+                  {resolveSkillIcon(skill.icon)}
+                </span>
+                <span>{skill.name}</span>
               </button>
             );
           })}

@@ -236,9 +236,9 @@ function handleApiError(provider: string, status: number, errorText: string): Er
   let cleanMessage = '';
   try {
     const parsed = JSON.parse(errorText);
-    cleanMessage = parsed?.error?.message || parsed?.message || errorText.slice(0, 200);
+    cleanMessage = parsed?.error?.message || parsed?.message || errorText.slice(0, 300);
   } catch {
-    cleanMessage = errorText.slice(0, 200);
+    cleanMessage = errorText.slice(0, 300);
   }
 
   if (status === 401) {
@@ -247,16 +247,23 @@ function handleApiError(provider: string, status: number, errorText: string): Er
     );
   }
   if (status === 403) {
-    return new Error(`${provider}: Akses ditolak (403 Forbidden). Pastikan akun Anda memiliki akses ke model ini.`);
+    return new Error(
+      `${provider}: Akses ditolak (403 Forbidden). Pastikan akun Anda memiliki akses ke model ini. ${cleanMessage ? `(${cleanMessage})` : ''}`
+    );
+  }
+  if (status === 404) {
+    return new Error(
+      `${provider}: Model tidak ditemukan (404 Not Found). Pastikan ID model valid. ${cleanMessage ? `(${cleanMessage})` : ''}`
+    );
   }
   if (status === 429) {
     return new Error(
-      `${provider}: Batas kuota atau rate limit tercapai (429 Too Many Requests). Cek billing atau tunggu sesaat.`
+      `${provider}: Batas kuota atau rate limit tercapai (429 Too Many Requests). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Cek billing/saldo API key Anda atau tunggu sesaat.`
     );
   }
   if (status >= 500) {
     return new Error(
-      `${provider}: Server provider sedang mengalami gangguan (${status} Server Error). Coba lagi nanti.`
+      `${provider}: Server provider sedang mengalami gangguan (${status} Server Error). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Coba gunakan model resmi yang stabil atau tunggu sesaat.`
     );
   }
   return new Error(`${provider} error (${status}): ${cleanMessage}`);
@@ -777,13 +784,15 @@ async function generateWithGemini(
 
   let res = await fetchGemini(activeModel);
 
-  // If 404 Not Found, automatically fallback to gemini-2.0-flash, then gemini-1.5-flash
-  if (res.status === 404 && activeModel !== 'gemini-2.0-flash') {
+  // If 404, 400, or 503 (unknown or unsupported/overloaded model e.g. gemini-3.7-flash), fallback to gemini-2.0-flash
+  const isFallbackCandidate = (status: number) => status === 404 || status === 400 || status === 503;
+  if (isFallbackCandidate(res.status) && activeModel !== 'gemini-2.0-flash') {
+    console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to 'gemini-2.0-flash'.`);
     activeModel = 'gemini-2.0-flash';
     const fallbackRes = await fetchGemini(activeModel);
     if (fallbackRes.ok) {
       res = fallbackRes;
-    } else if (fallbackRes.status === 404) {
+    } else if (isFallbackCandidate(fallbackRes.status)) {
       activeModel = 'gemini-1.5-flash';
       const legacyRes = await fetchGemini(activeModel);
       if (legacyRes.ok) {
@@ -1071,13 +1080,15 @@ export async function callRawLLM(opts: {
 
     let res = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
 
-    // If 404 Not Found, automatically fallback to gemini-2.0-flash, then gemini-1.5-flash
-    if (res.status === 404 && activeModel !== 'gemini-2.0-flash') {
+    // If 404, 400, or 503 (unknown or unsupported/overloaded model e.g. gemini-3.7-flash), fallback to gemini-2.0-flash
+    const isFallbackCandidate = (status: number) => status === 404 || status === 400 || status === 503;
+    if (isFallbackCandidate(res.status) && activeModel !== 'gemini-2.0-flash') {
+      console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to 'gemini-2.0-flash'.`);
       activeModel = 'gemini-2.0-flash';
       const fallbackRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
       if (fallbackRes.ok) {
         res = fallbackRes;
-      } else if (fallbackRes.status === 404) {
+      } else if (isFallbackCandidate(fallbackRes.status)) {
         activeModel = 'gemini-1.5-flash';
         const legacyRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
         if (legacyRes.ok) {

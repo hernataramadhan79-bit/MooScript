@@ -1,11 +1,39 @@
 import type { PersonaSkill } from '../../types';
 import { db } from '../../db/mooDb';
 
+export function resolveSkillIcon(icon?: string): string {
+  if (!icon) return 'auto_awesome';
+  const clean = icon.toLowerCase().trim();
+  switch (clean) {
+    case 'sparkles':
+    case 'sparkle':
+    case 'magic':
+      return 'auto_awesome';
+    case 'zap':
+    case 'lightning':
+      return 'bolt';
+    case 'brain':
+    case 'mind':
+      return 'psychology';
+    case 'flame':
+    case 'fire':
+      return 'local_fire_department';
+    case 'mascot':
+      return 'smart_toy';
+    case 'code':
+      return 'code';
+    case 'palette':
+      return 'palette';
+    default:
+      return icon;
+  }
+}
+
 export const BUILTIN_SKILLS: PersonaSkill[] = [
   {
     id: 'skill-tech-explainer',
-    name: '⚡ Tech Explainer',
-    icon: 'zap',
+    name: 'Tech Explainer',
+    icon: 'bolt',
     description: 'Fast tempo, punchy words, concise architectural logic.',
     systemPrompt: `Style: High-velocity technical explanation.
 Pacing: Fast, energetic, zero fluff.
@@ -18,8 +46,8 @@ Motion Personality: Precise, snappy, high information density with schematic dia
   },
   {
     id: 'skill-viral-hook',
-    name: '🧠 Viral Hook',
-    icon: 'brain',
+    name: 'Viral Hook',
+    icon: 'psychology',
     description: 'Aggressive first 3 seconds, curiosity gap phrasing.',
     systemPrompt: `Style: Addictive short-form hook format.
 Pacing: Rapid-fire opening curiosity gap followed by rapid revelations.
@@ -32,8 +60,8 @@ Motion Personality: Punchy camera moves, high-contrast focal points, and dramati
   },
   {
     id: 'skill-chill-lofi',
-    name: '☕ Chill Lofi Story',
-    icon: 'sparkles',
+    name: 'Chill Lofi Story',
+    icon: 'auto_awesome',
     description: 'Relaxed cadence, poetic sentences, subtle kinetic transitions.',
     systemPrompt: `Style: Reflective, serene, contemplative storytelling.
 Pacing: Measured and smooth with breathing room.
@@ -49,11 +77,9 @@ export async function initializeSkills(): Promise<PersonaSkill[]> {
   const existing = await db.skills.toArray();
   const existingIds = new Set(existing.map((s) => s.id));
 
-  // Ensure built-in skills are always present in DB
+  // Ensure built-in skills are always present and updated in DB
   for (const builtin of BUILTIN_SKILLS) {
-    if (!existingIds.has(builtin.id)) {
-      await db.skills.put(builtin);
-    }
+    await db.skills.put(builtin);
   }
 
   return await db.skills.toArray();

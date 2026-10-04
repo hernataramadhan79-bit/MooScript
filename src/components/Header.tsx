@@ -37,7 +37,24 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
           {/* Sisi Kiri: Logo + Judul Proyek */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex items-center gap-2.5 shrink-0">
-              <img alt="MooScript Logo" className="w-7 h-7 rounded-lg" src="/logo.svg" />
+              <svg
+                aria-label="MooScript Logo"
+                className="w-7 h-7 rounded-lg shrink-0 shadow-sm"
+                fill="none"
+                viewBox="0 0 100 100"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect fill="#09090b" height="100" rx="22" width="100" />
+                <rect fill="none" height="98" rx="21" stroke="#27272a" strokeWidth="1.5" width="98" x="1" y="1" />
+                <path d="M22 24 L38 32 L34 42 L20 34 Z" fill="#84cc16" />
+                <path d="M78 24 L62 32 L66 42 L80 34 Z" fill="#84cc16" />
+                <path d="M30 36 H70 L74 54 H26 Z" fill="#84cc16" />
+                <rect fill="#84cc16" height="24" rx="12" width="52" x="24" y="58" />
+                <rect fill="#09090b" height="7" rx="1.5" width="7" x="36" y="42" />
+                <rect fill="#09090b" height="7" rx="1.5" width="7" x="57" y="42" />
+                <rect fill="#09090b" height="8" rx="3" width="6" x="38" y="66" />
+                <rect fill="#09090b" height="8" rx="3" width="6" x="56" y="66" />
+              </svg>
               <span className="font-extrabold text-[15px] tracking-tight text-on-surface hidden sm:inline">
                 MooScript<span className="text-accent ml-0.5">Studio</span>
               </span>

@@ -5,6 +5,7 @@ import { Field } from '../../components/ui/Field';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
+import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import type { Composition, SceneModule, CaptionStyle, CaptionPosition } from '../../types';
 
 const mapFontDisplay = (fontFamily?: string): string => {
@@ -303,8 +304,8 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
             { keepStale: true }
           );
 
-          // Small delay between scene requests to avoid burst rate limits (HTTP 429)
-          await new Promise((r) => setTimeout(r, 200));
+          // Pacing delay between scene requests to avoid burst rate limits (HTTP 429)
+          await new Promise((r) => setTimeout(r, 1000));
         }
       };
 
@@ -392,7 +393,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
               >
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[18px] text-accent">
-                    {skill.icon || 'auto_awesome'}
+                    {resolveSkillIcon(skill.icon)}
                   </span>
                   <span className="text-[14px] font-semibold text-on-surface">{skill.name}</span>
                 </div>
