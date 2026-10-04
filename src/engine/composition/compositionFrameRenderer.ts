@@ -132,7 +132,7 @@ export async function createCompositionFrameRenderer(
       iframe.style.height = `${height}px`;
       iframe.style.opacity = '0';
       iframe.style.pointerEvents = 'none';
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+      iframe.setAttribute('sandbox', 'allow-scripts');
       iframe.srcdoc = buildCompositionDocument(project);
 
       document.body.appendChild(iframe);

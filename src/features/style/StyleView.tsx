@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { generateSingleSceneModule } from '../../engine/ai/director/directorPipeline';
+import { buildSceneModule } from '../../engine/composition/sceneTemplates';
 import { callRawLLM } from '../../engine/ai/llm';
 import type { Composition, SceneModule } from '../../types';
+
+const mapFontDisplay = (fontFamily?: string): string => {
+  switch (fontFamily) {
+    case 'Mono':
+      return 'JetBrains Mono';
+    case 'Impact':
+      return 'Syne';
+    case 'Jakarta':
+    default:
+      return 'Plus Jakarta Sans';
+  }
+};
 
 interface StyleViewProps {
   onBackStep?: () => void;
@@ -28,6 +41,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
 
   const [isCompilingMograph, setIsCompilingMograph] = useState(false);
   const [compilationProgress, setCompilationProgress] = useState<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fontOptions = [
     { value: 'Jakarta', label: 'Plus Jakarta', icon: 'font_download' },
@@ -36,6 +50,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
   ];
 
   const handleGenerateCustomMograph = async () => {
+    const currentProject = useMooStore.getState().project;
     const provider = settings.selectedLLMProvider;
     const apiKey = settings.apiKeys[provider] || '';
 
@@ -44,103 +59,198 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
       return;
     }
 
+    // Check if any scene was manually edited by user
+    const existingModules = currentProject.composition?.scenes || [];
+    const hasUserEdited = existingModules.some((m) => m.userEdited === true);
+    if (hasUserEdited) {
+      const confirmed =
+        typeof window !== 'undefined' && typeof window.confirm === 'function'
+          ? window.confirm(
+              'Beberapa adegan telah diedit secara manual. Menjalankan AI generator akan menimpa perubahan tersebut. Lanjutkan?'
+            )
+          : true;
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const startedId = currentProject.id;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsCompilingMograph(true);
     setCompilationProgress('Menyiapkan style brief dan instruksi motion director...');
 
     try {
-      const beats = project.scenes;
+      const beats = currentProject.scenes;
       const total = beats.length;
       const generatedScenes: SceneModule[] = [];
+      let failureCount = 0;
+
+      // Extract active skill system prompt as style advice (sliced to 2000 chars)
+      const activeSkill = skills.find((s) => s.id === activeSkillId);
+      const styleAdvice = activeSkill?.systemPrompt
+        ? activeSkill.systemPrompt.slice(0, 2000)
+        : undefined;
+
+      const modelToUse =
+        provider === 'gemini'
+          ? settings.geminiModel
+          : provider === 'openai'
+            ? settings.openaiModel
+            : provider === 'groq'
+              ? settings.groqModel
+              : provider === 'anthropic'
+                ? settings.anthropicModel
+                : settings.openrouterModel;
 
       for (let i = 0; i < total; i++) {
+        if (controller.signal.aborted) {
+          break;
+        }
+
         const beat = beats[i];
         setCompilationProgress(`Mendesain dan mengoding adegan ${i + 1} dari ${total}...`);
 
-        const sceneModule = await generateSingleSceneModule({
-          beat: {
-            id: beat.id,
-            narration: beat.narrationText || beat.text || '',
-            visualIntent: beat.visualData?.title || beat.narrationText || `Adegan ${i + 1}`,
-            durationHint: beat.durationInSeconds || 3.5
-          },
-          index: i,
-          total,
-          styleBrief: {
-            adjectives: ['energetic', 'clean', 'cinematic'],
-            palette: {
-              bg: project.theme.bg || '#09090b',
-              primary: project.theme.textPrimary || '#f4f4f6',
-              accent: project.theme.textHighlight || '#84cc16',
-              text: project.theme.textPrimary || '#ffffff'
+        const projectNow = useMooStore.getState().project;
+        const existingModule = projectNow.composition?.scenes?.find((m) => m.beatId === beat.id);
+        const fallbackModule: SceneModule =
+          existingModule ||
+          buildSceneModule(beat, projectNow.theme, {
+            width: projectNow.width || 1080,
+            height: projectNow.height || 1920
+          });
+
+        // 60-second per-scene timeout linked with parent abort signal
+        const sceneTimeoutController = new AbortController();
+        const timeoutId = setTimeout(() => {
+          sceneTimeoutController.abort(new Error('Batas waktu 60 detik per-adegan terlampaui'));
+        }, 60000);
+
+        const onParentAbort = () => {
+          sceneTimeoutController.abort(controller.signal.reason);
+        };
+        if (controller.signal.aborted) {
+          sceneTimeoutController.abort();
+        } else {
+          controller.signal.addEventListener('abort', onParentAbort, { once: true });
+        }
+
+        try {
+          const sceneModule = await generateSingleSceneModule({
+            beat: {
+              id: beat.id,
+              narration: beat.narrationText || beat.text || '',
+              visualIntent: beat.visualData?.title || beat.narrationText || `Adegan ${i + 1}`,
+              durationHint: beat.durationInSeconds || 3.5
             },
-            fontDisplay: project.theme.fontFamily || 'Plus Jakarta Sans',
-            fontBody: 'Plus Jakarta Sans',
-            backgroundLanguage: 'Subtle animated mesh gradient with floating particles',
-            motionSignature: 'Smooth camera punch-in with kinetic typography bounce'
-          },
-          provider,
-          apiKey,
-          model:
-            provider === 'gemini'
-              ? settings.geminiModel
-              : provider === 'openai'
-                ? settings.openaiModel
-                : provider === 'groq'
-                  ? settings.groqModel
-                  : provider === 'anthropic'
-                    ? settings.anthropicModel
-                    : settings.openrouterModel,
-          executeLlm: async ({ systemPrompt, userPrompt }) => {
-            const modelToUse =
-              provider === 'gemini'
-                ? settings.geminiModel
-                : provider === 'openai'
-                  ? settings.openaiModel
-                  : provider === 'groq'
-                    ? settings.groqModel
-                    : provider === 'anthropic'
-                      ? settings.anthropicModel
-                      : settings.openrouterModel;
+            index: i,
+            total,
+            styleBrief: {
+              adjectives: ['energetic', 'clean', 'cinematic'],
+              palette: {
+                bg: projectNow.theme.bg || '#09090b',
+                primary: projectNow.theme.textPrimary || '#f4f4f6',
+                accent: projectNow.theme.textHighlight || '#84cc16',
+                text: projectNow.theme.textPrimary || '#ffffff'
+              },
+              fontDisplay: mapFontDisplay(projectNow.theme.fontFamily),
+              fontBody: 'Plus Jakarta Sans',
+              backgroundLanguage: 'Subtle animated mesh gradient with floating particles',
+              motionSignature: 'Smooth camera punch-in with kinetic typography bounce'
+            },
+            styleAdvice,
+            provider,
+            apiKey,
+            model: modelToUse,
+            executeLlm: async ({ systemPrompt, userPrompt }) => {
+              return await callRawLLM({
+                provider,
+                apiKey,
+                model: modelToUse,
+                systemPrompt,
+                userPrompt,
+                signal: sceneTimeoutController.signal
+              });
+            }
+          });
 
-            return await callRawLLM({
-              provider,
-              apiKey,
-              model: modelToUse,
-              systemPrompt,
-              userPrompt
-            });
+          if (controller.signal.aborted) {
+            break;
           }
-        });
 
-        generatedScenes.push(sceneModule);
+          if (sceneModule.status === 'ok') {
+            generatedScenes.push({
+              ...sceneModule,
+              userEdited: false
+            });
+          } else {
+            failureCount++;
+            generatedScenes.push(fallbackModule);
+          }
+        } catch {
+          if (controller.signal.aborted) {
+            break;
+          }
+          failureCount++;
+          generatedScenes.push(fallbackModule);
+        } finally {
+          clearTimeout(timeoutId);
+          controller.signal.removeEventListener('abort', onParentAbort);
+        }
+      }
+
+      if (controller.signal.aborted) {
+        addToast('Pembuatan mograph dibatalkan.', 'info');
+        return;
+      }
+
+      // Check if project changed while generating
+      const latest = useMooStore.getState().project;
+      if (latest.id !== startedId) {
+        addToast('Project berganti, hasil visual dibuang.', 'warning');
+        return;
       }
 
       // Update project composition
+      const existingComp = latest.composition;
       const newComp: Composition = {
-        id: `comp-${Date.now()}`,
-        width: project.width || 1080,
-        height: project.height || 1920,
-        fps: project.fps || 30,
-        globalCss: `body { background: ${project.theme.bg}; }`,
+        id: existingComp?.id || `comp-${Date.now()}`,
+        width: latest.width || 1080,
+        height: latest.height || 1920,
+        fps: latest.fps || 30,
+        globalCss: `body { background: ${latest.theme.bg}; }`,
         scenes: generatedScenes,
-        createdAt: Date.now()
+        createdAt: existingComp?.createdAt || Date.now()
       };
 
-      // Set to store
-      const updatedProject = {
-        ...project,
-        renderMode: 'composition' as const,
-        composition: newComp
-      };
+      // Set to store without spreading old project
+      useMooStore.getState().setProject(
+        {
+          ...latest,
+          renderMode: 'composition' as const,
+          composition: newComp
+        },
+        { keepStale: true }
+      );
 
-      useMooStore.getState().setProject(updatedProject, { keepStale: true });
-
-      addToast('Mograph custom HTML/GSAP berhasil dibuat dan dipasang!', 'success');
-      if (onNextStep) onNextStep();
+      if (failureCount > 0) {
+        addToast(`${failureCount} dari ${total} adegan gagal, dipakai template bawaan`, 'warning');
+      } else {
+        addToast('Mograph custom HTML/GSAP berhasil dibuat dan dipasang!', 'success');
+        if (onNextStep) onNextStep();
+      }
     } catch (err: unknown) {
+      if (controller.signal.aborted) {
+        addToast('Pembuatan mograph dibatalkan.', 'info');
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Gagal mengenerate mograph: ${msg}`, 'error');
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsCompilingMograph(false);
       setCompilationProgress('');
     }
@@ -257,16 +367,36 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
           </div>
         )}
 
-        <Button
-          variant="primary"
-          icon="auto_awesome"
-          isLoading={isCompilingMograph}
-          disabled={isCompilingMograph}
-          onClick={handleGenerateCustomMograph}
-          className="w-full mt-1"
-        >
-          {isCompilingMograph ? 'Mengoding Animasi Mograph...' : 'Generate Mograph Custom dengan AI'}
-        </Button>
+        {isCompilingMograph ? (
+          <div className="flex gap-2 mt-1">
+            <Button
+              variant="primary"
+              icon="auto_awesome"
+              isLoading={true}
+              disabled={true}
+              className="flex-1"
+            >
+              Mengoding Animasi Mograph...
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                abortControllerRef.current?.abort();
+              }}
+            >
+              Batalkan
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="primary"
+            icon="auto_awesome"
+            onClick={handleGenerateCustomMograph}
+            className="w-full mt-1"
+          >
+            Generate Mograph Custom dengan AI
+          </Button>
+        )}
       </div>
 
       {/* Navigasi Langkah */}

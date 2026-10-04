@@ -120,7 +120,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           ref={iframeRef}
           srcDoc={srcDoc}
           title="MooScript Composition Stage"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts"
           onLoad={() => {
             if (iframeRef.current?.contentWindow) {
               iframeRef.current.contentWindow.postMessage(

@@ -34,10 +34,11 @@ export async function generateSingleSceneModule(params: {
   apiKey: string;
   model?: string;
   executeLlm: (opts: { systemPrompt: string; userPrompt: string }) => Promise<string>;
+  styleAdvice?: string;
 }): Promise<SceneModule> {
-  const { beat, index, total, styleBrief, executeLlm } = params;
+  const { beat, index, total, styleBrief, executeLlm, styleAdvice } = params;
 
-  const prompt = buildSceneCodegenPrompt({
+  let prompt = buildSceneCodegenPrompt({
     beatIndex: index,
     totalBeats: total,
     narration: beat.narration,
@@ -50,6 +51,10 @@ export async function generateSingleSceneModule(params: {
       backgroundLanguage: styleBrief.backgroundLanguage
     }
   });
+
+  if (styleAdvice) {
+    prompt += `\n=== STYLE ADVICE ===\n${styleAdvice}\n`;
+  }
 
   try {
     const rawResponse = await executeLlm({
@@ -109,7 +114,8 @@ export async function generateSingleSceneModule(params: {
       buildJs: parsed.buildJs,
       status: validation.valid ? 'ok' : 'error',
       errors: validation.errors,
-      version: 1
+      version: 1,
+      userEdited: false
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -120,7 +126,8 @@ export async function generateSingleSceneModule(params: {
       buildJs: `tl.from(root, { opacity: 0, duration: 0.5 });`,
       status: 'error',
       errors: [message],
-      version: 1
+      version: 1,
+      userEdited: false
     };
   }
 }
