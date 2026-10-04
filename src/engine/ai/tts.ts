@@ -230,6 +230,13 @@ export async function alignOpenAIAudioWithWhisper(params: {
 
     const data = await res.json();
     if (Array.isArray(data.words) && data.words.length > 0) {
+      const scriptWords = (params.sceneText || '').trim().split(/\s+/).filter((w) => w.length > 0);
+      if (data.words.length !== scriptWords.length) {
+        console.warn(
+          `Whisper transcribed word count (${data.words.length}) !== script word count (${scriptWords.length}), falling back to deterministic alignment.`
+        );
+        return [];
+      }
       return data.words.map((w: { word: string; start: number; end: number }) => ({
         word: w.word.trim(),
         start: Math.round(w.start * 1000) / 1000,
@@ -564,7 +571,12 @@ export async function generateSceneAudio(params: {
       signal
     });
 
-    if (whisperWords.length > 0) {
+    const scriptWordCount = rawText
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0).length;
+
+    if (whisperWords.length > 0 && whisperWords.length === scriptWordCount) {
       wordTimestamps = whisperWords.map((w) => ({
         ...w,
         start: Math.max(0, Math.min(w.start, audioDuration)),
@@ -811,6 +823,19 @@ export async function generateProjectAudioPerScene(params: {
       ? settings.voiceIds?.elevenlabs || '21m00Tcm4TlvDq8ikWAM'
       : settings.voiceIds?.openai || 'alloy';
 
+  const internalAbortController = new AbortController();
+  const onCallerAbort = () => {
+    internalAbortController.abort(signal?.reason || new DOMException('Operation aborted', 'AbortError'));
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      internalAbortController.abort(signal.reason);
+    } else {
+      signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+  }
+
   const segments: SceneAudioSegment[] = new Array(project.scenes.length);
   let currentIndex = 0;
   let completedCount = 0;
@@ -819,7 +844,7 @@ export async function generateProjectAudioPerScene(params: {
 
   async function worker() {
     while (currentIndex < project.scenes.length) {
-      if (signal?.aborted) {
+      if (internalAbortController.signal.aborted) {
         throw new DOMException('Operation aborted', 'AbortError');
       }
 
@@ -833,40 +858,51 @@ export async function generateProjectAudioPerScene(params: {
         statusText: `Synthesizing scene ${idx + 1} of ${project.scenes.length}...`
       });
 
-      const seg = await generateSceneAudio({
-        scene,
-        provider,
-        apiKeys: settings.apiKeys,
-        voiceId,
-        speed: settings.speed,
-        stability: settings.stability,
-        paddingSeconds,
-        signal
-      });
+      try {
+        const seg = await generateSceneAudio({
+          scene,
+          provider,
+          apiKeys: settings.apiKeys,
+          voiceId,
+          speed: settings.speed,
+          stability: settings.stability,
+          paddingSeconds,
+          signal: internalAbortController.signal
+        });
 
-      segments[idx] = seg;
-      if (seg.fromCache) {
-        cacheHitCount++;
-      } else {
-        apiCallCount++;
+        segments[idx] = seg;
+        if (seg.fromCache) {
+          cacheHitCount++;
+        } else {
+          apiCallCount++;
+        }
+
+        completedCount++;
+        onProgress?.({
+          currentScene: completedCount,
+          totalScenes: project.scenes.length,
+          sceneId: scene.id,
+          statusText: `Completed scene ${completedCount} of ${project.scenes.length}`,
+          fromCache: seg.fromCache
+        });
+      } catch (err) {
+        internalAbortController.abort();
+        throw err;
       }
-
-      completedCount++;
-      onProgress?.({
-        currentScene: completedCount,
-        totalScenes: project.scenes.length,
-        sceneId: scene.id,
-        statusText: `Completed scene ${completedCount} of ${project.scenes.length}`,
-        fromCache: seg.fromCache
-      });
     }
   }
 
   const workerCount = Math.min(concurrency, project.scenes.length);
   const workers = Array.from({ length: workerCount }, () => worker());
-  await Promise.all(workers);
+  try {
+    await Promise.all(workers);
+  } finally {
+    if (signal) {
+      signal.removeEventListener('abort', onCallerAbort);
+    }
+  }
 
-  if (signal?.aborted) {
+  if (signal?.aborted || internalAbortController.signal.aborted) {
     throw new DOMException('Operation aborted', 'AbortError');
   }
 

@@ -5,7 +5,9 @@ import {
   generateElevenLabsTTS,
   generateSyntheticAmbientAudio,
   generateProjectAudioPerScene,
-  decodeAudioBlob
+  decodeAudioBlob,
+  calculateFallbackSceneDuration,
+  computeDeterministicWordAlignment
 } from '../../engine/ai/tts';
 import { mixVoiceAndBgm } from '../../engine/audio/bgmMixer';
 import { synthesizeLocalTTS } from '../../engine/ai/localTts';
@@ -24,6 +26,56 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
     const { settings, project, addToast } = get();
     if (project.scenes.length === 0) {
       addToast('Cannot generate audio without any scenes.', 'warning');
+      return;
+    }
+
+    const startedProjectId = project.id;
+    const startedSceneTexts = new Map(
+      project.scenes.map((s) => [s.id, s.narrationText || s.text || ''])
+    );
+
+    if (settings.selectedTTSProvider === 'fallback') {
+      if (get().audioBlobUrl) {
+        URL.revokeObjectURL(get().audioBlobUrl!);
+      }
+
+      const latest = get().project;
+      if (latest.id !== startedProjectId) {
+        addToast('Project berganti, hasil audio dibuang.', 'warning');
+        return;
+      }
+
+      let totalDur = 0;
+      const mergedScenes = latest.scenes.map((s) => {
+        const text = s.narrationText || s.text || '';
+        const dur = calculateFallbackSceneDuration(text);
+        const words = computeDeterministicWordAlignment(text, dur);
+        totalDur += dur;
+        return {
+          ...s,
+          durationInSeconds: dur,
+          wordTimestamps: words
+        };
+      });
+
+      const finalProject = {
+        ...latest,
+        scenes: mergedScenes,
+        audioBlob: undefined,
+        audioDuration: Math.round(totalDur * 100) / 100
+      };
+
+      set({
+        project: finalProject,
+        isGeneratingAudio: false,
+        audioBlobUrl: null,
+        audioStale: false,
+        audioProgress: null
+      });
+
+      await saveProjectToDb(finalProject);
+      await get().refreshCacheSize();
+      addToast('Mode timer: durasi dihitung dari panjang teks (tanpa suara).', 'info');
       return;
     }
 
@@ -89,22 +141,57 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       }
       // ── End BGM Mix ────────────────────────────────────────────────────────
 
+      const latest = get().project;
+      if (latest.id !== startedProjectId) {
+        set({ isGeneratingAudio: false, audioProgress: null });
+        addToast('Project berganti, hasil audio dibuang.', 'warning');
+        return;
+      }
+
+      let hasTextChangedDuringGen = false;
+      const updatedDurationsBySceneId = new Map(
+        result.updatedProject.scenes.map((s) => [
+          s.id,
+          { duration: s.durationInSeconds, words: s.wordTimestamps }
+        ])
+      );
+
+      const mergedScenes = latest.scenes.map((s) => {
+        const genData = updatedDurationsBySceneId.get(s.id);
+        const currentText = s.narrationText || s.text || '';
+        const initialText = startedSceneTexts.get(s.id);
+
+        if (initialText !== undefined && currentText !== initialText) {
+          hasTextChangedDuringGen = true;
+        }
+
+        if (genData) {
+          return {
+            ...s,
+            durationInSeconds: genData.duration,
+            wordTimestamps: genData.words
+          };
+        }
+        return s;
+      });
+
       const newBlobUrl = URL.createObjectURL(finalAudioBlob);
       if (get().audioBlobUrl) {
         URL.revokeObjectURL(get().audioBlobUrl!);
       }
 
-      // Persist finalAudioBlob (may differ from result.audioBlob when BGM is mixed in)
       const finalProject = {
-        ...result.updatedProject,
-        audioBlob: finalAudioBlob
+        ...latest,
+        scenes: mergedScenes,
+        audioBlob: finalAudioBlob,
+        audioDuration: result.totalDuration
       };
 
       set({
         project: finalProject,
         isGeneratingAudio: false,
         audioBlobUrl: newBlobUrl,
-        audioStale: false,
+        audioStale: hasTextChangedDuringGen,
         audioProgress: null
       });
 

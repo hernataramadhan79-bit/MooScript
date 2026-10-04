@@ -3,6 +3,7 @@ import { useMooStore } from '../../store/useMooStore';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
+import { GlobalVoiceSelector } from '../../components/studio/GlobalVoiceSelector';
 import type { BgmPreset, TTSProvider } from '../../types';
 
 interface VoiceViewProps {
@@ -17,6 +18,8 @@ export const VoiceView: React.FC<VoiceViewProps> = ({ onBackStep, onNextStep }) 
     updateSettings,
     isGeneratingAudio,
     generateAudio,
+    cancelAudioGeneration,
+    audioProgress,
     audioStale,
     updateBgmPreset,
     updateBgmLevel,
@@ -62,16 +65,59 @@ export const VoiceView: React.FC<VoiceViewProps> = ({ onBackStep, onNextStep }) 
           />
         </Field>
 
-        <Button
-          variant="primary"
-          icon="mic"
-          isLoading={isGeneratingAudio}
-          disabled={isGeneratingAudio}
-          onClick={generateAudio}
-          className="w-full mt-1"
-        >
-          {isGeneratingAudio ? 'Men-generate Voiceover...' : 'Generate Voice & Sinkronisasi Kata'}
-        </Button>
+        <Field label="Pilih Karakter Suara & Audisi">
+          <GlobalVoiceSelector />
+        </Field>
+
+        {/* Progress Bar when generating */}
+        {isGeneratingAudio && audioProgress && (
+          <div className="flex flex-col gap-2 p-4 rounded-xl bg-surface-2 border border-border">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-medium text-on-surface">{audioProgress.statusText}</span>
+              <span className="font-mono text-accent font-semibold">
+                {audioProgress.totalScenes > 0
+                  ? Math.round((audioProgress.currentScene / audioProgress.totalScenes) * 100)
+                  : 0}
+                %
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-surface-3 overflow-hidden">
+              <div
+                className="h-full bg-accent transition-all duration-150 rounded-full"
+                style={{
+                  width: `${
+                    audioProgress.totalScenes > 0
+                      ? (audioProgress.currentScene / audioProgress.totalScenes) * 100
+                      : 0
+                  }%`
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 mt-1">
+          <Button
+            variant="primary"
+            icon="mic"
+            isLoading={isGeneratingAudio}
+            disabled={isGeneratingAudio}
+            onClick={generateAudio}
+            className="flex-1"
+          >
+            {isGeneratingAudio ? 'Men-generate Voiceover...' : 'Generate Voice & Sinkronisasi Kata'}
+          </Button>
+          {isGeneratingAudio && (
+            <Button
+              variant="secondary"
+              icon="cancel"
+              onClick={cancelAudioGeneration}
+              className="text-error hover:text-error"
+            >
+              Batalkan
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 2. Background Music & Ducking */}
@@ -106,7 +152,7 @@ export const VoiceView: React.FC<VoiceViewProps> = ({ onBackStep, onNextStep }) 
             </Field>
 
             <Field
-              label={`Ducking saat VO Bicara (${Math.round((1 - (project.bgm?.duckRatio ?? 0.15)) * 100)}%)`}
+              label={`Volume musik saat VO bicara (${Math.round((project.bgm?.duckRatio ?? 0.15) * 100)}%)`}
               hint="Otomatis mengecilkan musik"
             >
               <input
