@@ -95,4 +95,48 @@ tl.from(root.querySelector("h1"), { opacity: 0, duration: 0.5 });
     expect(mapFontDisplay('Impact')).toBe('Syne');
     expect(mapFontDisplay(undefined)).toBe('Plus Jakarta Sans');
   });
+
+  it('notifies onProgress callback with live status updates during scene generation and repair', async () => {
+    const progressUpdates: string[] = [];
+    const executeLlm = vi.fn().mockImplementation(async (opts: { systemPrompt: string; userPrompt: string }) => {
+      // First attempt fails validation, second attempt succeeds
+      if (opts.userPrompt.includes('error validasi')) {
+        return `\`\`\`html
+<div class="card">Repaired</div>
+\`\`\`
+\`\`\`css
+.card { width: 100%; }
+\`\`\`
+\`\`\`javascript
+tl.from(root.children, { opacity: 0, duration: 0.5 });
+\`\`\``;
+      }
+      return `\`\`\`html
+<div class="card">Hello</div>
+\`\`\`
+\`\`\`css
+.card { width: 100%; }
+\`\`\`
+\`\`\`javascript
+// missing gsap animation
+\`\`\``;
+    });
+
+    const result = await generateSingleSceneModule({
+      beat: dummyBeat,
+      index: 0,
+      total: 1,
+      styleBrief: dummyStyleBrief,
+      provider: 'openai',
+      apiKey: 'test-key',
+      executeLlm,
+      onProgress: (status) => progressUpdates.push(status)
+    });
+
+    expect(result.status).toBe('ok');
+    expect(progressUpdates.length).toBeGreaterThan(1);
+    expect(progressUpdates.some((p) => p.includes('Menganalisis'))).toBe(true);
+    expect(progressUpdates.some((p) => p.includes('Validasi'))).toBe(true);
+  });
 });
+

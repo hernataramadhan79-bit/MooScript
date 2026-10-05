@@ -1,7 +1,41 @@
-import type { MooProject, Scene, SceneTransition, CaptionStyle, CaptionPosition, CameraMovement } from '../../types';
+import type {
+  MooProject,
+  Scene,
+  SceneTransition,
+  CaptionStyle,
+  CaptionPosition,
+  CameraMovement,
+  MotionNode,
+  NodeAnimation,
+  BackgroundConfig,
+  ThemeTokens
+} from '../../types';
+import { resolveTheme } from '../../types';
 import { spring, easeOutExpo, easeInOutQuad, clamp, lerp } from '../physics/spring';
 import { drawIcon } from '../assets/icons';
 import { cleanWord } from '../../utils/textUtils';
+
+class SimpleDOMRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  constructor(x = 0, y = 0, width = 0, height = 0) {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.left = x;
+    this.top = y;
+    this.right = x + width;
+    this.bottom = y + height;
+  }
+}
+const RectClass = typeof DOMRect !== 'undefined' ? DOMRect : (SimpleDOMRect as unknown as typeof DOMRect);
 
 export interface RenderOptions {
   hud?: boolean;
@@ -122,6 +156,28 @@ export class CanvasRenderer {
   public clearCaches(): void {
     this.bgCache.clear();
     this.layoutCache.clear();
+    this.nodeBoundsMap.clear();
+  }
+
+  private nodeBoundsMap = new Map<string, DOMRect>();
+
+  public getNodeBoundsMap(): Map<string, DOMRect> {
+    return this.nodeBoundsMap;
+  }
+
+  public hitTestNode(canvasX: number, canvasY: number): string | null {
+    const entries = Array.from(this.nodeBoundsMap.entries()).reverse();
+    for (const [id, rect] of entries) {
+      if (
+        canvasX >= rect.left &&
+        canvasX <= rect.right &&
+        canvasY >= rect.top &&
+        canvasY <= rect.bottom
+      ) {
+        return id;
+      }
+    }
+    return null;
   }
 
   /**
@@ -177,8 +233,17 @@ export class CanvasRenderer {
     const sceneTotalFrames = Math.max(1, Math.round(sceneDuration * fps));
     const frameInScene = Math.max(0, Math.round(sceneElapsed * fps));
 
-    // 2. Clear & Render Background (Kinetic grid + vignette + deterministic pulse)
-    this.drawKineticBackground(ctx, width, height, t, project, sceneProgress);
+    // 2. Clear & Render Background
+    const themeTokens = resolveTheme(project, activeScene);
+    this.nodeBoundsMap.clear();
+
+    const hasAtomicNodes = Boolean(activeScene && activeScene.nodes && activeScene.nodes.length > 0);
+
+    if (hasAtomicNodes) {
+      this.drawProceduralBackground(ctx, activeScene?.background, t, themeTokens);
+    } else {
+      this.drawKineticBackground(ctx, width, height, t, project, sceneProgress);
+    }
 
     if (!activeScene) {
       this.renderEmptyState(ctx, width, height);
@@ -189,16 +254,18 @@ export class CanvasRenderer {
     ctx.save();
     ctx.translate(width / 2, height / 2);
 
-    // Apply Camera Transform
-    this.applyCameraMovement(ctx, activeScene.camera, sceneElapsed, sceneDuration, width, height);
+    if (!hasAtomicNodes) {
+      // Apply Camera Transform
+      this.applyCameraMovement(ctx, activeScene.camera, sceneElapsed, sceneDuration, width, height);
 
-    // Camera Push: subtle scale increment
-    const cameraScale = 1.0 + (frameInScene / sceneTotalFrames) * 0.05;
-    ctx.scale(cameraScale, cameraScale);
+      // Camera Push: subtle scale increment
+      const cameraScale = 1.0 + (frameInScene / sceneTotalFrames) * 0.05;
+      ctx.scale(cameraScale, cameraScale);
 
-    // Preset-specific motion transform with guaranteed non-zero scale floor
-    const preset = activeScene.motionPreset || 'punch_zoom';
-    this.applyMotionPresetTransform(ctx, preset, sceneElapsed, frameInScene, sceneTotalFrames);
+      // Preset-specific motion transform with guaranteed non-zero scale floor
+      const preset = activeScene.motionPreset || 'punch_zoom';
+      this.applyMotionPresetTransform(ctx, preset, sceneElapsed, frameInScene, sceneTotalFrames);
+    }
 
     // Dynamic scene transitions: cut, fade, slide
     const transition: SceneTransition = activeScene.transition ?? 'fade';
@@ -237,57 +304,64 @@ export class CanvasRenderer {
       this.renderHeader(ctx, width, sceneIndex + 1, project.scenes.length, project);
     }
 
-    // Scene Center Icon (rendered if layout is KINETIC_QUOTE)
     const layout = activeScene.layout || 'KINETIC_QUOTE';
-    if (activeScene.icon && layout === 'KINETIC_QUOTE') {
-      this.renderSceneIcon(ctx, width, activeScene.icon, project.theme.textHighlight, sceneElapsed);
-    }
 
-    // Dispatch rendering based on LayoutType
-    const springProgress = clamp(spring(sceneElapsed, { stiffness: 200, damping: 16 }), 0, 1);
+    if (hasAtomicNodes && activeScene.nodes) {
+      for (const node of activeScene.nodes) {
+        this.renderNode(ctx, node, t, sceneElapsed, themeTokens);
+      }
+    } else {
+      // Scene Center Icon (rendered if layout is KINETIC_QUOTE)
+      if (activeScene.icon && layout === 'KINETIC_QUOTE') {
+        this.renderSceneIcon(ctx, width, activeScene.icon, project.theme.textHighlight, sceneElapsed);
+      }
 
-    switch (layout) {
-      case 'METRIC_COUNTER': {
-        const val = activeScene.visualData?.metricValue || '100%';
-        const lbl = activeScene.visualData?.metricLabel || activeScene.narrationText || activeScene.text || 'Performance';
-        const title = activeScene.visualData?.title;
-        this.drawMetricCounter(ctx, 80, 420, width - 160, height * 0.46, val, lbl, springProgress, project.theme, title);
-        break;
-      }
-      case 'TERMINAL_MOCKUP': {
-        const code = activeScene.visualData?.codeSnippet || activeScene.narrationText || activeScene.text || 'npm install mooscript';
-        const lang = activeScene.visualData?.codeLanguage || 'terminal';
-        this.drawTerminalMockup(ctx, 70, 380, width - 140, height * 0.46, code, lang, springProgress, project.theme, sceneElapsed);
-        break;
-      }
-      case 'VS_COMPARISON': {
-        const lTitle = activeScene.visualData?.leftTitle || 'BEFORE';
-        const lDesc = activeScene.visualData?.leftDesc || 'Slow, manual editing';
-        const rTitle = activeScene.visualData?.rightTitle || 'AFTER';
-        const rDesc = activeScene.visualData?.rightDesc || activeScene.narrationText || activeScene.text || 'Fast automated rendering';
-        this.drawVsComparison(ctx, 80, 360, width - 160, height * 0.50, lTitle, lDesc, rTitle, rDesc, springProgress, project.theme);
-        break;
-      }
-      case 'LIST_STAGGER': {
-        let items = activeScene.visualData?.bulletItems;
-        if (!items || items.length === 0) {
-          const text = (activeScene.narrationText || activeScene.text || '').trim();
-          items = text.split(/[.,;]\s+/).filter((s) => s.length > 0);
-          if (items.length === 0 && text) items = [text];
+      // Dispatch rendering based on LayoutType
+      const springProgress = clamp(spring(sceneElapsed, { stiffness: 200, damping: 16 }), 0, 1);
+
+      switch (layout) {
+        case 'METRIC_COUNTER': {
+          const val = activeScene.visualData?.metricValue || '100%';
+          const lbl = activeScene.visualData?.metricLabel || activeScene.narrationText || activeScene.text || 'Performance';
+          const title = activeScene.visualData?.title;
+          this.drawMetricCounter(ctx, 80, 420, width - 160, height * 0.46, val, lbl, springProgress, project.theme, title);
+          break;
         }
-        const title = activeScene.visualData?.title;
-        this.drawStaggeredList(ctx, 80, 360, width - 160, height * 0.50, items || [], sceneElapsed, project.theme, title);
-        break;
+        case 'TERMINAL_MOCKUP': {
+          const code = activeScene.visualData?.codeSnippet || activeScene.narrationText || activeScene.text || 'npm install mooscript';
+          const lang = activeScene.visualData?.codeLanguage || 'terminal';
+          this.drawTerminalMockup(ctx, 70, 380, width - 140, height * 0.46, code, lang, springProgress, project.theme, sceneElapsed);
+          break;
+        }
+        case 'VS_COMPARISON': {
+          const lTitle = activeScene.visualData?.leftTitle || 'BEFORE';
+          const lDesc = activeScene.visualData?.leftDesc || 'Slow, manual editing';
+          const rTitle = activeScene.visualData?.rightTitle || 'AFTER';
+          const rDesc = activeScene.visualData?.rightDesc || activeScene.narrationText || activeScene.text || 'Fast automated rendering';
+          this.drawVsComparison(ctx, 80, 360, width - 160, height * 0.50, lTitle, lDesc, rTitle, rDesc, springProgress, project.theme);
+          break;
+        }
+        case 'LIST_STAGGER': {
+          let items = activeScene.visualData?.bulletItems;
+          if (!items || items.length === 0) {
+            const text = (activeScene.narrationText || activeScene.text || '').trim();
+            items = text.split(/[.,;]\s+/).filter((s) => s.length > 0);
+            if (items.length === 0 && text) items = [text];
+          }
+          const title = activeScene.visualData?.title;
+          this.drawStaggeredList(ctx, 80, 360, width - 160, height * 0.50, items || [], sceneElapsed, project.theme, title);
+          break;
+        }
+        case 'KINETIC_QUOTE':
+        default:
+          this.renderKineticTypography(ctx, width, height, activeScene, sceneElapsed, project);
+          break;
       }
-      case 'KINETIC_QUOTE':
-      default:
-        this.renderKineticTypography(ctx, width, height, activeScene, sceneElapsed, project);
-        break;
     }
 
-    // Optional Bottom Subtitles Layer (Auxiliary layer when enabled on visual components)
+    // Optional Bottom Subtitles Layer
     const shouldShowSubtitles = activeScene.showSubtitles ?? project.theme.showSubtitles ?? false;
-    if (shouldShowSubtitles && layout !== 'KINETIC_QUOTE') {
+    if (shouldShowSubtitles && (hasAtomicNodes || layout !== 'KINETIC_QUOTE')) {
       this.renderBottomSubtitleOverlay(ctx, width, height, activeScene, sceneElapsed, project);
     }
 
@@ -373,30 +447,6 @@ export class CanvasRenderer {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Dynamic subtle grid drift (deterministic closed-form)
-    const gridSize = 90;
-    const gridOffsetY = (t * 22) % gridSize;
-    ctx.save();
-    ctx.strokeStyle = '#27272a18';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let y = gridOffsetY; y <= height; y += gridSize) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-    }
-    ctx.stroke();
-
-    // Intersection dots for high-tech aesthetic
-    ctx.fillStyle = '#3f3f462a';
-    const dotSpacing = 180;
-    const dotOffsetY = (t * 18) % dotSpacing;
-    for (let x = 90; x < width; x += dotSpacing) {
-      for (let y = dotOffsetY; y < height; y += dotSpacing) {
-        ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
-      }
-    }
-    ctx.restore();
-
     // Dynamic subtle pulse based on sceneProgress
     if (progress > 0) {
       const pulse = Math.sin(progress * Math.PI); // 0 -> 1 -> 0
@@ -416,6 +466,513 @@ export class CanvasRenderer {
         ctx.restore();
       }
     }
+  }
+
+  public drawSolid(ctx: CanvasRenderingContext2D, theme: ThemeTokens, fill?: string): void {
+    ctx.fillStyle = fill || theme.bg;
+    ctx.fillRect(0, 0, this.width, this.height);
+  }
+
+  public drawDotGrid(ctx: CanvasRenderingContext2D, t: number, theme: ThemeTokens): void {
+    const { width, height } = this;
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, width, height);
+
+    const spacing = 48;
+    const radius = 2.2;
+    const cols = Math.ceil(width / spacing) + 1;
+    const rows = Math.ceil(height / spacing) + 1;
+
+    for (let r = 0; r < rows; r++) {
+      const y = r * spacing;
+      for (let c = 0; c < cols; c++) {
+        const x = c * spacing;
+        const wave = Math.sin((x / width) * 4.5 + t * 2.2) * Math.cos((y / height) * 4.5 + t * 1.8);
+        const alpha = clamp(0.12 + 0.32 * ((wave + 1) / 2), 0.04, 0.55);
+
+        ctx.fillStyle = theme.text;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
+  public drawMeshBlobs(ctx: CanvasRenderingContext2D, t: number, theme: ThemeTokens): void {
+    const { width, height } = this;
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, width, height);
+
+    const p1x = width * (0.35 + 0.18 * Math.sin(t * 1.1));
+    const p1y = height * (0.30 + 0.16 * Math.cos(t * 0.9));
+    const r1 = width * 0.55;
+
+    const g1 = ctx.createRadialGradient(p1x, p1y, 0, p1x, p1y, r1);
+    g1.addColorStop(0, `${theme.primary}55`);
+    g1.addColorStop(1, 'transparent');
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, width, height);
+
+    const p2x = width * (0.65 + 0.16 * Math.cos(t * 1.3));
+    const p2y = height * (0.70 + 0.18 * Math.sin(t * 1.0));
+    const r2 = width * 0.60;
+
+    const g2 = ctx.createRadialGradient(p2x, p2y, 0, p2x, p2y, r2);
+    g2.addColorStop(0, `${theme.accent}44`);
+    g2.addColorStop(1, 'transparent');
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, width, height);
+
+    const p3x = width * (0.50 + 0.20 * Math.sin(t * 0.8 + 1));
+    const p3y = height * (0.50 + 0.15 * Math.cos(t * 1.2 + 2));
+    const r3 = width * 0.45;
+
+    const g3 = ctx.createRadialGradient(p3x, p3y, 0, p3x, p3y, r3);
+    g3.addColorStop(0, `${theme.surface}66`);
+    g3.addColorStop(1, 'transparent');
+    ctx.fillStyle = g3;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  public drawBentoBase(ctx: CanvasRenderingContext2D, t: number, theme: ThemeTokens): void {
+    const { width, height } = this;
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, width, height);
+
+    this.drawMeshBlobs(ctx, t * 0.5, theme);
+
+    const padX = width * 0.08;
+    const cardW = width - padX * 2;
+    const cardH = height * 0.62;
+    const cardY = height * 0.22;
+
+    ctx.save();
+    ctx.fillStyle = `${theme.surface}99`;
+    ctx.strokeStyle = `${theme.muted}40`;
+    ctx.lineWidth = 1.5;
+
+    if (typeof (ctx as any).roundRect === 'function') {
+      ctx.beginPath();
+      (ctx as any).roundRect(padX, cardY, cardW, cardH, 28);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(padX, cardY, cardW, cardH);
+      ctx.strokeRect(padX, cardY, cardW, cardH);
+    }
+    ctx.restore();
+  }
+
+  public drawProceduralBackground(
+    ctx: CanvasRenderingContext2D,
+    config: BackgroundConfig | undefined,
+    t: number,
+    theme: ThemeTokens
+  ): void {
+    const type = config?.type || 'dot_grid';
+    switch (type) {
+      case 'solid':
+        this.drawSolid(ctx, theme, config?.customFill);
+        break;
+      case 'mesh_gradient':
+        this.drawMeshBlobs(ctx, t, theme);
+        break;
+      case 'bento_card':
+        this.drawBentoBase(ctx, t, theme);
+        break;
+      case 'dot_grid':
+      default:
+        this.drawDotGrid(ctx, t, theme);
+        break;
+    }
+  }
+
+  public renderNode(
+    ctx: CanvasRenderingContext2D,
+    node: MotionNode,
+    frameTime: number,
+    sceneTime: number,
+    theme: ThemeTokens,
+    parentCoord?: { x: number; y: number; width: number; height: number },
+    parentAbsPos?: { x: number; y: number },
+    parentCompoundScale = 1.0,
+    parentCompoundRotation = 0
+  ): void {
+    const { width: canvasWidth, height: canvasHeight } = this;
+
+    const baseW = parentCoord ? parentCoord.width : canvasWidth;
+    const baseH = parentCoord ? parentCoord.height : canvasHeight;
+
+    const transform = node.transform || { x: 50, y: 50, scale: 1, rotation: 0, opacity: 1 };
+    const style = node.style || { fillToken: 'text', fontSize: 32 };
+
+    const nodeW = transform.width !== undefined
+      ? (transform.width / 100) * baseW
+      : (parentCoord ? baseW * 0.8 : canvasWidth * 0.85);
+    const nodeH = transform.height !== undefined
+      ? (transform.height / 100) * baseH
+      : (parentCoord ? baseH * 0.35 : 120);
+
+    let localX = (transform.x / 100) * canvasWidth;
+    let localY = (transform.y / 100) * canvasHeight;
+    let absPx = localX;
+    let absPy = localY;
+
+    if (parentCoord && parentAbsPos) {
+      localX = -parentCoord.width / 2 + (transform.x / 100) * parentCoord.width;
+      localY = -parentCoord.height / 2 + (transform.y / 100) * parentCoord.height;
+      const pRad = (parentCompoundRotation * Math.PI) / 180;
+      const cosP = Math.cos(pRad);
+      const sinP = Math.sin(pRad);
+      const rotX = (localX * cosP - localY * sinP) * parentCompoundScale;
+      const rotY = (localX * sinP + localY * cosP) * parentCompoundScale;
+      absPx = parentAbsPos.x + rotX;
+      absPy = parentAbsPos.y + rotY;
+    }
+
+    let scale = transform.scale ?? 1.0;
+    let opacity = transform.opacity ?? 1.0;
+    const rotation = transform.rotation ?? 0;
+    let yOffset = 0;
+    let textSliceProgress = 1.0;
+
+    const enterAnim: NodeAnimation['enter'] = node.animation?.enter || (
+      (node.animation as any)?.enterType && (node.animation as any)?.enterType !== 'none'
+        ? { type: (node.animation as any).enterType, startAtSecond: 0, duration: 0.6 }
+        : undefined
+    );
+
+    if (enterAnim) {
+      const { type, startAtSecond = 0, duration = 0.6, springConfig } = enterAnim;
+      const elapsed = sceneTime - startAtSecond;
+
+      if (elapsed < 0) {
+        opacity = 0;
+        scale = 0;
+      } else {
+        if (type === 'spring_pop') {
+          const sp = spring(elapsed, springConfig || { stiffness: 220, damping: 14 });
+          scale *= clamp(sp, 0, 1.3);
+          opacity *= clamp(sp * 2, 0, 1);
+        } else if (type === 'wipe_up') {
+          const progress = clamp(duration > 0 ? elapsed / duration : 1, 0, 1);
+          const eased = easeOutExpo(progress);
+          yOffset += (1 - eased) * 50;
+          opacity *= eased;
+        } else if (type === 'blur_in') {
+          const progress = clamp(duration > 0 ? elapsed / duration : 1, 0, 1);
+          const eased = easeInOutQuad(progress);
+          opacity *= eased;
+        } else if (type === 'typewriter') {
+          const progress = clamp(duration > 0 ? elapsed / duration : 1, 0, 1);
+          textSliceProgress = progress;
+        }
+      }
+    }
+
+    if (node.animation?.active) {
+      const { type, intensity = 1 } = node.animation.active;
+      if (type === 'subtle_float') {
+        yOffset += Math.sin(sceneTime * 2.5) * (6 * intensity);
+      } else if (type === 'karaoke_glow') {
+        const pulse = Math.sin(sceneTime * 4) * 0.5 + 0.5;
+        scale *= 1 + 0.02 * pulse * intensity;
+      }
+    }
+
+    if (node.animation?.exit) {
+      const { type, startAtSecond = 3, duration = 0.5 } = node.animation.exit;
+      if (sceneTime >= startAtSecond) {
+        const exitElapsed = sceneTime - startAtSecond;
+        const progress = clamp(duration > 0 ? exitElapsed / duration : 1, 0, 1);
+        opacity *= clamp(1 - progress, 0, 1);
+        if (type === 'slide_down') {
+          yOffset += easeInOutQuad(progress) * 80;
+        }
+      }
+    }
+
+    if (opacity <= 0.001) {
+      return;
+    }
+
+    const resolveToken = (token?: string, fallback = '#ffffff') => {
+      if (!token) return fallback;
+      if (token in theme) return (theme as any)[token];
+      return token;
+    };
+
+    const fillColor = style.customFill || resolveToken(style.fillToken, theme.text);
+    const strokeColor = resolveToken(style.strokeToken, theme.muted);
+    const strokeWidth = style.strokeWidth || 0;
+    const borderRadius = style.borderRadius || 16;
+    const fontFamily = style.fontFamily === 'Mono'
+      ? "'JetBrains Mono', monospace"
+      : "'Plus Jakarta Sans', sans-serif";
+    const fontSize = style.fontSize || 32;
+    const fontWeight = style.fontWeight || 600;
+
+    ctx.save();
+    ctx.translate(localX, localY + yOffset);
+    if (rotation !== 0) {
+      ctx.rotate((rotation * Math.PI) / 180);
+    }
+    if (scale !== 1.0) {
+      ctx.scale(scale, scale);
+    }
+    ctx.globalAlpha = clamp(ctx.globalAlpha * opacity, 0, 1);
+
+    if (style.shadow) {
+      ctx.shadowColor = style.shadow.color;
+      ctx.shadowBlur = style.shadow.blur;
+      ctx.shadowOffsetY = style.shadow.offsetY;
+    }
+
+    let finalBoxWidth = nodeW;
+    let finalBoxHeight = nodeH;
+
+    switch (node.type) {
+      case 'container': {
+        const x0 = -nodeW / 2;
+        const y0 = -nodeH / 2;
+        ctx.fillStyle = fillColor;
+        if (strokeWidth > 0) {
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = strokeWidth;
+        }
+
+        if (typeof (ctx as any).roundRect === 'function') {
+          ctx.beginPath();
+          (ctx as any).roundRect(x0, y0, nodeW, nodeH, borderRadius);
+          ctx.fill();
+          if (strokeWidth > 0) ctx.stroke();
+        } else {
+          ctx.fillRect(x0, y0, nodeW, nodeH);
+          if (strokeWidth > 0) ctx.strokeRect(x0, y0, nodeW, nodeH);
+        }
+        break;
+      }
+      case 'text': {
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.textBaseline = 'middle';
+
+        let textToDraw = node.content || '';
+        if (textSliceProgress < 1.0) {
+          const chars = Math.max(1, Math.floor(textToDraw.length * textSliceProgress));
+          textToDraw = textToDraw.slice(0, chars);
+        }
+
+        const maxW = nodeW > 0 ? nodeW : canvasWidth * 0.85;
+        const words = textToDraw.split(/\s+/).filter(Boolean);
+        const focusWords = new Set(
+          ((node.extraProps?.focusWords as string[]) || []).map((w: string) => cleanWord(w))
+        );
+
+        if (words.length <= 1 || ctx.measureText(textToDraw).width <= maxW) {
+          ctx.textAlign = 'center';
+          ctx.fillStyle = fillColor;
+          ctx.fillText(textToDraw, 0, 0);
+          const metrics = ctx.measureText(textToDraw);
+          finalBoxWidth = metrics.width + 24;
+          finalBoxHeight = fontSize * 1.4;
+        } else {
+          const lines: string[][] = [[]];
+          let curLineWidth = 0;
+          const spaceW = ctx.measureText(' ').width;
+
+          for (const w of words) {
+            const wWidth = ctx.measureText(w).width;
+            if (curLineWidth + wWidth > maxW && lines[lines.length - 1].length > 0) {
+              lines.push([w]);
+              curLineWidth = wWidth + spaceW;
+            } else {
+              lines[lines.length - 1].push(w);
+              curLineWidth += wWidth + spaceW;
+            }
+          }
+
+          const lineHeight = fontSize * 1.35;
+          const totalTextHeight = lines.length * lineHeight;
+          const startY = -(totalTextHeight / 2) + lineHeight / 2;
+          let maxMeasuredLineWidth = 0;
+
+          for (let lIdx = 0; lIdx < lines.length; lIdx++) {
+            const lineWords = lines[lIdx];
+            let lineWidth = 0;
+            for (let wi = 0; wi < lineWords.length; wi++) {
+              lineWidth += ctx.measureText(lineWords[wi]).width;
+              if (wi < lineWords.length - 1) lineWidth += spaceW;
+            }
+            maxMeasuredLineWidth = Math.max(maxMeasuredLineWidth, lineWidth);
+
+            let curX = -lineWidth / 2;
+            const lineY = startY + lIdx * lineHeight;
+
+            const hasFocusOnLine = lineWords.some((w) => focusWords.has(cleanWord(w)));
+            if (!hasFocusOnLine) {
+              ctx.fillStyle = fillColor;
+              ctx.textAlign = 'left';
+              ctx.fillText(lineWords.join(' '), curX, lineY);
+            } else {
+              for (const w of lineWords) {
+                const wW = ctx.measureText(w).width;
+                const isFocus = focusWords.has(cleanWord(w));
+                ctx.fillStyle = isFocus ? theme.accent : fillColor;
+                ctx.textAlign = 'left';
+                ctx.fillText(w, curX, lineY);
+                curX += wW + spaceW;
+              }
+            }
+          }
+
+          finalBoxWidth = Math.max(maxMeasuredLineWidth + 24, 60);
+          finalBoxHeight = Math.max(totalTextHeight, fontSize * 1.4);
+        }
+        break;
+      }
+      case 'badge': {
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        const label = (node.content || '').toUpperCase();
+        const textMetrics = ctx.measureText(label);
+        const badgeW = Math.max(nodeW, textMetrics.width + 36);
+        const badgeH = Math.max(nodeH, fontSize * 1.8);
+        const x0 = -badgeW / 2;
+        const y0 = -badgeH / 2;
+
+        ctx.fillStyle = fillColor;
+        if (strokeWidth > 0) {
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = strokeWidth;
+        }
+
+        if (typeof (ctx as any).roundRect === 'function') {
+          ctx.beginPath();
+          (ctx as any).roundRect(x0, y0, badgeW, badgeH, borderRadius || badgeH / 2);
+          ctx.fill();
+          if (strokeWidth > 0) ctx.stroke();
+        } else {
+          ctx.fillRect(x0, y0, badgeW, badgeH);
+          if (strokeWidth > 0) ctx.strokeRect(x0, y0, badgeW, badgeH);
+        }
+
+        ctx.fillStyle = node.style.fillToken === 'surface' || node.style.fillToken === 'muted'
+          ? theme.text
+          : theme.bg;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, 0, 0);
+
+        finalBoxWidth = badgeW;
+        finalBoxHeight = badgeH;
+        break;
+      }
+      case 'metric': {
+        let displayVal = node.content || '100%';
+        if (node.animation?.active?.type === 'counter_tick') {
+          const enterDuration = node.animation?.enter?.duration || 1.0;
+          const tickProgress = clamp(sceneTime / enterDuration, 0, 1);
+          displayVal = interpolateMetricValue(displayVal, tickProgress);
+        }
+
+        ctx.font = `900 ${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = fillColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayVal, 0, 0);
+
+        const metrics = ctx.measureText(displayVal);
+        finalBoxWidth = metrics.width + 24;
+        finalBoxHeight = fontSize * 1.3;
+        break;
+      }
+      case 'code': {
+        const codeW = nodeW;
+        const codeH = nodeH;
+        const x0 = -codeW / 2;
+        const y0 = -codeH / 2;
+
+        ctx.fillStyle = fillColor;
+        if (typeof (ctx as any).roundRect === 'function') {
+          ctx.beginPath();
+          (ctx as any).roundRect(x0, y0, codeW, codeH, borderRadius);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x0, y0, codeW, codeH);
+        }
+
+        const lines = (node.content || '').split('\n');
+        ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        const lineHeight = fontSize * 1.5;
+        const pad = 24;
+        let lineY = y0 + pad;
+
+        const visibleLineCount = textSliceProgress < 1.0
+          ? Math.max(1, Math.floor(lines.length * textSliceProgress))
+          : lines.length;
+
+        for (let i = 0; i < visibleLineCount; i++) {
+          const line = lines[i];
+          const tokens = tokenizeCodeLine(line);
+          let tokenX = x0 + pad;
+
+          for (const token of tokens) {
+            ctx.fillStyle = token.color;
+            ctx.fillText(token.text, tokenX, lineY);
+            tokenX += ctx.measureText(token.text).width;
+          }
+          lineY += lineHeight;
+        }
+        break;
+      }
+      case 'shape': {
+        const x0 = -nodeW / 2;
+        const y0 = -nodeH / 2;
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(x0, y0, nodeW, nodeH);
+        break;
+      }
+    }
+
+    const totalEffectiveScale = scale * parentCompoundScale;
+    const rectW = finalBoxWidth * totalEffectiveScale;
+    const rectH = finalBoxHeight * totalEffectiveScale;
+    const rectX = absPx - rectW / 2;
+    const rectY = (absPy + yOffset * parentCompoundScale) - rectH / 2;
+
+    const domRect = new RectClass(rectX, rectY, rectW, rectH);
+    this.nodeBoundsMap.set(node.id, domRect as DOMRect);
+
+    if (node.children && node.children.length > 0) {
+      const containerCoord = {
+        x: -nodeW / 2,
+        y: -nodeH / 2,
+        width: nodeW,
+        height: nodeH
+      };
+      const currentAbsPos = { x: absPx, y: absPy + yOffset * parentCompoundScale };
+      const nextCompoundScale = parentCompoundScale * scale;
+      const nextCompoundRotation = parentCompoundRotation + rotation;
+      for (const child of node.children) {
+        this.renderNode(
+          ctx,
+          child,
+          frameTime,
+          sceneTime,
+          theme,
+          containerCoord,
+          currentAbsPos,
+          nextCompoundScale,
+          nextCompoundRotation
+        );
+      }
+    }
+
+    ctx.restore();
   }
 
   /**

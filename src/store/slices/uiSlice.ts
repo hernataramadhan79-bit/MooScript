@@ -16,6 +16,9 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
   activeSceneId: null,
   setActiveSceneId: (activeSceneId) => set({ activeSceneId }),
 
+  selectedNodeId: null,
+  setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),
+
   setActiveTab: (tab) => {
     if (tab === 'settings') {
       set({ isSettingsOpen: true });
@@ -46,5 +49,8 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
   },
   removeToast: (id) => {
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
-  }
+  },
+
+  isCompilingMograph: false,
+  setIsCompilingMograph: (isCompilingMograph) => set({ isCompilingMograph })
 });

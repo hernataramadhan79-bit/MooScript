@@ -7,19 +7,18 @@ import { GlobalVoiceSelector } from '../../components/studio/GlobalVoiceSelector
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import {
-  extractLayersFromHtml,
   mergeEditableLayers,
   getLayerText,
   setLayerText
 } from '../../engine/composition/layers';
 import type {
-  Composition,
   EditableLayer,
   LayerOverride,
   ScenePalette,
   TTSProvider,
   BgmPreset
 } from '../../types';
+import { BUILTIN_THEMES, resolveTheme } from '../../types';
 
 interface VisualEditorViewProps {
   onBackStep?: () => void;
@@ -50,20 +49,30 @@ export const VisualEditorView: React.FC<VisualEditorViewProps> = ({
     updateBgmPreset,
     updateBgmLevel,
     updateBgmDuckRatio,
+    shufflePalette,
+    setThemeTokens,
+    updateThemeToken,
     addToast
   } = useMooStore();
 
+  const [showColorModal, setShowColorModal] = useState(false);
+  const [themeScope, setThemeScope] = useState<'global' | 'scene'>('global');
+
   const fps = project.fps || 30;
-  const scenes = project.scenes || [];
+  const scenes = useMemo(() => project.scenes || [], [project.scenes]);
   const comp = project.composition;
-  const compScenes = comp?.scenes || [];
+  const compScenes = useMemo(() => comp?.scenes || [], [comp?.scenes]);
 
   // Active scene fallback
   const effectiveActiveId = activeSceneId || scenes[0]?.id || '';
   const activeSceneIndex = scenes.findIndex((s) => s.id === effectiveActiveId);
   const activeScene = scenes[activeSceneIndex] || scenes[0];
 
-  // Matching generated scene in composition
+  // Active theme resolved from project and active scene
+  const activeTheme = useMemo(() => {
+    return resolveTheme(project, activeScene || undefined);
+  }, [project, activeScene]);
+
   const activeCompScene = useMemo(() => {
     if (!activeScene) return undefined;
     return compScenes.find((s) => s.id === activeScene.id || s.beatId === activeScene.id);
@@ -239,6 +248,9 @@ export const VisualEditorView: React.FC<VisualEditorViewProps> = ({
         provider,
         apiKey,
         model: modelToUse,
+        onProgress: (status) => {
+          setRevisionProgress(status);
+        },
         executeLlm: async ({ systemPrompt, userPrompt }) => {
           return await callRawLLM({
             provider,
@@ -246,7 +258,11 @@ export const VisualEditorView: React.FC<VisualEditorViewProps> = ({
             model: modelToUse,
             systemPrompt,
             userPrompt,
-            signal: controller.signal
+            signal: controller.signal,
+            maxTokens: settings.maxOutputTokens || 2048,
+            onActivity: (status) => {
+              setRevisionProgress(status);
+            }
           });
         }
       });
@@ -415,6 +431,109 @@ export const VisualEditorView: React.FC<VisualEditorViewProps> = ({
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Post-Gen Theme Studio: Palet & Token Semantik */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-surface-1 border border-border flex flex-col gap-3.5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-accent uppercase tracking-wider flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[18px]">palette</span>
+            Post-Gen Visual Theming
+          </span>
+          <div className="flex items-center gap-1 bg-surface-2 p-0.5 rounded-lg border border-border text-[11px]">
+            <button
+              type="button"
+              onClick={() => setThemeScope('global')}
+              className={`px-2 py-0.5 rounded transition-all ${
+                themeScope === 'global' ? 'bg-surface-3 text-accent font-semibold shadow-xs' : 'text-text-muted hover:text-on-surface'
+              }`}
+            >
+              Global
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeScope('scene')}
+              className={`px-2 py-0.5 rounded transition-all ${
+                themeScope === 'scene' ? 'bg-surface-3 text-accent font-semibold shadow-xs' : 'text-text-muted hover:text-on-surface'
+              }`}
+            >
+              Adegan Ini
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Preset Selector */}
+          <select
+            value={activeTheme.id}
+            onChange={(e) => {
+              const selected = BUILTIN_THEMES.find((t) => t.id === e.target.value);
+              if (selected) {
+                setThemeTokens(selected, themeScope === 'scene' ? activeScene?.id : undefined);
+                addToast(`Tema diset ke ${selected.name}`, 'info', 2000);
+              }
+            }}
+            className="flex-1 min-w-[150px] px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-semibold text-on-surface focus:outline-none focus:border-accent cursor-pointer"
+          >
+            {BUILTIN_THEMES.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Shuffle Palette Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="casino"
+            onClick={() => {
+              shufflePalette(themeScope === 'scene' ? activeScene?.id : undefined);
+              addToast('Palet warna di-shuffle!', 'info', 1500);
+            }}
+            title="Ganti ke kombinasi palet berikutnya secara instan"
+          >
+            Shuffle Palette
+          </Button>
+
+          {/* Token Colors Modal Trigger */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="tune"
+            onClick={() => setShowColorModal(true)}
+            title="Kustomisasi Nilai Token Warna"
+          >
+            Custom Tokens
+          </Button>
+        </div>
+
+        {/* Live Token Color Preview Dots */}
+        <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface-2/40 border border-border/60">
+          <span className="text-[11px] text-text-muted font-mono">Tokens:</span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: activeTheme.bg }} />
+              <span className="text-[10px] text-text-muted">bg</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: activeTheme.surface }} />
+              <span className="text-[10px] text-text-muted">surface</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: activeTheme.primary }} />
+              <span className="text-[10px] text-text-muted">primary</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: activeTheme.accent }} />
+              <span className="text-[10px] text-text-muted">accent</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: activeTheme.text }} />
+              <span className="text-[10px] text-text-muted">text</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -974,6 +1093,68 @@ export const VisualEditorView: React.FC<VisualEditorViewProps> = ({
           </Button>
         )}
       </div>
+
+      {/* Modal Custom Token Overrides */}
+      {showColorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-accent text-[20px]">palette</span>
+                <h4 className="text-sm font-bold text-white">Semantic Theme Tokens</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowColorModal(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Kustomisasi nilai hex token semantik ({themeScope === 'scene' ? 'khusus adegan ini' : 'global seluruh proyek'}).
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 py-1">
+              {(['bg', 'surface', 'primary', 'accent', 'text', 'muted'] as const).map((tokenKey) => (
+                <div key={tokenKey} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700/60">
+                  <span className="text-[11px] font-semibold uppercase font-mono text-zinc-400">
+                    {tokenKey}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={activeTheme[tokenKey] || '#84cc16'}
+                      onChange={(e) =>
+                        updateThemeToken(
+                          tokenKey,
+                          e.target.value,
+                          themeScope === 'scene' ? activeScene?.id : undefined
+                        )
+                      }
+                      className="w-7 h-7 rounded cursor-pointer bg-transparent border-0"
+                    />
+                    <span className="text-xs font-mono text-zinc-200 uppercase">
+                      {activeTheme[tokenKey]}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowColorModal(false)}
+              >
+                Selesai
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

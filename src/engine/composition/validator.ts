@@ -84,7 +84,6 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
         .replace(/(?:^|\n)\s*(?:const|let|var)\s+ctx\b[^\n;]*;?/g, '\n')
         .replace(/(?:^|\n)\s*(?:const|let|var)\s+gsap\b[^\n;]*;?/g, '\n');
 
-      // eslint-disable-next-line no-new-func
       new Function('tl', 'root', 'ctx', 'gsap', checkJs);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

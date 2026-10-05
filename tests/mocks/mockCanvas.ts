@@ -67,8 +67,14 @@ export function createMockCanvas(initialWidth = 1080, initialHeight = 1920) {
       return { width: text.length * charWidth };
     },
 
-    createLinearGradient: () => GRADIENT_STUB,
-    createRadialGradient: () => GRADIENT_STUB,
+    createLinearGradient: (...args: any[]) => {
+      calls.push({ method: 'createLinearGradient', args });
+      return GRADIENT_STUB;
+    },
+    createRadialGradient: (...args: any[]) => {
+      calls.push({ method: 'createRadialGradient', args });
+      return GRADIENT_STUB;
+    },
     drawImage: () => calls.push({ method: 'drawImage', args: [] })
   };
 

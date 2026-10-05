@@ -75,7 +75,7 @@ Motion Personality: Smooth spatial drift, organic floating shapes, warm ambient 
 
 export async function initializeSkills(): Promise<PersonaSkill[]> {
   const existing = await db.skills.toArray();
-  const existingIds = new Set(existing.map((s) => s.id));
+  const _existingIds = new Set(existing.map((s) => s.id));
 
   // Ensure built-in skills are always present and updated in DB
   for (const builtin of BUILTIN_SKILLS) {

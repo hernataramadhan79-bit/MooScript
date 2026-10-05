@@ -128,13 +128,26 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
     return { html: '', css: '', buildJs: '' };
   }
 
+  // Strip <think>...</think> if present (DeepSeek, Qwen, Claude 3.7 reasoning blocks)
+  let cleanInput = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // If response ended before closing </think> (cut off by token limit), but contains code blocks inside it:
+  if (!cleanInput && rawText.includes('<think>')) {
+    const codeMatch = rawText.match(/`{3,}[\s\S]*$/);
+    if (codeMatch) {
+      cleanInput = codeMatch[0].trim();
+    }
+  }
+
+  const textToParse = cleanInput || rawText;
+
   let html = '';
   let css = '';
   let buildJs = '';
 
   // 0. Check if response is JSON (raw or wrapped in ```json)
-  const jsonBlockMatch = rawText.match(/`{3,}json\s*([\s\S]*?)(?:`{3,}|$)/i);
-  const candidateJson = jsonBlockMatch ? jsonBlockMatch[1].trim() : rawText.trim();
+  const jsonBlockMatch = textToParse.match(/`{3,}json\s*([\s\S]*?)(?:`{3,}|$)/i);
+  const candidateJson = jsonBlockMatch ? jsonBlockMatch[1].trim() : textToParse.trim();
   if (candidateJson.startsWith('{') && candidateJson.endsWith('}')) {
     try {
       const parsedJson = JSON.parse(candidateJson);
@@ -152,7 +165,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   const blockRe = /`{3,}([\w:-]*)\s*([\s\S]*?)(?:`{3,}|$)/g;
   const blocks: Array<{ tag: string; content: string }> = [];
   let m: RegExpExecArray | null;
-  while ((m = blockRe.exec(rawText)) !== null) {
+  while ((m = blockRe.exec(textToParse)) !== null) {
     const tag = (m[1] || '').toLowerCase().trim();
     const content = m[2].trim();
     if (content) {
@@ -190,12 +203,21 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   }
 
   // 3. Fallback: Extract from raw text if blocks weren't found
-  if (!html && /<div\b|<svg\b|<section\b/i.test(rawText)) {
-    const rawHtmlMatch = rawText.match(/<(div|svg|section)\b[\s\S]*?<\/\1>/i);
-    if (rawHtmlMatch) html = rawHtmlMatch[0].trim();
+  if (!html && /<(?:div|svg|section)\b/i.test(textToParse)) {
+    const firstTagMatch = textToParse.match(/<(div|svg|section)\b[^>]*>/i);
+    if (firstTagMatch && firstTagMatch.index !== undefined) {
+      const tag = firstTagMatch[1];
+      const startIdx = firstTagMatch.index;
+      const lastCloseIdx = textToParse.toLowerCase().lastIndexOf(`</${tag}>`);
+      if (lastCloseIdx !== -1 && lastCloseIdx > startIdx) {
+        html = textToParse.slice(startIdx, lastCloseIdx + `</${tag}>`.length).trim();
+      } else {
+        html = textToParse.slice(startIdx).trim();
+      }
+    }
   }
-  if (!buildJs && /\btl\.(?:to|from|fromTo|set)\b/i.test(rawText)) {
-    const jsSnippetMatch = rawText.match(/(?:tl\.(?:to|from|fromTo|set)[\s\S]*?)(?:\s*;|\s*`{3,}|\s*$)/i);
+  if (!buildJs && /\btl\.(?:to|from|fromTo|set)\b/i.test(textToParse)) {
+    const jsSnippetMatch = textToParse.match(/(?:tl\.(?:to|from|fromTo|set)[\s\S]*?)(?:\s*;|\s*`{3,}|\s*$)/i);
     if (jsSnippetMatch) {
       buildJs = jsSnippetMatch[0].replace(/`{3,}.*$/, '').trim();
     }
@@ -243,6 +265,205 @@ tl.to(root.querySelectorAll('[data-moo-layer]'), {
   return { html, css, buildJs };
 }
 
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function synthesizeFallbackScene(params: {
+  beat: StoryBeat;
+  index: number;
+  styleBrief: StyleBrief;
+  durationSec: number;
+}): { html: string; css: string; buildJs: string } {
+  const { beat, index, styleBrief, durationSec } = params;
+  const palette = styleBrief?.palette || {
+    bg: '#090d16',
+    surface: '#131b2e',
+    primary: '#3b82f6',
+    accent: '#06b6d4',
+    text: '#f8fafc',
+    muted: '#94a3b8'
+  };
+
+  const title = (beat.visualIntent || `Scene ${index + 1}`).trim();
+  const narration = (beat.narration || '').trim();
+  const sceneClass = `scene-s${index + 1}`;
+
+  const html = `<div class="scene-root ${sceneClass}">
+  <div class="synth-bg-glow" data-moo-layer="Ambient Glow"></div>
+  <div class="synth-card" data-moo-layer="Main Card">
+    <div class="synth-badge" data-moo-layer="Scene Tag">${escapeHtml(beat.visualConcept || `ACT ${index + 1}`)}</div>
+    <h2 class="synth-headline" data-moo-layer="Headline">${escapeHtml(title)}</h2>
+    ${narration ? `<p class="synth-narration" data-moo-layer="Narration">${escapeHtml(narration)}</p>` : ''}
+    <div class="synth-accent-bar" data-moo-layer="Accent Line"></div>
+  </div>
+</div>`;
+
+  const css = `.${sceneClass} {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  box-sizing: border-box;
+  background: var(--moo-bg, ${palette.bg});
+  color: var(--moo-text, ${palette.text});
+  font-family: var(--moo-font-display, '${styleBrief?.fontDisplay || 'system-ui, -apple-system, sans-serif'}');
+  overflow: hidden;
+}
+
+.${sceneClass} .synth-bg-glow {
+  position: absolute;
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(circle at 50% 50%, var(--moo-primary, ${palette.primary}) 0%, transparent 60%);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.${sceneClass} .synth-card {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 85%;
+  background: rgba(19, 27, 46, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 36px 30px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.${sceneClass} .synth-badge {
+  align-self: flex-start;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 9999px;
+  background: var(--moo-primary, ${palette.primary});
+  color: var(--moo-text, ${palette.text});
+  opacity: 0.9;
+}
+
+.${sceneClass} .synth-headline {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--moo-text, ${palette.text});
+}
+
+.${sceneClass} .synth-narration {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--moo-text, ${palette.text});
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.${sceneClass} .synth-accent-bar {
+  height: 4px;
+  width: 60px;
+  background: linear-gradient(90deg, var(--moo-primary, ${palette.primary}), var(--moo-accent, ${palette.accent}));
+  border-radius: 2px;
+  margin-top: 8px;
+}`;
+
+  const buildJs = `// Bespoke synthesis timeline for Scene #${index + 1}
+const card = root.querySelector('.synth-card');
+const badge = root.querySelector('.synth-badge');
+const headline = root.querySelector('.synth-headline');
+const narration = root.querySelector('.synth-narration');
+const glow = root.querySelector('.synth-bg-glow');
+const bar = root.querySelector('.synth-accent-bar');
+
+const targets = [card, badge, headline, narration, bar].filter(Boolean);
+tl.set(targets, { transformOrigin: 'center center' });
+
+// Entrance
+if (glow) {
+  tl.from(glow, {
+    scale: 0.6,
+    opacity: 0,
+    duration: Math.min(1.2, (ctx.dur || ${durationSec.toFixed(1)}) * 0.4),
+    ease: 'power2.out'
+  }, 0);
+}
+
+if (card) {
+  tl.from(card, {
+    scale: 0.92,
+    y: 40,
+    opacity: 0,
+    duration: Math.min(0.9, (ctx.dur || ${durationSec.toFixed(1)}) * 0.35),
+    ease: 'back.out(1.4)'
+  }, 0.1);
+}
+
+if (badge) {
+  tl.from(badge, {
+    scale: 0.8,
+    opacity: 0,
+    duration: 0.4,
+    ease: 'power3.out'
+  }, 0.3);
+}
+
+if (headline) {
+  tl.from(headline, {
+    y: 20,
+    opacity: 0,
+    duration: 0.5,
+    ease: 'power3.out'
+  }, 0.4);
+}
+
+if (narration) {
+  tl.from(narration, {
+    y: 15,
+    opacity: 0,
+    duration: 0.5,
+    ease: 'power3.out'
+  }, 0.5);
+}
+
+if (bar) {
+  tl.from(bar, {
+    scaleX: 0,
+    opacity: 0,
+    duration: 0.6,
+    ease: 'power2.out'
+  }, 0.6);
+}
+
+// Subtle cinematic breathing motion
+if (card) {
+  tl.to(card, {
+    y: '-=8',
+    duration: Math.max(1.0, (ctx.dur || ${durationSec.toFixed(1)}) * 0.5),
+    ease: 'sine.inOut',
+    yoyo: true,
+    repeat: 1
+  }, 0.8);
+}`;
+
+  return { html, css, buildJs };
+}
+
 export interface GenerateCustomSceneParams {
   beat: StoryBeat;
   index: number;
@@ -256,6 +477,7 @@ export interface GenerateCustomSceneParams {
   model?: string;
   executeLlm: (opts: { systemPrompt: string; userPrompt: string }) => Promise<string>;
   styleAdvice?: string;
+  onProgress?: (status: string) => void;
 }
 
 /**
@@ -265,14 +487,18 @@ export async function repairGeneratedScene(params: {
   originalCode: { html: string; css: string; buildJs: string };
   errors: string[];
   visualIntent: string;
+  narration?: string;
   durationSec: number;
   executeLlm: (opts: { systemPrompt: string; userPrompt: string }) => Promise<string>;
+  onProgress?: (status: string) => void;
 }): Promise<{ html: string; css: string; buildJs: string; valid: boolean; errors: string[] }> {
   try {
+    params.onProgress?.('AI sedang menganalisis error dan mereparasi GSAP timeline...');
     const repairPrompt = buildSceneRepairPrompt({
       originalCode: params.originalCode,
       errors: params.errors,
       visualIntent: params.visualIntent,
+      narration: params.narration,
       durationSec: params.durationSec
     });
 
@@ -315,10 +541,13 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     previousSceneSummary,
     nextSceneSummary,
     executeLlm,
-    styleAdvice
+    styleAdvice,
+    onProgress
   } = params;
 
   const duration = beat.durationHint || 3.5;
+
+  onProgress?.('Menganalisis konsep visual & menyusun prompt mograph...');
 
   let prompt = buildSceneCodegenPrompt({
     beatIndex: index,
@@ -346,23 +575,28 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
   }
 
   try {
+    onProgress?.('Menghubungi AI Motion Director untuk generasi kode...');
     const rawResponse = await executeLlm({
       systemPrompt: MOTION_DIRECTOR_SYSTEM_PROMPT,
       userPrompt: prompt
     });
 
+    onProgress?.('Mem-parsing blok kode HTML, CSS, dan GSAP...');
     let parsed = parseCodeBlocks(rawResponse);
     let validation = validateGeneratedScene(parsed);
 
     // If validation fails, attempt 1-time automatic repair with validation errors
     if (!validation.valid) {
       console.warn(`[MooScript] Validation failed for scene #${index + 1}, attempting auto-repair:`, validation.errors);
+      onProgress?.('Validasi layer GSAP: AI sedang mereparasi animasi...');
       const repaired = await repairGeneratedScene({
         originalCode: parsed,
         errors: validation.errors,
         visualIntent: beat.visualIntent,
+        narration: beat.narration,
         durationSec: duration,
-        executeLlm
+        executeLlm,
+        onProgress
       });
       if (repaired.valid) {
         parsed = { html: repaired.html, css: repaired.css, buildJs: repaired.buildJs };
@@ -370,10 +604,25 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
       } else {
         console.warn(`[MooScript] Repair attempt did not pass validation for scene #${index + 1}:`, repaired.errors);
         validation.errors = repaired.errors;
+
+        // If the scene is STILL completely empty after repair (e.g. AI token cutoff / no HTML generated),
+        // synthesize a bespoke motion graphic scene based on the story beat so that the project
+        // is never stranded with empty unrenderable scenes.
+        if (!parsed.html.trim()) {
+          console.warn(`[MooScript] Synthesizing bespoke fail-safe scene for scene #${index + 1} (${beat.visualIntent || 'Scene'})`);
+          parsed = synthesizeFallbackScene({
+            beat,
+            index,
+            styleBrief,
+            durationSec: duration
+          });
+          validation = validateGeneratedScene(parsed);
+        }
       }
     }
 
     const editableLayers = extractLayersFromHtml(parsed.html);
+    onProgress?.('Selesai merakit layer adegan');
 
     if (validation.valid) {
       return {

@@ -81,7 +81,8 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         prompt: scriptPrompt,
         skill: activeSkill,
         language: settings.outputLanguage || 'id',
-        signal: scriptAbortController.signal
+        signal: scriptAbortController.signal,
+        maxTokens: settings.maxOutputTokens || 2048
       });
 
       const newScenes: Scene[] = storyboard.scenes.map((s, idx) => {
@@ -103,7 +104,9 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
           focusWords,
           durationInSeconds: dur,
           wordTimestamps: computeDeterministicWordAlignment(text, dur),
-          showSubtitles: false
+          showSubtitles: false,
+          nodes: s.nodes || [],
+          background: s.background || { type: 'dot_grid' }
         };
       });
 

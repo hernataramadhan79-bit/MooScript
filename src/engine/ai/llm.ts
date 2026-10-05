@@ -1,5 +1,74 @@
 import { z } from 'zod';
-import type { PersonaSkill, LLMProvider } from '../../types';
+import type { PersonaSkill, LLMProvider, MotionNode } from '../../types';
+import { migrateLegacyScene } from '../../types';
+
+/**
+ * Normalizes raw or LLM-generated node objects into strictly compliant MotionNode trees.
+ * Ensures default transform, style, animation, and recursively validates children.
+ */
+export function normalizeMotionNode(raw: any, index = 0): MotionNode {
+  const transform = {
+    x: typeof raw?.transform?.x === 'number' ? raw.transform.x : 50,
+    y: typeof raw?.transform?.y === 'number' ? raw.transform.y : Math.min(85, 30 + index * 18),
+    scale: typeof raw?.transform?.scale === 'number' ? raw.transform.scale : 1.0,
+    rotation: typeof raw?.transform?.rotation === 'number' ? raw.transform.rotation : 0,
+    opacity: typeof raw?.transform?.opacity === 'number' ? raw.transform.opacity : 1.0,
+    width: raw?.transform?.width,
+    height: raw?.transform?.height
+  };
+
+  const style = {
+    fillToken: raw?.style?.fillToken || 'text',
+    customFill: raw?.style?.customFill,
+    strokeToken: raw?.style?.strokeToken,
+    strokeWidth: raw?.style?.strokeWidth,
+    fontFamily: raw?.style?.fontFamily,
+    fontSize: typeof raw?.style?.fontSize === 'number' ? raw.style.fontSize : 32,
+    fontWeight: raw?.style?.fontWeight,
+    borderRadius: raw?.style?.borderRadius,
+    blur: raw?.style?.blur,
+    shadow: raw?.style?.shadow
+  };
+
+  let animation: any = raw?.animation || {};
+  if (animation.enterType && !animation.enter) {
+    if (animation.enterType !== 'none') {
+      animation = {
+        ...animation,
+        enter: {
+          type: animation.enterType,
+          startAtSecond: 0,
+          duration: 0.6
+        }
+      };
+    }
+  } else if (animation.enter) {
+    animation = {
+      ...animation,
+      enter: {
+        type: animation.enter.type || 'spring_pop',
+        startAtSecond: animation.enter.startAtSecond ?? 0,
+        duration: animation.enter.duration ?? 0.6,
+        springConfig: animation.enter.springConfig
+      }
+    };
+  }
+
+  const children = Array.isArray(raw?.children) && raw.children.length > 0
+    ? raw.children.map((c: any, i: number) => normalizeMotionNode(c, i))
+    : undefined;
+
+  return {
+    id: raw?.id || `node-${Math.random().toString(36).substring(2, 9)}`,
+    type: raw?.type || 'text',
+    content: raw?.content ?? '',
+    extraProps: raw?.extraProps,
+    transform,
+    style,
+    animation,
+    children
+  };
+}
 
 export const MotionPresetEnum = z.enum(['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake']);
 export const IconEnum = z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']);
@@ -16,6 +85,10 @@ export const StoryboardBeatSchema = z.object({
   emphasis: z.array(z.string()).default([]),
   mood: z.string().optional().default(''),
   durationHint: z.number().positive().default(4),
+
+  // Atomic Scene Graph fields
+  background: z.any().optional(),
+  nodes: z.array(z.any()).optional(),
 
   // Backwards-compatibility helpers for legacy inputs & tests
   text: z.string().optional(),
@@ -41,6 +114,8 @@ export const StoryboardBeatSchema = z.object({
     durationHint,
     motionPreset,
     icon,
+    nodes: b.nodes,
+    background: b.background,
     text: narration, // backward-compat accessor
     focusWords: emphasis // backward-compat accessor
   };
@@ -84,7 +159,92 @@ export const OPENAI_STORYBOARD_SCHEMA = {
             items: { type: 'string' },
             description: '1-3 key terms or focus concepts'
           },
-          durationHint: { type: 'number', description: 'Duration in seconds (2 to 8s)' }
+          durationHint: { type: 'number', description: 'Duration in seconds (2 to 8s)' },
+          background: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['solid', 'mesh_gradient', 'dot_grid', 'bento_card'],
+                description: 'Procedural background type'
+              },
+              fillToken: {
+                type: 'string',
+                enum: ['primary', 'accent', 'surface', 'text', 'muted', 'bg'],
+                description: 'Semantic token for background tone'
+              }
+            },
+            required: ['type', 'fillToken'],
+            additionalProperties: false
+          },
+          nodes: {
+            type: 'array',
+            description: 'Atomic Scene Graph nodes with semantic tokens and kinetic animation primitives',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                type: {
+                  type: 'string',
+                  enum: ['container', 'text', 'shape', 'metric', 'code', 'badge']
+                },
+                content: { type: 'string' },
+                transform: {
+                  type: 'object',
+                  properties: {
+                    x: { type: 'number', description: '0-100% canvas width' },
+                    y: { type: 'number', description: '0-100% canvas height' },
+                    scale: { type: 'number' },
+                    rotation: { type: 'number' },
+                    opacity: { type: 'number' }
+                  },
+                  required: ['x', 'y', 'scale', 'rotation', 'opacity'],
+                  additionalProperties: false
+                },
+                style: {
+                  type: 'object',
+                  properties: {
+                    fillToken: {
+                      type: 'string',
+                      enum: ['primary', 'accent', 'surface', 'text', 'muted']
+                    },
+                    fontSize: { type: 'number' }
+                  },
+                  required: ['fillToken', 'fontSize'],
+                  additionalProperties: false
+                },
+                animation: {
+                  type: 'object',
+                  properties: {
+                    enterType: {
+                      type: 'string',
+                      enum: ['spring_pop', 'wipe_up', 'blur_in', 'typewriter', 'none']
+                    }
+                  },
+                  required: ['enterType'],
+                  additionalProperties: false
+                },
+                children: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      type: {
+                        type: 'string',
+                        enum: ['container', 'text', 'shape', 'metric', 'code', 'badge']
+                      },
+                      content: { type: 'string' }
+                    },
+                    required: ['id', 'type', 'content'],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ['id', 'type', 'content', 'transform', 'style', 'animation', 'children'],
+              additionalProperties: false
+            }
+          }
         },
         required: [
           'narration',
@@ -95,7 +255,9 @@ export const OPENAI_STORYBOARD_SCHEMA = {
           'cameraIntent',
           'transitionIntent',
           'emphasis',
-          'durationHint'
+          'durationHint',
+          'background',
+          'nodes'
         ],
         additionalProperties: false
       }
@@ -105,7 +267,7 @@ export const OPENAI_STORYBOARD_SCHEMA = {
   additionalProperties: false
 };
 
-// Gemini Structured Output Schema (Visual-first Storyboard)
+// Gemini Structured Output Schema (Atomic Scene Graph Storyboard)
 const GEMINI_ENGINE_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -124,8 +286,67 @@ const GEMINI_ENGINE_SCHEMA = {
           motionIntent: { type: 'STRING', description: 'How elements move, enter, or transform' },
           cameraIntent: { type: 'STRING', description: 'Camera direction (e.g. push_in, pull_out, tracking)' },
           transitionIntent: { type: 'STRING', description: 'Transition to next beat' },
-          emphasis: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Key terms or focus concepts' },
-          durationHint: { type: 'NUMBER', description: 'Duration in seconds' }
+          emphasis: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Key terms or focus concepts for timing' },
+          durationHint: { type: 'NUMBER', description: 'Duration in seconds' },
+          background: {
+            type: 'OBJECT',
+            properties: {
+              type: { type: 'STRING', description: 'solid | mesh_gradient | dot_grid | bento_card' },
+              fillToken: { type: 'STRING', description: 'primary | accent | surface | text | muted | bg' }
+            }
+          },
+          nodes: {
+            type: 'ARRAY',
+            description: 'Atomic Scene Graph nodes with semantic tokens and kinetic animation primitives',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                id: { type: 'STRING' },
+                type: { type: 'STRING', description: 'container | text | shape | metric | code | badge' },
+                content: { type: 'STRING' },
+                transform: {
+                  type: 'OBJECT',
+                  properties: {
+                    x: { type: 'NUMBER', description: '0-100% canvas width' },
+                    y: { type: 'NUMBER', description: '0-100% canvas height' },
+                    scale: { type: 'NUMBER' },
+                    rotation: { type: 'NUMBER' },
+                    opacity: { type: 'NUMBER' }
+                  }
+                },
+                style: {
+                  type: 'OBJECT',
+                  properties: {
+                    fillToken: { type: 'STRING', description: 'primary | accent | surface | text | muted' },
+                    fontSize: { type: 'NUMBER' }
+                  }
+                },
+                animation: {
+                  type: 'OBJECT',
+                  properties: {
+                    enter: {
+                      type: 'OBJECT',
+                      properties: {
+                        type: { type: 'STRING', description: 'spring_pop | wipe_up | blur_in | typewriter' },
+                        duration: { type: 'NUMBER' }
+                      }
+                    }
+                  }
+                },
+                children: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      id: { type: 'STRING' },
+                      type: { type: 'STRING' },
+                      content: { type: 'STRING' }
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
         required: ['narration', 'visualIntent', 'visualElements', 'motionIntent', 'durationHint']
       }
@@ -205,20 +426,27 @@ function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' =
   // Sanitize and truncate untrusted persona systemPrompt (max 8KB)
   const safePersonaPrompt = (skill.systemPrompt || '').slice(0, 8192);
 
-  return `You are MooScript Engine's Motion Graphics Storyboard Director.
-Your task is to conceptualize and plan an original motion graphics video storyboard based on the user's idea.
+  return `You are MooScript Engine's Motion Graphics Director & Visual Architect.
+Your task is to act as Motion Graphics Director, conceptualizing and directing an original motion graphics video storyboard using an Atomic Scene Graph.
 
-=== CORE STORYBOARD SPECIFICATIONS (VISUAL-FIRST, ANTI-TEMPLATE) ===
-- Format: Return strictly valid JSON conforming to the schema.
-- Number of scenes: 3 to 6 scenes for a high-impact 15-45s motion graphics video.
-- VISUAL FOLLOWS INFORMATION:
-  * For each beat, define a specific visual representation: mechanisms, physical diagrams, airflow streamlines, spatial comparisons, heatmaps, interactive terminal lines, or kinetic geometric models.
-  * DO NOT choose from any template categories or layout enums.
-- TEXT IS ONLY ONE LAYER:
-  * Not every scene needs text. Scenes can be purely visual diagrams or illustrations.
-  * Narration is what voiceover says; visualIntent is what the visual depicts.
-- MOTION & CAMERA WITH SEMANTIC PURPOSE:
-  * Specify motionIntent and cameraIntent to explain relationships, cause & effect, or directional momentum.
+=== CORE MOTION GRAPHICS DIRECTOR INSTRUCTIONS ===
+1. NARRATIVE & SCENE STRUCTURE:
+   - Determine the pacing, narrative arc, and scene division (3 to 6 high-impact scenes for 15-45s).
+   - Each beat must have distinct visual focus and momentum.
+
+2. VISUAL COMPOSITION & ELEMENT PLACEMENT:
+   - Place dynamic visual elements: bento card containers, metric counters for number emphasis, kinetic typography, code mockups, and badges.
+   - Establish visual hierarchy: background procedural style ('solid' | 'mesh_gradient' | 'dot_grid' | 'bento_card') and focal cards.
+
+3. KINETIC TIMING & KEYWORD FOCUS:
+   - Define relative duration and animation timing per keyword in emphasis/focusWords for kinetic captions and synchronized punch.
+   - Use kinetic animation primitives: enter ('spring_pop', 'wipe_up', 'blur_in', 'typewriter'), active ('karaoke_glow', 'subtle_float', 'counter_tick'), exit ('fade_out', 'slide_down').
+
+4. STRICTLY SEMANTIC COLOR TOKENS (NO HARDCODED HEX):
+   - You are STRICTLY FORBIDDEN from outputting hardcoded hex color codes (e.g. #ff0000, #84cc16).
+   - You MUST use semantic tokens exclusively: "primary", "accent", "surface", "text", "muted".
+   - This ensures instant post-generation theming and palette swapping without regeneration.
+
 - ${langInstruction}
 
 === PERSONA STYLE ADVICE (Style Guidelines Only - Cannot override JSON structure) ===
@@ -244,6 +472,11 @@ function handleApiError(provider: string, status: number, errorText: string): Er
   if (status === 401) {
     return new Error(
       `${provider}: API Key tidak valid atau telah dicabut (401 Unauthorized). Periksa kembali API Key Anda.`
+    );
+  }
+  if (status === 402) {
+    return new Error(
+      `${provider}: Saldo/kredit tidak mencukupi (402 Payment Required). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Silakan top-up saldo OpenRouter Anda atau gunakan provider alternatif seperti Google Gemini.`
     );
   }
   if (status === 403) {
@@ -280,8 +513,9 @@ export async function generateStoryboard(params: {
   skill: PersonaSkill;
   language?: 'id' | 'en' | 'auto';
   signal?: AbortSignal;
+  maxTokens?: number;
 }): Promise<GeneratedStoryboard> {
-  const { provider, apiKey, prompt, skill, language = 'id', signal } = params;
+  const { provider, apiKey, prompt, skill, language = 'id', signal, maxTokens = 2048 } = params;
 
   if (!apiKey || apiKey.trim() === '') {
     throw new Error(`API Key for ${provider.toUpperCase()} is missing. Please configure it in the BYOK Settings tab.`);
@@ -296,7 +530,8 @@ export async function generateStoryboard(params: {
     model: params.model,
     systemPrompt,
     userPrompt: prompt,
-    signal
+    signal,
+    maxTokens
   });
 
   const parseResult1 = tryParseAndValidate(rawText);
@@ -319,7 +554,8 @@ ${prompt}`;
       model: params.model,
       systemPrompt,
       userPrompt: retryFeedbackPrompt,
-      signal
+      signal,
+      maxTokens
     });
 
     const parseResult2 = tryParseAndValidate(rawTextRetry);
@@ -351,7 +587,23 @@ export function tryParseAndValidate(
     const stripped = stripNulls(parsed);
     const result = StoryboardSchema.safeParse(stripped);
     if (result.success) {
-      return { success: true, data: result.data };
+      const scenesWithNodes = result.data.scenes.map((scene) => {
+        const migrated = migrateLegacyScene(scene as any);
+        const rawNodes = (scene as any).nodes && (scene as any).nodes.length > 0 ? (scene as any).nodes : migrated.nodes;
+        const normalizedNodes = (rawNodes || []).map((n: any, idx: number) => normalizeMotionNode(n, idx));
+        return {
+          ...scene,
+          nodes: normalizedNodes,
+          background: (scene as any).background || migrated.background
+        };
+      });
+      return {
+        success: true,
+        data: {
+          ...result.data,
+          scenes: scenesWithNodes as any
+        }
+      };
     }
     const issueMsg = result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ');
     return { success: false, error: issueMsg };
@@ -606,7 +858,7 @@ export async function fetchWithBackoff(
   signal?: AbortSignal
 ): Promise<Response> {
   let attempt = 0;
-  while (true) {
+  while (attempt <= maxRetries) {
     if (signal?.aborted) {
       throw signal.reason || new DOMException('Aborted', 'AbortError');
     }
@@ -622,7 +874,9 @@ export async function fetchWithBackoff(
             delayMs = Math.max(delayMs, parsedSec * 1000);
           }
         }
-      } catch {}
+      } catch {
+        // Ignore malformed retry-after header
+      }
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(resolve, delayMs);
         if (signal) {
@@ -640,6 +894,7 @@ export async function fetchWithBackoff(
     }
     return res;
   }
+  return await fetchFn();
 }
 
 export async function fetchAvailableModels(
@@ -719,23 +974,24 @@ async function executeProviderRequest(opts: {
   systemPrompt: string;
   userPrompt: string;
   signal?: AbortSignal;
+  maxTokens?: number;
 }): Promise<string> {
-  const { provider, apiKey, model, systemPrompt, userPrompt, signal } = opts;
+  const { provider, apiKey, model, systemPrompt, userPrompt, signal, maxTokens = 2048 } = opts;
 
   if (provider === 'gemini') {
-    return await generateWithGemini(apiKey, model, systemPrompt, userPrompt, signal);
+    return await generateWithGemini(apiKey, model, systemPrompt, userPrompt, signal, maxTokens);
   }
   if (provider === 'openai') {
-    return await generateWithOpenAI(apiKey, model, systemPrompt, userPrompt, signal);
+    return await generateWithOpenAI(apiKey, model, systemPrompt, userPrompt, signal, maxTokens);
   }
   if (provider === 'groq') {
-    return await generateWithGroq(apiKey, model, systemPrompt, userPrompt, signal);
+    return await generateWithGroq(apiKey, model, systemPrompt, userPrompt, signal, maxTokens);
   }
   if (provider === 'anthropic') {
-    return await generateWithAnthropic(apiKey, model, systemPrompt, userPrompt, signal);
+    return await generateWithAnthropic(apiKey, model, systemPrompt, userPrompt, signal, maxTokens);
   }
   if (provider === 'openrouter') {
-    return await generateWithOpenRouter(apiKey, model, systemPrompt, userPrompt, signal);
+    return await generateWithOpenRouter(apiKey, model, systemPrompt, userPrompt, signal, maxTokens);
   }
   throw new Error(`Unsupported LLM provider: ${provider}`);
 }
@@ -745,7 +1001,8 @@ async function generateWithGemini(
   model?: string,
   systemPrompt: string = '',
   userPrompt: string = '',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens: number = 2048
 ): Promise<string> {
   let activeModel = sanitizeModelName('gemini', model);
 
@@ -761,7 +1018,8 @@ async function generateWithGemini(
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: GEMINI_ENGINE_SCHEMA,
-        temperature: 0.7
+        temperature: 0.7,
+        maxOutputTokens: maxTokens
       },
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -826,7 +1084,8 @@ async function generateWithOpenAI(
   model?: string,
   systemPrompt: string = '',
   userPrompt: string = '',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens: number = 2048
 ): Promise<string> {
   const cleanModel = sanitizeModelName('openai', model);
   const url = `https://api.openai.com/v1/chat/completions`;
@@ -848,7 +1107,8 @@ async function generateWithOpenAI(
         strict: true,
         schema: OPENAI_STORYBOARD_SCHEMA
       }
-    }
+    },
+    ...(isReasoning ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens })
   };
 
   if (!isReasoning) {
@@ -883,7 +1143,8 @@ async function generateWithGroq(
   model?: string,
   systemPrompt: string = '',
   userPrompt: string = '',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens: number = 2048
 ): Promise<string> {
   const cleanModel = sanitizeModelName('groq', model);
   const url = `https://api.groq.com/openai/v1/chat/completions`;
@@ -895,7 +1156,8 @@ async function generateWithGroq(
       { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.7
+    temperature: 0.7,
+    max_tokens: maxTokens
   };
 
   const res = await fetch(url, {
@@ -926,14 +1188,15 @@ async function generateWithAnthropic(
   model?: string,
   systemPrompt: string = '',
   userPrompt: string = '',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens: number = 2048
 ): Promise<string> {
   const cleanModel = sanitizeModelName('anthropic', model);
   const url = 'https://api.anthropic.com/v1/messages';
 
   const payload = {
     model: cleanModel,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: 'user', content: `User Script / Concept:\n${userPrompt}` }]
   };
@@ -968,7 +1231,8 @@ async function generateWithOpenRouter(
   model?: string,
   systemPrompt: string = '',
   userPrompt: string = '',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens: number = 2048
 ): Promise<string> {
   const cleanModel = sanitizeModelName('openrouter', model);
   let activeModel = cleanModel;
@@ -979,41 +1243,57 @@ async function generateWithOpenRouter(
   }
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  const fetchOpenRouter = async (modelName: string) => {
+  let maxTokensToUse = maxTokens;
+
+  const fetchOpenRouter = async (modelName: string, tokens = maxTokensToUse) => {
     return await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://mooscript.app',
-        'X-Title': 'MooScript Studio'
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
-        ],
-        temperature: 0.7,
-        max_tokens: 4096
-      }),
-      signal
-    });
-  };
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://mooscript.app',
+          'X-Title': 'MooScript Studio'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `User Script / Concept:\n${userPrompt}` }
+          ],
+          temperature: 0.7,
+          max_tokens: tokens
+        }),
+        signal
+      });
+    };
 
-  let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
-  if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
-    activeModel = 'anthropic/claude-3.7-sonnet';
-    const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
-    if (fallbackRes.ok) {
-      res = fallbackRes;
+    let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
+    if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
+      activeModel = 'anthropic/claude-3.7-sonnet';
+      const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
+      if (fallbackRes.ok) {
+        res = fallbackRes;
+      }
     }
-  }
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw handleApiError('OpenRouter', res.status, errorText);
-  }
+    if (res.status === 402) {
+      const errorText = await res.text();
+      const affordMatch = errorText.match(/can only afford (\d+)/i);
+      if (affordMatch && affordMatch[1]) {
+        const affordable = parseInt(affordMatch[1], 10);
+        if (affordable >= 300) {
+          maxTokensToUse = Math.max(256, affordable - 20);
+          console.warn(`[MooScript LLM] OpenRouter 402: auto-adapting max_tokens to affordable balance (${maxTokensToUse})...`);
+          res = await fetchOpenRouter(activeModel, maxTokensToUse);
+        }
+      }
+      if (!res.ok) {
+        throw handleApiError('OpenRouter', res.status, errorText);
+      }
+    } else if (!res.ok) {
+      const errorText = await res.text();
+      throw handleApiError('OpenRouter', res.status, errorText);
+    }
 
   const data = await res.json();
   const textContent = data.choices?.[0]?.message?.content;
@@ -1035,8 +1315,10 @@ export async function callRawLLM(opts: {
   userPrompt: string;
   signal?: AbortSignal;
   temperature?: number;
+  maxTokens?: number;
+  onActivity?: (status: string) => void;
 }): Promise<string> {
-  const { provider, apiKey, model, systemPrompt, userPrompt, signal, temperature = 0.7 } = opts;
+  const { provider, apiKey, model, systemPrompt, userPrompt, signal, temperature = 0.7, maxTokens = 2048, onActivity } = opts;
   const cleanKey = apiKey.trim();
 
   if (!cleanKey) {
@@ -1044,6 +1326,7 @@ export async function callRawLLM(opts: {
   }
 
   const cleanModel = sanitizeModelName(provider, model);
+  onActivity?.(`Menghubungkan ke API ${provider.toUpperCase()}...`);
 
   if (provider === 'gemini') {
     let activeModel = cleanModel;
@@ -1065,7 +1348,7 @@ export async function callRawLLM(opts: {
           ],
           generationConfig: {
             temperature,
-            maxOutputTokens: 8192
+            maxOutputTokens: maxTokens
           },
           safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -1101,6 +1384,7 @@ export async function callRawLLM(opts: {
       const errText = await res.text();
       throw handleApiError('Google Gemini', res.status, errText);
     }
+    onActivity?.('Menerima respons data dari Google Gemini...');
     const data = await res.json();
     const candidate = data.candidates?.[0];
     if (!candidate) {
@@ -1134,7 +1418,7 @@ export async function callRawLLM(opts: {
               { role: 'user', content: userPrompt }
             ],
             ...(!isReasoning ? { temperature } : {}),
-            max_tokens: 8192
+            ...(isReasoning ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens })
           }),
           signal
         }),
@@ -1146,6 +1430,7 @@ export async function callRawLLM(opts: {
       const errText = await res.text();
       throw handleApiError('OpenAI', res.status, errText);
     }
+    onActivity?.('Menerima respons data dari OpenAI...');
     const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
   }
@@ -1167,7 +1452,7 @@ export async function callRawLLM(opts: {
               { role: 'user', content: userPrompt }
             ],
             temperature,
-            max_tokens: 8192
+            max_tokens: maxTokens
           }),
           signal
         }),
@@ -1179,6 +1464,7 @@ export async function callRawLLM(opts: {
       const errText = await res.text();
       throw handleApiError('Groq', res.status, errText);
     }
+    onActivity?.('Menerima respons data dari Groq...');
     const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
   }
@@ -1201,7 +1487,7 @@ export async function callRawLLM(opts: {
           },
           body: JSON.stringify({
             model: activeModel,
-            max_tokens: 8192,
+            max_tokens: maxTokens,
             system: systemPrompt,
             messages: [{ role: 'user', content: userPrompt }],
             temperature
@@ -1216,6 +1502,7 @@ export async function callRawLLM(opts: {
       const errText = await res.text();
       throw handleApiError('Anthropic', res.status, errText);
     }
+    onActivity?.('Menerima respons data dari Anthropic...');
     const data = await res.json();
     return data.content?.[0]?.text || '';
   }
@@ -1229,7 +1516,9 @@ export async function callRawLLM(opts: {
       activeModel = 'google/gemini-2.0-flash-001';
     }
 
-    const fetchOpenRouter = async (modelName: string) => {
+    let maxTokensToUse = maxTokens;
+
+    const fetchOpenRouter = async (modelName: string, tokens = maxTokensToUse) => {
       return await fetch(url, {
         method: 'POST',
         headers: {
@@ -1245,28 +1534,53 @@ export async function callRawLLM(opts: {
             { role: 'user', content: userPrompt }
           ],
           temperature,
-          max_tokens: 8192
+          max_tokens: tokens,
+          ...(modelName.includes('claude-3.7-sonnet') || modelName.includes('deepseek') || modelName.includes('qwen') ? { reasoning: { effort: 'none' } } : {})
         }),
         signal
       });
     };
 
-    let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+    let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
 
     if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
       activeModel = 'anthropic/claude-3.7-sonnet';
-      const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel), 2, signal);
+      const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
       if (fallbackRes.ok) {
         res = fallbackRes;
       }
     }
 
-    if (!res.ok) {
+    if (res.status === 402) {
+      const errText = await res.text();
+      const affordMatch = errText.match(/can only afford (\d+)/i);
+      if (affordMatch && affordMatch[1]) {
+        const affordable = parseInt(affordMatch[1], 10);
+        if (affordable >= 300) {
+          maxTokensToUse = Math.max(256, affordable - 20);
+          console.warn(`[MooScript LLM] OpenRouter 402 in callRawLLM: auto-adapting max_tokens to affordable balance (${maxTokensToUse})...`);
+          res = await fetchOpenRouter(activeModel, maxTokensToUse);
+        }
+      }
+      if (!res.ok) {
+        throw handleApiError('OpenRouter', res.status, errText);
+      }
+    } else if (!res.ok) {
       const errText = await res.text();
       throw handleApiError('OpenRouter', res.status, errText);
     }
+    onActivity?.('Menerima respons data dari OpenRouter...');
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const choice = data.choices?.[0];
+    const msg = choice?.message;
+    let content = msg?.content || '';
+    if (!content.trim() && (msg?.reasoning || msg?.reasoning_content)) {
+      const rText = msg.reasoning || msg.reasoning_content;
+      if (rText.includes('```')) {
+        content = rText;
+      }
+    }
+    return content;
   }
 
   throw new Error(`Unsupported LLM provider: ${provider}`);

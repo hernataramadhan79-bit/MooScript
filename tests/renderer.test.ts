@@ -467,3 +467,140 @@ describe('Motion Graphics Primitives & Layouts', () => {
   });
 });
 
+// ── Atomic Scene Graph & Procedural Background Tests (Overhaul) ──────────────
+
+describe('Atomic Scene Graph & Procedural Backgrounds', () => {
+  const THEME = {
+    id: 'brutalist-lime',
+    name: 'Brutalist Lime',
+    bg: '#0d0d0e',
+    surface: '#18181b',
+    primary: '#84cc16',
+    accent: '#a3e635',
+    text: '#f4f4f5',
+    muted: '#71717a'
+  };
+
+  it('drawDotGrid renders deterministic wave dot matrix across two renders', () => {
+    const mock1 = createMockCanvas();
+    const renderer1 = new CanvasRenderer(mock1.canvas as any);
+    renderer1.drawDotGrid(mock1.ctx as any, 1.5, THEME);
+
+    const mock2 = createMockCanvas();
+    const renderer2 = new CanvasRenderer(mock2.canvas as any);
+    renderer2.drawDotGrid(mock2.ctx as any, 1.5, THEME);
+
+    expect(mock1.calls).toEqual(mock2.calls);
+    expect(mock1.calls.filter((c) => c.method === 'arc').length).toBeGreaterThan(50);
+  });
+
+  it('drawMeshBlobs renders multi-point radial gradients deterministically', () => {
+    const mock1 = createMockCanvas();
+    const renderer1 = new CanvasRenderer(mock1.canvas as any);
+    renderer1.drawMeshBlobs(mock1.ctx as any, 2.0, THEME);
+
+    const mock2 = createMockCanvas();
+    const renderer2 = new CanvasRenderer(mock2.canvas as any);
+    renderer2.drawMeshBlobs(mock2.ctx as any, 2.0, THEME);
+
+    expect(mock1.calls).toEqual(mock2.calls);
+    expect(mock1.calls.filter((c) => c.method === 'createRadialGradient').length).toBe(3);
+  });
+
+  it('drawBentoBase renders glassmorphism card outline and surface fill', () => {
+    const mock = createMockCanvas();
+    const renderer = new CanvasRenderer(mock.canvas as any);
+    renderer.drawBentoBase(mock.ctx as any, 1.0, THEME);
+
+    const fills = mock.calls.filter((c) => c.method === 'fillRect');
+    expect(fills.length).toBeGreaterThan(0);
+  });
+
+  it('renderNode renders atomic text, metric, and badge nodes with bounding box registration', () => {
+    const mock = createMockCanvas();
+    const renderer = new CanvasRenderer(mock.canvas as any);
+
+    const node = {
+      id: 'metric-card',
+      type: 'container' as const,
+      transform: { x: 50, y: 50, width: 80, height: 40, scale: 1, rotation: 0, opacity: 1 },
+      style: { fillToken: 'surface' as const, borderRadius: 20 },
+      animation: { enter: { type: 'spring_pop' as const, startAtSecond: 0, duration: 0.8 } },
+      children: [
+        {
+          id: 'metric-val',
+          type: 'metric' as const,
+          transform: { x: 50, y: 40, scale: 1, rotation: 0, opacity: 1 },
+          style: { fillToken: 'primary' as const, fontSize: 64 },
+          animation: { active: { type: 'counter_tick' as const } },
+          content: '+500%'
+        },
+        {
+          id: 'badge-tag',
+          type: 'badge' as const,
+          transform: { x: 50, y: 75, scale: 1, rotation: 0, opacity: 1 },
+          style: { fillToken: 'accent' as const, fontSize: 20 },
+          animation: { enter: { type: 'wipe_up' as const, startAtSecond: 0.2, duration: 0.5 } },
+          content: 'CONVERSION'
+        }
+      ]
+    };
+
+    renderer.renderNode(mock.ctx as any, node, 0.5, 0.5, THEME);
+
+    const boundsMap = renderer.getNodeBoundsMap();
+    expect(boundsMap.has('metric-card')).toBe(true);
+    expect(boundsMap.has('metric-val')).toBe(true);
+    expect(boundsMap.has('badge-tag')).toBe(true);
+
+    const hitContainer = renderer.hitTestNode(540, 960);
+    expect(hitContainer).toBeDefined();
+  });
+
+  it('renders an atomic scene graph project through draw() visitor pattern', () => {
+    const atomicProject: MooProject = {
+      ...SAMPLE_PROJECT,
+      scenes: [
+        {
+          id: 'atomic-sc-1',
+          durationInSeconds: 3.0,
+          narrationText: 'Atomic node based rendering',
+          background: { type: 'dot_grid' },
+          wordTimestamps: [],
+          nodes: [
+            {
+              id: 'headline',
+              type: 'text',
+              transform: { x: 50, y: 45, scale: 1, rotation: 0, opacity: 1 },
+              style: { fillToken: 'text', fontSize: 48, fontWeight: 800 },
+              animation: { enter: { type: 'spring_pop', startAtSecond: 0, duration: 0.8 } },
+              content: 'Atomic Scene Graph'
+            },
+            {
+              id: 'sub-badge',
+              type: 'badge',
+              transform: { x: 50, y: 65, scale: 1, rotation: 0, opacity: 1 },
+              style: { fillToken: 'primary', fontSize: 24 },
+              animation: { enter: { type: 'wipe_up', startAtSecond: 0.2, duration: 0.6 } },
+              content: 'PERFORMANCE'
+            }
+          ]
+        }
+      ]
+    };
+
+    const mock = createMockCanvas();
+    const renderer = new CanvasRenderer(mock.canvas as any);
+    renderer.draw(15, 90, atomicProject, { hud: false });
+
+    const fills = mock.calls.filter((c) => c.method === 'fillText').map((c) => String(c.args[0]));
+    expect(fills.some((t) => t.includes('Atomic Scene Graph'))).toBe(true);
+    expect(fills.some((t) => t.includes('PERFORMANCE'))).toBe(true);
+
+    const bounds = renderer.getNodeBoundsMap();
+    expect(bounds.has('headline')).toBe(true);
+    expect(bounds.has('sub-badge')).toBe(true);
+  });
+});
+
+

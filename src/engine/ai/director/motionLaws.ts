@@ -170,14 +170,35 @@ export function buildSceneRepairPrompt(params: {
   originalCode: { html: string; css: string; buildJs: string };
   errors: string[];
   visualIntent: string;
+  narration?: string;
   durationSec: number;
 }): string {
+  const hasOriginalHtml = Boolean(params.originalCode.html && params.originalCode.html.trim());
+
+  if (!hasOriginalHtml) {
+    return `
+Generasi sebelumnya GAGAL menghasilkan blok kode HTML yang valid.
+Visual Intent: "${params.visualIntent}"
+${params.narration ? `Narasi: "${params.narration}"\n` : ''}Durasi scene: ${params.durationSec.toFixed(1)}s
+
+TUGAS ANDA:
+Segera tuliskan 3 blok kode lengkap (html, css, javascript) yang valid:
+1. Blok html: wadah <div class="scene-s1"> dengan elemen data-moo-layer="..."
+2. Blok css: styling ter-scope untuk scene
+3. Blok javascript: timeline GSAP (tl.from / tl.to) mengontrol animasi visual
+
+PENTING:
+- Keluarkan HANYA 3 blok kode (\`\`\`html, \`\`\`css, \`\`\`javascript).
+- Dilarang menulis teks pembuka/penutup atau penjelasan. Langsung berikan blok kode!
+`;
+  }
+
   return `
 Kode scene motion graphics sebelumnya memiliki error validasi:
 ${params.errors.map((e) => `- ${e}`).join('\n')}
 
 Visual Intent Scene: "${params.visualIntent}"
-Durasi: ${params.durationSec.toFixed(1)}s
+${params.narration ? `Narasi: "${params.narration}"\n` : ''}Durasi: ${params.durationSec.toFixed(1)}s
 
 Perbaiki kode di bawah ini sehingga mematuhi seluruh aturan:
 1. Tidak ada Math.random(), gunakan ctx.rand()
@@ -186,7 +207,7 @@ Perbaiki kode di bawah ini sehingga mematuhi seluruh aturan:
 4. Pastikan buildJs menganimasikan elemen via timeline tl
 5. JANGAN deklarasikan ulang const/let tl atau const/let root (langsung panggil tl.to / tl.from)
 6. JANGAN gunakan import atau export default
-7. Keluarkan 3 blok kode (html, css, javascript) yang valid dan bersih.
+7. Keluarkan HANYA 3 blok kode (html, css, javascript) yang valid dan bersih tanpa penjelasan tambahan di luarnya.
 
 Kode Asli yang Bermasalah:
 \`\`\`html
@@ -202,3 +223,4 @@ ${params.originalCode.buildJs}
 \`\`\`
 `;
 }
+

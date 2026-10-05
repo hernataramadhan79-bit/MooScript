@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp } from '../types';
-import { CURRENT_SCHEMA_VERSION } from '../types';
+import { CURRENT_SCHEMA_VERSION, migrateLegacyScene, resolveTheme } from '../types';
 import { migrateLegacyProject } from '../engine/composition/migrate';
 
 export interface StoredAudio {
@@ -128,11 +128,15 @@ export function normalizeProject(project: MooProject): MooProject {
   project.scenes = project.scenes.map((s, idx) => {
     const narrationText = s.narrationText ?? (s as any).text ?? '';
     const visualIntent = s.visualIntent ?? (s as any).text ?? `Scene ${idx + 1}`;
+    let migrated = s;
+    if (!s.nodes || s.nodes.length === 0) {
+      migrated = migrateLegacyScene(s as any);
+    }
     return {
-      ...s,
+      ...migrated,
       narrationText,
       visualIntent,
-      durationInSeconds: s.durationInSeconds || 3,
+      durationInSeconds: s.durationInSeconds || migrated.durationInSeconds || 3,
       wordTimestamps: s.wordTimestamps || []
     };
   });
@@ -146,6 +150,9 @@ export function normalizeProject(project: MooProject): MooProject {
       captionPosition: 'center',
       showSubtitles: false
     };
+  }
+  if (!project.themeTokens) {
+    project.themeTokens = resolveTheme(project, project.scenes[0] || null);
   }
   // One-time migration for legacy projects
   if (project.schemaVersion !== CURRENT_SCHEMA_VERSION || !project.composition) {

@@ -61,7 +61,9 @@ describe('OpenAI Strict JSON Schema (Phase 1a)', () => {
       'cameraIntent',
       'transitionIntent',
       'emphasis',
-      'durationHint'
+      'durationHint',
+      'background',
+      'nodes'
     ]);
   });
 
@@ -342,5 +344,124 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
     expect(res).toBe('<div class="airflow"></div>');
     expect(urlsCalled.some((u) => u.includes('gemini-2.0-flash:generateContent'))).toBe(true);
   });
+
+  it('passes configured maxTokens to Gemini payload in generateStoryboard', async () => {
+    let capturedPayload: any = null;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, init: any) => {
+      if (init?.body) {
+        capturedPayload = JSON.parse(init.body);
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      title: 'Test Budget',
+                      targetDuration: 10,
+                      scenes: [
+                        {
+                          narration: 'Budget narration',
+                          visualIntent: 'Intent',
+                          visualElements: ['item'],
+                          motionIntent: 'fast',
+                          durationHint: 3
+                        }
+                      ]
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      } as any;
+    });
+
+    await generateStoryboard({
+      provider: 'gemini',
+      apiKey: 'test-key',
+      prompt: 'test prompt',
+      skill: dummySkill,
+      maxTokens: 1024
+    });
+
+    expect(capturedPayload).not.toBeNull();
+    expect(capturedPayload.generationConfig.maxOutputTokens).toBe(1024);
+  });
+
+  it('passes configured maxTokens to callRawLLM payload for OpenAI', async () => {
+    let capturedPayload: any = null;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, init: any) => {
+      if (init?.body) {
+        capturedPayload = JSON.parse(init.body);
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'test-code' } }]
+        })
+      } as any;
+    });
+
+    const res = await callRawLLM({
+      provider: 'openai',
+      apiKey: 'sk-test',
+      model: 'gpt-4o',
+      systemPrompt: 'Sys',
+      userPrompt: 'User',
+      maxTokens: 4096
+    });
+
+    expect(res).toBe('test-code');
+    expect(capturedPayload).not.toBeNull();
+    expect(capturedPayload.max_tokens).toBe(4096);
+  });
+
+  it('callRawLLM with OpenRouter automatically auto-adapts max_tokens on HTTP 402 with affordable balance', async () => {
+    let callCount = 0;
+    const tokensUsed: number[] = [];
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, init: any) => {
+      callCount++;
+      const body = JSON.parse(init.body);
+      tokensUsed.push(body.max_tokens);
+
+      if (callCount === 1) {
+        return {
+          ok: false,
+          status: 402,
+          text: async () =>
+            'OpenRouter error (402): This request requires more credits, or fewer max_tokens. You requested up to 8192 tokens, but can only afford 2082.'
+        } as any;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '<div>Adapted content</div>' } }]
+        })
+      } as any;
+    });
+
+    const result = await callRawLLM({
+      provider: 'openrouter',
+      apiKey: 'sk-or-test',
+      model: 'google/gemini-2.0-flash-001',
+      systemPrompt: 'System',
+      userPrompt: 'User prompt',
+      maxTokens: 8192
+    });
+
+    expect(result).toBe('<div>Adapted content</div>');
+    expect(callCount).toBe(2);
+    expect(tokensUsed[0]).toBe(8192);
+    // 2082 - 20 = 2062
+    expect(tokensUsed[1]).toBe(2062);
+  });
 });
+
 

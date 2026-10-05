@@ -29,9 +29,6 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
   const {
     project,
     settings,
-    updateThemeBg,
-    updateThemePrimary,
-    updateThemeHighlight,
     updateThemeFont,
     updateResolution,
     toggleGlobalSubtitles,
@@ -40,10 +37,11 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
     skills,
     activeSkillId,
     setActiveSkillId,
+    updateSettings,
+    isCompilingMograph,
+    setIsCompilingMograph,
     addToast
   } = useMooStore();
-
-  const [isCompilingMograph, setIsCompilingMograph] = useState(false);
   const [compilationProgress, setCompilationProgress] = useState<string>('');
   const [generationStats, setGenerationStats] = useState<{
     completed: number;
@@ -195,16 +193,50 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
 
           const projectNow = useMooStore.getState().project;
 
-          // Per-scene safety timeout controller (90s) so a single hung connection never freezes the whole studio
+          // AI Activity Watchdog & Dynamic Ticker
+          // Instead of an arbitrary hard cutoff, it monitors live responsiveness:
+          // - As long as AI is connected, communicating, or generating, it NEVER aborts.
+          // - Realtime elapsed timer provides live feedback in the UI.
+          // - Only trips if connection is genuinely frozen with zero activity for 180 consecutive seconds.
           const sceneAbortController = new AbortController();
-          const sceneTimeout = setTimeout(() => {
-            sceneAbortController.abort(new Error('Batas waktu 90 detik per-adegan terlampaui'));
-          }, 90000);
-
           const onParentAbort = () => {
             sceneAbortController.abort(controller.signal.reason);
           };
           controller.signal.addEventListener('abort', onParentAbort, { once: true });
+
+          let lastActivityTime = Date.now();
+          let currentActivityDetail = 'Menghubungkan ke AI...';
+          const sceneStartTime = Date.now();
+
+          const recordActivity = (detail: string) => {
+            lastActivityTime = Date.now();
+            currentActivityDetail = detail;
+          };
+
+          const ticker = setInterval(() => {
+            if (sceneAbortController.signal.aborted || controller.signal.aborted) {
+              clearInterval(ticker);
+              return;
+            }
+
+            const elapsedSec = Math.floor((Date.now() - sceneStartTime) / 1000);
+            const silenceSec = Math.floor((Date.now() - lastActivityTime) / 1000);
+
+            // True freeze watchdog: 180s of total silence without any socket packet/activity
+            if (silenceSec >= 180) {
+              clearInterval(ticker);
+              sceneAbortController.abort(
+                new Error(
+                  `Koneksi tidak merespons: server AI tidak mengirim data selama ${silenceSec} detik. Periksa koneksi internet atau ganti model.`
+                )
+              );
+              return;
+            }
+
+            setCompilationProgress(
+              `Mendesain adegan ${i + 1} dari ${total}... (${elapsedSec}s) • ${currentActivityDetail}`
+            );
+          }, 1000);
 
           try {
             const sceneModule = await generateCustomScene({
@@ -238,6 +270,9 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
               provider,
               apiKey,
               model: modelToUse,
+              onProgress: (status) => {
+                recordActivity(status);
+              },
               executeLlm: async ({ systemPrompt, userPrompt }) => {
                 return await callRawLLM({
                   provider,
@@ -245,7 +280,11 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
                   model: modelToUse,
                   systemPrompt,
                   userPrompt,
-                  signal: sceneAbortController.signal
+                  signal: sceneAbortController.signal,
+                  maxTokens: settings.maxOutputTokens || 2048,
+                  onActivity: (status) => {
+                    recordActivity(status);
+                  }
                 });
               }
             });
@@ -271,7 +310,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
               userEdited: false
             };
           } finally {
-            clearTimeout(sceneTimeout);
+            clearInterval(ticker);
             controller.signal.removeEventListener('abort', onParentAbort);
           }
 
@@ -372,12 +411,38 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
     <div className="flex flex-col gap-5 p-4 sm:p-5 max-w-2xl mx-auto w-full">
       {/* 1. Tone / Persona Preset Selection */}
       <div className="p-4 sm:p-5 rounded-2xl bg-surface-1 border border-border flex flex-col gap-4">
-        <span className="text-[13px] font-semibold text-accent uppercase tracking-wider flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[18px]">palette</span>
-          Arah Gaya & Persona Motion
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-accent uppercase tracking-wider flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+            Arah Pacing & Persona Motion (Opsional)
+          </span>
+          <span className="text-[11px] text-text-muted">
+            Murni mengarahkan ritme narasi — bukan template kaku
+          </span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          {/* Autonomous / Free Director option */}
+          <button
+            type="button"
+            onClick={() => setActiveSkillId('')}
+            className={`p-3 rounded-xl border text-left transition-all select-none flex flex-col gap-1.5 ${
+              !activeSkillId
+                ? 'bg-accent-muted border-accent text-on-surface shadow-sm ring-1 ring-accent/30'
+                : 'bg-surface-2 border-border text-text-muted hover:border-border-strong hover:text-on-surface'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-accent">
+                all_inclusive
+              </span>
+              <span className="text-[13px] font-semibold text-on-surface">Bebas / Murni</span>
+            </div>
+            <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">
+              AI merancang komposisi kinetik secara bebas sesuai konteks skrip.
+            </p>
+          </button>
+
           {skills.map((skill) => {
             const isSelected = skill.id === activeSkillId;
             return (
@@ -387,7 +452,7 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
                 onClick={() => setActiveSkillId(skill.id)}
                 className={`p-3 rounded-xl border text-left transition-all select-none flex flex-col gap-1.5 ${
                   isSelected
-                    ? 'bg-accent-muted border-accent text-on-surface shadow-sm'
+                    ? 'bg-accent-muted border-accent text-on-surface shadow-sm ring-1 ring-accent/30'
                     : 'bg-surface-2 border-border text-text-muted hover:border-border-strong hover:text-on-surface'
                 }`}
               >
@@ -395,9 +460,9 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
                   <span className="material-symbols-outlined text-[18px] text-accent">
                     {resolveSkillIcon(skill.icon)}
                   </span>
-                  <span className="text-[14px] font-semibold text-on-surface">{skill.name}</span>
+                  <span className="text-[13px] font-semibold text-on-surface">{skill.name}</span>
                 </div>
-                <p className="text-[12px] text-text-muted leading-relaxed line-clamp-2">
+                <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">
                   {skill.description}
                 </p>
               </button>
@@ -406,49 +471,30 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
         </div>
       </div>
 
-      {/* 2. Palet Warna & Tipografi */}
+      {/* 2. Decoupled Semantic Theming & Font */}
       <div className="p-4 sm:p-5 rounded-2xl bg-surface-1 border border-border flex flex-col gap-4">
-        <span className="text-[13px] font-semibold text-on-surface flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[18px] text-accent">format_paint</span>
-          Warna & Tipografi Video
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[18px] text-accent">palette</span>
+            Theming Visual (Post-Generation)
+          </span>
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent font-medium font-mono">
+            Decoupled Mode
+          </span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Warna Background">
-            <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-lg p-1.5 min-h-[44px]">
-              <input
-                type="color"
-                value={project.theme.bg || '#09090b'}
-                onChange={(e) => updateThemeBg(e.target.value)}
-                className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-              />
-              <span className="text-[13px] font-mono text-on-surface">{project.theme.bg}</span>
+        <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#84cc16] ring-1 ring-white/20" title="Primary" />
+              <span className="w-3.5 h-3.5 rounded-full bg-[#a3e635] ring-1 ring-white/20" title="Accent" />
+              <span className="w-3.5 h-3.5 rounded-full bg-[#18181b] ring-1 ring-white/20" title="Surface" />
+              <span className="w-3.5 h-3.5 rounded-full bg-[#0d0d0e] ring-1 ring-white/20" title="Background" />
             </div>
-          </Field>
-
-          <Field label="Warna Teks Utama">
-            <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-lg p-1.5 min-h-[44px]">
-              <input
-                type="color"
-                value={project.theme.textPrimary || '#f4f4f6'}
-                onChange={(e) => updateThemePrimary(e.target.value)}
-                className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-              />
-              <span className="text-[13px] font-mono text-on-surface">{project.theme.textPrimary}</span>
+            <div className="text-[12px] text-zinc-300 leading-snug">
+              Warna tidak lagi dikunci di awal. AI menghasilkan komposisi murni dengan <strong>Semantic Tokens</strong> yang bebas di-<em>shuffle</em> dan diedit di langkah <strong>3. Edit</strong>.
             </div>
-          </Field>
-
-          <Field label="Warna Aksen Highlight">
-            <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-lg p-1.5 min-h-[44px]">
-              <input
-                type="color"
-                value={project.theme.textHighlight || '#84cc16'}
-                onChange={(e) => updateThemeHighlight(e.target.value)}
-                className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-              />
-              <span className="text-[13px] font-mono text-on-surface">{project.theme.textHighlight}</span>
-            </div>
-          </Field>
+          </div>
         </div>
 
         <Field label="Karakter Font Display">
@@ -591,6 +637,57 @@ export const StyleView: React.FC<StyleViewProps> = ({ onBackStep, onNextStep }) 
             )}
           </div>
         )}
+
+        {/* Token Output Budget Control */}
+        <div className="p-3 rounded-xl bg-surface-3/70 border border-border flex flex-col gap-2">
+          <div className="flex items-center justify-between text-[12px]">
+            <span className="text-on-surface font-medium flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-accent">data_thresholding</span>
+              Alokasi Token Output (Max Tokens)
+            </span>
+            <span className="font-mono text-accent font-bold text-[11px] bg-accent/10 px-2 py-0.5 rounded border border-accent/20">
+              {settings.maxOutputTokens || 2048} tokens
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={512}
+              max={8192}
+              step={256}
+              disabled={isCompilingMograph}
+              value={settings.maxOutputTokens || 2048}
+              onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
+              className="w-full accent-accent h-1.5 bg-surface-1 rounded-lg appearance-none cursor-pointer disabled:opacity-40"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-1.5 pt-0.5">
+            <span className="text-[10px] text-text-muted">Preset Cepat:</span>
+            <div className="flex gap-1.5">
+              {[1024, 2048, 4096, 8192].map((tok) => {
+                const isActive = (settings.maxOutputTokens || 2048) === tok;
+                return (
+                  <button
+                    key={tok}
+                    type="button"
+                    disabled={isCompilingMograph}
+                    onClick={() => updateSettings({ maxOutputTokens: tok })}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition-colors disabled:opacity-40 ${
+                      isActive
+                        ? 'bg-accent/20 border-accent/50 text-accent font-bold'
+                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface hover:bg-surface-1'
+                    }`}
+                  >
+                    {tok}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className="text-[10px] text-text-muted leading-tight">
+            *Tip: Gunakan 1024–2048 untuk akun OpenRouter saldo rendah guna menghindari error 402, atau 4096+ untuk animasi kompleks.
+          </p>
+        </div>
 
         {isCompilingMograph ? (
           <div className="flex gap-2 mt-1">

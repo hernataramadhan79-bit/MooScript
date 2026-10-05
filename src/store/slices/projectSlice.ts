@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette } from '../../types';
-import { CURRENT_SCHEMA_VERSION } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode } from '../../types';
+import { CURRENT_SCHEMA_VERSION, BUILTIN_THEMES, migrateLegacyScene } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 import {
   saveProjectToDb,
@@ -278,8 +278,11 @@ export const INITIAL_PROJECT: MooProject = {
     preset: 'none',
     level: 0.18,
     duckRatio: 0.15
-  }
+  },
+  themeTokens: BUILTIN_THEMES[0]
 };
+
+INITIAL_PROJECT.scenes = INITIAL_PROJECT.scenes.map((s) => migrateLegacyScene(s as any));
 
 
 // Debounced Persistence & Lifecycle Handlers
@@ -328,6 +331,29 @@ if (typeof window !== 'undefined') {
   });
   window.addEventListener('pagehide', () => {
     flushPendingSave();
+  });
+}
+
+function updateNodeInTree(nodes: MotionNode[], nodeId: string, update: Partial<MotionNode>): MotionNode[] {
+  return nodes.map((node) => {
+    if (node.id === nodeId) {
+      return {
+        ...node,
+        ...update,
+        transform: update.transform ? { ...node.transform, ...update.transform } : node.transform,
+        style: update.style ? { ...node.style, ...update.style } : node.style,
+        animation: update.animation ? { ...node.animation, ...update.animation } : node.animation,
+        extraProps: update.extraProps ? { ...node.extraProps, ...update.extraProps } : node.extraProps,
+        children: update.children !== undefined ? update.children : node.children
+      };
+    }
+    if (node.children && node.children.length > 0) {
+      return {
+        ...node,
+        children: updateNodeInTree(node.children, nodeId, update)
+      };
+    }
+    return node;
   });
 }
 
@@ -383,7 +409,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
           showSubtitles: false
         },
         scenes: [
-          {
+          migrateLegacyScene({
             id: `sc-1-${now}`,
             narrationText: 'New kinetic visual scene.',
             text: 'New kinetic visual scene.',
@@ -395,8 +421,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
             camera: 'push_in',
             durationInSeconds: 3.0,
             wordTimestamps: []
-          }
+          } as any)
         ],
+        themeTokens: BUILTIN_THEMES[0],
         audioDuration: 3.0,
         bgm: {
           preset: 'none',
@@ -955,6 +982,126 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         audioStale: hasAudio ? true : get().audioStale
       });
       triggerSave(updated);
-    }
+    },
+
+    shufflePalette: (sceneId?: string) => {
+      const current = get().project;
+      const defaultTheme = current.themeTokens || BUILTIN_THEMES[0];
+      const sceneTokens = sceneId ? current.scenes.find((s) => s.id === sceneId)?.themeTokens : undefined;
+      const currentId = sceneTokens?.id || defaultTheme.id;
+
+      const currentIndex = BUILTIN_THEMES.findIndex((t) => t.id === currentId);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % BUILTIN_THEMES.length : 0;
+      const nextTheme = BUILTIN_THEMES[nextIndex];
+
+      if (sceneId) {
+        const updatedScenes = current.scenes.map((s) =>
+          s.id === sceneId ? { ...s, themeTokens: nextTheme } : s
+        );
+        const updatedProject: MooProject = { ...current, scenes: updatedScenes };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      } else {
+        const updatedProject: MooProject = {
+          ...current,
+          themeTokens: nextTheme,
+          theme: {
+            ...current.theme,
+            bg: nextTheme.bg,
+            textPrimary: nextTheme.text,
+            textHighlight: nextTheme.primary
+          }
+        };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      }
+    },
+
+    setThemeTokens: (tokens: ThemeTokens, sceneId?: string) => {
+      const current = get().project;
+      if (sceneId) {
+        const updatedScenes = current.scenes.map((s) =>
+          s.id === sceneId ? { ...s, themeTokens: tokens } : s
+        );
+        const updatedProject: MooProject = { ...current, scenes: updatedScenes };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      } else {
+        const updatedProject: MooProject = {
+          ...current,
+          themeTokens: tokens,
+          theme: {
+            ...current.theme,
+            bg: tokens.bg,
+            textPrimary: tokens.text,
+            textHighlight: tokens.primary
+          }
+        };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      }
+    },
+
+    updateThemeToken: (key: keyof ThemeTokens, value: string, sceneId?: string) => {
+      const current = get().project;
+      if (sceneId) {
+        const scene = current.scenes.find((s) => s.id === sceneId);
+        const defaultTheme = current.themeTokens || BUILTIN_THEMES[0];
+        const baseTheme: ThemeTokens = {
+          ...defaultTheme,
+          ...(scene?.themeTokens || {})
+        };
+        const newTokens: ThemeTokens = {
+          ...baseTheme,
+          [key]: value
+        };
+        const updatedScenes = current.scenes.map((s) =>
+          s.id === sceneId ? { ...s, themeTokens: newTokens } : s
+        );
+        const updatedProject: MooProject = { ...current, scenes: updatedScenes };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      } else {
+        const baseTheme = current.themeTokens || BUILTIN_THEMES[0];
+        const newTokens: ThemeTokens = {
+          ...baseTheme,
+          [key]: value
+        };
+        const updatedProject: MooProject = {
+          ...current,
+          themeTokens: newTokens,
+          theme: {
+            ...current.theme,
+            ...(key === 'bg' ? { bg: value } : {}),
+            ...(key === 'text' ? { textPrimary: value } : {}),
+            ...(key === 'primary' ? { textHighlight: value } : {})
+          }
+        };
+        set({ project: updatedProject });
+        triggerSave(updatedProject);
+      }
+    },
+
+    updateSceneNode: (sceneId: string, nodeId: string, update: Partial<MotionNode>) => {
+      const current = get().project;
+      const sceneIndex = current.scenes.findIndex((s) => s.id === sceneId);
+      if (sceneIndex < 0) return;
+
+      let scene = current.scenes[sceneIndex];
+      if (!scene.nodes || scene.nodes.length === 0) {
+        scene = migrateLegacyScene(scene as any);
+      }
+
+      const updatedNodes = updateNodeInTree(scene.nodes || [], nodeId, update);
+      const updatedScenes = current.scenes.map((s, idx) =>
+        idx === sceneIndex ? { ...scene, nodes: updatedNodes } : s
+      );
+      const updatedProject: MooProject = { ...current, scenes: updatedScenes };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+    },
+
+    selectedNodeId: null,
+    setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id })
   };
 };

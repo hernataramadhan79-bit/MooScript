@@ -11,7 +11,9 @@ import type {
   ToastNotification,
   TTSProvider,
   CameraMovement,
-  AspectRatio
+  AspectRatio,
+  ThemeTokens,
+  MotionNode
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
@@ -31,9 +33,13 @@ export interface UiSlice {
   setSettingsOpen: (open: boolean) => void;
   activeSceneId: string | null;
   setActiveSceneId: (id: string | null) => void;
+  selectedNodeId: string | null;
+  setSelectedNodeId: (id: string | null) => void;
   toasts: ToastNotification[];
   addToast: (message: string, type?: ToastNotification['type'], durationMs?: number) => void;
   removeToast: (id: string) => void;
+  isCompilingMograph: boolean;
+  setIsCompilingMograph: (isCompiling: boolean) => void;
 }
 
 export interface ProjectSlice {
@@ -71,6 +77,12 @@ export interface ProjectSlice {
   duplicateScene: (id: string) => void;
   removeScene: (id: string) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
+  shufflePalette: (sceneId?: string) => void;
+  setThemeTokens: (tokens: ThemeTokens, sceneId?: string) => void;
+  updateThemeToken: (key: keyof ThemeTokens, value: string, sceneId?: string) => void;
+  updateSceneNode: (sceneId: string, nodeId: string, update: Partial<MotionNode>) => void;
+  selectedNodeId: string | null;
+  setSelectedNodeId: (id: string | null) => void;
 }
 
 export interface ScriptSlice {

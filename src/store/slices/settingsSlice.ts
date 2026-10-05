@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   groqModel: 'llama-3.3-70b-versatile',
   anthropicModel: 'claude-sonnet-4-6',
   openrouterModel: 'anthropic/claude-sonnet-4.6',
+  maxOutputTokens: 2048,
   voiceIds: {
     openai: 'alloy',
     elevenlabs: '21m00Tcm4TlvDq8ikWAM',

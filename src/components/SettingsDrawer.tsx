@@ -464,6 +464,52 @@ export const SettingsDrawer: React.FC = () => {
               </div>
             </div>
 
+            {/* Token Output Budget (Max Output Tokens) */}
+            <div className="flex flex-col gap-1.5 p-2 sm:p-2.5 rounded-lg bg-black/50 border border-white/[0.06]">
+              <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+                <span className="font-medium text-zinc-300 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px] text-primary">data_thresholding</span>
+                  Alokasi Token Output (Max Tokens)
+                </span>
+                <span className="font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                  {settings.maxOutputTokens || 2048} tokens
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                Atur batas maksimum token generasi AI. Nilai hemat (1024–2048) mencegah error 402 pada akun OpenRouter saldo rendah/terbatas, sementara nilai tinggi (4096+) memberikan keleluasaan untuk skrip panjang atau model reasoning.
+              </p>
+              <div className="flex items-center gap-3 pt-0.5">
+                <input
+                  type="range"
+                  min={512}
+                  max={8192}
+                  step={256}
+                  value={settings.maxOutputTokens || 2048}
+                  onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
+                  className="w-full accent-primary h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                {[1024, 2048, 4096, 8192].map((tokenPreset) => {
+                  const isCurrent = (settings.maxOutputTokens || 2048) === tokenPreset;
+                  return (
+                    <button
+                      key={tokenPreset}
+                      type="button"
+                      onClick={() => updateSettings({ maxOutputTokens: tokenPreset })}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-mono font-semibold border transition-all ${
+                        isCurrent
+                          ? 'bg-primary/20 text-primary border-primary/40'
+                          : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:bg-white/[0.08] hover:text-zinc-200'
+                      }`}
+                    >
+                      {tokenPreset}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Keys Input Form */}
             <div className="space-y-3 pt-1">
               {/* Gemini */}

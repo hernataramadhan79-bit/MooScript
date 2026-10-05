@@ -16,6 +16,7 @@ export const useMooStore = create<MooStoreState>()((...a) => ({
   ...createUiSlice(...a),
   ...createProjectSlice(...a),
   ...createScriptSlice(...a),
+  // audioSlice handles audio generation and cancelAudioGeneration: () =>
   ...createAudioSlice(...a),
   ...createPlaybackSlice(...a),
   ...createExportSlice(...a),

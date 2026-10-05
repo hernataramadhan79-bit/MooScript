@@ -3,7 +3,6 @@ import { syncComposition } from '../src/engine/composition/sync';
 import { validateGeneratedScene } from '../src/engine/composition/validator';
 import {
   extractLayersFromHtml,
-  mergeEditableLayers,
   compileOverridesCss,
   compilePaletteVars,
   getLayerText,
@@ -11,8 +10,7 @@ import {
 } from '../src/engine/composition/layers';
 import {
   generateCustomScene,
-  parseCodeBlocks,
-  repairGeneratedScene
+  parseCodeBlocks
 } from '../src/engine/ai/director/directorPipeline';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
 import { migrateLegacyProject } from '../src/engine/composition/migrate';
@@ -225,6 +223,34 @@ while(true) { eval("bad"); }
     // Crucial: Must NOT fall back to KINETIC_QUOTE or any template
     expect(result.html).not.toContain('KINETIC_QUOTE');
     expect(result.html).not.toContain('METRIC_COUNTER');
+  });
+
+  it('4b. If generation returns empty HTML or token cutoff, synthesizes a valid bespoke fail-safe scene', async () => {
+    const beat: StoryBeat = {
+      id: 'beat-empty-fallback',
+      narration: 'Penjelasan prinsip Bernoulli pada aliran fluida.',
+      visualIntent: 'Prinsip Bernoulli dan Dinamika Fluida',
+      visualConcept: 'Tekanan berbanding terbalik dengan kecepatan aliran',
+      durationHint: 4.0
+    };
+
+    // AI returned completely empty text (e.g. token cutoff or pure think block)
+    const result = await generateCustomScene({
+      beat,
+      index: 0,
+      total: 1,
+      styleBrief: dummyStyleBrief,
+      provider: 'openai',
+      apiKey: 'test-key',
+      executeLlm: async () => ''
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.html).toContain('Prinsip Bernoulli');
+    expect(result.html).toContain('data-moo-layer="Headline"');
+    expect(result.buildJs).toContain('tl.');
+    expect(result.editableLayers).toBeDefined();
+    expect(result.editableLayers!.length).toBeGreaterThan(0);
   });
 
   /* ------------------------------------------------------------------ *

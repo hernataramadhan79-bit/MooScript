@@ -16,7 +16,7 @@ import { CodeInspectorModal } from './features/scene/CodeInspectorModal';
 export type StudioStep = 'ide' | 'mograph' | 'edit' | 'ekspor';
 
 export const App: React.FC = () => {
-  const { initStore, togglePlay } = useMooStore();
+  const { initStore, togglePlay, isGeneratingScript, isCompilingMograph, isExporting } = useMooStore();
 
   const [currentStep, setCurrentStep] = useState<StudioStep>('ide');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -42,11 +42,11 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay]);
 
-  const studioSteps: { id: StudioStep; label: string; icon: string }[] = [
-    { id: 'ide', label: '1. Ide', icon: 'lightbulb' },
-    { id: 'mograph', label: '2. Mograph', icon: 'movie_filter' },
+  const studioSteps: { id: StudioStep; label: string; icon: string; isBusy?: boolean }[] = [
+    { id: 'ide', label: '1. Ide', icon: 'lightbulb', isBusy: isGeneratingScript },
+    { id: 'mograph', label: '2. Mograph', icon: 'movie_filter', isBusy: isCompilingMograph },
     { id: 'edit', label: '3. Edit', icon: 'tune' },
-    { id: 'ekspor', label: '4. Ekspor', icon: 'download' }
+    { id: 'ekspor', label: '4. Ekspor', icon: 'download', isBusy: isExporting }
   ];
 
   return (
@@ -74,7 +74,9 @@ export const App: React.FC = () => {
                         : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[17px]">{step.icon}</span>
+                    <span className={`material-symbols-outlined text-[17px] ${step.isBusy ? 'animate-spin text-accent' : ''}`}>
+                      {step.isBusy ? 'sync' : step.icon}
+                    </span>
                     <span className="truncate">{step.label}</span>
                   </button>
                 );
@@ -82,30 +84,30 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Flow Panel */}
-          <div className="flex-1 overflow-y-auto">
-            {currentStep === 'ide' && (
+          {/* Active Flow Panel - Kept mounted so background processes, timers & scroll states persist */}
+          <div className="flex-1 overflow-y-auto relative">
+            <div className={currentStep === 'ide' ? 'block' : 'hidden'}>
               <IdeaView
                 onNextStep={() => setCurrentStep('mograph')}
                 onOpenCodeInspector={(id) => setInspectingBeatId(id)}
               />
-            )}
-            {currentStep === 'mograph' && (
+            </div>
+            <div className={currentStep === 'mograph' ? 'block' : 'hidden'}>
               <StyleView
                 onBackStep={() => setCurrentStep('ide')}
                 onNextStep={() => setCurrentStep('edit')}
               />
-            )}
-            {currentStep === 'edit' && (
+            </div>
+            <div className={currentStep === 'edit' ? 'block' : 'hidden'}>
               <VisualEditorView
                 onBackStep={() => setCurrentStep('mograph')}
                 onNextStep={() => setCurrentStep('ekspor')}
                 onOpenCodeInspector={(id) => setInspectingBeatId(id)}
               />
-            )}
-            {currentStep === 'ekspor' && (
+            </div>
+            <div className={currentStep === 'ekspor' ? 'block' : 'hidden'}>
               <ExportView onBackStep={() => setCurrentStep('edit')} />
-            )}
+            </div>
           </div>
         </section>
 
