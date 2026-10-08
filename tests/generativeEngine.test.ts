@@ -640,6 +640,40 @@ export default function buildScene(tl, root, ctx, gsap) {
     expect(validation.valid).toBe(true);
     expect(validation.errors).toEqual([]);
   });
+
+  it('15. parseCodeBlocks sanitizes external asset URLs and normalizes arbitrary timeline names', () => {
+    const rawLlmResponse = `
+\`\`\`html
+<div class="scene-s2">
+  <img data-moo-layer="photo" src="https://images.unsplash.com/photo-12345" onclick="alert(1)" />
+  <h2 data-moo-layer="title">Sanitized Media</h2>
+</div>
+\`\`\`
+
+\`\`\`css
+.scene-s2 {
+  background-image: url('https://example.com/bg.jpg');
+  width: 100%;
+}
+\`\`\`
+
+\`\`\`javascript
+const sceneTimeline = gsap.timeline();
+sceneTimeline.from(root.querySelector('.title'), { opacity: 0, duration: 1 });
+\`\`\`
+`;
+
+    const parsed = parseCodeBlocks(rawLlmResponse);
+    expect(parsed.html).not.toContain('https://images.unsplash.com');
+    expect(parsed.html).not.toContain('onclick=');
+    expect(parsed.html).toContain('data:image/svg+xml');
+    expect(parsed.buildJs).toContain('tl.from');
+
+    const validation = validateGeneratedScene(parsed);
+    expect(validation.valid).toBe(true);
+    expect(validation.errors).toEqual([]);
+  });
 });
+
 
 

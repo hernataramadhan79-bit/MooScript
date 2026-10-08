@@ -61,10 +61,14 @@ describe('Composition Document Builder', () => {
     expect(doc).toContain('Hello');
     expect(doc).toContain('.test { color: #84cc16; }');
     expect(doc).toContain('moo-stage');
+    expect(doc).toContain('Content-Security-Policy');
+    expect(doc).toContain("connect-src 'none'");
   });
 
-  it('ensures getRuntimeScript() compiles without syntax or regex errors', () => {
+  it('ensures getRuntimeScript() compiles without syntax or regex errors and includes try-catch frame capture', () => {
     const script = getRuntimeScript();
     expect(() => new Function(script)).not.toThrow();
+    expect(script).toContain('frame_error');
+    expect(script).toContain('encodeURIComponent(svgString)');
   });
 });

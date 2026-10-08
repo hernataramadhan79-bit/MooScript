@@ -35,6 +35,12 @@ export function cleanGeneratedHtml(rawHtml: string): { html: string; embeddedCss
     .replace(/<(meta|link|base)\b[^>]*>/gi, '')
     .trim();
 
+  // Strip dangerous inline event handlers
+  html = html.replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // Sanitize external URLs on src/href/xlink:href into safe inline SVG data URIs
+  html = html.replace(/(?:src|href|xlink:href)\s*=\s*["']\s*(?:https?:|\/\/)[^"']*["']/gi, 'src="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100%\' height=\'100%\' fill=\'%23334155\'/></svg>"');
+
   return { html, embeddedCss, embeddedJs };
 }
 
@@ -44,6 +50,8 @@ export function cleanGeneratedCss(rawCss: string): string {
   css = css.replace(/<\/?style\b[^>]*>/gi, '');
   // Strip @import (single-line or multi-line)
   css = css.replace(/@import\s+[^;\n]+;?/gi, '');
+  // Sanitize external url(...) to none
+  css = css.replace(/url\(\s*["']?\s*(?:https?:|\/\/)[^)'"]*["']?\s*\)/gi, 'none');
   return css.trim();
 }
 
@@ -96,12 +104,19 @@ export function cleanGeneratedJs(rawJs: string): string {
   }
 
   // Strip duplicate declarations of parameters provided in runtime scope (tl, root, ctx, gsap)
-  // If chained off gsap.timeline(...), replace with tl:
-  // e.g.: const tl = gsap.timeline({ ... }).from(...).to(...) => tl.from(...).to(...)
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)(?=\s*\.)/g, '\ntl');
+  // Find any custom timeline variable names assigned to gsap.timeline(...) and normalize to tl
+  const customTlVarMatches = js.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:window\.)?gsap\.timeline\b/g);
+  for (const match of customTlVarMatches) {
+    const varName = match[1];
+    if (varName && varName !== 'tl') {
+      js = js.replace(new RegExp(`\\b${varName}\\s*\\.`, 'g'), 'tl.');
+    }
+  }
 
-  // Standalone gsap.timeline(...)
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)\s*;?/g, '\n');
+  // Strip chained or standalone gsap.timeline(...) declarations
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)(?=\s*\.)/g, '\ntl');
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)\s*;?/g, '\n');
+
   // Any other declaration of tl, root, ctx, gsap
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\b[^\n;]*;?/g, '\n');
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+root\b[^\n;]*;?/g, '\n');
@@ -109,11 +124,11 @@ export function cleanGeneratedJs(rawJs: string): string {
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+gsap\b[^\n;]*;?/g, '\n');
 
   // Auto-fix determinism violations: replace Math.random() with ctx.rand()
-  js = js.replace(/\bMath\.random\s*\(\s*\)/g, 'ctx.rand()');
+  js = js.replace(/\bMath\.random\s*\([^)]*\)/g, 'ctx.rand()');
 
   // Auto-fix Date.now() and performance.now() with 0
-  js = js.replace(/\bDate\.now\s*\(\s*\)/g, '0');
-  js = js.replace(/\bperformance\.now\s*\(\s*\)/g, '0');
+  js = js.replace(/\bDate\.now\s*\([^)]*\)/g, '0');
+  js = js.replace(/\bperformance\.now\s*\([^)]*\)/g, '0');
 
   return js.trim();
 }
@@ -246,20 +261,24 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   // synthesize a smooth default GSAP animation so the scene never fails validation or stays static.
   if (!buildJs.trim() && html.trim()) {
     buildJs = `// Auto-synthesized entrance animation for scene layers
-tl.from(root.children, {
+const targets = root.children && root.children.length > 0 ? root.children : [root];
+tl.from(targets, {
   opacity: 0,
   y: 35,
   duration: Math.min(1.0, (ctx.dur || 3.5) * 0.4),
   stagger: 0.15,
   ease: 'power3.out'
 });
-tl.to(root.querySelectorAll('[data-moo-layer]'), {
-  scale: 1.03,
-  duration: Math.max(0.5, (ctx.dur || 3.5) * 0.6),
-  ease: 'sine.inOut',
-  yoyo: true,
-  repeat: 1
-}, '-=0.5');`;
+const layers = root.querySelectorAll('[data-moo-layer]');
+if (layers && layers.length > 0) {
+  tl.to(layers, {
+    scale: 1.03,
+    duration: Math.max(0.5, (ctx.dur || 3.5) * 0.6),
+    ease: 'sine.inOut',
+    yoyo: true,
+    repeat: 1
+  }, '-=0.5');
+}`;
   }
 
   return { html, css, buildJs };
@@ -587,7 +606,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
 
     // If validation fails, attempt 1-time automatic repair with validation errors
     if (!validation.valid) {
-      console.warn(`[MooScript] Validation failed for scene #${index + 1}, attempting auto-repair:`, validation.errors);
+      console.warn(`[MooScript] Validation failed for scene #${index + 1}, attempting auto-repair:`, validation.errors.join(' | '));
       onProgress?.('Validasi layer GSAP: AI sedang mereparasi animasi...');
       const repaired = await repairGeneratedScene({
         originalCode: parsed,
@@ -602,7 +621,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
         parsed = { html: repaired.html, css: repaired.css, buildJs: repaired.buildJs };
         validation = { valid: true, errors: [] };
       } else {
-        console.warn(`[MooScript] Repair attempt did not pass validation for scene #${index + 1}:`, repaired.errors);
+        console.warn(`[MooScript] Repair attempt did not pass validation for scene #${index + 1}:`, repaired.errors.join(' | '));
         validation.errors = repaired.errors;
 
         // If the scene is STILL completely empty after repair (e.g. AI token cutoff / no HTML generated),

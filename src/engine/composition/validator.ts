@@ -70,7 +70,7 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
   }
 
   // Check structure of build function
-  if (combinedJs && !combinedJs.includes('tl') && !combinedJs.includes('build')) {
+  if (combinedJs && !combinedJs.includes('tl') && !combinedJs.includes('gsap') && !combinedJs.includes('build')) {
     errors.push('Format tidak lengkap: buildJs harus memuat manipulasi timeline GSAP');
   }
 

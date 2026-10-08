@@ -111,9 +111,16 @@ function renderKineticQuote(
 `.trim();
 
   const buildJs = `
-tl.from(root.querySelector(".${prefix}-container"), { opacity: 0, duration: 0.3 })
-  .from(root.querySelectorAll(".${prefix}-w"), { opacity: 0, y: 25, scale: 0.85, stagger: 0.08, duration: 0.5, ease: "back.out(1.7)" }, "-=0.1")
-  .to(root.querySelectorAll(".${prefix}-focus"), { scale: 1.15, duration: 0.3, ease: "power2.out", stagger: 0.1 }, "-=0.2");
+const container = root.querySelector(".${prefix}-container");
+if (container) tl.from(container, { opacity: 0, duration: 0.3 });
+const words = root.querySelectorAll(".${prefix}-w");
+if (words.length > 0) {
+  tl.from(words, { opacity: 0, y: 25, scale: 0.85, stagger: 0.08, duration: 0.5, ease: "back.out(1.7)" }, "-=0.1");
+}
+const focusWords = root.querySelectorAll(".${prefix}-focus");
+if (focusWords.length > 0) {
+  tl.to(focusWords, { scale: 1.15, duration: 0.3, ease: "power2.out", stagger: 0.1 }, "-=0.2");
+}
 `.trim();
 
   return { html, css, buildJs };

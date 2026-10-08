@@ -65,6 +65,8 @@ export async function createCompositionFrameRenderer(
                 img.onload = () => {
                   const ctx = targetCanvas.getContext('2d');
                   if (ctx) {
+                    ctx.fillStyle = '#09090b';
+                    ctx.fillRect(0, 0, width, height);
                     ctx.drawImage(img, 0, 0, width, height);
                   }
                   res();
@@ -132,7 +134,7 @@ export async function createCompositionFrameRenderer(
       iframe.style.height = `${height}px`;
       iframe.style.opacity = '0';
       iframe.style.pointerEvents = 'none';
-      iframe.setAttribute('sandbox', 'allow-scripts');
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
       iframe.srcdoc = buildCompositionDocument(project);
 
       document.body.appendChild(iframe);

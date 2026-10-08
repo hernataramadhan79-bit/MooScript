@@ -208,6 +208,7 @@ Perbaiki kode di bawah ini sehingga mematuhi seluruh aturan:
 5. JANGAN deklarasikan ulang const/let tl atau const/let root (langsung panggil tl.to / tl.from)
 6. JANGAN gunakan import atau export default
 7. Keluarkan HANYA 3 blok kode (html, css, javascript) yang valid dan bersih tanpa penjelasan tambahan di luarnya.
+8. Pastikan sintaks JavaScript valid dan tidak ada kurung atau tanda petik yang terpotong. Langsung gunakan tl.to() atau tl.from().
 
 Kode Asli yang Bermasalah:
 \`\`\`html

@@ -35,19 +35,24 @@ function toDomId(sceneId: string): string {
 }
 
 /** Neutral status surface for scenes that have not been generated (or failed). This is NOT a visual template. */
-function statusPlaceholder(scene: GeneratedScene): { html: string; css: string; buildJs: string } {
+function statusPlaceholder(scene: GeneratedScene, text?: string): { html: string; css: string; buildJs: string } {
   const label =
     scene.status === 'generating'
       ? 'Generating motion graphics…'
       : scene.status === 'error'
         ? 'Scene generation failed'
         : 'Not generated yet';
-  const detail = scene.status === 'error' && scene.errors?.length ? scene.errors[0] : 'Run Generate Mograph or Regenerate Scene';
+  const detail =
+    scene.status === 'error' && scene.errors?.length
+      ? scene.errors[0]
+      : text && text.trim()
+        ? text.trim()
+        : 'Run Generate Mograph or Regenerate Scene';
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return {
     html: `<div class="moo-status-card" data-moo-placeholder="${scene.status}"><div class="moo-status-title">${esc(label)}</div><div class="moo-status-detail">${esc(detail.slice(0, 160))}</div></div>`,
-    css: `.moo-status-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:64px;text-align:center;background:var(--moo-bg,#09090b);color:var(--moo-text,#f4f4f5);font-family:var(--moo-font-body,sans-serif)}.moo-status-title{font-size:44px;font-weight:700;opacity:.9}.moo-status-detail{font-size:26px;opacity:.55;max-width:80%}`,
-    buildJs: ''
+    css: `.moo-status-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:64px;text-align:center;background:var(--moo-bg,#09090b);color:var(--moo-text,#f4f4f5);font-family:var(--moo-font-body,sans-serif)}.moo-status-title{font-size:44px;font-weight:700;opacity:.9}.moo-status-detail{font-size:26px;opacity:.85;max-width:85%;line-height:1.4}`,
+    buildJs: 'tl.from(".moo-status-card", { opacity: 0.9, duration: 0.1 });'
   };
 }
 
@@ -88,8 +93,10 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
   };
 
   const resolved = orderedModules.map((mod) => {
+    const ts = timelineScenes.find((s) => s.id === mod.beatId);
+    const sceneText = ts?.narrationText || ts?.text || '';
     const needsPlaceholder = mod.status !== 'ok' || !(mod.html || '').trim();
-    const src = needsPlaceholder ? statusPlaceholder(mod) : { html: mod.html, css: mod.css, buildJs: mod.buildJs };
+    const src = needsPlaceholder ? statusPlaceholder(mod, sceneText) : { html: mod.html, css: mod.css, buildJs: mod.buildJs };
     return { mod, ...src };
   });
 
@@ -234,6 +241,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
   <!-- Google Fonts for Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -242,6 +250,9 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <!-- GSAP Inlined Core -->
   <script>
     ${gsapScript}
+    if (window.gsap && typeof window.gsap.config === 'function') {
+      window.gsap.config({ nullTargetWarn: false });
+    }
   </script>
   <style>
     * {

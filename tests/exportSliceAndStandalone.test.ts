@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
-import { safeFileName } from '../src/features/export/ExportView';
+import { safeFileName, triggerFileDownload } from '../src/features/export/ExportView';
 import { useMooStore } from '../src/store/useMooStore';
 import type { MooProject } from '../src/types';
 
@@ -12,6 +12,34 @@ describe('Export Safe Filename Helper (Phase 5b)', () => {
     expect(safeFileName('')).toBe('mooscript');
     expect(safeFileName(undefined)).toBe('mooscript');
     expect(safeFileName('   :::   ')).toBe('-');
+  });
+
+  it('triggerFileDownload creates an anchor attached to body, triggers click, and removes it', () => {
+    const mockAnchor = {
+      href: '',
+      download: '',
+      click: vi.fn()
+    };
+    const mockBody = {
+      appendChild: vi.fn(),
+      removeChild: vi.fn(),
+      contains: vi.fn().mockReturnValue(true)
+    };
+    const origDoc = globalThis.document;
+    // @ts-expect-error mocking minimal document for node test env
+    globalThis.document = {
+      createElement: vi.fn().mockReturnValue(mockAnchor),
+      body: mockBody
+    };
+
+    triggerFileDownload('blob:http://localhost/test-video.mp4', 'test-video.mp4');
+
+    expect(mockAnchor.href).toBe('blob:http://localhost/test-video.mp4');
+    expect(mockAnchor.download).toBe('test-video.mp4');
+    expect(mockBody.appendChild).toHaveBeenCalledWith(mockAnchor);
+    expect(mockAnchor.click).toHaveBeenCalled();
+
+    globalThis.document = origDoc;
   });
 });
 

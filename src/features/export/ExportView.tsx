@@ -13,6 +13,20 @@ export function safeFileName(title?: string): string {
   return cleaned || 'mooscript';
 }
 
+export function triggerFileDownload(url: string, filename: string): void {
+  if (typeof document === 'undefined') return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    if (document.body.contains(a)) {
+      document.body.removeChild(a);
+    }
+  }, 100);
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -38,12 +52,14 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
 
   const [exportFormat, setExportFormat] = useState<'mp4' | 'html' | 'srt'>('mp4');
 
-  const projectId = project.id;
+  // Only revoke export result when switching to a different project
+  const prevProjectIdRef = React.useRef(project.id);
   useEffect(() => {
-    if (!isExporting) {
+    if (prevProjectIdRef.current !== project.id) {
+      prevProjectIdRef.current = project.id;
       revokeExportResult();
     }
-  }, [projectId, isExporting, revokeExportResult]);
+  }, [project.id, revokeExportResult]);
 
   useEffect(() => {
     return () => {
@@ -58,6 +74,12 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
     { value: 'html' as const, label: 'HTML Bundle Standalone', icon: 'html' },
     { value: 'srt' as const, label: 'Subtitle SRT', icon: 'subtitles' }
   ];
+
+  const handleDownloadMp4 = () => {
+    if (!exportResult?.objectUrl) return;
+    triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.mp4`);
+    addToast('Mengunduh berkas MP4...', 'success');
+  };
 
   const handleExport = async () => {
     if (exportFormat === 'html') {
@@ -81,11 +103,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
       });
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeFileName(project.title)}.html`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      triggerFileDownload(url, `${safeFileName(project.title)}.html`);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
       addToast('HTML Standalone berhasil diunduh!', 'success');
       return;
     }
@@ -94,11 +113,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
       const srtContent = generateSrt(project);
       const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeFileName(project.title)}.srt`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      triggerFileDownload(url, `${safeFileName(project.title)}.srt`);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
       addToast('Subtitle SRT berhasil diunduh!', 'success');
       return;
     }
@@ -108,10 +124,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
     const result = useMooStore.getState().exportResult;
     if (result && result.objectUrl) {
       addToast('MP4 Video berhasil diekspor langsung di browser!', 'success');
-      const a = document.createElement('a');
-      a.href = result.objectUrl;
-      a.download = `${safeFileName(project.title)}.mp4`;
-      a.click();
+      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.mp4`);
     }
   };
 
@@ -195,45 +208,103 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
           </div>
         )}
 
-        {/* Download Ready Banner */}
-        {exportResult?.objectUrl && !isExporting && (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-accent-muted border border-accent/40 text-[13px] text-on-surface">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-accent text-[18px]">check_circle</span>
-              <span>Video siap diunduh</span>
-            </span>
-            <a
-              href={exportResult.objectUrl}
-              download={`${safeFileName(project.title)}.mp4`}
-              className="font-semibold text-accent hover:underline"
+        {/* Video Ready to Download Card */}
+        {exportResult?.objectUrl && !isExporting ? (
+          <div className="p-4 sm:p-5 rounded-2xl bg-surface-2 border-2 border-accent/40 flex flex-col gap-4 shadow-xl">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px] font-bold">check_circle</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-on-surface">Video Berhasil Diekspor!</h3>
+                  <p className="text-[11px] text-text-muted">Siap diunduh atau diputar langsung di bawah</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold ${
+                    exportResult.hasAudio
+                      ? 'text-lime-400 bg-lime-950/40 border-lime-700/50'
+                      : 'text-amber-400 bg-amber-950/40 border-amber-700/50'
+                  }`}
+                >
+                  {exportResult.hasAudio ? 'AVC + AAC' : 'Video Only'}
+                </span>
+                <span className="text-[11px] font-mono font-semibold text-accent bg-surface-3 px-2 py-0.5 rounded-md border border-border">
+                  {(exportResult.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Preview Video Player */}
+            <div className="w-full max-w-sm mx-auto aspect-[9/16] max-h-72 rounded-xl overflow-hidden border border-border bg-black shadow-lg">
+              <video
+                className="w-full h-full object-contain"
+                controls
+                playsInline
+                src={exportResult.objectUrl}
+              />
+            </div>
+
+            {/* Main Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-2.5 pt-1">
+              <Button
+                variant="primary"
+                icon="download"
+                onClick={handleDownloadMp4}
+                className="flex-1 min-h-[44px] text-sm font-bold shadow-md shadow-accent/20"
+              >
+                Unduh Video (.MP4) • {(exportResult.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
+              </Button>
+              <Button
+                variant="secondary"
+                icon="refresh"
+                onClick={handleExport}
+                className="min-h-[44px]"
+              >
+                Ekspor Ulang
+              </Button>
+              <Button
+                variant="ghost"
+                icon="close"
+                onClick={revokeExportResult}
+                title="Tutup pratinjau dan bebaskan memori browser"
+                className="min-h-[44px] text-text-muted hover:text-on-surface"
+              >
+                Tutup
+              </Button>
+            </div>
+
+            <p className="text-[11px] text-text-faint text-center">
+              💡 Unduhan file otomatis dipicu saat render selesai. Jika browser Anda memblokir unduhan otomatis, tekan tombol hijau <strong>Unduh Video (.MP4)</strong> di atas.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mt-1">
+            <Button
+              variant="primary"
+              icon="download"
+              isLoading={isExporting}
+              disabled={isExporting}
+              onClick={handleExport}
+              className="flex-1"
             >
-              Unduh Lagi
-            </a>
+              {isExporting ? 'Mengekspor Frame Video...' : `Ekspor ${exportFormat.toUpperCase()}`}
+            </Button>
+            {isExporting && (
+              <Button
+                variant="secondary"
+                icon="cancel"
+                onClick={cancelExport}
+                className="text-error hover:text-error"
+              >
+                Batalkan
+              </Button>
+            )}
           </div>
         )}
-
-        <div className="flex items-center gap-2 mt-1">
-          <Button
-            variant="primary"
-            icon="download"
-            isLoading={isExporting}
-            disabled={isExporting}
-            onClick={handleExport}
-            className="flex-1"
-          >
-            {isExporting ? 'Mengekspor Frame Video...' : `Ekspor ${exportFormat.toUpperCase()}`}
-          </Button>
-          {isExporting && (
-            <Button
-              variant="secondary"
-              icon="cancel"
-              onClick={cancelExport}
-              className="text-error hover:text-error"
-            >
-              Batalkan
-            </Button>
-          )}
-        </div>
       </div>
 
       {/* Navigasi Langkah */}

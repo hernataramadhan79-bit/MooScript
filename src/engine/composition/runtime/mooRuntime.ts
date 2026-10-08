@@ -46,7 +46,59 @@ export function getRuntimeScript(): string {
 
     // Disable real-time auto-ticker: playback is purely driven by host seek()
     window.gsap.ticker.lagSmoothing(0);
+    if (typeof window.gsap.config === 'function') {
+      window.gsap.config({ nullTargetWarn: false });
+    }
     masterTl = window.gsap.timeline({ paused: true });
+
+    function isEmptyTarget(targets) {
+      if (!targets) return true;
+      if (typeof NodeList !== 'undefined' && targets instanceof NodeList && targets.length === 0) return true;
+      if (typeof HTMLCollection !== 'undefined' && targets instanceof HTMLCollection && targets.length === 0) return true;
+      if (Array.isArray(targets) && targets.length === 0) return true;
+      return false;
+    }
+
+    function makeSafeTimeline(realTl) {
+      if (typeof Proxy === 'undefined') return realTl;
+      return new Proxy(realTl, {
+        get: function(target, prop, receiver) {
+          const val = Reflect.get(target, prop, receiver);
+          if (typeof val === 'function' && (prop === 'to' || prop === 'from' || prop === 'fromTo' || prop === 'set')) {
+            return function() {
+              const args = Array.prototype.slice.call(arguments);
+              const targets = args[0];
+              if (isEmptyTarget(targets)) {
+                return receiver;
+              }
+              const res = val.apply(target, args);
+              return res === target ? receiver : res;
+            };
+          }
+          return typeof val === 'function' ? val.bind(target) : val;
+        }
+      });
+    }
+
+    function makeSafeGsap(realGsap) {
+      if (typeof Proxy === 'undefined') return realGsap;
+      return new Proxy(realGsap, {
+        get: function(target, prop, receiver) {
+          const val = Reflect.get(target, prop, receiver);
+          if (typeof val === 'function' && (prop === 'to' || prop === 'from' || prop === 'fromTo' || prop === 'set')) {
+            return function() {
+              const args = Array.prototype.slice.call(arguments);
+              const targets = args[0];
+              if (isEmptyTarget(targets)) {
+                return target;
+              }
+              return val.apply(target, args);
+            };
+          }
+          return typeof val === 'function' ? val.bind(target) : val;
+        }
+      });
+    }
 
     stageElem = document.getElementById('moo-stage');
     if (!stageElem) {
@@ -71,8 +123,8 @@ export function getRuntimeScript(): string {
       sceneWrapper.style.inset = '0';
       sceneWrapper.style.width = '100%';
       sceneWrapper.style.height = '100%';
-      sceneWrapper.style.opacity = '0';
-      sceneWrapper.style.visibility = 'hidden';
+      sceneWrapper.style.opacity = i === 0 ? '1' : '0';
+      sceneWrapper.style.visibility = i === 0 ? 'visible' : 'hidden';
       sceneWrapper.style.pointerEvents = 'none';
       sceneWrapper.style.overflow = 'hidden';
       sceneWrapper.innerHTML = def.html || '';
@@ -94,14 +146,16 @@ export function getRuntimeScript(): string {
         index: i
       };
 
-      // Create scene child timeline
-      const sceneTl = window.gsap.timeline();
+      // Create scene child timeline with target safety
+      const rawSceneTl = window.gsap.timeline();
+      const safeSceneTl = makeSafeTimeline(rawSceneTl);
+      const safeGsap = makeSafeGsap(window.gsap);
       try {
         if (typeof def.build === 'function') {
-          def.build(sceneTl, sceneWrapper, ctx);
+          def.build(safeSceneTl, sceneWrapper, ctx);
         } else if (typeof def.buildSrc === 'string' && def.buildSrc.trim()) {
           const fn = new Function('tl', 'root', 'ctx', 'gsap', def.buildSrc);
-          fn(sceneTl, sceneWrapper, ctx, window.gsap);
+          fn(safeSceneTl, sceneWrapper, ctx, safeGsap);
         }
       } catch (err) {
         console.error('Error in scene build(): ' + sceneItem.id, err);
@@ -113,7 +167,7 @@ export function getRuntimeScript(): string {
         masterTl.set(sceneWrapper, { opacity: 0, visibility: 'hidden' }, accumulatedTime + duration);
       }
 
-      masterTl.add(sceneTl, accumulatedTime);
+      masterTl.add(rawSceneTl, accumulatedTime);
       accumulatedTime += duration;
     }
 
@@ -143,6 +197,23 @@ export function getRuntimeScript(): string {
     if (masterTl) {
       masterTl.seek(t, false);
     }
+    // Explicitly enforce scene wrapper visibility so boundary/zero-duration issues never hide active scenes
+    var allScenes = window.__MOO_SCENES__ || [];
+    var curAccTime = 0;
+    for (var idx = 0; idx < allScenes.length; idx++) {
+      var sItem = allScenes[idx];
+      var sWrap = document.getElementById('scene-' + sItem.id);
+      var sDur = 3.0;
+      if (masterTl && masterTl.getChildren) {
+        // use default duration if meta is not locally cached
+      }
+      var isVisible = (t >= curAccTime && (t < curAccTime + sDur || idx === allScenes.length - 1));
+      if (sWrap) {
+        sWrap.style.opacity = isVisible ? '1' : '0';
+        sWrap.style.visibility = isVisible ? 'visible' : 'hidden';
+      }
+      curAccTime += sDur;
+    }
   }
 
   window.__MOO_INIT__ = initMasterTimeline;
@@ -167,44 +238,81 @@ export function getRuntimeScript(): string {
       try {
         const width = data.width || 1080;
         const height = data.height || 1920;
-        const styles = Array.from(document.querySelectorAll('style'))
+        const rawStyles = Array.from(document.querySelectorAll('style'))
           .map(function(s) { return s.textContent || ''; })
           .join(String.fromCharCode(10));
+
+        var styles = rawStyles.split('url(').join('none(');
+        if (styles.indexOf('@import') !== -1) {
+          styles = styles.split('@import').map(function(part, i) {
+            if (i === 0) return part;
+            var semi = part.indexOf(';');
+            return semi !== -1 ? part.slice(semi + 1) : '';
+          }).join('');
+        }
 
         const stageContainer = document.getElementById('moo-stage') || document.getElementById('moo-viewport') || document.body;
         const clone = stageContainer ? stageContainer.cloneNode(true) : document.createElement('div');
 
+        if (clone.querySelectorAll) {
+          const extImgs = clone.querySelectorAll('img, image');
+          for (let i = 0; i < extImgs.length; i++) {
+            const el = extImgs[i];
+            const src = el.getAttribute('src') || el.getAttribute('href') || '';
+            if (src.indexOf('http://') === 0 || src.indexOf('https://') === 0 || src.indexOf('//') === 0) {
+              if (el.tagName && el.tagName.toLowerCase() === 'img') {
+                el.setAttribute('src', 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
+              } else {
+                el.removeAttribute('href');
+              }
+            }
+          }
+        }
+
         const serialized = new XMLSerializer().serializeToString(clone);
         const wrapperXmlns = serialized.indexOf('xmlns="http://www.w3.org/1999/xhtml"') !== -1 ? '' : ' xmlns="http://www.w3.org/1999/xhtml"';
+
+        const rootComputed = window.getComputedStyle ? window.getComputedStyle(document.documentElement) : null;
+        const mooBg = rootComputed?.getPropertyValue('--moo-bg')?.trim() || '#09090b';
+        const mooAccent = rootComputed?.getPropertyValue('--moo-accent')?.trim() || '#84cc16';
+        const mooText = rootComputed?.getPropertyValue('--moo-text')?.trim() || '#f4f4f5';
+        const mooPrimary = rootComputed?.getPropertyValue('--moo-primary')?.trim() || '#ffffff';
 
         const svgString = 
           '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
           '<style><![CDATA[' + styles + ']]></style>' +
           '<foreignObject width="100%" height="100%">' +
-          '<div' + wrapperXmlns + ' style="width:100%;height:100%;position:relative;background:#09090b;color:#f4f4f6;overflow:hidden;">' +
+          '<div' + wrapperXmlns + ' style="width:100%;height:100%;position:relative;background:' + mooBg + ';color:' + mooText + ';--moo-bg:' + mooBg + ';--moo-accent:' + mooAccent + ';--moo-text:' + mooText + ';--moo-primary:' + mooPrimary + ';overflow:hidden;">' +
           serialized +
           '</div>' +
           '</foreignObject>' +
           '</svg>';
 
-        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
+        // Directly use Data URI to avoid Chromium tainted canvas on Blob URLs
         const img = new Image();
         img.onload = function() {
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          URL.revokeObjectURL(url);
-          const dataUrl = canvas.toDataURL('image/png');
-          window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Canvas 2D context is unavailable');
+            }
+            // Clear with solid background first so output is never transparent zeros
+            ctx.fillStyle = mooBg;
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/png');
+            window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
+          } catch (err) {
+            window.parent.postMessage({ type: 'frame_error', id: data.id, message: String(err) }, '*');
+          }
         };
         img.onerror = function(err) {
-          URL.revokeObjectURL(url);
-          window.parent.postMessage({ type: 'frame_error', id: data.id, message: String(err) }, '*');
+          window.parent.postMessage({ type: 'frame_error', id: data.id, message: 'SVG image error: ' + String(err) }, '*');
         };
-        img.src = url;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
       } catch (err) {
         window.parent.postMessage({ type: 'frame_error', id: data.id, message: String(err) }, '*');
       }
@@ -228,6 +336,10 @@ export function serializeSvgFrame(
     ? ''
     : ' xmlns="http://www.w3.org/1999/xhtml"';
 
+  const cleanStyles = styles
+    .replace(/@import[^;\n]+;?/gi, '')
+    .replace(/url\([^)]*\)/gi, 'none');
+
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +
     width +
@@ -235,7 +347,7 @@ export function serializeSvgFrame(
     height +
     '">' +
     '<style><![CDATA[' +
-    styles +
+    cleanStyles +
     ']]></style>' +
     '<foreignObject width="100%" height="100%">' +
     '<div' +

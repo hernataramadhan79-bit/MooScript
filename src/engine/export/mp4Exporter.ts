@@ -275,9 +275,15 @@ export async function exportMooProjectToMP4(
     format: new Mp4OutputFormat({ fastStart: 'in-memory' })
   });
 
+  const hasGeneratedCompositionScenes = Boolean(
+    project.composition?.scenes?.some(
+      (s) => s.status === 'ok' && Boolean(s.html && s.html.trim().length > 0)
+    )
+  );
+
   const isCompositionMode =
     (project.renderMode || 'composition') === 'composition' &&
-    !!project.composition?.scenes?.length;
+    hasGeneratedCompositionScenes;
 
   // 5. Worker-driven rendering pipeline (OffscreenCanvas) with seamless main-thread fallback
   let workerChunks: Array<{

@@ -28,9 +28,23 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,wasm}'],
-        maximumFileSizeToCacheInBytes: 35 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: /\.(?:wasm)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mooscript-wasm-cache',
+              expiration: {
+                maxEntries: 5,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
           {
             urlPattern: /^https:\/\/huggingface\.co\/.*/i,
             handler: 'CacheFirst',
