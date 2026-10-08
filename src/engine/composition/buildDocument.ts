@@ -2,6 +2,22 @@ import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../.
 import { getRuntimeScript } from './runtime/mooRuntime';
 import { compileOverridesCss, compilePaletteVars } from './layers';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
+// Local WOFF2 subsets inlined as data-URIs so SVG foreignObject export frames
+// render with correct typography even when Google Fonts is unreachable
+// (foreignObject isolates external <link> fonts; data: URIs always resolve).
+import jakarta400 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-400-normal.woff2?inline';
+import jakarta700 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-700-normal.woff2?inline';
+import jakarta800 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-800-normal.woff2?inline';
+import mono400 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?inline';
+import mono700 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2?inline';
+
+const EMBEDDED_FONT_CSS = `
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:400;font-display:swap;src:url('${jakarta400}') format('woff2');}
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:700;font-display:swap;src:url('${jakarta700}') format('woff2');}
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:800;font-display:swap;src:url('${jakarta800}') format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('${mono400}') format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('${mono700}') format('woff2');}
+`;
 
 export interface BuildDocumentOptions {
   standalone?: boolean;
@@ -225,6 +241,33 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   </script>`
     : '';
 
+  const standaloneScaleScript = options?.standalone
+    ? `
+  <!-- Standalone Responsive Auto-Scale: fit 1080x1920 internal coords to any viewport -->
+  <script>
+    (function() {
+      if (window.parent !== window) return;
+      var vp = document.getElementById('moo-viewport');
+      if (!vp) return;
+      var baseW = ${width};
+      var baseH = ${height};
+      function fit() {
+        var availW = window.innerWidth || baseW;
+        var availH = window.innerHeight || baseH;
+        var controller = document.getElementById('moo-standalone-controller');
+        var reservedH = controller ? 90 : 0;
+        var s = Math.min(availW / baseW, (availH - reservedH) / baseH);
+        if (!isFinite(s) || s <= 0) s = 1;
+        vp.style.transform = 'scale(' + s + ')';
+        vp.style.flexShrink = '0';
+      }
+      window.addEventListener('resize', fit);
+      window.addEventListener('orientationchange', fit);
+      fit();
+    })();
+  </script>`
+    : '';
+
   const meta = {
     scenes: resolved.map(({ mod }) => {
       const ts = timelineScenes.find((s) => s.id === mod.beatId);
@@ -243,10 +286,10 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
-  <!-- Google Fonts for Typography -->
+  <!-- Google Fonts for Typography (non-blocking fallback; local WOFF2 above is the primary source) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Syne:wght@700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <!-- GSAP Inlined Core -->
   <script>
     ${gsapScript}
@@ -255,6 +298,8 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
     }
   </script>
   <style>
+    /* Self-contained WOFF2 fonts (local @fontsource, data-URI) — primary type source */
+    ${EMBEDDED_FONT_CSS}
     * {
       box-sizing: border-box;
       margin: 0;
@@ -339,7 +384,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
         window.addEventListener('load', triggerInit);
       }
     })();
-  </script>${standaloneController}
+  </script>${standaloneController}${standaloneScaleScript}
 </body>
 </html>`;
 }

@@ -30,7 +30,7 @@ export const PwaReloadPrompt: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 max-w-sm w-full p-4 rounded-xl bg-zinc-900 border border-primary/40 shadow-2xl animate-fadeIn text-white space-y-2.5">
+    <div className="fixed bottom-20 right-4 z-40 max-w-sm w-full p-4 rounded-xl bg-zinc-900 border border-primary/40 shadow-2xl animate-fadeIn text-white space-y-2.5">
       <div className="flex items-start gap-2.5">
         <span className="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5">
           {needRefresh ? 'system_update' : 'cloud_done'}

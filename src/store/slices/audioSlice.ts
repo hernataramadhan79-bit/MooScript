@@ -275,8 +275,9 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           audioBlob = await generateSyntheticAmbientAudio(1.5);
         } else {
           const res = await generateElevenLabsTTS({
-            apiKey: key,
+            apiKey: key.trim(),
             voiceId: voice || '21m00Tcm4TlvDq8ikWAM',
+            modelId: settings.elevenLabsModel || 'eleven_flash_v2_5',
             text: sampleText,
             stability: settings.stability
           });

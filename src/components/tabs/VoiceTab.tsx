@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { ELEVENLABS_MODELS, DEFAULT_ELEVENLABS_MODEL } from '../../engine/ai/tts';
 
 export const ELEVENLABS_VOICES = [
   { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
@@ -100,6 +101,22 @@ export const VoiceTab: React.FC = () => {
               </option>
             ))}
           </select>
+          <label className="text-xs text-zinc-400 mt-1">ElevenLabs Model (kuota gratis)</label>
+          <select
+            value={settings.elevenLabsModel || DEFAULT_ELEVENLABS_MODEL}
+            onChange={(e) => updateSettings({ elevenLabsModel: e.target.value })}
+            className="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm"
+          >
+            {ELEVENLABS_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-zinc-500 leading-relaxed">
+            Flash v2.5 paling hemat (~0.5 kredit/karakter) dan termasuk kuota gratis 10rb kredit/bulan. Multilingual v2
+            premium (~1 kredit/karakter) menghabiskan kuota 2x lebih cepat.
+          </p>
         </div>
       )}
 

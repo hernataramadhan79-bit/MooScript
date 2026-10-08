@@ -70,10 +70,12 @@ export function formatVttTimecode(seconds: number): string {
 function chunkWordsIntoPhrases(
   words: WordTimestamp[],
   sceneOffset: number,
-  maxWords: number
+  maxWords: number,
+  sceneDuration: number
 ): Array<{ startTime: number; endTime: number; text: string }> {
   if (words.length === 0) return [];
 
+  const sceneEnd = sceneOffset + sceneDuration;
   const chunks: Array<{ startTime: number; endTime: number; text: string }> = [];
   let currentGroup: WordTimestamp[] = [];
 
@@ -86,10 +88,10 @@ function chunkWordsIntoPhrases(
     const isLastWord = i === words.length - 1;
 
     if (hasPunctuation || isAtLimit || isLastWord) {
-      const startTime = sceneOffset + currentGroup[0].start;
-      const endTime = Math.max(
-        startTime + 0.1,
-        sceneOffset + currentGroup[currentGroup.length - 1].end
+      const startTime = Math.min(sceneOffset + currentGroup[0].start, sceneEnd);
+      const endTime = Math.min(
+        sceneEnd,
+        Math.max(startTime + 0.1, sceneOffset + currentGroup[currentGroup.length - 1].end)
       );
       const text = currentGroup.map((cw) => cw.word).join(' ').trim();
 
@@ -133,12 +135,13 @@ export function generateSubtitleCues(
         });
       }
     } else if (mode === 'word') {
-      // Word mode: 1 cue per spoken word
+      // Word mode: 1 cue per spoken word (clamped to scene bounds)
+      const sceneEnd = sceneOffset + sceneDuration;
       for (const wt of scene.wordTimestamps) {
         const text = wt.word.trim();
         if (text.length > 0) {
-          const startTime = sceneOffset + wt.start;
-          const endTime = Math.max(startTime + 0.05, sceneOffset + wt.end);
+          const startTime = Math.min(sceneOffset + wt.start, sceneEnd);
+          const endTime = Math.min(sceneEnd, Math.max(startTime + 0.05, sceneOffset + wt.end));
           cues.push({
             index: cueIndex++,
             startTime,
@@ -149,7 +152,7 @@ export function generateSubtitleCues(
       }
     } else {
       // Phrase mode: chunk words into bite-sized phrases
-      const phrases = chunkWordsIntoPhrases(scene.wordTimestamps, sceneOffset, maxWords);
+      const phrases = chunkWordsIntoPhrases(scene.wordTimestamps, sceneOffset, maxWords, sceneDuration);
       if (phrases.length > 0) {
         for (const p of phrases) {
           cues.push({

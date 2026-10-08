@@ -206,11 +206,15 @@ self.onmessage = async (e: MessageEvent) => {
         chunks[0].meta = lastMeta;
       }
 
-      self.postMessage({
-        type: 'SUCCESS',
-        chunks,
-        totalFrames
-      });
+      // Transfer ArrayBuffer ownership instead of structured-cloning tens of MB.
+      self.postMessage(
+        {
+          type: 'SUCCESS',
+          chunks,
+          totalFrames
+        },
+        chunks.map((c) => c.data)
+      );
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       self.postMessage({ type: 'ERROR', error: errMsg });

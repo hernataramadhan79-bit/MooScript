@@ -58,6 +58,21 @@ export default defineConfig({
                 statuses: [0, 200]
               }
             }
+          },
+          {
+            // Hugging Face LFS redirect target (cas-bridge.xethub.hf.co)
+            urlPattern: /^https:\/\/([a-z0-9-]+\.)?xethub\.hf\.co\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'huggingface-lfs-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }

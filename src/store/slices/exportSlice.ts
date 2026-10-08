@@ -10,6 +10,8 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
   exportResult: null,
 
   startExport: async (opts?: ExportOptions) => {
+    // Re-entrancy guard: ignore double-triggered exports (double-click, strict-mode).
+    if (get().isExporting) return;
     get().pause();
 
     const scenes = get().project.scenes;
@@ -25,6 +27,9 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     }
 
     exportAbortController = new AbortController();
+    // Capture the controller locally so the finally-block only clears it
+    // when it still belongs to THIS export (a newer export may have started).
+    const localController = exportAbortController;
     set({
       isExporting: true,
       exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Starting export...' }
@@ -34,14 +39,14 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
       const result = await exportMooProjectToMP4(
         get().project,
         (progress) => set({ exportProgress: progress }),
-        exportAbortController.signal,
+        localController.signal,
         opts
       );
       set({ isExporting: false, exportResult: result });
     } catch (err: unknown) {
       set({ isExporting: false });
       const isAborted =
-        exportAbortController?.signal.aborted ||
+        localController.signal.aborted ||
         (err instanceof DOMException && err.name === 'AbortError') ||
         (err instanceof Error && err.message.toLowerCase().includes('cancel'));
 
@@ -50,7 +55,9 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
         get().addToast(`MP4 Export failed: ${message}`, 'error');
       }
     } finally {
-      exportAbortController = null;
+      if (exportAbortController === localController) {
+        exportAbortController = null;
+      }
     }
   },
 

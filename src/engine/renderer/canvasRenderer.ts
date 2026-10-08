@@ -78,6 +78,44 @@ export function interpolateMetricValue(target: string, progress: number): string
 }
 
 /**
+ * Safely applies an alpha channel to any CSS color string.
+ * Plain `${color}${alphaHex}` concatenation crashes `addColorStop` / canvas
+ * fills when the color is not a 6-digit hex (e.g. `#fff`, `rgb(...)`,
+ * named colors), so normalize every form instead.
+ */
+export function withAlpha(color: string, alphaHex: string): string {
+  if (typeof color !== 'string') return color;
+  const a = alphaHex.replace(/^#/, '').slice(0, 2).padEnd(2, '0');
+  const c = color.trim();
+
+  let m = c.match(/^#([0-9a-fA-F]{6})$/);
+  if (m) return `#${m[1]}${a}`;
+
+  m = c.match(/^#([0-9a-fA-F]{3})$/);
+  if (m) {
+    const [r, g, b] = m[1].split('');
+    return `#${r}${r}${g}${g}${b}${b}${a}`;
+  }
+
+  m = c.match(/^#([0-9a-fA-F]{8})$/);
+  if (m) return `#${m[1].slice(0, 6)}${a}`;
+
+  m = c.match(/^rgba?\(\s*([^)]+)\)$/i);
+  if (m) {
+    const parts = m[1].split(',').map((s) => s.trim());
+    if (parts.length >= 3) {
+      const alphaDec = (parseInt(a, 16) / 255).toFixed(3);
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alphaDec})`;
+    }
+    return c;
+  }
+
+  // Named colors / CSS vars / unparseable tokens: return untouched rather
+  // than producing an invalid color string that would throw on assignment.
+  return c;
+}
+
+/**
  * Deterministic syntax tokenizer for code mockup cards
  */
 export function tokenizeCodeLine(line: string): Array<{ text: string; color: string }> {
@@ -258,9 +296,14 @@ export class CanvasRenderer {
       // Apply Camera Transform
       this.applyCameraMovement(ctx, activeScene.camera, sceneElapsed, sceneDuration, width, height);
 
-      // Camera Push: subtle scale increment
-      const cameraScale = 1.0 + (frameInScene / sceneTotalFrames) * 0.05;
-      ctx.scale(cameraScale, cameraScale);
+      // Subtle scale drift ONLY when no explicit camera move owns the transform.
+      // push_in / pull_out / snap_zoom already scale inside applyCameraMovement,
+      // so an unconditional extra scale would neutralize pull_out and over-zoom push_in.
+      const camMode = activeScene.camera;
+      if (!camMode || camMode === 'steady_drift') {
+        const cameraScale = 1.0 + (frameInScene / sceneTotalFrames) * 0.05;
+        ctx.scale(cameraScale, cameraScale);
+      }
 
       // Preset-specific motion transform with guaranteed non-zero scale floor
       const preset = activeScene.motionPreset || 'punch_zoom';
@@ -459,7 +502,7 @@ export class CanvasRenderer {
         const alphaHex = Math.round(pulse * 26)
           .toString(16)
           .padStart(2, '0');
-        pulseGrad.addColorStop(0, `${highlight}${alphaHex}`);
+        pulseGrad.addColorStop(0, withAlpha(highlight, alphaHex));
         pulseGrad.addColorStop(0.7, 'transparent');
         ctx.fillStyle = pulseGrad;
         ctx.fillRect(0, 0, width, height);
@@ -510,7 +553,7 @@ export class CanvasRenderer {
     const r1 = width * 0.55;
 
     const g1 = ctx.createRadialGradient(p1x, p1y, 0, p1x, p1y, r1);
-    g1.addColorStop(0, `${theme.primary}55`);
+    g1.addColorStop(0, withAlpha(theme.primary, '55'));
     g1.addColorStop(1, 'transparent');
     ctx.fillStyle = g1;
     ctx.fillRect(0, 0, width, height);
@@ -520,7 +563,7 @@ export class CanvasRenderer {
     const r2 = width * 0.60;
 
     const g2 = ctx.createRadialGradient(p2x, p2y, 0, p2x, p2y, r2);
-    g2.addColorStop(0, `${theme.accent}44`);
+    g2.addColorStop(0, withAlpha(theme.accent, '44'));
     g2.addColorStop(1, 'transparent');
     ctx.fillStyle = g2;
     ctx.fillRect(0, 0, width, height);
@@ -530,7 +573,7 @@ export class CanvasRenderer {
     const r3 = width * 0.45;
 
     const g3 = ctx.createRadialGradient(p3x, p3y, 0, p3x, p3y, r3);
-    g3.addColorStop(0, `${theme.surface}66`);
+    g3.addColorStop(0, withAlpha(theme.surface, '66'));
     g3.addColorStop(1, 'transparent');
     ctx.fillStyle = g3;
     ctx.fillRect(0, 0, width, height);
@@ -549,8 +592,8 @@ export class CanvasRenderer {
     const cardY = height * 0.22;
 
     ctx.save();
-    ctx.fillStyle = `${theme.surface}99`;
-    ctx.strokeStyle = `${theme.muted}40`;
+    ctx.fillStyle = withAlpha(theme.surface, '99');
+    ctx.strokeStyle = withAlpha(theme.muted, '40');
     ctx.lineWidth = 1.5;
 
     if (typeof (ctx as any).roundRect === 'function') {
@@ -1053,7 +1096,7 @@ export class CanvasRenderer {
     this.drawCardContainer(ctx, x, y, w, h, 24, progress, {
       bg: '#141416f0',
       borderColor: '#27272ae6',
-      accentGlow: `${theme.textHighlight || '#84cc16'}22`
+      accentGlow: withAlpha(theme.textHighlight || '#84cc16', '22')
     });
 
     ctx.save();
@@ -1121,9 +1164,9 @@ export class CanvasRenderer {
     } else {
       ctx.rect(pillX, pillY, pillW, pillH);
     }
-    ctx.fillStyle = `${highlight}22`;
+    ctx.fillStyle = withAlpha(highlight, '22');
     ctx.fill();
-    ctx.strokeStyle = `${highlight}66`;
+    ctx.strokeStyle = withAlpha(highlight, '66');
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -1312,8 +1355,8 @@ export class CanvasRenderer {
     const bottomY = y + cardH + 70;
     this.drawCardContainer(ctx, x, bottomY, w, cardH, 18, progress, {
       bg: '#141416f5',
-      borderColor: `${highlight}88`,
-      accentGlow: `${highlight}22`
+      borderColor: withAlpha(highlight, '88'),
+      accentGlow: withAlpha(highlight, '22')
     });
 
     // Tag for Bottom Card
@@ -1390,9 +1433,9 @@ export class CanvasRenderer {
       } else {
         ctx.rect(badgeX, badgeY, badgeSize, badgeSize);
       }
-      ctx.fillStyle = `${highlight}22`;
+      ctx.fillStyle = withAlpha(highlight, '22');
       ctx.fill();
-      ctx.strokeStyle = `${highlight}66`;
+      ctx.strokeStyle = withAlpha(highlight, '66');
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -1533,8 +1576,8 @@ export class CanvasRenderer {
       const glowY = height * 0.45;
       const glowRadius = width * 0.85;
       const grad = offCtx.createRadialGradient(glowX, glowY, 40, glowX, glowY, glowRadius);
-      grad.addColorStop(0, `${highlight}22`);
-      grad.addColorStop(0.5, `${highlight}08`);
+      grad.addColorStop(0, withAlpha(highlight, '22'));
+      grad.addColorStop(0.5, withAlpha(highlight, '08'));
       grad.addColorStop(1, 'transparent');
       offCtx.fillStyle = grad;
       offCtx.fillRect(0, 0, width, height);
@@ -1667,7 +1710,7 @@ export class CanvasRenderer {
     ctx.fillStyle = '#1c1b1d';
     ctx.fill();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = `${highlightColor}88`;
+    ctx.strokeStyle = withAlpha(highlightColor, '88');
     ctx.stroke();
 
     // Draw pre-compiled icon

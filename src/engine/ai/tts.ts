@@ -254,16 +254,64 @@ export async function alignOpenAIAudioWithWhisper(params: {
 }
 
 /**
+ * ElevenLabs TTS model catalogue. Flash v2.5 is the default: cheapest
+ * (~0.5 credit/char), lowest latency, and sits inside the free-tier quota.
+ * Multilingual v2 is premium quality at ~1 credit/char — it drains the
+ * 10k free monthly credits twice as fast.
+ */
+export const ELEVENLABS_MODELS = [
+  { id: 'eleven_flash_v2_5', name: 'Flash v2.5 (Gratis • Terhemat)', free: true },
+  { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5 (Hemat)', free: true },
+  { id: 'eleven_multilingual_v2', name: 'Multilingual v2 (Premium)', free: false }
+] as const;
+
+export const DEFAULT_ELEVENLABS_MODEL = 'eleven_flash_v2_5';
+
+/**
+ * Translates raw ElevenLabs HTTP failures into actionable Indonesian messages.
+ */
+export function mapElevenLabsError(status: number, errText: string): Error {
+  let detail = errText || '';
+  try {
+    const parsed = JSON.parse(errText);
+    const d = parsed?.detail;
+    if (typeof d === 'string') detail = d;
+    else if (d && typeof d.message === 'string') detail = d.message;
+    else if (Array.isArray(d) && d.length > 0 && typeof d[0]?.msg === 'string') detail = d[0].msg;
+  } catch {
+    // Keep the raw body when it is not JSON.
+  }
+
+  if (status === 401) {
+    return new Error(
+      'ElevenLabs: API key ditolak (401). Penyebab paling umum: key bertipe scoped tanpa permission text_to_speech, atau key sudah dicabut. Aktifkan permission text_to_speech untuk key ini di dashboard ElevenLabs (Profile → API Keys).'
+    );
+  }
+  if (status === 402 || /quota|credit|payment|insufficient|balance/i.test(detail)) {
+    return new Error(
+      'ElevenLabs: kuota kredit habis. Cek sisa kredit di dashboard ElevenLabs, atau hemat pemakaian dengan model Flash v2.5 di tab Voice.'
+    );
+  }
+  if (/model[^.]{0,60}(not available|upgrade|plan)|plan[^.]{0,40}model|only available/i.test(detail)) {
+    return new Error(
+      'ElevenLabs: model ini tidak termasuk paket akunmu. Ganti ke Flash v2.5 (gratis, paling hemat) di tab Voice.'
+    );
+  }
+  return new Error(`ElevenLabs TTS Error (${status}): ${detail.slice(0, 300)}`);
+}
+
+/**
  * Generate Audio via ElevenLabs TTS with word timestamps
  */
 export async function generateElevenLabsTTS(params: {
   apiKey: string;
   voiceId: string;
   text: string;
+  modelId?: string;
   stability?: number;
   signal?: AbortSignal;
 }): Promise<{ audioBlob: Blob; wordTimestamps: WordTimestamp[] }> {
-  const { apiKey, voiceId, text, stability = 85, signal } = params;
+  const { apiKey, voiceId, text, modelId = DEFAULT_ELEVENLABS_MODEL, stability = 85, signal } = params;
 
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`;
 
@@ -277,7 +325,7 @@ export async function generateElevenLabsTTS(params: {
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: modelId,
         voice_settings: {
           stability: (stability || 85) / 100,
           similarity_boost: 0.8
@@ -290,7 +338,7 @@ export async function generateElevenLabsTTS(params: {
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`ElevenLabs TTS Error (${res.status}): ${errText}`);
+    throw mapElevenLabsError(res.status, errText);
   }
 
   const json = await res.json();
@@ -502,6 +550,7 @@ export async function generateSceneAudio(params: {
   provider: TTSProvider;
   apiKeys: { openai?: string; elevenlabs?: string };
   voiceId: string;
+  elevenLabsModel?: string;
   speed?: number;
   stability?: number;
   paddingSeconds?: number;
@@ -512,6 +561,7 @@ export async function generateSceneAudio(params: {
     provider,
     apiKeys,
     voiceId,
+    elevenLabsModel,
     speed = 1.05,
     stability = 85,
     paddingSeconds = DEFAULT_SCENE_PADDING_SECONDS,
@@ -519,7 +569,7 @@ export async function generateSceneAudio(params: {
   } = params;
 
   const rawText = (scene.narrationText || scene.text || '').trim();
-  const cacheKey = `${provider}:${voiceId}:${speed}:${stability}:${rawText}`;
+  const cacheKey = `${provider}:${voiceId}:${elevenLabsModel || ''}:${speed}:${stability}:${rawText}`;
 
   // 1. Check IndexedDB cache first
   const cached = await getCachedSceneAudio(cacheKey);
@@ -609,8 +659,9 @@ export async function generateSceneAudio(params: {
     const key = apiKeys.elevenlabs;
     if (!key) throw new Error('ElevenLabs API Key is missing. Please configure it in Settings.');
     const result = await generateElevenLabsTTS({
-      apiKey: key,
+      apiKey: key.trim(),
       voiceId: voiceId || '21m00Tcm4TlvDq8ikWAM',
+      modelId: elevenLabsModel || DEFAULT_ELEVENLABS_MODEL,
       text: rawText,
       stability,
       signal
@@ -864,6 +915,7 @@ export async function generateProjectAudioPerScene(params: {
           provider,
           apiKeys: settings.apiKeys,
           voiceId,
+          elevenLabsModel: settings.elevenLabsModel,
           speed: settings.speed,
           stability: settings.stability,
           paddingSeconds,

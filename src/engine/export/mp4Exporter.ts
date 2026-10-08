@@ -170,7 +170,7 @@ export async function exportMooProjectToMP4(
 
   // 1. Verify WebCodecs VideoEncoder availability via mediabunny
   const isVideoSupported = await canEncodeVideo('avc');
-  if (!isVideoSupported && typeof VideoEncoder === 'undefined') {
+  if (!isVideoSupported || typeof VideoEncoder === 'undefined') {
     throw new Error(
       'WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.'
     );
@@ -216,13 +216,19 @@ export async function exportMooProjectToMP4(
 
   if (project.audioBlob && project.audioBlob.size > 0) {
     try {
-      const audioCtx = new (
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      )();
-      const arrayBuffer = await project.audioBlob.arrayBuffer();
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      audioDuration = audioBuffer.duration;
-      await audioCtx.close();
+      let audioCtx: AudioContext | null = null;
+      try {
+        audioCtx = new (
+          window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        )();
+        const arrayBuffer = await project.audioBlob.arrayBuffer();
+        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        audioDuration = audioBuffer.duration;
+      } finally {
+        if (audioCtx) {
+          await audioCtx.close().catch(() => {});
+        }
+      }
 
       if (Math.abs(audioDuration - scenesDurationSum) > 0.5) {
         warnings.push(
@@ -252,7 +258,7 @@ export async function exportMooProjectToMP4(
 
   if (audioBuffer) {
     const isAudioSupported = await canEncodeAudio('aac');
-    if (!isAudioSupported && typeof AudioEncoder === 'undefined') {
+    if (!isAudioSupported || typeof AudioEncoder === 'undefined') {
       warnings.push('AudioEncoder tidak didukung oleh browser Anda. Video diekspor tanpa audio.');
     } else {
       // Ensure 48kHz for broad compatibility

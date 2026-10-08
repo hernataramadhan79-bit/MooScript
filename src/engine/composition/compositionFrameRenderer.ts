@@ -134,7 +134,9 @@ export async function createCompositionFrameRenderer(
       iframe.style.height = `${height}px`;
       iframe.style.opacity = '0';
       iframe.style.pointerEvents = 'none';
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+      // Opaque-origin sandbox: postMessage + foreignObject rasterization work fine
+      // without allow-same-origin, and scene JS can never reach host IndexedDB.
+      iframe.setAttribute('sandbox', 'allow-scripts');
       iframe.srcdoc = buildCompositionDocument(project);
 
       document.body.appendChild(iframe);

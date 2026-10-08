@@ -701,6 +701,8 @@ export interface EngineSettings {
     elevenlabs: string;
     local: string;
   };
+  /** ElevenLabs TTS model id. Defaults to eleven_flash_v2_5 (cheapest, free-tier friendly). */
+  elevenLabsModel?: string;
   speed: number;
   stability: number;
   duckingDb: number;

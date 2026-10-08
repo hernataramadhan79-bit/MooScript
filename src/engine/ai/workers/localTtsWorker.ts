@@ -125,25 +125,28 @@ async function textToPhonemeIds(
   voiceId: string,
   phonemeIdMap: Record<string, number[]>
 ): Promise<number[]> {
-  const ids: number[] = [];
   const startId = phonemeIdMap['^'] ? phonemeIdMap['^'][0] : 1;
   const endId = phonemeIdMap['$'] ? phonemeIdMap['$'][0] : 2;
   const padId = phonemeIdMap['_'] ? phonemeIdMap['_'][0] : 0;
   const spaceId = phonemeIdMap[' '] ? phonemeIdMap[' '][0] : 3;
 
-  ids.push(startId);
+  // Raw token stream first (no framing yet)
+  const rawIds: number[] = [];
+  const pushMapped = (char: string) => {
+    if (phonemeIdMap[char]) {
+      rawIds.push(...phonemeIdMap[char]);
+    } else if (char === ' ') {
+      rawIds.push(spaceId);
+    } else {
+      rawIds.push(padId);
+    }
+  };
 
   if (voiceId.startsWith('id_ID') || voiceId.includes('indotts')) {
     // Indonesian: Direct character mapping as mapped in id_ID-news_tts-medium
     const cleaned = text.toLowerCase().normalize('NFD');
     for (const char of cleaned) {
-      if (phonemeIdMap[char]) {
-        ids.push(...phonemeIdMap[char]);
-      } else if (char === ' ') {
-        ids.push(spaceId);
-      } else {
-        ids.push(padId);
-      }
+      pushMapped(char);
     }
   } else {
     // English or other languages: Use phonemizer for eSpeak IPA conversion
@@ -151,29 +154,24 @@ async function textToPhonemeIds(
       const phones = await phonemize(text, 'en-us');
       const fullPhones = phones.join(' ');
       for (const char of fullPhones) {
-        if (phonemeIdMap[char]) {
-          ids.push(...phonemeIdMap[char]);
-        } else if (char === ' ') {
-          ids.push(spaceId);
-        } else {
-          ids.push(padId);
-        }
+        pushMapped(char);
       }
     } catch (phonemizeErr) {
       console.warn('Phonemizer failed, falling back to direct character mapping:', phonemizeErr);
       const cleaned = text.toLowerCase();
       for (const char of cleaned) {
-        if (phonemeIdMap[char]) {
-          ids.push(...phonemeIdMap[char]);
-        } else if (char === ' ') {
-          ids.push(spaceId);
-        } else {
-          ids.push(padId);
-        }
+        pushMapped(char);
       }
     }
   }
 
+  // Piper VITS requires blank/PAD (_) interspersed between every token:
+  // [^, 0, p1, 0, p2, 0, ..., $]. Without interspersion the duration
+  // predictor collapses and synthesis degrades into garbled/robotic audio.
+  const ids: number[] = [startId, padId];
+  for (const pid of rawIds) {
+    ids.push(pid, padId);
+  }
   ids.push(endId);
   return ids;
 }

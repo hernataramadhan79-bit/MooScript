@@ -256,44 +256,64 @@ export function buildDuckingCurve(
     return points;
   }
 
-  // Merge overlapping/adjacent word ranges with attack/release buffers
+  // Merge overlapping/adjacent word ranges. Regions store the pure voice span;
+  // the release tail is only used as merge tolerance and applied ONCE later.
   const regions: Array<{ start: number; end: number }> = [];
   let current: { start: number; end: number } | null = null;
 
   for (const w of wordTimestamps) {
+    const wStart = Math.max(0, w.start - attackSec);
+    const wEnd = Math.max(wStart, w.end);
     if (!current) {
-      current = { start: Math.max(0, w.start - attackSec), end: w.end + releaseSec };
-    } else if (w.start - attackSec <= current.end) {
-      // Extend current region
-      current.end = Math.max(current.end, w.end + releaseSec);
+      current = { start: wStart, end: wEnd };
+    } else if (wStart <= current.end + releaseSec) {
+      // Extend current region (gap is bridged by the release tail)
+      current.end = Math.max(current.end, wEnd);
     } else {
       regions.push(current);
-      current = { start: Math.max(0, w.start - attackSec), end: w.end + releaseSec };
+      current = { start: wStart, end: wEnd };
     }
   }
   if (current) regions.push(current);
 
-  // Build gain points (points array was declared above before the early-return check)
+  // Build gain points. current.end above is the VOICE end (no release baked in),
+  // so the release ramp below is applied exactly once per region.
+  const rawPoints: GainPoint[] = [{ time: 0, value: fullGain, ramp: 'set' }];
 
   for (const r of regions) {
-    const duckStart = Math.max(0, r.start);
-    const duckEnd = Math.min(voiceDuration, r.end);
+    const duckStart = Math.max(0, Math.min(r.start, voiceDuration));
+    const duckEnd = Math.max(0, Math.min(r.end, voiceDuration));
+    if (duckEnd <= duckStart && duckStart !== 0) continue;
 
-    // Already at fullGain before this region, ramp down to duckedGain
-    points.push({ time: duckStart, value: duckedGain, ramp: 'linear' });
+    if (duckStart > 0) {
+      // Ramp down from full gain into the ducked region
+      rawPoints.push({ time: duckStart, value: duckedGain, ramp: 'linear' });
+    } else {
+      // Region starts at t=0: a linearRamp at time 0 is invalid/duplicated,
+      // so the curve simply STARTS ducked instead.
+      rawPoints[0] = { time: 0, value: duckedGain, ramp: 'set' };
+    }
     // Hold ducked level through voice
-    points.push({ time: duckEnd, value: duckedGain, ramp: 'set' });
-    // Ramp back to full
-    points.push({
-      time: Math.min(voiceDuration, duckEnd + releaseSec),
-      value: fullGain,
-      ramp: 'linear'
-    });
+    rawPoints.push({ time: duckEnd, value: duckedGain, ramp: 'set' });
+    // Single release ramp back to full gain
+    const releaseEnd = Math.min(voiceDuration, duckEnd + releaseSec);
+    if (releaseEnd > duckEnd) {
+      rawPoints.push({ time: releaseEnd, value: fullGain, ramp: 'linear' });
+    }
   }
 
   // Ensure we end at full gain
-  points.push({ time: voiceDuration, value: fullGain, ramp: 'set' });
-  return points;
+  rawPoints.push({ time: voiceDuration, value: fullGain, ramp: 'set' });
+
+  // Enforce strictly-ascending, deduplicated timestamps (keep last per time)
+  // so AudioParam automation never receives duplicate or unordered events.
+  const byTime = new Map<number, GainPoint>();
+  for (const p of rawPoints) {
+    const t = Math.max(0, Math.min(voiceDuration, p.time));
+    byTime.set(t, { ...p, time: t });
+  }
+  const deduped: GainPoint[] = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
+  return deduped;
 }
 
 // ── Master mix function ───────────────────────────────────────────────────────

@@ -109,6 +109,12 @@ export function getRuntimeScript(): string {
     const scenes = window.__MOO_SCENES__;
     let accumulatedTime = 0;
 
+    // Cache real per-scene durations so seekTo() never falls back to a hardcoded 3s.
+    window.__MOO_SCENE_DURATIONS__ = scenes.map(function(sItem) {
+      const mm = (compositionMeta?.scenes || []).find(function(m) { return m.id === sItem.id; }) || {};
+      return mm.duration || 3.0;
+    });
+
     for (let i = 0; i < scenes.length; i++) {
       const sceneItem = scenes[i];
       const def = sceneItem.definition;
@@ -140,7 +146,7 @@ export function getRuntimeScript(): string {
           if (!meta.wordTimestamps) return 0;
           const clean = String(word).toLowerCase().trim();
           const match = meta.wordTimestamps.find(w => String(w.word).toLowerCase().includes(clean));
-          return match ? Math.max(0, match.start - accumulatedTime) : 0;
+          return match ? Math.max(0, match.start) : 0;
         },
         rand: scenePrng,
         index: i
@@ -203,10 +209,7 @@ export function getRuntimeScript(): string {
     for (var idx = 0; idx < allScenes.length; idx++) {
       var sItem = allScenes[idx];
       var sWrap = document.getElementById('scene-' + sItem.id);
-      var sDur = 3.0;
-      if (masterTl && masterTl.getChildren) {
-        // use default duration if meta is not locally cached
-      }
+      var sDur = (window.__MOO_SCENE_DURATIONS__ && window.__MOO_SCENE_DURATIONS__[idx]) || 3.0;
       var isVisible = (t >= curAccTime && (t < curAccTime + sDur || idx === allScenes.length - 1));
       if (sWrap) {
         sWrap.style.opacity = isVisible ? '1' : '0';
@@ -242,7 +245,11 @@ export function getRuntimeScript(): string {
           .map(function(s) { return s.textContent || ''; })
           .join(String.fromCharCode(10));
 
-        var styles = rawStyles.split('url(').join('none(');
+        // Only neutralize EXTERNAL urls (http/https/protocol-relative). data: URIs,
+        // blob: URIs and #fragment anchors must survive rasterization intact.
+        // NOTE: backslashes are doubled because this script is emitted through
+        // a TypeScript template literal.
+        var styles = rawStyles.replace(/url\\(\\s*['"]?(?:https?:|\\/\\/)[^)'"]*['"]?\\s*\\)/gi, 'none');
         if (styles.indexOf('@import') !== -1) {
           styles = styles.split('@import').map(function(part, i) {
             if (i === 0) return part;
@@ -270,7 +277,11 @@ export function getRuntimeScript(): string {
         }
 
         const serialized = new XMLSerializer().serializeToString(clone);
-        const wrapperXmlns = serialized.indexOf('xmlns="http://www.w3.org/1999/xhtml"') !== -1 ? '' : ' xmlns="http://www.w3.org/1999/xhtml"';
+        // The wrapper <div> directly under <foreignObject> MUST always carry the
+        // XHTML namespace — XMLSerializer puts xmlns on the first serialized child,
+        // never on our wrapper, so a conditional check leaves the wrapper
+        // namespace-less and Chromium renders a blank frame.
+        const wrapperXmlns = ' xmlns="http://www.w3.org/1999/xhtml"';
 
         const rootComputed = window.getComputedStyle ? window.getComputedStyle(document.documentElement) : null;
         const mooBg = rootComputed?.getPropertyValue('--moo-bg')?.trim() || '#09090b';
@@ -332,13 +343,13 @@ export function serializeSvgFrame(
   styles: string
 ): string {
   const serialized = new XMLSerializer().serializeToString(clone);
-  const wrapperXmlns = serialized.includes('xmlns="http://www.w3.org/1999/xhtml"')
-    ? ''
-    : ' xmlns="http://www.w3.org/1999/xhtml"';
+  // Wrapper <div> under <foreignObject> always needs the XHTML namespace
+  // (see capture handler above for rationale).
+  const wrapperXmlns = ' xmlns="http://www.w3.org/1999/xhtml"';
 
   const cleanStyles = styles
     .replace(/@import[^;\n]+;?/gi, '')
-    .replace(/url\([^)]*\)/gi, 'none');
+    .replace(/url\(\s*['"]?(?:https?:|\/\/)[^)'"]*['"]?\s*\)/gi, 'none');
 
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +

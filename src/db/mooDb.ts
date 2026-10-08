@@ -96,19 +96,25 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
     cleanProject.updatedAt = now;
     await db.projects.put(cleanProject as MooProject);
 
-    // Only write audioBlob if reference has actually changed for this project
+    // Only write audioBlob if reference has actually changed for this project.
+    // NOTE: an explicit delete is required when audioBlob is missing/empty
+    // (timer mode or removed audio). The old `audioBlob !== undefined` check
+    // skipped this case, leaving zombie blobs that resurrected on reload.
     const lastSaved = lastSavedAudioBlobByProject.get(project.id);
-    if (audioBlob !== undefined && audioBlob !== lastSaved) {
-      if (audioBlob && audioBlob.size > 0) {
+    const hasAudio = !!audioBlob && audioBlob.size > 0;
+    const hadAudio = !!lastSaved && lastSaved.size > 0;
+    if (hasAudio) {
+      if (audioBlob !== lastSaved) {
         await db.audioBlobs.put({
           projectId: project.id,
           blob: audioBlob,
           updatedAt: now
         });
-      } else {
-        await db.audioBlobs.delete(project.id);
+        lastSavedAudioBlobByProject.set(project.id, audioBlob);
       }
-      lastSavedAudioBlobByProject.set(project.id, audioBlob);
+    } else if (hadAudio || lastSaved !== undefined) {
+      await db.audioBlobs.delete(project.id);
+      lastSavedAudioBlobByProject.delete(project.id);
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -169,6 +175,9 @@ export async function loadProjectFromDb(id: string): Promise<MooProject | null> 
     if (storedAudio) {
       project.audioBlob = storedAudio.blob;
       lastSavedAudioBlobByProject.set(id, storedAudio.blob);
+    } else {
+      // No blob on disk — drop any stale in-memory reference (zombie guard).
+      lastSavedAudioBlobByProject.delete(id);
     }
     return normalizeProject(project);
   } catch (err: unknown) {

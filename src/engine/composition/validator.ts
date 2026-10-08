@@ -36,9 +36,11 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
   const combinedJs = code.buildJs || '';
   const combinedHtml = code.html || '';
 
+  // Strip real comments ONCE (string/regex aware) instead of per-pattern.
+  const cleanCode = stripCommentsRespectingStrings(combinedJs);
+
   // Check forbidden patterns in JS
   for (const { pattern, message } of FORBIDDEN_PATTERNS) {
-    const cleanCode = combinedJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     if (pattern.test(cleanCode)) {
       errors.push(message);
     }
@@ -112,6 +114,103 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
     errors,
     warnings
   };
+}
+
+/**
+ * Removes line comments and block comments while respecting string literals
+ * (single quotes, double quotes, template quotes) and regex literals.
+ *
+ * The naive comment stripping deleted the rest of any line containing
+ * a double slash — including code like const url = "http://..." followed by
+ * a real violation — which both hid real violations (security bypass) and
+ * created false positives from commented-out code. This tokenizer only
+ * strips comments that appear in actual code position.
+ */
+export function stripCommentsRespectingStrings(code: string): string {
+  let out = '';
+  let i = 0;
+  const n = code.length;
+  let quote: "'" | '"' | '`' | null = null;
+
+  const isRegexStart = (prev: string): boolean => {
+    if (!prev) return true;
+    return '=(:,!&|?{};,[+-*%^~<>'.includes(prev);
+  };
+
+  while (i < n) {
+    const ch = code[i];
+    const next = i + 1 < n ? code[i + 1] : '';
+
+    if (quote) {
+      out += ch;
+      if (ch === '\\' && i + 1 < n) {
+        out += code[i + 1];
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      i++;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    if (ch === '/' && next === '/') {
+      // `//` can never open a regex literal — always a line comment here.
+      while (i < n && code[i] !== '\n') i++;
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < n && !(code[i] === '*' && code[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+
+    if (ch === '/') {
+      // Heuristic regex-literal skip so `//` sequences inside /.../ survive.
+      let j = i - 1;
+      while (j >= 0 && (code[j] === ' ' || code[j] === '\t' || code[j] === '\n' || code[j] === '\r')) j--;
+      const prev = j >= 0 ? code[j] : '';
+      const prevWord = code.slice(Math.max(0, j - 5), j + 1);
+      if (isRegexStart(prev) || /\breturn$/.test(prevWord)) {
+        let k = i + 1;
+        let inClass = false;
+        let closed = false;
+        while (k < n) {
+          const c = code[k];
+          if (c === '\\') {
+            k += 2;
+            continue;
+          }
+          if (c === '[') inClass = true;
+          else if (c === ']') inClass = false;
+          else if (c === '/' && !inClass) {
+            closed = true;
+            break;
+          } else if (c === '\n') break;
+          k++;
+        }
+        if (closed) {
+          let e = k + 1;
+          while (e < n && /[a-z]/i.test(code[e])) e++;
+          out += code.slice(i, e);
+          i = e;
+          continue;
+        }
+      }
+    }
+
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 /**

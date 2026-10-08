@@ -357,10 +357,44 @@ const GEMINI_ENGINE_SCHEMA = {
 
 /**
  * Strips markdown code fences (```json ... ```) from LLM output.
+ * Also removes reasoning traces (<think>, <reasoning>) emitted by
+ * deepseek/qwen-style models, tolerates unclosed reasoning blocks cut off
+ * by token limits, and extracts fenced JSON wherever it appears
+ * (not only at the start of the response).
  */
 export function cleanJsonFence(raw: string): string {
   if (!raw) return '';
   let cleaned = raw.trim();
+
+  // Strip complete reasoning blocks (case-insensitive, incl. attributes)
+  cleaned = cleaned.replace(/<think\b[^>]*>[\s\S]*?<\/think\s*>/gi, '').trim();
+  cleaned = cleaned.replace(/<reasoning\b[^>]*>[\s\S]*?<\/reasoning\s*>/gi, '').trim();
+
+  // Unclosed <think> (response cut off by token limit)
+  const thinkOpen = cleaned.search(/<think\b[^>]*>/i);
+  if (thinkOpen !== -1) {
+    const afterThink = cleaned.slice(thinkOpen);
+    if (/`{3,}/.test(afterThink)) {
+      // The answer fence survived inside/after the reasoning spill —
+      // drop only the tag itself and let fence extraction below handle it.
+      cleaned = (cleaned.slice(0, thinkOpen) + afterThink.replace(/<think\b[^>]*>/i, '')).trim();
+    } else {
+      // Pure reasoning spill with no answer payload.
+      cleaned = cleaned.slice(0, thinkOpen).trim();
+    }
+  }
+
+  // Extract a fenced block wherever it sits (```json preferred, else first fence)
+  const jsonFence = cleaned.match(/`{3,}\s*json\s*\n?([\s\S]*?)(?:`{3,}|$)/i);
+  if (jsonFence) {
+    return jsonFence[1].trim();
+  }
+  if (cleaned.includes('```')) {
+    const anyFence = cleaned.match(/`{3,}[^\n]*\n?([\s\S]*?)(?:`{3,}|$)/);
+    if (anyFence) {
+      return anyFence[1].trim();
+    }
+  }
   if (cleaned.startsWith('```json')) {
     cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
   } else if (cleaned.startsWith('```')) {
@@ -1634,10 +1668,38 @@ export async function testProviderApiKey(
         signal: controller.signal
       });
     } else if (provider === 'elevenlabs') {
+      const elevenHeaders = { 'xi-api-key': trimmedKey };
       res = await fetch('https://api.elevenlabs.io/v1/user', {
-        headers: { 'xi-api-key': trimmedKey },
+        headers: elevenHeaders,
         signal: controller.signal
       });
+      if (res.status === 401) {
+        // Scoped keys without `user_read` fail /v1/user even when perfectly
+        // valid — verify via /v1/voices instead of crying "invalid key".
+        let probe = '';
+        try {
+          probe = await res.clone().text();
+        } catch {
+          probe = '';
+        }
+        if (/missing_permissions|missing permission/i.test(probe)) {
+          const voicesRes = await fetch('https://api.elevenlabs.io/v1/voices', {
+            headers: elevenHeaders,
+            signal: controller.signal
+          });
+          if (voicesRes.ok) {
+            return {
+              success: true,
+              message: 'API Key valid (scoped key — terverifikasi via daftar voices).'
+            };
+          }
+          return {
+            success: false,
+            message:
+              'ElevenLabs: key terdeteksi tapi izinnya tidak cukup. Aktifkan permission text_to_speech (dan user_read bila tersedia) untuk key ini di dashboard ElevenLabs.'
+          };
+        }
+      }
     } else {
       return { success: false, message: `Unknown provider: ${provider}` };
     }

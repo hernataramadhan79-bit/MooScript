@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     elevenlabs: '21m00Tcm4TlvDq8ikWAM',
     local: 'id_ID-news_tts'
   },
+  elevenLabsModel: 'eleven_flash_v2_5',
   speed: 1.05,
   stability: 85,
   duckingDb: -12,

@@ -368,7 +368,7 @@ describe('Phase 3: Composition & Export Tests', () => {
       expect(parsedDoc.querySelector('h1')?.textContent).toContain('Title\u00A0With\u00A0Spaces');
     });
 
-    it('removes duplicate xmlns attribute on root div if already present', () => {
+    it('always stamps the XHTML namespace on the wrapper div (blank-frame guard)', () => {
       const mockDiv = {
         outerHTML: '<div xmlns="http://www.w3.org/1999/xhtml"><span>Test</span></div>'
       };
@@ -379,9 +379,40 @@ describe('Phase 3: Composition & Export Tests', () => {
       const parserErrors = parsedDoc.getElementsByTagName('parsererror');
 
       expect(parserErrors.length).toBe(0);
-      // Ensure xmlns is not duplicated
+      // The wrapper <div> directly under <foreignObject> must ALWAYS carry the
+      // XHTML namespace, otherwise Chromium renders a blank frame.
+      expect(serializedSvg).toMatch(/<foreignObject[^>]*><div xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+      // The inner payload keeps its own xmlns — occurrences must never be zero.
       const matchCount = (serializedSvg.match(/xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/g) || []).length;
-      expect(matchCount).toBe(1);
+      expect(matchCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it('stamps wrapper xmlns even when the serialized payload lacks it', () => {
+      const mockDiv = {
+        outerHTML: '<div><span>No Namespace Payload</span></div>'
+      };
+
+      const serializedSvg = serializeSvgFrame(mockDiv as any, 1080, 1920, '');
+      expect(serializedSvg).toMatch(/<foreignObject[^>]*><div xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+    });
+
+    it('preserves data: URIs and #anchors while neutralizing external url()', () => {
+      const mockDiv = {
+        outerHTML: '<div><span>Styles</span></div>'
+      };
+
+      const css = [
+        '.a { background: url(data:image/svg+xml;base64,AAA); }',
+        '.b { background: url(#localGradient); }',
+        '.c { background: url(https://evil.example.com/x.png); }',
+        '.d { background: url(//cdn.example.com/y.png); }'
+      ].join('\n');
+
+      const serializedSvg = serializeSvgFrame(mockDiv as any, 1080, 1920, css);
+      expect(serializedSvg).toContain('url(data:image/svg+xml;base64,AAA)');
+      expect(serializedSvg).toContain('url(#localGradient)');
+      expect(serializedSvg).not.toContain('https://evil.example.com/x.png');
+      expect(serializedSvg).not.toContain('//cdn.example.com/y.png');
     });
   });
 

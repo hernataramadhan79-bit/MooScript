@@ -8,6 +8,7 @@ import {
   sanitizeModelName,
   generateStoryboard,
   callRawLLM,
+  testProviderApiKey,
   parseGeminiModelsList,
   parseOpenAIModelsList,
   parseAnthropicModelsList,
@@ -465,3 +466,33 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
 });
 
 
+describe(`testProviderApiKey elevenlabs scoped-key fallback`, () => {
+  const origFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = origFetch;
+    vi.restoreAllMocks();
+  });
+
+  it(`accepts scoped keys via /v1/voices when /v1/user reports missing_permissions`, async () => {
+    (globalThis as any).fetch = vi.fn(async (url: string) => {
+      if (String(url).endsWith(`/v1/user`)) {
+        return new Response(
+          JSON.stringify({ detail: { status: `missing_permissions`, message: `missing the permission user_read` } }),
+          { status: 401 }
+        );
+      }
+      return new Response(JSON.stringify({ voices: [] }), { status: 200 });
+    });
+    const res = await testProviderApiKey(`elevenlabs`, `sk_test_scoped`);
+    expect(res.success).toBe(true);
+  });
+
+  it(`still rejects truly invalid keys`, async () => {
+    (globalThis as any).fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ detail: { status: `invalid_api_key`, message: `Invalid API key` } }), { status: 401 })
+    );
+    const res = await testProviderApiKey(`elevenlabs`, `sk_invalid`);
+    expect(res.success).toBe(false);
+  });
+});
