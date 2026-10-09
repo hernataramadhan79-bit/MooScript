@@ -2,7 +2,7 @@
  * Core Motion Graphics Director Laws & Prompts
  * 
  * Grounded in generative cinematic motion design principles.
- * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and GSAP timeline animations
+ * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and GSAP animation code
  * based on the concept and narrative — NEVER constrained by fixed slide or text templates.
  */
 
@@ -35,26 +35,31 @@ Your task is to invent and write custom, production-grade HTML (with SVGs/shapes
 
 7. COMPOSITION MUST BE BESPOKE & EDITABLE:
    - Build completely custom DOM/SVG layers.
-   - Tag major editable visual elements with stable identifiers: \`data-moo-layer="layer-id"\` (e.g. \`data-moo-layer="airplane"\`, \`data-moo-layer="airflow"\`, \`data-moo-layer="metric"\`, \`data-moo-layer="main-title"\`).
+   - Tag major editable visual elements with stable identifiers: data-moo-layer="layer-id" (e.g. data-moo-layer="airplane", data-moo-layer="airflow", data-moo-layer="metric", data-moo-layer="main-title").
 
-8. CONTINUITY:
-   - Harmonize typography, color tokens, and motion personality with the surrounding scenes.
+8. FREEDOM OF PALETTE & FAITHFULNESS TO USER INTENT (CRITICAL):
+   - 100% OBEY USER INTENT: The user's story, narration, visual intent, visual concept, and focus words are your supreme instructions. Visuals must faithfully depict what is requested.
+   - NEVER FORCE A GREEN/LIME PALETTE: Dilarang memaksakan warna hijau limau (#84cc16) kecuali topik adegan secara spesifik meminta tanaman/alam!
+   - Select cohesive lighting, background atmosphere, and color accents organically matching the subject matter (e.g. ocean: deep cyan/navy; fire/heat: vermilion/amber; tech: dark slate/ice-blue; finance: charcoal/gold; clean studio: monochromatic high contrast).
+   - Use scoped CSS variables with your chosen contextual colors as fallback:
+     var(--moo-bg, <theme-bg>), var(--moo-text, <theme-text>), var(--moo-accent, <theme-accent>), var(--moo-primary, <theme-primary>).
+     This guarantees post-generation theming in the editor without forcing a preset palette upfront.
 
 === GSAP TIMELINE TIMING & EASING ===
 - Animate elements through parameter 'tl' (GSAP Timeline) provided directly by the runtime.
-- DO NOT redeclare 'tl', 'root', 'ctx', or 'gsap' (DO NOT write \`const tl = gsap.timeline()\` or \`const root = ...\`).
-- DO NOT use \`import\` or \`export default\`. DO NOT wrap in \`function(...) { ... }\` or \`DOMContentLoaded\`. Write direct GSAP calls.
-- Target elements inside 'root' using \`root.querySelector()\` or \`root.querySelectorAll()\`.
+- DO NOT redeclare 'tl', 'root', 'ctx', or 'gsap' (DO NOT write const tl = gsap.timeline() or const root = ...).
+- DO NOT use import or export default. DO NOT wrap in function(...) { ... } or DOMContentLoaded. Write direct GSAP calls.
+- Target elements inside 'root' using root.querySelector() or root.querySelectorAll().
 - Use cinematic easings: 'power3.out', 'expo.out', 'back.out(1.5)', 'circ.out', 'sine.inOut'.
-- Total scene duration is \`ctx.dur\` (in seconds). All animations must complete cleanly within [0, ctx.dur].
-- Sync animations with spoken keywords via \`ctx.at('keyword')\` if voiceover timestamps are available.
+- Total scene duration is ctx.dur (in seconds). All animations must complete cleanly within [0, ctx.dur].
+- Sync animations with spoken keywords via ctx.at('keyword') if voiceover timestamps are available.
 
 === DETERMINISM & CODE SECURITY LAWS ===
-- NEVER use \`Math.random()\`. Use \`ctx.rand()\` for deterministic pseudo-random values.
-- NEVER read \`Date.now()\`, \`performance.now()\`, or \`new Date()\`.
-- NEVER call \`fetch()\`, \`XMLHttpRequest\`, \`WebSocket\`, or inject \`<script>\` / \`<iframe>\` tags.
-- NEVER access \`window.parent\`, \`window.top\`, \`globalThis\`, \`localStorage\`, or \`document.cookie\`.
-- All CSS must be self-contained; use CSS variables: \`var(--moo-bg)\`, \`var(--moo-primary)\`, \`var(--moo-accent)\`, \`var(--moo-text)\`.
+- NEVER use Math.random(). Use ctx.rand() for deterministic pseudo-random values.
+- NEVER read Date.now(), performance.now(), or new Date().
+- NEVER call fetch(), XMLHttpRequest, WebSocket, or inject <script> / <iframe> tags.
+- NEVER access window.parent, window.top, globalThis, localStorage, or document.cookie.
+- All CSS must be self-contained; use CSS variables: var(--moo-bg), var(--moo-primary), var(--moo-accent), var(--moo-text).
 `;
 
 export interface SceneCodegenParams {
@@ -70,6 +75,7 @@ export interface SceneCodegenParams {
   aspectRatio: string;
   previousSceneSummary?: string;
   nextSceneSummary?: string;
+  focusWords?: string[];
   styleBrief: {
     palette: { bg: string; primary: string; accent: string; text: string };
     fontDisplay: string;
@@ -93,10 +99,11 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
     aspectRatio,
     previousSceneSummary,
     nextSceneSummary,
+    focusWords,
     styleBrief
   } = params;
 
-  const elementsList = visualElements && visualElements.length > 0 ? visualElements.join(', ') : 'Custom geometric & illustrative elements';
+  const elementsList = visualElements && visualElements.length > 0 ? visualElements.join(', ') : 'Elemen visual geometris & ilustratif custom';
 
   let contextSnippet = '';
   if (previousSceneSummary) {
@@ -106,35 +113,39 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
     contextSnippet += `- Scene Berikutnya (#${beatIndex + 2}): "${nextSceneSummary}"\n`;
   }
 
+  const focusList = focusWords && focusWords.length > 0 ? focusWords.join(', ') : '';
+
   return `
 Desain dan kodekan SCENE #${beatIndex + 1} dari ${totalBeats} untuk video motion graphics ini.
 
-=== INFORMASI & INTENT SCENE ===
-- Narasi (VO): "${narration || '(Scene visual murni tanpa teks narasi)'}"
-- Visual Intent: "${visualIntent}"
-${visualConcept ? `- Konsep Visual: "${visualConcept}"\n` : ''}
-- Elemen Visual Utama: ${elementsList}
-${motionIntent ? `- Arahan Gerak (Motion Intent): "${motionIntent}"\n` : ''}
+=== ARAHAN UTAMA: 100% PATUH PADA IDE & INTENT PENGGUNA ===
+- Narasi (Voiceover): "${narration || '(Scene visual murni tanpa teks narasi)'}"
+- Visual Intent (Apa yang digambar/dimunculkan): "${visualIntent}"
+${visualConcept ? `- Konsep / Metafora Visual: "${visualConcept}"\n` : ''}
+${focusList ? `- Kata Kunci Sorotan (Focus Words): "${focusList}" (Wajib berikan highlight aksen/punch kinetik saat kata ini muncul)\n` : ''}
+- Elemen Visual: ${elementsList}
+${motionIntent ? `- Arahan Gerak: "${motionIntent}"\n` : ''}
 ${cameraIntent ? `- Arahan Kamera: "${cameraIntent}"\n` : ''}
 - Durasi scene: ${durationSec.toFixed(1)} detik.
 - Aspek Rasio: ${aspectRatio}
 
 ${contextSnippet ? `=== KONTINUITAS DENGAN SCENE LAIN ===\n${contextSnippet}\n` : ''}
-=== STYLE TOKENS ===
-- Background: var(--moo-bg, ${styleBrief.palette.bg})
-- Primary Accent: var(--moo-primary, ${styleBrief.palette.primary})
-- Highlight Accent: var(--moo-accent, ${styleBrief.palette.accent})
-- Text Color: var(--moo-text, ${styleBrief.palette.text})
-- Font Display: var(--moo-font-display, '${styleBrief.fontDisplay}')
-- Motion Signature: ${styleBrief.motionSignature}
-- Atmosphere: ${styleBrief.backgroundLanguage}
+=== PALET WARNA & ATMOSFER (BEBAS SESUAI TOPIK — JANGAN DEFAULT HIJAU) ===
+- Rancang atmosfer latar belakang, gradien, pencahayaan, dan warna yang SEPENUHNYA COCOK dan ORGANIK dengan topik cerita di atas.
+- DILARANG memaksakan warna hijau limau (#84cc16) kecuali topik cerita Anda memang tentang botani/lingkungan hidup!
+- Untuk fleksibilitas editing pasca-generasi, bungkus warna dengan CSS variables menggunakan warna tematik pilihan Anda sebagai fallback:
+  * Background: var(--moo-bg, ${styleBrief.palette.bg || '#09090b'})
+  * Text Color: var(--moo-text, ${styleBrief.palette.text || '#ffffff'})
+  * Accent Highlight: var(--moo-accent, ${styleBrief.palette.accent && styleBrief.palette.accent !== '#84cc16' ? styleBrief.palette.accent : 'pilih-warna-aksen-tematik-sesuai-topik'})
+  * Primary: var(--moo-primary, ${styleBrief.palette.primary && styleBrief.palette.primary !== '#84cc16' ? styleBrief.palette.primary : 'pilih-warna-primer-tematik'})
+  * Font Display: var(--moo-font-display, '${styleBrief.fontDisplay || 'Plus Jakarta Sans'}')
 
 === PERSYARATAN ELEMEN & KODE ===
-1. Buat komposisi visual custom yang menggambarkan konsep secara langsung (diagram, SVG grafis, bentuk, objek bergerak, atau metafora visual).
-2. Tandai elemen-elemen penting dengan atribut \`data-moo-layer="layer-id"\` (misal \`data-moo-layer="airplane"\`, \`data-moo-layer="airflow"\`, \`data-moo-layer="title"\`).
-3. Wadah utama harus berukuran 100% x 100% dan ter-scope dengan class \`.scene-s${beatIndex + 1}\`.
-4. Kode GSAP dieksekusi langsung di runtime dengan parameter (tl, root, ctx, gsap). JANGAN deklarasikan ulang 'const tl = gsap.timeline()' atau 'const root = ...'. JANGAN gunakan 'export default' atau membungkus dalam function. Langsung panggil \`tl.to(...)\`, \`tl.from(...)\`, atau \`tl.fromTo(...)\` dalam durasi maksimal \`ctx.dur\`.
-5. EFISIENSI & KECEPATAN TINGGI: Tuliskan kode yang bersih, padat, dan elegan (~30-60 baris total). Hindari string path SVG yang terlalu panjang atau kode boilerplate yang bertele-tele. Cukup hasilkan 3 blok kode murni tanpa kata pembuka atau penutup tambahan.
+1. Wajib representasikan Visual Intent & Konsep pengguna secara nyata (buat diagram interaktif, ilustrasi SVG grafis, bentuk geometris kinetik, atau alur visual yang nyata). JANGAN sekadar kartu teks statis.
+2. Tandai elemen-elemen penting dengan atribut data-moo-layer="layer-id" (misal data-moo-layer="airplane", data-moo-layer="streamline", data-moo-layer="headline").
+3. Wadah utama harus berukuran 100% x 100% dan ter-scope dengan class .scene-s${beatIndex + 1}.
+4. Kode GSAP dieksekusi langsung di runtime dengan parameter (tl, root, ctx, gsap). JANGAN deklarasikan ulang 'const tl' atau 'const root'. Langsung panggil tl.to(...), tl.from(...), atau tl.fromTo(...) dalam durasi maksimal ctx.dur.
+5. EFISIENSI & KUALITAS TINGGI: Tuliskan kode yang bersih, padat, dan elegan (~30-60 baris total). Hasilkan HANYA 3 blok kode murni tanpa kata pembuka atau penutup tambahan.
 
 === FORMAT OUTPUT WAJIB ===
 Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tambahan di luar blok):
@@ -224,4 +235,3 @@ ${params.originalCode.buildJs}
 \`\`\`
 `;
 }
-

@@ -39,6 +39,7 @@ export interface StoryBeat {
   cameraIntent?: string;
   transitionIntent?: string;
   emphasis?: string[];
+  focusWords?: string[];
   mood?: string;
   durationHint?: number;
   locked?: boolean;

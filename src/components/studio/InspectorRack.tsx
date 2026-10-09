@@ -3,7 +3,6 @@ import { useMooStore } from '../../store/useMooStore';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
-import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
 import type {
@@ -151,9 +150,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const {
     project,
     settings,
-    skills,
-    activeSkillId,
-    setActiveSkillId,
     isCompilingMograph,
     setIsCompilingMograph,
     updateThemeFont,
@@ -361,12 +357,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       }
       setGenerationStats({ completed: 0, total, sceneStatuses: initialStatuses });
 
-      // Extract active skill system prompt as style advice
-      const activeSkill = skills.find((s) => s.id === activeSkillId);
-      const styleAdvice = activeSkill?.systemPrompt
-        ? activeSkill.systemPrompt.slice(0, 2000)
-        : undefined;
-
       const modelToUse =
         provider === 'gemini'
           ? settings.geminiModel
@@ -479,25 +469,28 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 visualElements: beat.visualElements,
                 motionIntent: beat.motionIntent,
                 cameraIntent: beat.camera,
-                durationHint: beat.durationInSeconds || 3.5
+                durationHint: beat.durationInSeconds || 3.5,
+                focusWords: beat.focusWords
               },
               index: i,
               total,
               aspectRatio: projectNow.aspectRatio || '9:16',
               styleBrief: {
-                adjectives: ['energetic', 'clean', 'cinematic'],
+                adjectives: ['cinematic', 'expressive', 'bespoke'],
                 palette: {
                   bg: projectNow.theme.bg || '#09090b',
                   primary: projectNow.theme.textPrimary || '#f4f4f6',
-                  accent: projectNow.theme.textHighlight || '#84cc16',
+                  accent:
+                    projectNow.theme.textHighlight && projectNow.theme.textHighlight !== '#84cc16'
+                      ? projectNow.theme.textHighlight
+                      : '',
                   text: projectNow.theme.textPrimary || '#ffffff'
                 },
                 fontDisplay: mapFontDisplay(projectNow.theme.fontFamily),
                 fontBody: 'Plus Jakarta Sans',
-                backgroundLanguage: 'Subtle animated mesh gradient with floating particles',
-                motionSignature: 'Smooth camera punch-in with kinetic typography bounce'
+                backgroundLanguage: 'Visual atmosfer tematik yang secara organik mengekspresikan ide adegan',
+                motionSignature: 'Animasi kinetik dinamis yang secara akurat memvisualisasikan narasi & konsep'
               },
-              styleAdvice,
               provider,
               apiKey,
               model: modelToUse,
@@ -788,62 +781,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <span>Generate Mograph AI</span>
                 </button>
               )}
-            </div>
-
-            {/* Persona & Pacing Motion (Skills) */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Persona Motion & Ritme
-              </span>
-
-              <div className="grid grid-cols-1 gap-2">
-                {/* Opsi Bebas / Murni */}
-                <button
-                  type="button"
-                  onClick={() => setActiveSkillId('')}
-                  className={`p-2.5 rounded-xl border text-left transition-all select-none flex items-center gap-2.5 ${
-                    !activeSkillId
-                      ? 'bg-surface-3 border-accent text-on-surface ring-1 ring-accent/30 shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:border-border-strong hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px] text-accent shrink-0">
-                    all_inclusive
-                  </span>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[12px] font-semibold text-on-surface">Bebas / Murni</span>
-                    <span className="text-[11px] text-text-muted truncate">
-                      AI merancang komposisi kinetik bebas sesuai skrip
-                    </span>
-                  </div>
-                </button>
-
-                {skills.map((skill) => {
-                  const isSelected = skill.id === activeSkillId;
-                  return (
-                    <button
-                      key={skill.id}
-                      type="button"
-                      onClick={() => setActiveSkillId(skill.id)}
-                      className={`p-2.5 rounded-xl border text-left transition-all select-none flex items-center gap-2.5 ${
-                        isSelected
-                          ? 'bg-surface-3 border-accent text-on-surface ring-1 ring-accent/30 shadow-sm'
-                          : 'bg-surface-2 border-border text-text-muted hover:border-border-strong hover:text-on-surface'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[20px] text-accent shrink-0">
-                        {resolveSkillIcon(skill.icon)}
-                      </span>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[12px] font-semibold text-on-surface">{skill.name}</span>
-                        <span className="text-[11px] text-text-muted truncate">
-                          {skill.description}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Subtitel Global & Resolusi */}

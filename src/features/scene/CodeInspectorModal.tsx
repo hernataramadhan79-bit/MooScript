@@ -35,7 +35,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
     } else {
       // Default template if not yet generated
       setHtmlCode('<div class="scene-box">\n  <h1 class="headline">Custom Title</h1>\n</div>');
-      setCssCode('.scene-box {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.headline {\n  font-size: 72px;\n  color: #84cc16;\n}');
+      setCssCode('.scene-box {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.headline {\n  font-size: 72px;\n  color: var(--moo-accent, #38bdf8);\n}');
       setJsCode('tl.from(root.querySelector(".headline"), {\n  scale: 0.5,\n  opacity: 0,\n  duration: 0.8,\n  ease: "back.out(1.7)"\n});');
       setErrors([]);
     }

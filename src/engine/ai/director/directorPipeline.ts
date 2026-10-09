@@ -581,6 +581,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     aspectRatio,
     previousSceneSummary,
     nextSceneSummary,
+    focusWords: beat.focusWords,
     styleBrief: {
       palette: styleBrief.palette,
       fontDisplay: styleBrief.fontDisplay,
