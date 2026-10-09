@@ -9,7 +9,6 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/jetbrains-mono/600.css';
 import '@fontsource/jetbrains-mono/700.css';
-import '@fontsource/material-symbols-outlined/index.css';
 import { App } from './App';
 import './index.css';
 
