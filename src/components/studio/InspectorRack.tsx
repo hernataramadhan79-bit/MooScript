@@ -5,22 +5,31 @@ import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
+import {
+  mergeEditableLayers,
+  getLayerText,
+  setLayerText
+} from '../../engine/composition/layers';
 import type {
   ThemeTokens,
   CaptionPosition,
   CaptionStyle,
   BgmPreset,
   Composition,
-  SceneModule
+  SceneModule,
+  EditableLayer,
+  LayerOverride,
+  ScenePalette
 } from '../../types';
 
-export type InspectorTab = 'mograph' | 'gaya' | 'suara' | 'ekspor';
+export type InspectorTab = 'adegan' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
 
 export interface InspectorRackProps {
   className?: string;
   defaultTab?: InspectorTab;
   activeTab?: InspectorTab;
   onTabChange?: (tab: InspectorTab) => void;
+  onOpenCodeInspector?: (beatId: string) => void;
 }
 
 interface ThemePresetItem {
@@ -138,7 +147,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   className = '',
   defaultTab = 'mograph',
   activeTab: controlledTab,
-  onTabChange
+  onTabChange,
+  onOpenCodeInspector
 }) => {
   const [internalTab, setInternalTab] = useState<InspectorTab>(defaultTab);
   const activeTab = controlledTab !== undefined ? controlledTab : internalTab;
@@ -150,6 +160,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const {
     project,
     settings,
+    activeSceneId,
+    setActiveSceneId,
+    updateLayerOverride,
+    updateScenePalette,
+    setProject,
     isCompilingMograph,
     setIsCompilingMograph,
     updateThemeFont,
@@ -171,6 +186,254 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     startExport,
     addToast
   } = useMooStore();
+
+  // Active Scene & Layer States
+  const scenes = useMemo(() => project.scenes || [], [project.scenes]);
+  const activeScene = useMemo(() => {
+    return scenes.find((s) => s.id === activeSceneId) || scenes[0];
+  }, [scenes, activeSceneId]);
+
+  const activeSceneIndex = useMemo(() => {
+    return scenes.findIndex((s) => s.id === activeScene?.id);
+  }, [scenes, activeScene]);
+
+  const activeCompScene = useMemo(() => {
+    const compScenes = project.composition?.scenes || [];
+    return compScenes.find((s) => s.id === activeScene?.id || s.beatId === activeScene?.id);
+  }, [project.composition?.scenes, activeScene]);
+
+  const availableLayers = useMemo(() => {
+    if (!activeCompScene?.html) return [];
+    return mergeEditableLayers(activeCompScene.editableLayers, activeCompScene.html);
+  }, [activeCompScene?.editableLayers, activeCompScene?.html]);
+
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+
+  const activeLayer = useMemo(() => {
+    if (!availableLayers.length) return null;
+    return availableLayers.find((l) => l.id === selectedLayerId) || availableLayers[0];
+  }, [availableLayers, selectedLayerId]);
+
+  const currentOverrides = activeCompScene?.overrides || {};
+  const activeLayerOverride = activeLayer ? currentOverrides[activeLayer.id] || {} : {};
+  const currentPalette = activeCompScene?.palette || {};
+
+  // Single Scene AI Revision States
+  const [revisionPrompt, setRevisionPrompt] = useState<string>('');
+  const [isRevisingScene, setIsRevisingScene] = useState<boolean>(false);
+  const [revisionProgress, setRevisionProgress] = useState<string>('');
+  const singleSceneAbortRef = useRef<AbortController | null>(null);
+
+  const getLayerIcon = (type: EditableLayer['type']) => {
+    switch (type) {
+      case 'text':
+        return 'title';
+      case 'shape':
+        return 'crop_square';
+      case 'svg':
+        return 'polyline';
+      case 'image':
+        return 'image';
+      case 'group':
+      default:
+        return 'folder';
+    }
+  };
+
+  const handleOverrideChange = (prop: keyof LayerOverride, val: number | string | undefined) => {
+    if (!activeScene || !activeLayer) return;
+    updateLayerOverride(activeScene.id, activeLayer.id, { [prop]: val });
+  };
+
+  const handleResetLayerOverride = () => {
+    if (!activeScene || !activeLayer) return;
+    updateLayerOverride(activeScene.id, activeLayer.id, {
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      opacity: 1,
+      color: undefined
+    });
+    addToast(`Override layer ${activeLayer.label} direset.`, 'info');
+  };
+
+  const handleLayerTextChange = (newText: string) => {
+    if (!activeScene || !activeCompScene || !activeLayer || !project.composition) return;
+    const updatedHtml = setLayerText(activeCompScene.html, activeLayer.id, newText);
+    const updatedCompScenes = project.composition.scenes.map((s) => {
+      if (s.id !== activeCompScene.id && s.beatId !== activeCompScene.beatId) return s;
+      return {
+        ...s,
+        html: updatedHtml,
+        userEdited: true
+      };
+    });
+    setProject({
+      ...project,
+      composition: {
+        ...project.composition,
+        scenes: updatedCompScenes,
+        updatedAt: Date.now()
+      }
+    });
+  };
+
+  const handlePaletteChange = (prop: keyof ScenePalette, val: string) => {
+    if (!activeScene) return;
+    updateScenePalette(activeScene.id, { [prop]: val });
+  };
+
+  const handleResetPalette = () => {
+    if (!activeScene) return;
+    updateScenePalette(activeScene.id, {
+      bg: undefined,
+      primary: undefined,
+      accent: undefined,
+      text: undefined
+    });
+    addToast('Palet warna adegan dikembalikan ke default.', 'info');
+  };
+
+  const handleReviseSingleScene = async () => {
+    if (!activeScene) return;
+    const provider = settings.selectedLLMProvider;
+    const apiKey = settings.apiKeys[provider] || '';
+    if (!apiKey) {
+      addToast(`Masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan.`, 'warning');
+      return;
+    }
+
+    const controller = new AbortController();
+    singleSceneAbortRef.current = controller;
+    setIsRevisingScene(true);
+    setRevisionProgress('Menghubungi AI...');
+
+    const modelToUse =
+      provider === 'gemini'
+        ? settings.geminiModel
+        : provider === 'openai'
+          ? settings.openaiModel
+          : provider === 'groq'
+            ? settings.groqModel
+            : provider === 'anthropic'
+              ? settings.anthropicModel
+              : settings.openrouterModel;
+
+    try {
+      const revisedVisualIntent = revisionPrompt.trim()
+        ? `${activeScene.visualIntent || activeScene.narrationText || ''}. Instruksi perubahan: ${revisionPrompt.trim()}`
+        : activeScene.visualIntent || activeScene.narrationText || 'Adegan mograph dinamis';
+
+      const sceneModule = await generateCustomScene({
+        beat: {
+          id: activeScene.id,
+          narration: activeScene.narrationText || activeScene.text || '',
+          visualIntent: revisedVisualIntent,
+          visualConcept: activeScene.visualConcept,
+          visualElements: activeScene.visualElements,
+          motionIntent: activeScene.motionIntent,
+          cameraIntent: activeScene.camera,
+          durationHint: activeScene.durationInSeconds || 3.5,
+          focusWords: activeScene.focusWords
+        },
+        index: activeSceneIndex >= 0 ? activeSceneIndex : 0,
+        total: scenes.length,
+        aspectRatio: project.aspectRatio || '9:16',
+        styleBrief: {
+          adjectives: ['cinematic', 'expressive', 'bespoke'],
+          palette: {
+            bg: project.theme.bg || '#09090b',
+            primary: project.theme.textPrimary || '#f4f4f6',
+            accent:
+              project.theme.textHighlight && project.theme.textHighlight !== '#84cc16'
+                ? project.theme.textHighlight
+                : '',
+            text: project.theme.textPrimary || '#ffffff'
+          },
+          fontDisplay: mapFontDisplay(project.theme.fontFamily),
+          fontBody: 'Plus Jakarta Sans',
+          backgroundLanguage: 'Visual atmosfer tematik yang secara organik mengekspresikan ide adegan',
+          motionSignature: 'Animasi kinetik dinamis yang secara akurat memvisualisasikan narasi & konsep'
+        },
+        provider,
+        apiKey,
+        model: modelToUse,
+        onProgress: (status) => setRevisionProgress(status),
+        executeLlm: async ({ systemPrompt, userPrompt }) => {
+          return await callRawLLM({
+            provider,
+            apiKey,
+            model: modelToUse,
+            systemPrompt,
+            userPrompt,
+            signal: controller.signal,
+            maxTokens: settings.maxOutputTokens || 2048,
+            onActivity: (status) => setRevisionProgress(status)
+          });
+        }
+      });
+
+      if (controller.signal.aborted) {
+        addToast('Revisi adegan dibatalkan.', 'info');
+        return;
+      }
+
+      const currentComp = useMooStore.getState().project.composition;
+      const currentScenesList = currentComp?.scenes || [];
+      const updatedCompScenes = currentScenesList.map((mod) => {
+        if (mod.id !== activeScene.id && mod.beatId !== activeScene.id) return mod;
+        return {
+          ...sceneModule,
+          userEdited: true
+        };
+      });
+
+      const currentProject = useMooStore.getState().project;
+      const updatedProjectScenes = currentProject.scenes.map((s) => {
+        if (s.id !== activeScene.id) return s;
+        return {
+          ...s,
+          visualIntent: revisedVisualIntent
+        };
+      });
+
+      setProject({
+        ...currentProject,
+        scenes: updatedProjectScenes,
+        composition: {
+          ...(currentComp || {
+            id: `comp-${Date.now()}`,
+            width: currentProject.width || 1080,
+            height: currentProject.height || 1920,
+            fps: currentProject.fps || 30,
+            duration: currentProject.audioDuration || 10,
+            createdAt: Date.now()
+          }),
+          scenes: updatedCompScenes,
+          updatedAt: Date.now()
+        }
+      });
+
+      setRevisionPrompt('');
+      if (sceneModule.status === 'error') {
+        addToast('Gagal merevisi adegan. Silakan cek detail error.', 'error');
+      } else {
+        addToast(`Adegan #${activeSceneIndex + 1} berhasil direvisi!`, 'success');
+      }
+    } catch (err: unknown) {
+      if (controller.signal.aborted) {
+        addToast('Revisi dibatalkan.', 'info');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Error merevisi adegan: ${msg}`, 'error');
+    } finally {
+      setIsRevisingScene(false);
+      setRevisionProgress('');
+      singleSceneAbortRef.current = null;
+    }
+  };
 
   // Mograph Compilation States
   const [compilationProgress, setCompilationProgress] = useState<string>('');
@@ -634,9 +897,22 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     <div
       className={`w-full flex flex-col bg-surface-1 border border-border rounded-2xl overflow-hidden select-none ${className}`}
     >
-      {/* 1. Header Tab Studio Minimalis (4 Tab) */}
+      {/* 1. Header Tab Studio Minimalis (5 Tab) */}
       <div className="p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm">
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
+        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
+          <button
+            type="button"
+            onClick={() => setActiveTab('adegan')}
+            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
+              activeTab === 'adegan'
+                ? 'bg-surface-3 text-accent shadow-sm'
+                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            <span className="truncate">Adegan</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('mograph')}
@@ -693,6 +969,438 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
       {/* 2. Isi Panel Tab */}
       <div className="p-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-220px)]">
+        {/* ================= TAB ADEGAN (PER-SCENE EDITING, LAYERS & PALETTE) ================= */}
+        {activeTab === 'adegan' && (
+          <div className="flex flex-col gap-4">
+            {!activeScene ? (
+              <div className="p-4 rounded-xl bg-surface-2 border border-border text-center text-text-muted text-[13px]">
+                Belum ada adegan. Tambahkan adegan pada naskah terlebih dahulu.
+              </div>
+            ) : (
+              <>
+                {/* 1. Scene Switcher & Summary Card */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="px-1.5 py-0.5 rounded bg-surface-3 text-accent font-mono text-[11px] font-bold">
+                        #{activeSceneIndex + 1}
+                      </span>
+                      <span className="text-[12px] font-semibold text-on-surface truncate">
+                        {activeScene.visualIntent || activeScene.narrationText || `Adegan #${activeSceneIndex + 1}`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-3 text-text-muted">
+                        {activeScene.durationInSeconds.toFixed(1)}s
+                      </span>
+                      {activeCompScene && (
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase font-bold ${
+                            activeCompScene.status === 'ok'
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : activeCompScene.status === 'error'
+                                ? 'bg-rose-500/15 text-rose-400'
+                                : 'bg-zinc-500/15 text-zinc-400'
+                          }`}
+                        >
+                          {activeCompScene.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scene Selector Dropdown */}
+                  {scenes.length > 1 && (
+                    <div className="flex items-center gap-2 pt-1 border-t border-border/40">
+                      <span className="text-[11px] text-text-muted shrink-0">Pilih Adegan:</span>
+                      <select
+                        value={activeScene.id}
+                        onChange={(e) => setActiveSceneId(e.target.value)}
+                        className="flex-1 bg-surface-2 border border-border rounded-lg px-2 py-1 text-[11px] text-on-surface focus:outline-none focus:border-accent"
+                      >
+                        {scenes.map((s, idx) => (
+                          <option key={s.id} value={s.id}>
+                            #{idx + 1} - {(s.visualIntent || s.narrationText || `Adegan ${idx + 1}`).slice(0, 32)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Alert if Scene has Error */}
+                {activeCompScene?.status === 'error' && (
+                  <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-rose-400 font-semibold text-[12px]">
+                      <span className="material-symbols-outlined text-[17px]">error</span>
+                      <span>Adegan ini mengalami kendala rendering</span>
+                    </div>
+                    {activeCompScene.errors && activeCompScene.errors.length > 0 && (
+                      <p className="text-[11px] text-rose-300/80 font-mono truncate">
+                        {activeCompScene.errors[0]}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleReviseSingleScene}
+                      disabled={isRevisingScene}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors self-start flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">refresh</span>
+                      Generate Ulang Adegan Ini
+                    </button>
+                  </div>
+                )}
+
+                {/* 2. Revisi AI Adegan Tunggal */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-accent">auto_awesome</span>
+                      Revisi AI Adegan #{activeSceneIndex + 1}
+                    </span>
+                    <span className="text-[10px] text-text-muted">Khusus adegan ini</span>
+                  </div>
+
+                  <textarea
+                    value={revisionPrompt}
+                    onChange={(e) => setRevisionPrompt(e.target.value)}
+                    placeholder="Instruksi revisi, misal: 'Ubah grafik batang jadi diagram lingkaran'..."
+                    rows={2}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-surface-1 border border-border text-[12px] text-on-surface placeholder:text-text-muted/60 focus:outline-none focus:border-accent resize-none"
+                  />
+
+                  {revisionProgress && (
+                    <div className="p-2 rounded-lg bg-surface-1 border border-border text-[11px] text-accent flex items-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-[14px]">sync</span>
+                      <span className="truncate">{revisionProgress}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReviseSingleScene}
+                      disabled={isRevisingScene}
+                      className="flex-1 py-1.5 px-3 rounded-xl bg-accent text-on-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {isRevisingScene ? (
+                        <>
+                          <span className="material-symbols-outlined animate-spin text-[15px]">sync</span>
+                          <span>Merevisi...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+                          <span>Revisi Adegan Ini</span>
+                        </>
+                      )}
+                    </button>
+                    {isRevisingScene && (
+                      <button
+                        type="button"
+                        onClick={() => singleSceneAbortRef.current?.abort()}
+                        className="py-1.5 px-2.5 rounded-xl bg-surface-1 border border-border text-[11px] text-text-muted hover:text-rose-400 transition-colors"
+                      >
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Layer Inspector & Non-Destructive Overrides */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-accent">layers</span>
+                      Layer & Transform
+                    </span>
+                    <span className="text-[10px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-surface-3">
+                      {availableLayers.length} Layer
+                    </span>
+                  </div>
+
+                  {availableLayers.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed">
+                      {activeCompScene
+                        ? 'Tidak ada layer yang ditandai data-moo-layer pada adegan ini.'
+                        : 'Mograph belum di-generate. Buka tab Mograph untuk membuat visual.'}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Layer Pills Selector */}
+                      <div className="flex flex-wrap gap-1">
+                        {availableLayers.map((layer) => {
+                          const isSelected = layer.id === activeLayer?.id;
+                          const hasOverrides = Boolean(currentOverrides[layer.id]);
+
+                          return (
+                            <button
+                              key={layer.id}
+                              type="button"
+                              onClick={() => setSelectedLayerId(layer.id)}
+                              className={`px-2 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all ${
+                                isSelected
+                                  ? 'bg-accent text-on-accent font-semibold shadow-xs'
+                                  : 'bg-surface-1 text-text-muted hover:text-on-surface border border-border'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[13px]">
+                                {getLayerIcon(layer.type)}
+                              </span>
+                              <span className="truncate max-w-[90px]">{layer.label}</span>
+                              {hasOverrides && (
+                                <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-black' : 'bg-accent'}`} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Controls for Active Layer */}
+                      {activeLayer && (
+                        <div className="p-3 rounded-xl bg-surface-1 border border-border space-y-3">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="material-symbols-outlined text-accent text-[16px] shrink-0">
+                                {getLayerIcon(activeLayer.type)}
+                              </span>
+                              <div className="min-w-0">
+                                <h4 className="text-[12px] font-semibold text-on-surface truncate">
+                                  {activeLayer.label}
+                                </h4>
+                                <span className="text-[9px] font-mono text-text-muted">
+                                  {activeLayer.id} • {activeLayer.type}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleResetLayerOverride}
+                              className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors shrink-0"
+                              title="Reset transform ke default"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">restart_alt</span>
+                              Reset
+                            </button>
+                          </div>
+
+                          {/* Direct Text Editor for Text Layers */}
+                          {activeLayer.type === 'text' && activeCompScene?.html && (
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
+                                Konten Teks
+                              </span>
+                              <input
+                                type="text"
+                                value={getLayerText(activeCompScene.html, activeLayer.id)}
+                                onChange={(e) => handleLayerTextChange(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-[12px] text-on-surface focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          )}
+
+                          {/* Position X and Y */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Pos X</span>
+                                <span className="text-accent">{activeLayerOverride.x || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={-300}
+                                max={300}
+                                step={2}
+                                value={activeLayerOverride.x || 0}
+                                onChange={(e) => handleOverrideChange('x', parseFloat(e.target.value))}
+                                className="w-full accent-accent h-1 cursor-pointer"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Pos Y</span>
+                                <span className="text-accent">{activeLayerOverride.y || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={-300}
+                                max={300}
+                                step={2}
+                                value={activeLayerOverride.y || 0}
+                                onChange={(e) => handleOverrideChange('y', parseFloat(e.target.value))}
+                                className="w-full accent-accent h-1 cursor-pointer"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Scale and Rotation */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Skala</span>
+                                <span className="text-accent">{activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}x</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0.1}
+                                max={2.5}
+                                step={0.05}
+                                value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
+                                onChange={(e) => handleOverrideChange('scale', parseFloat(e.target.value))}
+                                className="w-full accent-accent h-1 cursor-pointer"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Rotasi</span>
+                                <span className="text-accent">{activeLayerOverride.rotation || 0}°</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={-180}
+                                max={180}
+                                step={5}
+                                value={activeLayerOverride.rotation || 0}
+                                onChange={(e) => handleOverrideChange('rotation', parseFloat(e.target.value))}
+                                className="w-full accent-accent h-1 cursor-pointer"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Opacity and Color */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Transparansi</span>
+                                <span className="text-accent">
+                                  {Math.round((activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0) * 100)}%
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0}
+                                onChange={(e) => handleOverrideChange('opacity', parseFloat(e.target.value))}
+                                className="w-full accent-accent h-1 cursor-pointer"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                <span>Warna Layer</span>
+                                <span className="text-accent text-[9px]">{activeLayerOverride.color || 'Bawaan'}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="color"
+                                  value={activeLayerOverride.color || '#84cc16'}
+                                  onChange={(e) => handleOverrideChange('color', e.target.value)}
+                                  className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                                />
+                                {activeLayerOverride.color && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOverrideChange('color', undefined)}
+                                    className="text-[9px] text-text-muted hover:text-on-surface"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* 4. Scene Palette (CSS Variables Overrides) */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-accent">palette</span>
+                      Palet Warna Adegan #{activeSceneIndex + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResetPalette}
+                      className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">restart_alt</span>
+                      Reset
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
+                      <span className="text-[9px] font-mono text-text-muted uppercase">Bg</span>
+                      <input
+                        type="color"
+                        value={currentPalette.bg || project.theme.bg || '#09090b'}
+                        onChange={(e) => handlePaletteChange('bg', e.target.value)}
+                        className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
+                      <span className="text-[9px] font-mono text-text-muted uppercase">Primary</span>
+                      <input
+                        type="color"
+                        value={currentPalette.primary || project.theme.textPrimary || '#ffffff'}
+                        onChange={(e) => handlePaletteChange('primary', e.target.value)}
+                        className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
+                      <span className="text-[9px] font-mono text-text-muted uppercase">Accent</span>
+                      <input
+                        type="color"
+                        value={currentPalette.accent || project.theme.textHighlight || '#84cc16'}
+                        onChange={(e) => handlePaletteChange('accent', e.target.value)}
+                        className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
+                      <span className="text-[9px] font-mono text-text-muted uppercase">Text</span>
+                      <input
+                        type="color"
+                        value={currentPalette.text || project.theme.textPrimary || '#ffffff'}
+                        onChange={(e) => handlePaletteChange('text', e.target.value)}
+                        className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Akses Kode Adegan */}
+                {onOpenCodeInspector && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCodeInspector(activeScene.id)}
+                    className="p-3 rounded-2xl bg-surface-2/60 border border-border hover:border-accent/40 text-on-surface hover:text-accent flex items-center justify-between transition-colors text-[12px] font-medium"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[17px]">code</span>
+                      Buka Editor Kode Adegan
+                    </span>
+                    <span className="material-symbols-outlined text-[16px] text-text-muted">chevron_right</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* ================= TAB MOGRAPH (AI GENERATOR & PACING) ================= */}
         {activeTab === 'mograph' && (
           <div className="flex flex-col gap-5">

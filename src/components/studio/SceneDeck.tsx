@@ -51,12 +51,14 @@ export interface SceneDeckProps {
   className?: string;
   onOpenCodeInspector?: (beatId: string) => void;
   onNavigateToMograph?: () => void;
+  onEditScene?: (sceneId: string) => void;
 }
 
 export const SceneDeck: React.FC<SceneDeckProps> = ({
   className = '',
   onOpenCodeInspector,
-  onNavigateToMograph
+  onNavigateToMograph,
+  onEditScene
 }) => {
   const {
     project,
@@ -144,6 +146,15 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           const focusSet = new Set((scene.focusWords || []).map(cleanWord));
           const isDetailOpen = Boolean(expandedDetails[scene.id] || scene.visualIntent || scene.visualConcept);
 
+          const compScene = project.composition?.scenes?.find(
+            (s) => s.id === scene.id || s.beatId === scene.id
+          );
+          const isEdited = Boolean(
+            compScene?.userEdited ||
+            (compScene?.overrides && Object.keys(compScene.overrides).length > 0)
+          );
+          const compStatus = compScene?.status;
+
           return (
             <div
               key={scene.id}
@@ -160,9 +171,29 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <span className="px-1.5 py-0.5 rounded bg-surface-3 text-accent font-mono text-[11px] font-semibold shrink-0 select-none">
                     #{index + 1}
                   </span>
-                  <span className="text-[12px] font-medium text-on-surface truncate max-w-[120px] sm:max-w-[150px]">
+                  <span className="text-[12px] font-medium text-on-surface truncate max-w-[100px] sm:max-w-[130px]">
                     {visualTitle}
                   </span>
+
+                  {/* Status & Edit Badges */}
+                  {compStatus && (
+                    <span
+                      className={`text-[8px] px-1 py-0.2 rounded-full font-mono uppercase font-bold shrink-0 ${
+                        compStatus === 'ok'
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : compStatus === 'error'
+                            ? 'bg-rose-500/15 text-rose-400'
+                            : 'bg-zinc-500/15 text-zinc-400'
+                      }`}
+                    >
+                      {compStatus}
+                    </span>
+                  )}
+                  {isEdited && (
+                    <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">
+                      edit
+                    </span>
+                  )}
 
                   {/* Input Durasi Angka */}
                   <div
@@ -188,8 +219,21 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   </div>
                 </div>
 
-                {/* Tombol Aksi: Code Inspector, Urutan, Duplikat, Hapus */}
+                {/* Tombol Aksi: Edit Adegan, Code Inspector, Urutan, Duplikat, Hapus */}
                 <div className="flex items-center gap-0.5 shrink-0">
+                  {onEditScene && (
+                    <IconButton
+                      icon="tune"
+                      aria-label="Edit Adegan"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveSceneId(scene.id);
+                        onEditScene(scene.id);
+                      }}
+                      className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px] !text-accent"
+                    />
+                  )}
                   {onOpenCodeInspector && (
                     <IconButton
                       icon="code"

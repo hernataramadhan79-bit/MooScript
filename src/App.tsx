@@ -10,11 +10,11 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 
-export type MobileTab = 'naskah' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
+export type MobileTab = 'naskah' | 'adegan' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
 export type { InspectorTab };
 
 export const App: React.FC = () => {
-  const { initStore, togglePlay, project } = useMooStore();
+  const { initStore, togglePlay, project, setActiveSceneId } = useMooStore();
 
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('mograph');
   const [mobileTab, setMobileTab] = useState<MobileTab>('naskah');
@@ -50,8 +50,15 @@ export const App: React.FC = () => {
     setMobileTab('mograph');
   };
 
+  const handleEditScene = (sceneId: string) => {
+    setActiveSceneId(sceneId);
+    setInspectorTab('adegan');
+    setMobileTab('adegan');
+  };
+
   const mobileTabs: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'naskah', label: 'Naskah', icon: 'edit_note' },
+    { id: 'adegan', label: 'Adegan', icon: 'tune' },
     { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
     { id: 'gaya', label: 'Gaya', icon: 'palette' },
     { id: 'suara', label: 'Suara', icon: 'graphic_eq' },
@@ -83,6 +90,7 @@ export const App: React.FC = () => {
             <SceneDeck
               onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
               onNavigateToMograph={handleNavigateToMograph}
+              onEditScene={handleEditScene}
             />
           </div>
         </aside>
@@ -117,12 +125,22 @@ export const App: React.FC = () => {
                   className="h-full"
                   onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   onNavigateToMograph={handleNavigateToMograph}
+                  onEditScene={handleEditScene}
+                />
+              )}
+              {mobileTab === 'adegan' && (
+                <InspectorRack
+                  activeTab="adegan"
+                  onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+                  className="h-full border-0 rounded-none shadow-none"
                 />
               )}
               {mobileTab === 'mograph' && (
                 <InspectorRack
                   activeTab="mograph"
                   onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   className="h-full border-0 rounded-none shadow-none"
                 />
               )}
@@ -130,6 +148,7 @@ export const App: React.FC = () => {
                 <InspectorRack
                   activeTab="gaya"
                   onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   className="h-full border-0 rounded-none shadow-none"
                 />
               )}
@@ -137,6 +156,7 @@ export const App: React.FC = () => {
                 <InspectorRack
                   activeTab="suara"
                   onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   className="h-full border-0 rounded-none shadow-none"
                 />
               )}
@@ -144,13 +164,14 @@ export const App: React.FC = () => {
                 <InspectorRack
                   activeTab="ekspor"
                   onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   className="h-full border-0 rounded-none shadow-none"
                 />
               )}
             </div>
 
-            {/* Mobile Bottom Navigation Bar (5 Tab) */}
-            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-1 py-1.5 grid grid-cols-5 gap-1 select-none">
+            {/* Mobile Bottom Navigation Bar (6 Tab) */}
+            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-1 py-1.5 grid grid-cols-6 gap-0.5 select-none">
               {mobileTabs.map((tab) => {
                 const isActive = mobileTab === tab.id;
                 return (
@@ -158,16 +179,16 @@ export const App: React.FC = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => setMobileTab(tab.id)}
-                    className={`py-1.5 px-0.5 rounded-xl text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
+                    className={`py-1.5 px-0.5 rounded-xl text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
                       isActive
                         ? 'bg-surface-3 text-accent shadow-sm'
                         : 'text-text-muted hover:text-on-surface'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[18px]">
+                    <span className="material-symbols-outlined text-[17px]">
                       {tab.icon}
                     </span>
-                    <span className="truncate">{tab.label}</span>
+                    <span className="truncate max-w-[45px]">{tab.label}</span>
                   </button>
                 );
               })}
@@ -175,11 +196,12 @@ export const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Zona Kanan: Inspector Rack (Mograph, Gaya, Suara, Ekspor) - Desktop Only */}
+        {/* Zona Kanan: Inspector Rack (Adegan, Mograph, Gaya, Suara, Ekspor) - Desktop Only */}
         <aside className="hidden lg:flex w-[340px] xl:w-[380px] shrink-0 border-l border-border bg-surface-1 flex-col h-full overflow-hidden">
           <InspectorRack
             activeTab={inspectorTab}
             onTabChange={setInspectorTab}
+            onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
             className="h-full border-0 rounded-none shadow-none"
           />
         </aside>
