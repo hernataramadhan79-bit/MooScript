@@ -1,6 +1,6 @@
 # MooScript Studio — Zero-Server Motion Graphics Generator
 
-> **Pure Client-Side, Hardware-Accelerated 1080×1920 MP4 Video Generator** compiling text, audio, and kinetic motion graphics directly inside your browser tabs using **WebCodecs** (`VideoEncoder`), **HTML5 Canvas**, and **Mediabunny**.
+> **Pure Client-Side, Hardware-Accelerated MP4 Video Generator** compiling text, audio, and kinetic motion graphics directly inside your browser tabs using **WebCodecs** (`VideoEncoder`), **HTML/CSS/GSAP Layered Composition Engine**, and **Mediabunny**.
 
 ---
 
@@ -8,22 +8,23 @@
 
 1. **100% Client-Side & Zero-Server**:
    - Runs completely on the user's device in modern web browsers.
+   - **4-Step Production Wizard**: Structured flow guiding creators from Concept (`Idea`), Theme (`Style`), Directing (`Visual Editor`), to Delivery (`Export`).
    - Bring-Your-Own-Key (BYOK) for Gemini, OpenAI, Groq, and ElevenLabs. API keys are stored only locally in IndexedDB or sessionStorage (memory-safe mode).
-   - **Local Offline TTS Engine**: Synthesizes speech locally in the browser via Web Worker without any API key or external network request.
-   - **Procedural BGM Mixer**: Web Audio API ambient, hip-hop, cinematic, and lo-fi tracks with dynamic sidechain speech ducking.
+   - **Local Offline TTS Engine**: Synthesizes speech locally in the browser via Piper ONNX Web Worker without external network requests.
+   - **Decoupled Procedural BGM Engine**: Standalone or sidechained BGM generation using Web Audio API with automatic dynamic speech ducking. Modifying BGM presets re-mixes audio instantly without re-calling TTS APIs.
    - **SubRip (.srt) & WebVTT (.vtt) Export**: Instant subtitle track generation directly from word timestamps.
    - **Multi-Project Management**: Create, switch, duplicate, and delete multiple video projects stored locally in IndexedDB.
-   - **Installable Progressive Web App (PWA)**: Precaches assets, self-hosted typography, and local TTS models for instant offline startup. COOP/COEP isolation headers are not required (no dependency on SharedArrayBuffer).
-   - 100% self-hosted typography: Google Fonts are bundled locally (`@fontsource`) for true offline compliance without external CDN requests.
+   - **Installable Progressive Web App (PWA)**: Precaches assets, self-hosted typography (`Plus Jakarta Sans`, `JetBrains Mono`), and local TTS models for instant offline startup.
 
-2. **Deterministic Frame Evaluation (`RenderState = f(currentFrame, fps, project)`)**:
-   - Never relies on `requestAnimationFrame` or `setTimeout` during video compilation.
-   - Animations, camera motion, and spring curves (`spring(t)`, `easeOutExpo`, `easeInOutQuad`, `easeOutBack`) are evaluated as analytical, closed-form functions of the discrete frame index.
-   - Caption style presets: `boxed`, `karaoke`, `bold-pop`, and `minimal` with platform safe-zone aware placement (`top`, `center`, `bottom`).
+2. **Dual-Engine Architecture (GSAP Layers + Canvas Fallback)**:
+   - **Primary Engine (v2)**: Sandboxed HTML/CSS/GSAP Layer Composition (`mooRuntime.ts`). Provides fluid kinetic typography, SVG graphics, responsive aspect ratios (9:16, 16:9, 1:1), and non-destructive layer overrides.
+   - **Legacy Engine**: 2D HTML5 Canvas renderer (`canvasRenderer.ts`) retained as a lightweight fallback.
+   - Evaluated deterministically during video compilation via GSAP timeline scrubbing (`tl.seek(t)`).
    - 100% reproducible video renders with zero dropped frames or audio desynchronization.
 
-3. **Hardware Acceleration via WebCodecs**:
+3. **Hardware Acceleration via WebCodecs & Canvas Pooling**:
    - Uses browser-native `VideoEncoder` with dynamic fallback (`avc1.4d002a`, `avc1.640028`, `avc1.42001f`).
+   - **Canvas Pooling & Zero-Copy Rasterization**: Reuses a single shared canvas buffer during export to prevent memory leaks and browser tab termination on mobile and Safari iOS devices.
    - Adaptive bitrates derived automatically from resolution, fps, and screen aspect ratio.
    - Avoids heavy WASM FFmpeg binaries to guarantee lightweight, instant renders without crashing browser tabs.
 
@@ -86,40 +87,41 @@ MooScript Studio is a full-fledged Progressive Web App powered by `vite-plugin-p
 │   └── tts.test.ts              # Deterministic word alignment & fallback duration calculations
 ├── src/
 │   ├── db/
-│   │   └── mooDb.ts             # Dexie IndexedDB persistence layer (projects, audio cache, settings)
+│   │   └── mooDb.ts             # Dexie IndexedDB persistence layer (projects, audio cache, settings, assets)
 │   ├── engine/
 │   │   ├── ai/
 │   │   │   ├── llm.ts           # BYOK LLM wrapper (Gemini, OpenAI, Groq) with structured outputs
-│   │   │   └── tts.ts           # BYOK TTS wrapper (OpenAI, ElevenLabs, offline synthesizer)
-│   │   ├── assets/
-│   │   │   └── icons.ts         # Pre-compiled static vector Path2D icons
+│   │   │   ├── tts.ts           # BYOK TTS wrapper (OpenAI, ElevenLabs, offline synthesizer)
+│   │   │   └── localTts.ts      # Client-side Piper ONNX speech synthesizer (100% offline)
+│   │   ├── audio/
+│   │   │   └── bgmMixer.ts      # Standalone & ducking procedural BGM synthesis (Web Audio API)
+│   │   ├── composition/         # GSAP Layered Composition Engine (v2)
+│   │   │   ├── buildDocument.ts # Self-contained HTML/CSS sandboxed stage assembler
+│   │   │   ├── layers.ts        # Layer metadata discovery, CSS overrides, palette tokens
+│   │   │   └── runtime/
+│   │   │       └── mooRuntime.ts # Iframe GSAP runtime, timeline scrubber, canvas pooling
 │   │   ├── export/
-│   │   │   └── mp4Exporter.ts   # WebCodecs VideoEncoder + Mediabunny deterministic export pipeline
-│   │   ├── physics/
-│   │   │   └── spring.ts        # Analytical harmonic oscillator spring physics & motion easing curves
-│   │   ├── renderer/
-│   │   │   └── canvasRenderer.ts # Dynamic kinetic typography & mograph canvas renderer
-│   │   └── skills/
-│   │       └── skillManager.ts  # Persona Skills CRUD engine & validation schemas
+│   │   │   └── mp4Exporter.ts   # WebCodecs VideoEncoder + Mediabunny hardware export pipeline
+│   │   └── renderer/
+│   │       └── canvasRenderer.ts # 2D Canvas fallback engine
+│   ├── features/                # 4-Step Production Wizard
+│   │   ├── idea/                # Step 0: Prompt, AI director & persona skills
+│   │   ├── style/               # Step 1: Visual identity, palette & typography
+│   │   ├── editor/              # Step 2: Interactive composition stage, timeline & audio controls
+│   │   └── export/              # Step 3: Aspect ratio, bitrate & MP4/subtitle export
 │   ├── store/
-│   │   ├── slices/              # Modular Zustand store slices
-│   │   │   ├── uiSlice.ts       # Navigation & toast notifications
-│   │   │   ├── projectSlice.ts  # Project state, scenes CRUD, debounced save
-│   │   │   ├── scriptSlice.ts   # AI script prompting & undo snapshot
-│   │   │   ├── audioSlice.ts    # Audio generation & audition
-│   │   │   ├── playbackSlice.ts # Master audio clock & idempotent rAF preview transport
-│   │   │   ├── exportSlice.ts   # MP4 export flow & progress tracking
-│   │   │   └── settingsSlice.ts # BYOK API keys, storage mode, skills, cache size
+│   │   ├── slices/              # Modular Zustand store slices (project, audio, bgm, playback, settings)
 │   │   ├── types.ts             # Central store slice interfaces
 │   │   └── useMooStore.ts       # Unified backwards-compatible Zustand hook
 │   ├── components/
-│   │   ├── Header.tsx           # Brand header with Mascot and API status
-│   │   ├── BottomNav.tsx        # Mobile safe bottom tab navigation
-│   │   ├── ToastContainer.tsx   # Global toast notifications
-│   │   └── tabs/                # ScriptTab, VoiceTab, StudioTab, SettingsTab
+│   │   ├── studio/
+│   │   │   ├── CompositionStage.tsx # Responsive sandboxed iframe stage host
+│   │   │   └── CanvasStage.tsx      # Legacy 2D canvas stage fallback
+│   │   └── timeline/
+│   │       └── TimelineBar.tsx      # Interactive audio scrubber & scene playhead
 │   ├── types/
 │   │   └── index.ts             # TypeScript data contracts
-│   ├── App.tsx                  # Root layout
+│   ├── App.tsx                  # Wizard stage orchestrator
 │   └── main.tsx                 # Entrypoint with self-hosted fonts
 ├── LICENSE                      # MIT License
 ├── package.json

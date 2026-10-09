@@ -21,7 +21,7 @@ export function triggerFileDownload(url: string, filename: string): void {
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {
-    if (document.body.contains(a)) {
+    if (typeof document !== 'undefined' && document.body && document.body.contains(a)) {
       document.body.removeChild(a);
     }
   }, 100);

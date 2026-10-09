@@ -422,3 +422,31 @@ export async function mixVoiceAndBgm(
   const mixed = await mixCtx.startRendering();
   return audioBufferToWavBlob(mixed);
 }
+
+/**
+ * Render standalone BGM buffer as WAV Blob without voiceover.
+ */
+export async function renderStandaloneBgm(
+  preset: BgmPreset,
+  durationSeconds: number,
+  level = 0.18,
+  sampleRate = 48000
+): Promise<Blob | null> {
+  if (preset === 'none' || durationSeconds <= 0) return null;
+  const bgmBuffer = await renderBgmBuffer(preset, durationSeconds, sampleRate);
+  if (!bgmBuffer) return null;
+
+  const length = bgmBuffer.length;
+  const ctx = new OfflineAudioContext(2, length, sampleRate);
+  const src = ctx.createBufferSource();
+  src.buffer = bgmBuffer;
+  const gainNode = ctx.createGain();
+  gainNode.gain.setValueAtTime(Math.max(0.001, level), 0);
+  src.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  src.start(0);
+
+  const mixed = await ctx.startRendering();
+  return audioBufferToWavBlob(mixed);
+}
+

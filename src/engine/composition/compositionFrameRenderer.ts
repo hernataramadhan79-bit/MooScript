@@ -63,18 +63,34 @@ export async function createCompositionFrameRenderer(
                 clearTimeout(frameTimeout);
                 const img = new Image();
                 img.onload = () => {
-                  const ctx = targetCanvas.getContext('2d');
-                  if (ctx) {
-                    ctx.fillStyle = '#09090b';
-                    ctx.fillRect(0, 0, width, height);
-                    ctx.drawImage(img, 0, 0, width, height);
+                  try {
+                    const ctx = targetCanvas.getContext('2d');
+                    if (ctx) {
+                      ctx.fillStyle = '#09090b';
+                      ctx.fillRect(0, 0, width, height);
+                      ctx.drawImage(img, 0, 0, width, height);
+                    }
+                    res();
+                  } finally {
+                    img.onload = null;
+                    img.onerror = null;
+                    img.src = '';
                   }
-                  res();
                 };
                 img.onerror = (err) => {
+                  img.onload = null;
+                  img.onerror = null;
+                  img.src = '';
                   rej(new Error(`Image render error for frame ${frame}: ${String(err)}`));
                 };
-                img.src = dataUrl;
+                try {
+                  img.src = dataUrl;
+                } catch (err) {
+                  img.onload = null;
+                  img.onerror = null;
+                  img.src = '';
+                  rej(new Error(`Image render error for frame ${frame}: ${String(err)}`));
+                }
               };
 
               pendingErrorCallback = (errMsg: string) => {
@@ -84,7 +100,7 @@ export async function createCompositionFrameRenderer(
 
               contentWindow.postMessage(
                 {
-                  type: 'capture',
+                  type: 'capture_frame',
                   time: timeSec,
                   id: frame,
                   width,
@@ -117,6 +133,16 @@ export async function createCompositionFrameRenderer(
 
     function cleanup() {
       window.removeEventListener('message', handleMessage);
+      pendingCallback = null;
+      pendingErrorCallback = null;
+      pendingFrameId = null;
+      if (iframe) {
+        try {
+          iframe.contentWindow?.postMessage({ type: 'teardown' }, '*');
+        } catch {
+          // ignore
+        }
+      }
       if (iframe && iframe.parentNode) {
         iframe.parentNode.removeChild(iframe);
         iframe = null;

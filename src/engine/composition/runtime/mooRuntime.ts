@@ -1,4 +1,19 @@
 /**
+ * Shared canvas instance and context for canvas pooling in export rendering.
+ */
+export let sharedExportCanvas: HTMLCanvasElement | null = null;
+export let sharedExportCtx: CanvasRenderingContext2D | null = null;
+
+export function resetSharedCanvas(): void {
+  if (sharedExportCanvas) {
+    sharedExportCanvas.width = 0;
+    sharedExportCanvas.height = 0;
+    sharedExportCanvas = null;
+    sharedExportCtx = null;
+  }
+}
+
+/**
  * MooRuntime client-side script injected into the isolated iframe sandbox.
  * Enforces determinism, wraps GSAP timeline, and provides postMessage communication with host.
  */
@@ -222,6 +237,23 @@ export function getRuntimeScript(): string {
   window.__MOO_INIT__ = initMasterTimeline;
   window.__MOO_SEEK__ = seekTo;
 
+  // Canvas pooling for zero-allocation frame capture
+  let sharedExportCanvas = null;
+  let sharedExportCtx = null;
+
+  function resetSharedCanvas() {
+    if (sharedExportCanvas) {
+      sharedExportCanvas.width = 0;
+      sharedExportCanvas.height = 0;
+      sharedExportCanvas = null;
+      sharedExportCtx = null;
+    }
+  }
+
+  window.__MOO_TEARDOWN__ = resetSharedCanvas;
+  window.addEventListener('beforeunload', resetSharedCanvas);
+  window.addEventListener('unload', resetSharedCanvas);
+
   // 5. Host Communication Protocol
   window.addEventListener('message', async function(ev) {
     const data = ev.data;
@@ -233,7 +265,7 @@ export function getRuntimeScript(): string {
       const t = Number(data.time) || 0;
       seekTo(t);
       window.parent.postMessage({ type: 'seeked', id: data.id, time: t }, '*');
-    } else if (data.type === 'capture') {
+    } else if (data.type === 'capture_frame' || data.type === 'capture') {
       const t = Number(data.time) || 0;
       seekTo(t);
 
@@ -303,30 +335,50 @@ export function getRuntimeScript(): string {
         const img = new Image();
         img.onload = function() {
           try {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
+            if (!sharedExportCanvas) {
+              sharedExportCanvas = document.createElement('canvas');
+              sharedExportCtx = sharedExportCanvas.getContext('2d');
+            }
+            if (!sharedExportCtx) {
+              sharedExportCtx = sharedExportCanvas.getContext('2d');
+            }
+            if (sharedExportCanvas.width !== width) {
+              sharedExportCanvas.width = width;
+            }
+            if (sharedExportCanvas.height !== height) {
+              sharedExportCanvas.height = height;
+            }
+            if (!sharedExportCtx) {
               throw new Error('Canvas 2D context is unavailable');
             }
             // Clear with solid background first so output is never transparent zeros
-            ctx.fillStyle = mooBg;
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/png');
+            sharedExportCtx.fillStyle = mooBg;
+            sharedExportCtx.fillRect(0, 0, width, height);
+            sharedExportCtx.drawImage(img, 0, 0, width, height);
+            const dataUrl = sharedExportCanvas.toDataURL('image/png');
+            img.onload = null;
+            img.onerror = null;
+            img.src = '';
             window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
           } catch (err) {
+            img.onload = null;
+            img.onerror = null;
+            img.src = '';
             window.parent.postMessage({ type: 'frame_error', id: data.id, message: String(err) }, '*');
           }
         };
         img.onerror = function(err) {
+          img.onload = null;
+          img.onerror = null;
+          img.src = '';
           window.parent.postMessage({ type: 'frame_error', id: data.id, message: 'SVG image error: ' + String(err) }, '*');
         };
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
       } catch (err) {
         window.parent.postMessage({ type: 'frame_error', id: data.id, message: String(err) }, '*');
       }
+    } else if (data.type === 'teardown' || data.type === 'cleanup' || data.type === 'reset_canvas') {
+      resetSharedCanvas();
     }
   });
 })();

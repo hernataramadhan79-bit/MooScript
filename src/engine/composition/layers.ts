@@ -151,6 +151,7 @@ function num(n: unknown): number | undefined {
  */
 export function compileOverridesCss(sceneDomId: string, overrides?: Record<string, LayerOverride>): string {
   if (!overrides) return '';
+  const safeDomId = String(sceneDomId).trim().replace(/[^a-zA-Z0-9_-]/g, '-');
   const rules: string[] = [];
   for (const [rawId, o] of Object.entries(overrides)) {
     if (!o) continue;
@@ -171,7 +172,7 @@ export function compileOverridesCss(sceneDomId: string, overrides?: Record<strin
       decls.push(`color: ${o.color.trim()} !important`, `fill: ${o.color.trim()} !important`);
     }
     if (decls.length) {
-      rules.push(`#${sceneDomId} [data-moo-layer="${id}"] { ${decls.join('; ')}; }`);
+      rules.push(`#${safeDomId} [data-moo-layer="${id}"] { ${decls.join('; ')}; }`);
     }
   }
   return rules.join('\n');
@@ -179,7 +180,7 @@ export function compileOverridesCss(sceneDomId: string, overrides?: Record<strin
 
 export function compilePaletteVars(palette: Partial<ScenePalette> | undefined): string {
   if (!palette) return '';
-  const safe = (v?: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$/.test(v.trim()) ? v.trim() : undefined);
+  const safe = (v?: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$/.test(v.trim()) ? v.trim() : undefined);
   const parts: string[] = [];
   const bg = safe(palette.bg);
   const primary = safe(palette.primary);

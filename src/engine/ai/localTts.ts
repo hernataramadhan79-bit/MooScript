@@ -43,6 +43,10 @@ export const LOCAL_VOICES: LocalVoice[] = [
   }
 ];
 
+export function getLocalVoice(voiceId: string): LocalVoice | undefined {
+  return LOCAL_VOICES.find((v) => v.id === voiceId);
+}
+
 export const TTS_CACHE_NAME = 'mooscript-tts-models-v1';
 
 export interface DownloadProgress {

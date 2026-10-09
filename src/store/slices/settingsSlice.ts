@@ -47,8 +47,14 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
     const isSession = merged.apiKeyStorage === 'session';
     const settingsToPersist = isSession ? { ...merged, apiKeys: {} } : merged;
 
-    if (isSession && typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem('mooscript_session_keys', JSON.stringify(merged.apiKeys));
+    if (isSession) {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('mooscript_session_keys', JSON.stringify(merged.apiKeys));
+      }
+    } else {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('mooscript_session_keys');
+      }
     }
     await db.settings.put({ id: 'current', data: settingsToPersist });
   },
@@ -64,6 +70,9 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
       }
       await db.settings.put({ id: 'current', data: { ...merged, apiKeys: {} } });
     } else {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('mooscript_session_keys');
+      }
       await db.settings.put({ id: 'current', data: merged });
     }
   },
@@ -115,16 +124,20 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
       await db.settings.put({ id: 'current', data: settings });
     }
 
-    // Restore session keys from sessionStorage if present
+    // Restore session keys from sessionStorage if present (or clean up if persistent)
     if (typeof sessionStorage !== 'undefined') {
       try {
-        const sessionKeysRaw = sessionStorage.getItem('mooscript_session_keys');
-        if (sessionKeysRaw) {
-          const sessionKeys = JSON.parse(sessionKeysRaw);
-          settings = { ...settings, apiKeys: { ...settings.apiKeys, ...sessionKeys } };
+        if (settings.apiKeyStorage === 'session') {
+          const sessionKeysRaw = sessionStorage.getItem('mooscript_session_keys');
+          if (sessionKeysRaw) {
+            const sessionKeys = JSON.parse(sessionKeysRaw);
+            settings = { ...settings, apiKeys: { ...settings.apiKeys, ...sessionKeys } };
+          }
+        } else {
+          sessionStorage.removeItem('mooscript_session_keys');
         }
       } catch {
-        // Ignore session parse error
+        // Ignore session storage error
       }
     }
 

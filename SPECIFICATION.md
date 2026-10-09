@@ -100,20 +100,20 @@ export interface MooProject {
 }
 ```
 
-### Module 3: Deterministic Canvas Mograph Renderer (`src/engine/renderer/canvasRenderer.ts`)
+### Module 3: Composition & Rendering Architecture
 
-- **Canvas Context**: OffscreenCanvas (fallback to standard `<canvas>`) configured at 1080x1920.
-- **Dynamic Kinetic Typography Engine**:
-  - For any given frame:
-    - Elapsed seconds: `t = frame / fps`.
-    - Identify the active Scene by accumulating previous scene durations.
-    - Within active scene, determine spoken word: `t >= word.start && t <= word.end`.
-    - Highlight active words using dynamic styling: scale bounce (spring simulation), background pill badge, and accent color.
-    - Render non-active words with lowered opacity or base color.
-    - Wrap words gracefully across multiple lines with automatic padding and centered typography calculations.
-- **Motion Presets & Physics**:
-  - `spring(t, { stiffness, damping, mass })`, `easeOutExpo`, `easeInOutQuad`.
-  - Camera pushes: `scale = 1.0 + (frameInScene / totalSceneFrames) * 0.05`.
+MooScript operates a dual-engine rendering pipeline:
+
+#### Primary Engine (v2): HTML/CSS/GSAP Layer Composition (`src/engine/composition/`)
+- **Sandboxed Stage**: Executed inside an isolated iframe (`sandbox="allow-scripts"`).
+- **GSAP Timeline Driver (`mooRuntime.ts`)**: Evaluates scenes deterministically by scrubbing a synchronized GSAP Master Timeline (`tl.seek(t)`).
+- **Editable Layers (`layers.ts`)**: Generates and inspects elements with `data-moo-layer` attributes, allowing non-destructive visual adjustments (text, color, scale, translate, rotate, opacity) without altering base templates.
+- **Canvas Pooling (`resetSharedCanvas`)**: Employs a pooled offscreen canvas buffer for SVG frame rasterization, preventing memory bloat during WebCodecs frame-by-frame export runs.
+- **Offline Fonts**: Self-contained `@fontsource` WOFF2 data-URIs (`Plus Jakarta Sans`, `JetBrains Mono`) ensuring pixel-perfect layout and rendering even without internet connectivity.
+
+#### Fallback Engine: Deterministic 2D Canvas Renderer (`src/engine/renderer/canvasRenderer.ts`)
+- **Canvas Context**: OffscreenCanvas / `<canvas>` configured for responsive dimensions.
+- **Kinetic Layout Presets**: Legacy 5 layouts (`KINETIC_QUOTE`, `METRIC_COUNTER`, `TERMINAL_MOCKUP`, `VS_COMPARISON`, `LIST_STAGGER`) retained for lightweight fallback mode.
 
 ### Module 4: WebCodecs + MP4 Muxer Pipeline (`src/engine/export/mp4Exporter.ts`)
 

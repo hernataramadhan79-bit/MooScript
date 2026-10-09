@@ -107,16 +107,13 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           width: `${width}px`,
           height: `${height}px`,
           transform: `scale(${scale})`,
-          transformOrigin: 'center center'
+          transformOrigin: 'center center',
+          transition: 'transform 0.15s ease-out'
         }}
-        className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-border bg-black transition-transform duration-75 ease-out"
+        className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-border bg-black transition-transform duration-150 ease-out"
       >
         <iframe
-          key={
-            composition
-              ? `${composition.id}-${composition.updatedAt || ''}-${composition.scenes?.length || 0}`
-              : 'comp-default'
-          }
+          key={`${projectId}-${width}x${height}`}
           ref={iframeRef}
           srcDoc={srcDoc}
           title="MooScript Composition Stage"

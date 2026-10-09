@@ -430,19 +430,28 @@ export async function exportMooProjectToMP4(
         throw new Error('Mediabunny output buffer is empty.');
       }
 
-      const blob = new Blob([buffer], { type: 'video/mp4' });
-      const objectUrl = URL.createObjectURL(blob);
+      let objectUrl: string | null = null;
+      try {
+        const blob = new Blob([buffer], { type: 'video/mp4' });
+        objectUrl = URL.createObjectURL(blob);
 
-      onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
+        onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
 
-      return {
-        blob,
-        objectUrl,
-        fileSizeBytes: blob.size,
-        durationSeconds: totalDuration,
-        hasAudio,
-        warnings
-      };
+        return {
+          blob,
+          objectUrl,
+          fileSizeBytes: blob.size,
+          durationSeconds: totalDuration,
+          hasAudio,
+          warnings
+        };
+      } catch (err: unknown) {
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = null;
+        }
+        throw err;
+      }
     } catch (err: unknown) {
       await output.cancel().catch(() => {});
       if (abortSignal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
@@ -562,19 +571,28 @@ export async function exportMooProjectToMP4(
       throw new Error('Mediabunny output buffer is empty.');
     }
 
-    const blob = new Blob([buffer], { type: 'video/mp4' });
-    const objectUrl = URL.createObjectURL(blob);
+    let objectUrl: string | null = null;
+    try {
+      const blob = new Blob([buffer], { type: 'video/mp4' });
+      objectUrl = URL.createObjectURL(blob);
 
-    onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
+      onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
 
-    return {
-      blob,
-      objectUrl,
-      fileSizeBytes: blob.size,
-      durationSeconds: totalDuration,
-      hasAudio,
-      warnings
-    };
+      return {
+        blob,
+        objectUrl,
+        fileSizeBytes: blob.size,
+        durationSeconds: totalDuration,
+        hasAudio,
+        warnings
+      };
+    } catch (err: unknown) {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+      throw err;
+    }
   } catch (err: unknown) {
     await output.cancel().catch(() => {});
     if (abortSignal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {

@@ -100,9 +100,12 @@ export interface AudioSlice {
   audioBlobUrl: string | null;
   audioStale: boolean;
   audioProgress: AudioProgressInfo | null;
+  rawVoiceBlob?: Blob | null;
   generateAudio: () => Promise<void>;
   cancelAudioGeneration: () => void;
   auditionVoice: (provider?: TTSProvider, voiceId?: string) => Promise<void>;
+  remixAudio: () => Promise<void>;
+  generateBgmOnlyAudio: () => Promise<void>;
 }
 
 export interface PlaybackSlice {
@@ -139,9 +142,9 @@ export interface SettingsSlice {
 }
 
 export interface BgmSlice {
-  updateBgmPreset: (preset: BgmPreset) => void;
-  updateBgmLevel: (level: number) => void;
-  updateBgmDuckRatio: (duckRatio: number) => void;
+  updateBgmPreset: (preset: BgmPreset) => Promise<void> | void;
+  updateBgmLevel: (level: number) => Promise<void> | void;
+  updateBgmDuckRatio: (duckRatio: number) => Promise<void> | void;
 }
 
 export type MooStoreState = UiSlice &

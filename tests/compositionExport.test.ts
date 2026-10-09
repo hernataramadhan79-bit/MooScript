@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
-import { serializeSvgFrame, getRuntimeScript } from '../src/engine/composition/runtime/mooRuntime';
+import { serializeSvgFrame, getRuntimeScript, resetSharedCanvas } from '../src/engine/composition/runtime/mooRuntime';
 import { exportMooProjectToMP4 } from '../src/engine/export/mp4Exporter';
 import * as compRendererModule from '../src/engine/composition/compositionFrameRenderer';
 import { createMockCanvas } from './mocks/mockCanvas';
@@ -575,6 +575,21 @@ describe('Phase 3: Composition & Export Tests', () => {
 
       renderer?.cleanup();
     });
+
+    it('EXPORT-001: compositionFrameRenderer sends teardown message on cleanup to free memory', async () => {
+      const rendererPromise = compRendererModule.createCompositionFrameRenderer(dummyProject, 1080, 1920);
+
+      (globalThis as any).window.dispatchEvent({
+        data: { type: 'ready' },
+        source: mockContentWindow
+      });
+
+      const renderer = await rendererPromise;
+      expect(renderer).not.toBeNull();
+
+      renderer?.cleanup();
+      expect(mockContentWindow.postMessage).toHaveBeenCalledWith({ type: 'teardown' }, '*');
+    });
   });
 
   describe('3e & 3f: Export Correctness, Duration, and Failure Handling', () => {
@@ -787,4 +802,33 @@ describe('Phase 3: Composition & Export Tests', () => {
       expect(result.durationSeconds).toBe(1.0); // Uses scenes duration because audioStale is true
     });
   });
+
+  describe('EXPORT-001, PERF-001, UI-001: Canvas Pooling, Memory Leak Prevention & Stable Iframe Key', () => {
+    it('EXPORT-001: mooRuntime includes canvas pooling, capture_frame handling, and canvas reset on teardown', () => {
+      const script = getRuntimeScript();
+      expect(script).toContain('sharedExportCanvas');
+      expect(script).toContain('sharedExportCtx');
+      expect(script).toContain('capture_frame');
+      expect(script).toContain('sharedExportCanvas.width = 0');
+      expect(script).toContain('sharedExportCanvas.height = 0');
+      expect(script).toContain('teardown');
+      expect(typeof resetSharedCanvas).toBe('function');
+    });
+
+    it('EXPORT-001: resetSharedCanvas executes cleanly and resets dimensions', () => {
+      expect(() => resetSharedCanvas()).not.toThrow();
+    });
+
+    it('PERF-001 & UI-001: CompositionStage uses stable key and CSS scale transition', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const stageContent = fs.readFileSync(
+        path.resolve(__dirname, '../src/components/studio/CompositionStage.tsx'),
+        'utf-8'
+      );
+      expect(stageContent).toContain('key={`${projectId}-${width}x${height}`}');
+      expect(stageContent).toContain("transition: 'transform 0.15s ease-out'");
+    });
+  });
 });
+

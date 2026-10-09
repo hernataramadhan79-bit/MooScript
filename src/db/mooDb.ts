@@ -17,12 +17,23 @@ export interface CachedSceneAudio {
   updatedAt: number;
 }
 
+export interface AssetRecord {
+  id: string;
+  projectId: string;
+  name: string;
+  mimeType: string;
+  blob?: Blob;
+  dataUrl?: string;
+  createdAt: number;
+}
+
 export class MooDatabase extends Dexie {
   projects!: Table<MooProject, string>;
   audioBlobs!: Table<StoredAudio, string>;
   skills!: Table<PersonaSkill, string>;
   settings!: Table<{ id: string; data: EngineSettings }, string>;
   sceneAudioCache!: Table<CachedSceneAudio, string>;
+  assets!: Table<AssetRecord, string>;
 
   constructor() {
     super('MooScriptDB');

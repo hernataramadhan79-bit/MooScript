@@ -17,6 +17,9 @@ const EMBEDDED_FONT_CSS = `
 @font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:800;font-display:swap;src:url('${jakarta800}') format('woff2');}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('${mono400}') format('woff2');}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('${mono700}') format('woff2');}
+/* Offline fallbacks for display typefaces so foreignObject and offline PWA never render system serif */
+@font-face{font-family:'Syne';font-style:normal;font-weight:700 800;font-display:swap;src:url('${jakarta800}') format('woff2');}
+@font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:700 800;font-display:swap;src:url('${jakarta800}') format('woff2');}
 `;
 
 export interface BuildDocumentOptions {
