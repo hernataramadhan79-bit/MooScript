@@ -64,29 +64,29 @@ export const GlobalVoiceSelector: React.FC = () => {
         onChange={handleChange}
         className="flex-1 bg-[#18181c] text-zinc-200 border border-white/[0.08] rounded h-7 px-2 text-[11px] font-medium focus:outline-none focus:border-[#84cc16]/50 cursor-pointer min-w-0"
       >
-        <optgroup label="Local Offline TTS (Zero-API)">
+        <optgroup label="Suara Offline (Lokal)">
           {LOCAL_VOICES.map((v) => (
             <option key={v.id} value={`local:${v.id}`}>
-              Piper: {v.name} ({v.language.toUpperCase()})
+              {v.name} ({v.language.toUpperCase()})
             </option>
           ))}
         </optgroup>
-        <optgroup label="OpenAI Voice (API Key Required)">
+        <optgroup label="OpenAI">
           {OPENAI_VOICES.map((v) => (
             <option key={v.id} value={`openai:${v.id}`}>
               {v.name}
             </option>
           ))}
         </optgroup>
-        <optgroup label="ElevenLabs Voice (API Key Required)">
+        <optgroup label="ElevenLabs">
           {ELEVENLABS_VOICES.map((v) => (
             <option key={v.id} value={`elevenlabs:${v.id}`}>
               {v.name}
             </option>
           ))}
         </optgroup>
-        <optgroup label="Browser Procedural">
-          <option value="fallback:fallback">Procedural Synth (Ambient Fallback)</option>
+        <optgroup label="Browser">
+          <option value="fallback:fallback">Suara Standar Browser</option>
         </optgroup>
       </select>
 

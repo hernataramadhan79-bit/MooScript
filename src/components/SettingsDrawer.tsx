@@ -377,7 +377,7 @@ export const SettingsDrawer: React.FC = () => {
         <div className="h-11 sm:h-14 px-3.5 sm:px-5 border-b border-white/[0.08] flex items-center justify-between shrink-0 bg-white/[0.02]">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px] sm:text-[20px]">tune</span>
-            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">Studio Settings & BYOK Keys</h2>
+            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">Pengaturan Studio</h2>
           </div>
 
           <button
@@ -391,21 +391,20 @@ export const SettingsDrawer: React.FC = () => {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4 text-xs">
-          {/* 1. BYOK API Keys */}
+          {/* 1. API Keys */}
           <section className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 sm:space-y-3 shadow-sm">
             <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-[15px] sm:text-[17px]">key</span>
                 <span className="text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider">
-                  BYOK API Keys (Lokal)
+                  Kunci API AI
                 </span>
               </div>
-              <span className="text-[9px] sm:text-[10px] font-mono text-zinc-500">Zero Server</span>
             </div>
 
             {/* Storage Mode */}
             <div className="flex flex-col gap-1 p-2 sm:p-2.5 rounded-lg bg-black/50 border border-white/[0.06]">
-              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-300">Mode Penyimpanan Kunci</span>
+              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-300">Penyimpanan Kunci</span>
               <div className="grid grid-cols-2 gap-1.5 sm:gap-2 pt-0.5">
                 <button
                   type="button"
@@ -416,7 +415,7 @@ export const SettingsDrawer: React.FC = () => {
                       : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
                   }`}
                 >
-                  Persistent (IndexedDB)
+                  Permanen
                 </button>
                 <button
                   type="button"
@@ -427,14 +426,14 @@ export const SettingsDrawer: React.FC = () => {
                       : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
                   }`}
                 >
-                  Session Only (RAM)
+                  Sesi Ini Saja
                 </button>
               </div>
             </div>
 
-            {/* Primary Scripting Engine */}
+            {/* Primary AI Provider */}
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-400">Primary Scripting Engine</span>
+              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-400">Penyedia AI Utama</span>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-1.5">
                 {(['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).map((prov) => {
                   const isSelected = settings.selectedLLMProvider === prov;
@@ -469,15 +468,12 @@ export const SettingsDrawer: React.FC = () => {
               <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
                 <span className="font-medium text-zinc-300 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[14px] text-primary">data_thresholding</span>
-                  Alokasi Token Output (Max Tokens)
+                  Batas Panjang Respons (Max Tokens)
                 </span>
                 <span className="font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                  {settings.maxOutputTokens || 2048} tokens
+                  {settings.maxOutputTokens || 2048}
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-400 leading-relaxed">
-                Atur batas maksimum token generasi AI. Nilai hemat (1024–2048) mencegah error 402 pada akun OpenRouter saldo rendah/terbatas, sementara nilai tinggi (4096+) memberikan keleluasaan untuk skrip panjang atau model reasoning.
-              </p>
               <div className="flex items-center gap-3 pt-0.5">
                 <input
                   type="range"
@@ -905,17 +901,17 @@ export const SettingsDrawer: React.FC = () => {
             </div>
           </section>
 
-          {/* 2. Persona Skills Engine */}
+          {/* 2. Persona Skills */}
           <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3 shadow-sm">
             <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-[17px]">psychology</span>
-                <span className="text-xs font-semibold text-white uppercase tracking-wider">Persona Skills Engine</span>
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">Gaya Penulisan</span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer flex items-center gap-0.5">
                   <span className="material-symbols-outlined text-[13px]">file_upload</span>
-                  Import
+                  Impor
                   <input accept=".json" className="hidden" type="file" onChange={handleImportSkill} />
                 </label>
                 <button
@@ -924,7 +920,7 @@ export const SettingsDrawer: React.FC = () => {
                   className="text-[10px] font-mono text-primary hover:text-lime-300 flex items-center gap-0.5"
                 >
                   <span className="material-symbols-outlined text-[13px]">add</span>
-                  New
+                  Baru
                 </button>
               </div>
             </div>
@@ -939,7 +935,7 @@ export const SettingsDrawer: React.FC = () => {
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-white text-xs truncate">{s.name}</span>
                       {s.isBuiltin && (
-                        <span className="text-[9px] font-mono px-1 rounded bg-white/[0.06] text-zinc-400">Built-in</span>
+                        <span className="text-[9px] font-mono px-1 rounded bg-white/[0.06] text-zinc-400">Bawaan</span>
                       )}
                     </div>
                     <span className="text-[10px] text-zinc-400 truncate block">{s.description}</span>
@@ -949,7 +945,7 @@ export const SettingsDrawer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleExportSkill(s)}
-                      title="Export Skill JSON"
+                      title="Ekspor Skill JSON"
                       className="w-6 h-6 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                     >
                       <span className="material-symbols-outlined text-[15px]">file_download</span>
@@ -958,7 +954,7 @@ export const SettingsDrawer: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleDeleteSkill(s.id)}
-                        title="Delete Skill"
+                        title="Hapus Skill"
                         className="w-6 h-6 rounded text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                       >
                         <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -970,19 +966,19 @@ export const SettingsDrawer: React.FC = () => {
             </div>
           </section>
 
-          {/* 3. Local Storage & Models Cache */}
+          {/* 3. Storage & Cache */}
           <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 shadow-sm">
             <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-zinc-400 text-[17px]">storage</span>
                 <span className="text-xs font-semibold text-white uppercase tracking-wider">
-                  IndexedDB Storage & Cache
+                  Penyimpanan & Cache
                 </span>
               </div>
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Cache Audio Per-Scene (voiceover project tidak dihapus):</span>
+              <span className="text-zinc-400">Cache Suara:</span>
               <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
             </div>
 
@@ -991,12 +987,12 @@ export const SettingsDrawer: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   await clearCache();
-                  addToast('Cache audio & project berhasil dibersihkan!', 'info');
+                  addToast('Cache suara berhasil dibersihkan!', 'info');
                 }}
                 className="h-7 px-2.5 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-zinc-300 rounded-lg hover:bg-white/[0.1] active:scale-95 transition-all flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-                <span>Bersihkan Cache Audio</span>
+                <span>Bersihkan Cache</span>
               </button>
 
               <button
@@ -1005,15 +1001,15 @@ export const SettingsDrawer: React.FC = () => {
                 className="h-7 px-2.5 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-red-300 rounded-lg hover:bg-red-500/20 active:scale-95 transition-all flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-[14px]">delete</span>
-                <span>Purge Model Piper ({(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB)</span>
+                <span>Hapus Model Suara ({(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB)</span>
               </button>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-xs">
-              <span className="text-zinc-400 text-[11px]">Storage Eviction Protection:</span>
+              <span className="text-zinc-400 text-[11px]">Proteksi Penyimpanan:</span>
               {persistenceStatus?.persisted ? (
                 <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded">
-                  Persisted (Safe)
+                  Aktif
                 </span>
               ) : (
                 <button
@@ -1021,36 +1017,35 @@ export const SettingsDrawer: React.FC = () => {
                   onClick={handleRequestPersistence}
                   className="text-[10px] font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2 py-0.5 rounded transition-colors"
                 >
-                  Enable Persistent Mode
+                  Aktifkan
                 </button>
               )}
             </div>
           </section>
 
-          {/* 4. Hardware & AI Stats */}
+          {/* 4. Hardware Stats */}
           <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 shadow-sm">
             <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <span className="text-xs font-semibold text-white uppercase tracking-wider">Client Hardware Stats</span>
-              <span className="text-[10px] font-mono text-zinc-500">100% Client-Side</span>
+              <span className="text-xs font-semibold text-white uppercase tracking-wider">Perangkat</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Akselerasi</span>
-                <span className={`text-xs font-mono font-bold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-amber-400'}`}>
-                  {deviceCaps?.hasWebGpu ? 'WebGPU' : 'WASM'}
+                <span className="text-[10px] text-zinc-400">Grafis</span>
+                <span className={`text-xs font-mono font-bold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-zinc-200'}`}>
+                  {deviceCaps?.hasWebGpu ? 'Tinggi' : 'Standar'}
                 </span>
               </div>
               <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">RAM Perangkat</span>
+                <span className="text-[10px] text-zinc-400">Memori</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
-                  {deviceCaps?.deviceMemoryGb ? `~${deviceCaps.deviceMemoryGb} GB` : 'Standard'}
+                  {deviceCaps?.deviceMemoryGb ? `~${deviceCaps.deviceMemoryGb} GB` : 'Standar'}
                 </span>
               </div>
               <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">CPU Threads</span>
+                <span className="text-[10px] text-zinc-400">CPU</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
-                  {deviceCaps?.hardwareConcurrency || 4} Cores
+                  {deviceCaps?.hardwareConcurrency || 4} Core
                 </span>
               </div>
             </div>

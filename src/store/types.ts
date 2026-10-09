@@ -111,6 +111,8 @@ export interface AudioSlice {
 export interface PlaybackSlice {
   currentFrame: number;
   isPlaying: boolean;
+  isLooping: boolean;
+  toggleLoop: () => void;
   seekFrame: (frame: number) => void;
   seekTime: (timeSec: number) => void;
   togglePlay: () => void;

@@ -10,7 +10,7 @@ let scriptAbortController: AbortController | null = null;
 
 export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice> = (set, get) => ({
   isGeneratingScript: false,
-  scriptPrompt: 'How zero-server motion graphics compiles MP4 videos in the browser using WebCodecs',
+  scriptPrompt: 'Tips meningkatkan produktivitas dan fokus kerja harian',
   setScriptPrompt: (scriptPrompt) => set({ scriptPrompt }),
 
   cancelGenerateScript: () => {

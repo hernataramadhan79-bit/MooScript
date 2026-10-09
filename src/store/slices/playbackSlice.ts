@@ -32,6 +32,11 @@ export function stopPlaybackAudio(): void {
 export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSlice> = (set, get) => ({
   currentFrame: 0,
   isPlaying: false,
+  isLooping: false,
+
+  toggleLoop: () => {
+    set((state) => ({ isLooping: !state.isLooping }));
+  },
 
   seekFrame: (currentFrame) => {
     const fps = get().project.fps || 30;
@@ -142,6 +147,22 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
 
       // Check if finished
       if (targetFrame >= currentMaxFrames || (isAudioMasterActive && playbackAudioElement?.ended)) {
+        if (get().isLooping) {
+          playbackStartTime = performance.now();
+          playbackStartFrame = 0;
+          set({ currentFrame: 0 });
+          if (playbackAudioElement) {
+            try {
+              playbackAudioElement.currentTime = 0;
+              playbackAudioElement.play().catch(() => {});
+            } catch (err) {
+              console.warn('Loop audio rewind failed:', err);
+            }
+          }
+          playbackRafId = requestAnimationFrame(tick);
+          return;
+        }
+
         cancelPlaybackRaf();
         isAudioMasterActive = false;
         set({ currentFrame: 0, isPlaying: false });

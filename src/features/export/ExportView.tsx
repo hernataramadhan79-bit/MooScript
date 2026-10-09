@@ -70,8 +70,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
   }, []);
 
   const formatOptions = [
-    { value: 'mp4' as const, label: 'MP4 Video (WebCodecs)', icon: 'movie' },
-    { value: 'html' as const, label: 'HTML Bundle Standalone', icon: 'html' },
+    { value: 'mp4' as const, label: 'Video MP4', icon: 'movie' },
+    { value: 'html' as const, label: 'HTML Mandiri', icon: 'html' },
     { value: 'srt' as const, label: 'Subtitle SRT', icon: 'subtitles' }
   ];
 
@@ -137,7 +137,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
           Format Ekspor Video
         </span>
 
-        <Field label="Pilih Format Deliverable">
+        <Field label="Pilih Format">
           <SegmentedControl
             options={formatOptions}
             value={exportFormat}
@@ -148,17 +148,17 @@ export const ExportView: React.FC<ExportViewProps> = ({ onBackStep }) => {
         <div className="text-[13px] text-text-muted leading-relaxed bg-surface-2 p-3.5 rounded-xl border border-border">
           {exportFormat === 'mp4' && (
             <p>
-              Hardware-accelerated MP4 rendering langsung di browser melalui browser native WebCodecs dan mediabunny. 100% zero-server, tanpa watermark atau kuota server.
+              Render video MP4 berkualitas tinggi langsung di browser tanpa watermark.
             </p>
           )}
           {exportFormat === 'html' && (
             <p>
-              Satu berkas HTML mandiri berisi seluruh GSAP timeline, CSS, aset visual, dan kontrol pemutar audio terintegrasi. Dapat dibuka langsung dengan klik ganda di browser apa pun tanpa server.
+              Berkas web interaktif mandiri yang dapat dibuka langsung di peramban apa pun.
             </p>
           )}
           {exportFormat === 'srt' && (
             <p>
-              File subtitle terformat standar dengan timestamp kata presisi untuk dipasangkan ke video player atau media sosial.
+              Berkas subtitle terformat standar dengan penanda waktu presisi untuk pemutar video.
             </p>
           )}
         </div>

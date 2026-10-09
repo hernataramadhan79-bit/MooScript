@@ -106,14 +106,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
 
           {/* Sisi Kanan: Status & Aksi Utama */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* BYOK Status Badge */}
+            {/* Status Kunci API / Mode Lokal */}
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="hidden md:flex items-center gap-2 px-3 h-8 rounded-lg bg-surface-2 border border-border text-[12px] font-medium text-text-muted hover:text-on-surface transition-colors"
             >
               <span className={`w-2 h-2 rounded-full ${hasApiKey ? 'bg-accent' : 'bg-amber-400'}`} />
-              <span>{hasApiKey ? 'BYOK Terhubung' : 'Offline / Local'}</span>
+              <span>{hasApiKey ? 'Kunci API Aktif' : 'Mode Lokal'}</span>
             </button>
 
             {onOpenExport && (

@@ -81,11 +81,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
                   {project.width}×{project.height} MP4 Video ({project.aspectRatio || '9:16'})
                 </span>
                 <span className="text-[10px] text-zinc-400 font-mono">
-                  AVC H.264 • {project.fps || 30} FPS • AAC Audio • Hardware Accelerated
+                  MP4 • {project.fps || 30} FPS • Audio Stereo
                 </span>
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/25 font-bold">
-                WebCodecs
+                Full HD
               </span>
             </div>
 
@@ -166,10 +166,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
             <div className="p-4 rounded-lg bg-[#84cc16]/10 border border-[#84cc16]/30 space-y-3">
               <div className="flex items-center gap-2 text-zinc-100">
                 <span className="material-symbols-outlined text-[18px] text-[#84cc16]">check_circle</span>
-                <span className="font-bold text-xs">Video Rendered Successfully!</span>
+                <span className="font-bold text-xs">Video Berhasil Dibuat</span>
               </div>
               <p className="text-[11px] text-zinc-300">
-                File size: {(exportResult.blob.size / (1024 * 1024)).toFixed(2)} MB • Zero server leak.
+                Ukuran file: {(exportResult.blob.size / (1024 * 1024)).toFixed(2)} MB
               </p>
               <div className="flex gap-2">
                 <button

@@ -96,9 +96,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[22px]">video_library</span>
             <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-bold text-white">Project Manager</h2>
+              <h2 className="text-sm font-bold text-white">Daftar Proyek</h2>
               <span className="text-[11px] font-mono text-zinc-500">
-                {projectsList.length} {projectsList.length === 1 ? 'project' : 'projects'}
+                {projectsList.length} proyek
               </span>
             </div>
           </div>
@@ -111,13 +111,13 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
               className="px-3 h-8 rounded-lg bg-primary hover:bg-lime-300 text-black text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>New Project</span>
+              <span>Proyek Baru</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
-              aria-label="Close modal"
+              aria-label="Tutup modal"
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
@@ -167,7 +167,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
                     {isActive && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider">
-                        Active
+                        Aktif
                       </span>
                     )}
                   </div>
@@ -175,7 +175,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                   <div className="flex items-center gap-3 mt-1 text-[10px] font-mono text-zinc-400">
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-[13px] text-zinc-500">movie</span>
-                      {sceneCount} {sceneCount === 1 ? 'scene' : 'scenes'}
+                      {sceneCount} adegan
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
@@ -193,7 +193,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     <button
                       type="button"
                       onClick={() => handleStartRename(p)}
-                      title="Rename project"
+                      title="Ubah nama proyek"
                       className="w-7 h-7 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                     >
                       <span className="material-symbols-outlined text-[15px]">edit</span>
@@ -203,7 +203,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                   <button
                     type="button"
                     onClick={(e) => handleDuplicate(e, p.id)}
-                    title="Duplicate project"
+                    title="Duplikat proyek"
                     className="w-7 h-7 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                   >
                     <span className="material-symbols-outlined text-[15px]">content_copy</span>
@@ -213,7 +213,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     type="button"
                     onClick={(e) => handleDelete(e, p)}
                     disabled={projectsList.length <= 1}
-                    title={projectsList.length <= 1 ? 'Cannot delete only project' : 'Delete project'}
+                    title={projectsList.length <= 1 ? 'Tidak dapat menghapus proyek satu-satunya' : 'Hapus proyek'}
                     className="w-7 h-7 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -226,8 +226,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
         {/* Footer info */}
         <div className="px-5 py-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-[11px] font-mono text-zinc-500">
-          <span>100% Local IndexedDB</span>
-          <span>Switch project anytime</span>
+          <span>Penyimpanan Lokal</span>
+          <span>Ganti proyek kapan saja</span>
         </div>
       </div>
     </div>

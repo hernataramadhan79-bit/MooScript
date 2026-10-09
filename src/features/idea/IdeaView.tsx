@@ -41,10 +41,10 @@ export const IdeaView: React.FC<IdeaViewProps> = ({ onNextStep, onOpenCodeInspec
   ];
 
   const quickConcepts = [
-    'Penjelasan zero-server WebCodecs di browser',
-    'Mengapa AI Agents butuh structured outputs',
-    'Tips produktivitas developer 2026',
-    'Komparasi performa Rust vs C++'
+    'Cara kerja kamera mirrorless modern',
+    'Tips produktivitas kerja harian',
+    '3 kebiasaan pagi orang sukses',
+    'Panduan memulai gaya hidup sehat'
   ];
 
   return (
