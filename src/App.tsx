@@ -4,19 +4,21 @@ import { Header } from './components/Header';
 import { CompositionStage } from './components/studio/CompositionStage';
 import { TimelineBar } from './components/studio/TimelineBar';
 import { SceneDeck } from './components/studio/SceneDeck';
-import { InspectorRack } from './components/studio/InspectorRack';
+import { InspectorRack, type InspectorTab } from './components/studio/InspectorRack';
+import { CodeInspectorModal } from './features/scene/CodeInspectorModal';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 
-export type MobileTab = 'naskah' | 'gaya' | 'suara' | 'ekspor';
-export type InspectorTab = 'gaya' | 'suara' | 'ekspor';
+export type MobileTab = 'naskah' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
+export type { InspectorTab };
 
 export const App: React.FC = () => {
   const { initStore, togglePlay, project } = useMooStore();
 
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('gaya');
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('mograph');
   const [mobileTab, setMobileTab] = useState<MobileTab>('naskah');
+  const [inspectingBeatId, setInspectingBeatId] = useState<string | null>(null);
 
   useEffect(() => {
     initStore().catch((err) => console.error('Failed to init store', err));
@@ -43,8 +45,14 @@ export const App: React.FC = () => {
     setMobileTab('ekspor');
   };
 
+  const handleNavigateToMograph = () => {
+    setInspectorTab('mograph');
+    setMobileTab('mograph');
+  };
+
   const mobileTabs: { id: MobileTab; label: string; icon: string }[] = [
-    { id: 'naskah', label: 'Naskah', icon: 'movie_filter' },
+    { id: 'naskah', label: 'Naskah', icon: 'edit_note' },
+    { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
     { id: 'gaya', label: 'Gaya', icon: 'palette' },
     { id: 'suara', label: 'Suara', icon: 'graphic_eq' },
     { id: 'ekspor', label: 'Ekspor', icon: 'download' }
@@ -63,7 +71,7 @@ export const App: React.FC = () => {
         <aside className="hidden lg:flex w-[340px] xl:w-[380px] shrink-0 border-r border-border bg-surface-1 flex-col h-full overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-surface-1/90 backdrop-blur-sm flex items-center justify-between shrink-0 select-none">
             <span className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[17px] text-accent">movie_filter</span>
+              <span className="material-symbols-outlined text-[17px] text-accent">edit_note</span>
               Naskah & Adegan
             </span>
             <span className="text-[11px] font-mono text-text-muted px-2 py-0.5 rounded-full bg-surface-2 border border-border">
@@ -72,7 +80,10 @@ export const App: React.FC = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <SceneDeck />
+            <SceneDeck
+              onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+              onNavigateToMograph={handleNavigateToMograph}
+            />
           </div>
         </aside>
 
@@ -101,7 +112,20 @@ export const App: React.FC = () => {
           {/* Mobile Bottom Workspace: Tabbed Drawer */}
           <div className="flex lg:hidden flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto">
-              {mobileTab === 'naskah' && <SceneDeck className="h-full" />}
+              {mobileTab === 'naskah' && (
+                <SceneDeck
+                  className="h-full"
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+                  onNavigateToMograph={handleNavigateToMograph}
+                />
+              )}
+              {mobileTab === 'mograph' && (
+                <InspectorRack
+                  activeTab="mograph"
+                  onTabChange={(t) => setMobileTab(t)}
+                  className="h-full border-0 rounded-none shadow-none"
+                />
+              )}
               {mobileTab === 'gaya' && (
                 <InspectorRack
                   activeTab="gaya"
@@ -125,8 +149,8 @@ export const App: React.FC = () => {
               )}
             </div>
 
-            {/* Mobile Bottom Navigation Bar */}
-            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-2 py-1.5 grid grid-cols-4 gap-1 select-none">
+            {/* Mobile Bottom Navigation Bar (5 Tab) */}
+            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-1 py-1.5 grid grid-cols-5 gap-1 select-none">
               {mobileTabs.map((tab) => {
                 const isActive = mobileTab === tab.id;
                 return (
@@ -134,7 +158,7 @@ export const App: React.FC = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => setMobileTab(tab.id)}
-                    className={`py-1.5 px-1 rounded-xl text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
+                    className={`py-1.5 px-0.5 rounded-xl text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
                       isActive
                         ? 'bg-surface-3 text-accent shadow-sm'
                         : 'text-text-muted hover:text-on-surface'
@@ -143,7 +167,7 @@ export const App: React.FC = () => {
                     <span className="material-symbols-outlined text-[18px]">
                       {tab.icon}
                     </span>
-                    <span>{tab.label}</span>
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 );
               })}
@@ -151,7 +175,7 @@ export const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Zona Kanan: Inspector Rack (Gaya, Suara, Ekspor) - Desktop Only */}
+        {/* Zona Kanan: Inspector Rack (Mograph, Gaya, Suara, Ekspor) - Desktop Only */}
         <aside className="hidden lg:flex w-[340px] xl:w-[380px] shrink-0 border-l border-border bg-surface-1 flex-col h-full overflow-hidden">
           <InspectorRack
             activeTab={inspectorTab}
@@ -161,13 +185,20 @@ export const App: React.FC = () => {
         </aside>
       </main>
 
-      {/* 3. Settings Drawer */}
+      {/* 3. Code Inspector Modal */}
+      <CodeInspectorModal
+        beatId={inspectingBeatId}
+        isOpen={Boolean(inspectingBeatId)}
+        onClose={() => setInspectingBeatId(null)}
+      />
+
+      {/* 4. Settings Drawer */}
       <SettingsDrawer />
 
-      {/* 4. Toast Notifications */}
+      {/* 5. Toast Notifications */}
       <ToastContainer />
 
-      {/* 5. PWA Reload Prompt */}
+      {/* 6. PWA Reload Prompt */}
       <PwaReloadPrompt />
     </div>
   );
