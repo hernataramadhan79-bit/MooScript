@@ -50,14 +50,12 @@ const cleanWord = (w: string): string => w.replace(/^[^\w\s]+|[^\w\s]+$/g, '').t
 export interface SceneDeckProps {
   className?: string;
   onOpenCodeInspector?: (beatId: string) => void;
-  onNavigateToMograph?: () => void;
   onEditScene?: (sceneId: string) => void;
 }
 
 export const SceneDeck: React.FC<SceneDeckProps> = ({
   className = '',
   onOpenCodeInspector,
-  onNavigateToMograph,
   onEditScene
 }) => {
   const {
@@ -78,11 +76,19 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     undoGenerateScript,
     previousScenesSnapshot,
     activeSceneId,
-    setActiveSceneId
+    setActiveSceneId,
+    seekFrame
   } = useMooStore();
 
   const scenes = project.scenes || [];
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (activeSceneId && cardRefs.current[activeSceneId]) {
+      cardRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeSceneId]);
 
   const toggleDetail = (sceneId: string) => {
     setExpandedDetails((prev) => ({
@@ -132,8 +138,31 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
       {/* 2. Daftar Kartu Adegan (Scene Storyboard) */}
       <div className="flex flex-col gap-2.5">
-        {scenes.map((scene, index) => {
+        {scenes.length === 0 ? (
+          <div className="p-6 rounded-xl border border-dashed border-border/80 flex flex-col items-center justify-center text-center gap-3 bg-surface-1/40 my-1">
+            <div className="w-10 h-10 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+              <span className="material-symbols-outlined text-[20px]">movie_edit</span>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold text-text">Mulai Naskah Motion Graphics</h4>
+              <p className="text-[11px] text-text-muted max-w-[240px]">
+                Ketik ide atau naskah Anda di kolom atas untuk menyusun shot otomatis, atau buat adegan manual.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="add"
+              onClick={addScene}
+              className="mt-1"
+            >
+              Tambah Adegan Pertama
+            </Button>
+          </div>
+        ) : (
+          scenes.map((scene, index) => {
           const isActive = activeSceneId === scene.id;
+          const startSec = scenes.slice(0, index).reduce((acc, s) => acc + (s.durationInSeconds || 3), 0);
           const narration = scene.narrationText ?? scene.text ?? '';
           const duration = Math.min(30, Math.max(0.5, scene.durationInSeconds || 3));
           const visualTitle = scene.visualIntent
@@ -158,7 +187,14 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           return (
             <div
               key={scene.id}
-              onClick={() => setActiveSceneId(scene.id)}
+              ref={(el) => {
+                cardRefs.current[scene.id] = el;
+              }}
+              onClick={() => {
+                const fps = project.fps || 30;
+                seekFrame(Math.round(startSec * fps));
+                setActiveSceneId(scene.id);
+              }}
               className={`p-3 rounded-xl border transition-all duration-150 flex flex-col gap-2.5 cursor-pointer ${
                 isActive
                   ? 'bg-surface-2/70 border-accent/60 shadow-sm ring-1 ring-accent/20'
@@ -413,7 +449,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               </div>
             </div>
           );
-        })}
+        })
+      )}
 
         {/* Tombol Tambah Adegan */}
         <button
@@ -425,17 +462,6 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           <span>+ Tambah Adegan</span>
         </button>
 
-        {/* Tombol Navigasi Cepat ke Mograph AI */}
-        {onNavigateToMograph && (
-          <button
-            type="button"
-            onClick={onNavigateToMograph}
-            className="w-full mt-1 py-2 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] select-none"
-          >
-            <span className="material-symbols-outlined text-[16px] text-accent">movie_filter</span>
-            <span>Konfigurasi & Generate Mograph AI →</span>
-          </button>
-        )}
       </div>
     </div>
   );

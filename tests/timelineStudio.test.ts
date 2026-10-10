@@ -106,4 +106,167 @@ describe('Timeline Studio Suite (Playback & Transport)', () => {
     expect(useMooStore.getState().currentFrame).toBe(90);
     expect(useMooStore.getState().activeSceneId).toBe('scene-2');
   });
+
+  it('calculates cumulative start seconds and synchronizes seek accurately', () => {
+    const store = useMooStore.getState();
+    const scenes = store.project.scenes;
+    const fps = store.project.fps || 30;
+
+    // Scene 0 starts at 0s
+    const start0 = scenes.slice(0, 0).reduce((acc, s) => acc + (s.durationInSeconds || 3), 0);
+    expect(start0).toBe(0);
+
+    // Scene 1 starts at scene 0's duration (3.0s)
+    const start1 = scenes.slice(0, 1).reduce((acc, s) => acc + (s.durationInSeconds || 3), 0);
+    expect(start1).toBe(3.0);
+    store.seekFrame(Math.round(start1 * fps));
+    store.setActiveSceneId(scenes[1].id);
+
+    expect(useMooStore.getState().currentFrame).toBe(90);
+    expect(useMooStore.getState().activeSceneId).toBe('scene-2');
+  });
+
+  it('determines active scene boundary across timeline scrub positions', () => {
+    const store = useMooStore.getState();
+    const scenes = store.project.scenes;
+
+    let accumulated = 0;
+    const boundaries = scenes.map((s, idx) => {
+      const start = accumulated;
+      const dur = s.durationInSeconds || 3;
+      const end = accumulated + dur;
+      accumulated = end;
+      return { ...s, shotNumber: idx + 1, startSec: start, endSec: end };
+    });
+
+    const getActiveSceneAtSec = (sec: number) => {
+      const idx = boundaries.findIndex((s) => sec >= s.startSec && sec < s.endSec);
+      if (idx >= 0) return boundaries[idx];
+      if (sec >= accumulated && boundaries.length > 0) return boundaries[boundaries.length - 1];
+      return boundaries[0];
+    };
+
+    expect(getActiveSceneAtSec(0).id).toBe('scene-1');
+    expect(getActiveSceneAtSec(1.5).id).toBe('scene-1');
+    expect(getActiveSceneAtSec(2.99).id).toBe('scene-1');
+    expect(getActiveSceneAtSec(3.0).id).toBe('scene-2');
+    expect(getActiveSceneAtSec(5.5).id).toBe('scene-2');
+    expect(getActiveSceneAtSec(10.0).id).toBe('scene-2');
+  });
+
+  it('handles undefined durationInSeconds with unified 3.0s fallback without desync', () => {
+    const fps = 30;
+    const scenes = [
+      { id: 'sc-1', durationInSeconds: undefined },
+      { id: 'sc-2', durationInSeconds: 4.0 }
+    ];
+
+    let accumulated = 0;
+    const boundaries = scenes.map((s, idx) => {
+      const start = accumulated;
+      const dur = s.durationInSeconds || 3;
+      const end = accumulated + dur;
+      accumulated = end;
+      return {
+        id: s.id,
+        shotNumber: idx + 1,
+        startSec: start,
+        endSec: end,
+        startFrame: Math.round(start * fps),
+        endFrame: Math.round(end * fps)
+      };
+    });
+
+    expect(boundaries[0].startSec).toBe(0);
+    expect(boundaries[0].endSec).toBe(3);
+    expect(boundaries[0].startFrame).toBe(0);
+    expect(boundaries[0].endFrame).toBe(90);
+
+    expect(boundaries[1].startSec).toBe(3);
+    expect(boundaries[1].endSec).toBe(7);
+    expect(boundaries[1].startFrame).toBe(90);
+    expect(boundaries[1].endFrame).toBe(210);
+
+    // Clicking sc-1 seeks to frame 0
+    const frameSc1 = Math.round(boundaries[0].startSec * fps);
+    const matchedSc1 = boundaries.find((b) => frameSc1 >= b.startFrame && frameSc1 < b.endFrame);
+    expect(matchedSc1?.id).toBe('sc-1');
+
+    // Clicking sc-2 seeks to frame 90
+    const frameSc2 = Math.round(boundaries[1].startSec * fps);
+    const matchedSc2 = boundaries.find((b) => frameSc2 >= b.startFrame && frameSc2 < b.endFrame);
+    expect(matchedSc2?.id).toBe('sc-2');
+  });
+
+  it('prevents downward Math.round frame rounding desync at 24fps and 30fps', () => {
+    // 1. Initial project scenes at 24fps clicking Scene 3 (startSec 6.8s)
+    const fps24 = 24;
+    const scenes24 = [
+      { id: 'sc-1', durationInSeconds: 3.2 },
+      { id: 'sc-2', durationInSeconds: 3.6 },
+      { id: 'sc-3', durationInSeconds: 3.2 }
+    ];
+
+    let acc24 = 0;
+    const boundaries24 = scenes24.map((s, idx) => {
+      const start = acc24;
+      const dur = s.durationInSeconds || 3;
+      const end = acc24 + dur;
+      acc24 = end;
+      return {
+        id: s.id,
+        shotNumber: idx + 1,
+        startSec: start,
+        endSec: end,
+        startFrame: Math.round(start * fps24),
+        endFrame: Math.round(end * fps24)
+      };
+    });
+
+    // Scene 3 starts at 6.8s -> Math.round(6.8 * 24) = 163 frames
+    const target24StartSec = scenes24.slice(0, 2).reduce((sum, s) => sum + (s.durationInSeconds || 3), 0);
+    expect(target24StartSec).toBeCloseTo(6.8);
+    const currentFrame24 = Math.round(target24StartSec * fps24);
+    expect(currentFrame24).toBe(163);
+
+    // Discrete frame comparison matches sc-3, not sc-2
+    const matched24 = boundaries24.find(
+      (b) => currentFrame24 >= b.startFrame && currentFrame24 < b.endFrame
+    );
+    expect(matched24?.id).toBe('sc-3');
+
+    // 2. Realistic TTS scene at 30fps clicking Scene 2 (startSec 2.34s)
+    const fps30 = 30;
+    const scenes30 = [
+      { id: 'sc-1', durationInSeconds: 2.34 },
+      { id: 'sc-2', durationInSeconds: 3.12 }
+    ];
+
+    let acc30 = 0;
+    const boundaries30 = scenes30.map((s, idx) => {
+      const start = acc30;
+      const dur = s.durationInSeconds || 3;
+      const end = acc30 + dur;
+      acc30 = end;
+      return {
+        id: s.id,
+        shotNumber: idx + 1,
+        startSec: start,
+        endSec: end,
+        startFrame: Math.round(start * fps30),
+        endFrame: Math.round(end * fps30)
+      };
+    });
+
+    // Scene 2 starts at 2.34s -> Math.round(2.34 * 30) = 70 frames
+    const target30StartSec = scenes30.slice(0, 1).reduce((sum, s) => sum + (s.durationInSeconds || 3), 0);
+    expect(target30StartSec).toBe(2.34);
+    const currentFrame30 = Math.round(target30StartSec * fps30);
+    expect(currentFrame30).toBe(70);
+
+    const matched30 = boundaries30.find(
+      (b) => currentFrame30 >= b.startFrame && currentFrame30 < b.endFrame
+    );
+    expect(matched30?.id).toBe('sc-2');
+  });
 });

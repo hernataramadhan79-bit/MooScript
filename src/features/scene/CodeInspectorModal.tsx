@@ -112,7 +112,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
     <Sheet
       isOpen={isOpen}
       onClose={onClose}
-      title="Code Inspector — Mograph Editor"
+      title="Code Inspector: Mograph Editor"
       description="Edit langsung struktur DOM, style CSS, dan kurva animasi GSAP untuk scene ini."
       maxWidth="max-w-3xl"
     >

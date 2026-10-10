@@ -41,7 +41,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     >
       <span className="material-symbols-outlined">{icon}</span>
       {badge && (
-        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-accent animate-pulse ring-2 ring-background" />
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-accent ring-2 ring-background" />
       )}
     </button>
   );

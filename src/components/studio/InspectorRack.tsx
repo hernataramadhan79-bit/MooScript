@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
@@ -22,7 +23,87 @@ import type {
   ScenePalette
 } from '../../types';
 
-export type InspectorTab = 'adegan' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
+export type InspectorTab = 'mograph' | 'style' | 'audio' | 'ekspor';
+
+const DebouncedSlider: React.FC<{
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChangeComplete: (val: number) => void;
+  className?: string;
+}> = ({ value, min, max, step, onChangeComplete, className }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const valRef = useRef(value);
+  
+  useEffect(() => {
+    setLocalVal(value);
+    valRef.current = value;
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setLocalVal(v);
+    valRef.current = v;
+  };
+
+  const handleCommit = () => {
+    onChangeComplete(valRef.current);
+  };
+
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={localVal}
+      onChange={handleChange}
+      onPointerUp={handleCommit}
+      onKeyUp={handleCommit}
+      onBlur={handleCommit}
+      className={className}
+    />
+  );
+};
+
+const DebouncedColor: React.FC<{
+  value: string;
+  onChangeComplete: (val: string) => void;
+  className?: string;
+}> = ({ value, onChangeComplete, className }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setLocalVal(v);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      onChangeComplete(v);
+    }, 200);
+  };
+
+  const handleBlur = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    onChangeComplete(localVal);
+  };
+
+  return (
+    <input
+      type="color"
+      value={localVal}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
 
 export interface InspectorRackProps {
   className?: string;
@@ -102,26 +183,6 @@ const THEME_PRESETS: ThemePresetItem[] = [
   }
 ];
 
-function safeFileName(title?: string): string {
-  if (!title) return 'mooscript';
-  const cleaned = title.replace(/[\\/:*?"<>|]+/g, '-').trim();
-  return cleaned || 'mooscript';
-}
-
-function triggerFileDownload(url: string, filename: string): void {
-  if (typeof document === 'undefined') return;
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    if (typeof document !== 'undefined' && document.body && document.body.contains(a)) {
-      document.body.removeChild(a);
-    }
-  }, 100);
-}
-
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -176,6 +237,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     isGeneratingAudio,
     generateAudio,
     audioProgress,
+    auditionVoice,
     updateBgmPreset,
     updateBgmLevel,
     updateBgmDuckRatio,
@@ -497,6 +559,37 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     { id: 'local', label: 'Offline Lokal' }
   ];
 
+  const OPENAI_VOICE_OPTIONS = [
+    { id: 'alloy', label: 'Alloy' },
+    { id: 'echo', label: 'Echo' },
+    { id: 'fable', label: 'Fable' },
+    { id: 'onyx', label: 'Onyx' },
+    { id: 'nova', label: 'Nova' },
+    { id: 'shimmer', label: 'Shimmer' }
+  ];
+
+  const ELEVENLABS_VOICE_OPTIONS = [
+    { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel' },
+    { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi' },
+    { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Bella' },
+    { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni' },
+    { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh' },
+    { id: 'custom', label: 'Kustom' }
+  ];
+
+  const LOCAL_VOICE_OPTIONS = [
+    { id: 'id_ID-news_tts', label: 'Ayu / Kokoro (id_ID-news_tts)' },
+    { id: 'en_US-lessac', label: 'Lessac (en_US-lessac)' },
+    { id: 'fallback', label: 'WebSpeech / Standar Browser (fallback)' }
+  ];
+
+  const currentOpenAIVoice = settings.voiceIds?.openai || 'alloy';
+  const currentElevenLabsVoice = settings.voiceIds?.elevenlabs || '21m00Tcm4TlvDq8ikWAM';
+  const isElevenLabsCustom =
+    !ELEVENLABS_VOICE_OPTIONS.slice(0, 5).some((v) => v.id === currentElevenLabsVoice) ||
+    currentElevenLabsVoice === 'custom';
+  const currentLocalVoice = settings.voiceIds?.local || 'id_ID-news_tts';
+
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (val === 'gemini') {
@@ -507,6 +600,22 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       updateSettings({ selectedTTSProvider: 'elevenlabs' });
     } else if (val === 'local') {
       updateSettings({ selectedTTSProvider: 'local' });
+    }
+  };
+
+  const handleAuditionVoice = async () => {
+    if (currentVoiceProvider === 'openai') {
+      await auditionVoice('openai', currentOpenAIVoice);
+    } else if (currentVoiceProvider === 'elevenlabs') {
+      await auditionVoice('elevenlabs', currentElevenLabsVoice);
+    } else if (currentVoiceProvider === 'local') {
+      if (currentLocalVoice === 'fallback') {
+        await auditionVoice('fallback');
+      } else {
+        await auditionVoice('local', currentLocalVoice);
+      }
+    } else {
+      await auditionVoice('fallback');
     }
   };
 
@@ -528,6 +637,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     project.resolution ||
     (project.width === 1080 || project.height === 1080 ? '1080p' : '720p');
 
+  // Export Watermark & HUD options
+  const [exportWatermark, setExportWatermark] = useState(false);
+  const [exportHud, setExportHud] = useState(false);
+
   // MP4 Export trigger
   const handleExportMp4 = async () => {
     if (isExporting) return;
@@ -536,7 +649,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       addToast('Mengunduh video MP4...', 'success');
       return;
     }
-    await startExport();
+    await startExport({ watermark: exportWatermark, hud: exportHud });
     const result = useMooStore.getState().exportResult;
     if (result?.objectUrl) {
       triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.mp4`);
@@ -897,22 +1010,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     <div
       className={`w-full flex flex-col bg-surface-1 border border-border rounded-2xl overflow-hidden select-none ${className}`}
     >
-      {/* 1. Header Tab Studio Minimalis (5 Tab) */}
-      <div className="p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm">
-        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
-          <button
-            type="button"
-            onClick={() => setActiveTab('adegan')}
-            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
-              activeTab === 'adegan'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            <span className="truncate">Adegan</span>
-          </button>
-
+      {/* 1. Header Tab Studio Minimalis (4 Tab) */}
+      <div className="hidden lg:block p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm">
+        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
           <button
             type="button"
             onClick={() => setActiveTab('mograph')}
@@ -928,28 +1028,28 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
           <button
             type="button"
-            onClick={() => setActiveTab('gaya')}
+            onClick={() => setActiveTab('style')}
             className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
-              activeTab === 'gaya'
+              activeTab === 'style'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">palette</span>
-            <span className="truncate">Gaya</span>
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            <span className="truncate">Gaya & Layer</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('suara')}
+            onClick={() => setActiveTab('audio')}
             className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
-              activeTab === 'suara'
+              activeTab === 'audio'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
-            <span className="truncate">Suara</span>
+            <span className="truncate">Audio</span>
           </button>
 
           <button
@@ -969,8 +1069,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
       {/* 2. Isi Panel Tab */}
       <div className="p-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-220px)]">
-        {/* ================= TAB ADEGAN (PER-SCENE EDITING, LAYERS & PALETTE) ================= */}
-        {activeTab === 'adegan' && (
+        {/* ================= TAB GAYA & LAYER (PER-SCENE EDITING, LAYERS & PALETTE) ================= */}
+        {activeTab === 'style' && (
           <div className="flex flex-col gap-4">
             {!activeScene ? (
               <div className="p-4 rounded-xl bg-surface-2 border border-border text-center text-text-muted text-[13px]">
@@ -1209,13 +1309,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <span>Pos X</span>
                                 <span className="text-accent">{activeLayerOverride.x || 0}px</span>
                               </div>
-                              <input
-                                type="range"
+                              <DebouncedSlider
                                 min={-300}
                                 max={300}
                                 step={2}
                                 value={activeLayerOverride.x || 0}
-                                onChange={(e) => handleOverrideChange('x', parseFloat(e.target.value))}
+                                onChangeComplete={(val) => handleOverrideChange('x', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
                             </div>
@@ -1225,13 +1324,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <span>Pos Y</span>
                                 <span className="text-accent">{activeLayerOverride.y || 0}px</span>
                               </div>
-                              <input
-                                type="range"
+                              <DebouncedSlider
                                 min={-300}
                                 max={300}
                                 step={2}
                                 value={activeLayerOverride.y || 0}
-                                onChange={(e) => handleOverrideChange('y', parseFloat(e.target.value))}
+                                onChangeComplete={(val) => handleOverrideChange('y', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
                             </div>
@@ -1244,13 +1342,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <span>Skala</span>
                                 <span className="text-accent">{activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}x</span>
                               </div>
-                              <input
-                                type="range"
+                              <DebouncedSlider
                                 min={0.1}
                                 max={2.5}
                                 step={0.05}
                                 value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
-                                onChange={(e) => handleOverrideChange('scale', parseFloat(e.target.value))}
+                                onChangeComplete={(val) => handleOverrideChange('scale', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
                             </div>
@@ -1260,13 +1357,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <span>Rotasi</span>
                                 <span className="text-accent">{activeLayerOverride.rotation || 0}°</span>
                               </div>
-                              <input
-                                type="range"
+                              <DebouncedSlider
                                 min={-180}
                                 max={180}
                                 step={5}
                                 value={activeLayerOverride.rotation || 0}
-                                onChange={(e) => handleOverrideChange('rotation', parseFloat(e.target.value))}
+                                onChangeComplete={(val) => handleOverrideChange('rotation', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
                             </div>
@@ -1281,13 +1377,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   {Math.round((activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0) * 100)}%
                                 </span>
                               </div>
-                              <input
-                                type="range"
+                              <DebouncedSlider
                                 min={0}
                                 max={1}
                                 step={0.05}
                                 value={activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0}
-                                onChange={(e) => handleOverrideChange('opacity', parseFloat(e.target.value))}
+                                onChangeComplete={(val) => handleOverrideChange('opacity', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
                             </div>
@@ -1298,10 +1393,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <span className="text-accent text-[9px]">{activeLayerOverride.color || 'Bawaan'}</span>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <input
-                                  type="color"
+                                <DebouncedColor
                                   value={activeLayerOverride.color || '#84cc16'}
-                                  onChange={(e) => handleOverrideChange('color', e.target.value)}
+                                  onChangeComplete={(val) => handleOverrideChange('color', val)}
                                   className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
                                 />
                                 {activeLayerOverride.color && (
@@ -1342,60 +1436,41 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="grid grid-cols-4 gap-1.5">
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
                       <span className="text-[9px] font-mono text-text-muted uppercase">Bg</span>
-                      <input
-                        type="color"
+                      <DebouncedColor
                         value={currentPalette.bg || project.theme.bg || '#09090b'}
-                        onChange={(e) => handlePaletteChange('bg', e.target.value)}
+                        onChangeComplete={(val) => handlePaletteChange('bg', val)}
                         className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
                       />
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
                       <span className="text-[9px] font-mono text-text-muted uppercase">Primary</span>
-                      <input
-                        type="color"
+                      <DebouncedColor
                         value={currentPalette.primary || project.theme.textPrimary || '#ffffff'}
-                        onChange={(e) => handlePaletteChange('primary', e.target.value)}
+                        onChangeComplete={(val) => handlePaletteChange('primary', val)}
                         className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
                       />
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
                       <span className="text-[9px] font-mono text-text-muted uppercase">Accent</span>
-                      <input
-                        type="color"
+                      <DebouncedColor
                         value={currentPalette.accent || project.theme.textHighlight || '#84cc16'}
-                        onChange={(e) => handlePaletteChange('accent', e.target.value)}
+                        onChangeComplete={(val) => handlePaletteChange('accent', val)}
                         className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
                       />
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
                       <span className="text-[9px] font-mono text-text-muted uppercase">Text</span>
-                      <input
-                        type="color"
+                      <DebouncedColor
                         value={currentPalette.text || project.theme.textPrimary || '#ffffff'}
-                        onChange={(e) => handlePaletteChange('text', e.target.value)}
+                        onChangeComplete={(val) => handlePaletteChange('text', val)}
                         className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
                       />
                     </div>
                   </div>
                 </div>
-
-                {/* 5. Akses Kode Adegan */}
-                {onOpenCodeInspector && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenCodeInspector(activeScene.id)}
-                    className="p-3 rounded-2xl bg-surface-2/60 border border-border hover:border-accent/40 text-on-surface hover:text-accent flex items-center justify-between transition-colors text-[12px] font-medium"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[17px]">code</span>
-                      Buka Editor Kode Adegan
-                    </span>
-                    <span className="material-symbols-outlined text-[16px] text-text-muted">chevron_right</span>
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -1490,6 +1565,21 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Akses Editor Kode Adegan */}
+            {onOpenCodeInspector && activeScene && (
+              <button
+                type="button"
+                onClick={() => onOpenCodeInspector(activeScene.id)}
+                className="p-3 rounded-2xl bg-surface-2/60 border border-border hover:border-accent/40 text-on-surface hover:text-accent flex items-center justify-between transition-colors text-[12px] font-medium"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">code</span>
+                  Buka Editor Kode Adegan
+                </span>
+                <span className="material-symbols-outlined text-[16px] text-text-muted">chevron_right</span>
+              </button>
+            )}
 
             {/* Subtitel Global & Resolusi */}
             <div className="flex flex-col gap-3 pt-1 border-t border-border">
@@ -1603,12 +1693,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 })}
               </div>
             </div>
-          </div>
-        )}
+            <div className="w-full h-px bg-border my-2" />
 
-        {/* ================= TAB GAYA ================= */}
-        {activeTab === 'gaya' && (
-          <div className="flex flex-col gap-5">
             {/* Tema Visual */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
@@ -1730,54 +1816,200 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         )}
 
         {/* ================= TAB SUARA ================= */}
-        {activeTab === 'suara' && (
+        {activeTab === 'audio' && (
           <div className="flex flex-col gap-5">
             {/* Vokal / Voiceover */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Vokal
-              </span>
-              <div className="relative">
-                <select
-                  value={currentVoiceProvider}
-                  onChange={handleProviderChange}
-                  className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
-                >
-                  {voiceProviders.map((vp) => (
-                    <option key={vp.id} value={vp.id} className="bg-surface-1 text-on-surface">
-                      {vp.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                  expand_more
+            <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                  Penyedia Suara (TTS)
                 </span>
+                <div className="relative">
+                  <select
+                    value={currentVoiceProvider}
+                    onChange={handleProviderChange}
+                    className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
+                  >
+                    {voiceProviders.map((vp) => (
+                      <option key={vp.id} value={vp.id} className="bg-surface-1 text-on-surface">
+                        {vp.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    expand_more
+                  </span>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => generateAudio()}
-                disabled={isGeneratingAudio}
-                className="w-full min-h-[40px] px-4 py-2 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
-              >
-                {isGeneratingAudio ? (
-                  <>
-                    <span className="material-symbols-outlined text-[17px] animate-spin">
-                      progress_activity
+              {/* Karakter Suara Berdasarkan Provider */}
+              {currentVoiceProvider === 'openai' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                    Karakter Suara OpenAI
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={currentOpenAIVoice}
+                      onChange={(e) =>
+                        updateSettings({
+                          voiceIds: { ...settings.voiceIds, openai: e.target.value }
+                        })
+                      }
+                      className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
+                    >
+                      {OPENAI_VOICE_OPTIONS.map((v) => (
+                        <option key={v.id} value={v.id} className="bg-surface-1 text-on-surface">
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      expand_more
                     </span>
-                    <span>
-                      {audioProgress?.currentScene
-                        ? `Memproses (${audioProgress.currentScene}/${audioProgress.totalScenes})`
-                        : 'Menghasilkan Suara...'}
+                  </div>
+                </div>
+              )}
+
+              {currentVoiceProvider === 'elevenlabs' && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                    Karakter Suara ElevenLabs
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={isElevenLabsCustom ? 'custom' : currentElevenLabsVoice}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'custom') {
+                          updateSettings({
+                            voiceIds: {
+                              ...settings.voiceIds,
+                              elevenlabs: isElevenLabsCustom ? currentElevenLabsVoice : ''
+                            }
+                          });
+                        } else {
+                          updateSettings({
+                            voiceIds: { ...settings.voiceIds, elevenlabs: val }
+                          });
+                        }
+                      }}
+                      className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
+                    >
+                      {ELEVENLABS_VOICE_OPTIONS.map((v) => (
+                        <option key={v.id} value={v.id} className="bg-surface-1 text-on-surface">
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      expand_more
                     </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[17px]">record_voice_over</span>
-                    <span>Generate Suara</span>
-                  </>
-                )}
-              </button>
+                  </div>
+
+                  {isElevenLabsCustom && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-text-muted font-medium">Custom Voice ID</span>
+                      <input
+                        type="text"
+                        placeholder="Masukkan Custom Voice ID ElevenLabs..."
+                        value={currentElevenLabsVoice === 'custom' ? '' : currentElevenLabsVoice}
+                        onChange={(e) =>
+                          updateSettings({
+                            voiceIds: { ...settings.voiceIds, elevenlabs: e.target.value.trim() }
+                          })
+                        }
+                        className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[12px] font-mono rounded-xl h-9 px-3 focus:outline-none transition-colors"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {currentVoiceProvider === 'local' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                    Karakter Suara Lokal (Offline)
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={currentLocalVoice}
+                      onChange={(e) =>
+                        updateSettings({
+                          voiceIds: { ...settings.voiceIds, local: e.target.value }
+                        })
+                      }
+                      className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
+                    >
+                      {LOCAL_VOICE_OPTIONS.map((v) => (
+                        <option key={v.id} value={v.id} className="bg-surface-1 text-on-surface">
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      expand_more
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Slider Kecepatan Bicara (Speech Rate) */}
+              <div className="flex flex-col gap-1.5 pt-0.5">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-text-muted font-medium">Kecepatan Bicara</span>
+                  <span className="font-mono text-on-surface font-semibold">
+                    {(settings.speed ?? 1.05).toFixed(2)}x
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.05"
+                  value={settings.speed ?? 1.05}
+                  onChange={(e) => updateSettings({ speed: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
+                />
+              </div>
+
+              {/* Tombol Audisi & Generate Suara */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleAuditionVoice}
+                  className="min-h-[40px] px-3 py-2 rounded-xl bg-surface-2 border border-border hover:bg-surface-3 text-on-surface font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-sm"
+                  title="Dengarkan contoh suara"
+                >
+                  <span className="material-symbols-outlined text-[17px] text-accent">volume_up</span>
+                  <span>Coba Suara</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => generateAudio()}
+                  disabled={isGeneratingAudio}
+                  className="min-h-[40px] px-3 py-2 rounded-xl bg-accent text-on-accent font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
+                >
+                  {isGeneratingAudio ? (
+                    <>
+                      <span className="material-symbols-outlined text-[16px] animate-spin">
+                        progress_activity
+                      </span>
+                      <span className="truncate">
+                        {audioProgress?.currentScene
+                          ? `(${audioProgress.currentScene}/${audioProgress.totalScenes})`
+                          : 'Proses...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">record_voice_over</span>
+                      <span className="truncate">Generate Suara</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Musik Latar (BGM) */}
@@ -1879,6 +2111,40 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 >
                   720p (HD)
                 </button>
+              </div>
+            </div>
+
+            {/* Opsi Overlay Ekspor: Watermark & HUD */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                Opsi Ekspor
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={exportWatermark}
+                    onChange={(e) => setExportWatermark(e.target.checked)}
+                    className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-semibold text-on-surface">Watermark</span>
+                    <span className="text-[10px] text-text-muted">Logo MooScript</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={exportHud}
+                    onChange={(e) => setExportHud(e.target.checked)}
+                    className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-semibold text-on-surface">HUD Info</span>
+                    <span className="text-[10px] text-text-muted">Overlay Debug/FPS</span>
+                  </div>
+                </label>
               </div>
             </div>
 

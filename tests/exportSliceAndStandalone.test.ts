@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
-import { safeFileName, triggerFileDownload } from '../src/features/export/ExportView';
+import { safeFileName, triggerFileDownload } from '../src/utils/fileUtils';
 import { useMooStore } from '../src/store/useMooStore';
 import type { MooProject } from '../src/types';
 
@@ -14,32 +14,143 @@ describe('Export Safe Filename Helper (Phase 5b)', () => {
     expect(safeFileName('   :::   ')).toBe('-');
   });
 
-  it('triggerFileDownload creates an anchor attached to body, triggers click, and removes it', () => {
-    const mockAnchor = {
-      href: '',
-      download: '',
-      click: vi.fn()
-    };
-    const mockBody = {
-      appendChild: vi.fn(),
-      removeChild: vi.fn(),
-      contains: vi.fn().mockReturnValue(true)
-    };
-    const origDoc = globalThis.document;
-    // @ts-expect-error mocking minimal document for node test env
-    globalThis.document = {
-      createElement: vi.fn().mockReturnValue(mockAnchor),
-      body: mockBody
-    };
+  describe('Adversarial Stress: safeFileName', () => {
+    it('neutralizes unix, windows, and UNC path traversal attempts', () => {
+      expect(safeFileName('../../etc/passwd')).toBe('..-..-etc-passwd');
+      expect(safeFileName('../../../../root/secret.key')).toBe('..-..-..-..-root-secret.key');
+      expect(safeFileName('C:\\Windows\\System32\\cmd.exe')).toBe('C-Windows-System32-cmd.exe');
+      expect(safeFileName('\\\\server\\share\\subfolder\\file.txt')).toBe('-server-share-subfolder-file.txt');
+    });
 
-    triggerFileDownload('blob:http://localhost/test-video.mp4', 'test-video.mp4');
+    it('neutralizes all 9 forbidden filesystem characters (< > : " / \\ | ? *)', () => {
+      const forbidden = '<>:"/\\|?*';
+      const result = safeFileName(`test${forbidden}file`);
+      expect(result).toBe('test-file');
+      expect(/[\\/:*?"<>|]/.test(result)).toBe(false);
+      expect(safeFileName('alpha:::::::beta??????gamma')).toBe('alpha-beta-gamma');
+      expect(safeFileName(':::***???///\\\\\\')).toBe('-');
+      expect(safeFileName(':leading-colon')).toBe('-leading-colon');
+      expect(safeFileName('trailing-colon:')).toBe('trailing-colon-');
+    });
 
-    expect(mockAnchor.href).toBe('blob:http://localhost/test-video.mp4');
-    expect(mockAnchor.download).toBe('test-video.mp4');
-    expect(mockBody.appendChild).toHaveBeenCalledWith(mockAnchor);
-    expect(mockAnchor.click).toHaveBeenCalled();
+    it('handles falsy, nullish, and whitespace inputs safely', () => {
+      expect(safeFileName(undefined)).toBe('mooscript');
+      expect(safeFileName('')).toBe('mooscript');
+      // @ts-expect-error testing null input runtime safety
+      expect(safeFileName(null)).toBe('mooscript');
+      expect(safeFileName('   ')).toBe('mooscript');
+      expect(safeFileName('\t\n\r  \t')).toBe('mooscript');
+      expect(safeFileName('   My Project Title   ')).toBe('My Project Title');
+    });
 
-    globalThis.document = origDoc;
+    it('preserves multilingual unicode, accents, RTL scripts, and emojis', () => {
+      expect(safeFileName('ムービースクリプト_動画制作2026')).toBe('ムービースクリプト_動画制作2026');
+      expect(safeFileName('Проект_Видео_Анимация')).toBe('Проект_Видео_Анимация');
+      expect(safeFileName('مشروع_فيديو_رائع')).toBe('مشروع_فيديو_رائع');
+      expect(safeFileName('Über_Café_Niño_Ålesund')).toBe('Über_Café_Niño_Ålesund');
+      expect(safeFileName('🎬 MooScript Studio 🚀 🔥 100%')).toBe('🎬 MooScript Studio 🚀 🔥 100%');
+      expect(safeFileName('🎬 Video: "Special Cut" / 2026?')).toBe('🎬 Video- -Special Cut- - 2026-');
+    });
+
+    it('handles boundary conditions, scale (10,000 chars), and script injection', () => {
+      expect(safeFileName('.')).toBe('.');
+      expect(safeFileName('..')).toBe('..');
+      expect(safeFileName('...')).toBe('...');
+
+      const largeTitle = 'a/b*c:d?e<f>g|h\\i'.repeat(1000);
+      const start = performance.now();
+      const result = safeFileName(largeTitle);
+      const elapsed = performance.now() - start;
+      expect(elapsed).toBeLessThan(50);
+      expect(result).toBe('a-b-c-d-e-f-g-h-i'.repeat(1000));
+
+      const malicious = '<script>alert(document.cookie)</script>';
+      expect(safeFileName(malicious)).toBe('-script-alert(document.cookie)-script-');
+
+      const benign = 'My-File_v1.0.0 (Final) [Draft] {OK} $100 & 50% + 20=70! ~tag';
+      expect(safeFileName(benign)).toBe(benign);
+    });
+  });
+
+  describe('Adversarial Stress: triggerFileDownload', () => {
+    it('safely no-ops in Node / SSR environments where document is undefined', () => {
+      const origDoc = globalThis.document;
+      // @ts-expect-error simulating ssr
+      delete globalThis.document;
+
+      expect(() => {
+        triggerFileDownload('https://example.com/asset.mp4', 'asset.mp4');
+      }).not.toThrow();
+
+      globalThis.document = origDoc;
+    });
+
+    it('creates an anchor attached to body, triggers click, and removes it', () => {
+      const mockAnchor = {
+        href: '',
+        download: '',
+        click: vi.fn()
+      };
+      const mockBody = {
+        appendChild: vi.fn(),
+        removeChild: vi.fn(),
+        contains: vi.fn().mockReturnValue(true)
+      };
+      const origDoc = globalThis.document;
+      // @ts-expect-error mocking minimal document for node test env
+      globalThis.document = {
+        createElement: vi.fn().mockReturnValue(mockAnchor),
+        body: mockBody
+      };
+
+      triggerFileDownload('blob:http://localhost/test-video.mp4', 'test-video.mp4');
+
+      expect(mockAnchor.href).toBe('blob:http://localhost/test-video.mp4');
+      expect(mockAnchor.download).toBe('test-video.mp4');
+      expect(mockBody.appendChild).toHaveBeenCalledWith(mockAnchor);
+      expect(mockAnchor.click).toHaveBeenCalled();
+
+      globalThis.document = origDoc;
+    });
+
+    it('guards against null document.body or uncontained elements during timer cleanup', () => {
+      vi.useFakeTimers();
+
+      const mockAnchor = {
+        href: '',
+        download: '',
+        click: vi.fn()
+      };
+      const removeChildMock = vi.fn();
+      const mockBody = {
+        appendChild: vi.fn(),
+        contains: vi.fn().mockReturnValue(false),
+        removeChild: removeChildMock
+      };
+
+      const origDoc = globalThis.document;
+      // @ts-expect-error mocking minimal document
+      globalThis.document = {
+        createElement: vi.fn().mockReturnValue(mockAnchor),
+        body: mockBody
+      };
+
+      triggerFileDownload('blob:test', 'test.mp4');
+      vi.advanceTimersByTime(100);
+
+      // Element was not contained in body, so removeChild should not be called
+      expect(removeChildMock).not.toHaveBeenCalled();
+
+      // Now test with null body during timer firing
+      // @ts-expect-error testing null body
+      globalThis.document.body = null;
+      expect(() => {
+        vi.advanceTimersByTime(100);
+      }).not.toThrow();
+
+      globalThis.document = origDoc;
+      vi.useRealTimers();
+    });
   });
 });
 

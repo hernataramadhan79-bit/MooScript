@@ -2,6 +2,14 @@
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
+  safelist: [
+    'bg-accent',
+    'text-accent',
+    'text-on-accent',
+    'text-text-muted',
+    'border-accent',
+    'ring-accent'
+  ],
   theme: {
     extend: {
       colors: {
@@ -26,11 +34,17 @@ export default {
         'outline-variant': 'var(--border-subtle)',
         border: 'var(--border)',
         'border-strong': 'var(--border-strong)',
+        'on-accent': 'var(--on-accent)',
+        'text-muted': 'var(--text-muted)',
+        'text-faint': 'var(--text-faint)',
         accent: {
-          lime: 'var(--accent)',
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          muted: 'var(--accent-muted)',
           danger: 'var(--danger)',
           warning: 'var(--warning)',
-          success: 'var(--success)'
+          success: 'var(--success)',
+          lime: 'var(--accent)'
         }
       },
       fontFamily: {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 
 interface TimelineBarProps {
@@ -30,7 +30,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
 
   const fps = project.fps || 30;
   const calculatedSceneDuration = project.scenes.reduce(
-    (sum, s) => sum + (s.durationInSeconds || 0),
+    (sum, s) => sum + (s.durationInSeconds || 3),
     0
   );
   const totalDuration =
@@ -55,6 +55,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
           durationInSeconds: totalDuration,
           startSec: 0,
           endSec: totalDuration,
+          startFrame: 0,
+          endFrame: totalFrames,
           widthPct: 100
         }
       ];
@@ -63,29 +65,41 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     let accumulated = 0;
     return project.scenes.map((s, idx) => {
       const start = accumulated;
-      const dur = s.durationInSeconds || 0;
+      const dur = s.durationInSeconds || 3;
       const end = accumulated + dur;
       accumulated = end;
       return {
         ...s,
         shotNumber: idx + 1,
+        durationInSeconds: dur,
         startSec: start,
         endSec: end,
+        startFrame: Math.round(start * fps),
+        endFrame: Math.round(end * fps),
         widthPct: totalDuration > 0 ? (dur / totalDuration) * 100 : 0
       };
     });
-  }, [project.scenes, totalDuration]);
+  }, [project.scenes, totalDuration, fps, totalFrames]);
 
-  // Current active scene based on playhead position
+  // Current active scene based on playhead position (discrete frame comparison eliminates rounding jitter)
   const currentSceneIndex = sceneBoundaries.findIndex(
-    (s) => currentTimeSec >= s.startSec && currentTimeSec < s.endSec
+    (s) => currentFrame >= s.startFrame && currentFrame < s.endFrame
   );
   const activeIndex =
     currentSceneIndex >= 0
       ? currentSceneIndex
-      : currentTimeSec >= totalDuration && sceneBoundaries.length > 0
+      : currentFrame >= totalFrames && sceneBoundaries.length > 0
       ? sceneBoundaries.length - 1
       : 0;
+
+  const activeBoundary = sceneBoundaries[activeIndex];
+
+  // Synchronize activeSceneId with current timeline playhead/scrubbing
+  useEffect(() => {
+    if (activeBoundary && activeBoundary.id !== activeSceneId && activeBoundary.id !== 'default') {
+      setActiveSceneId(activeBoundary.id);
+    }
+  }, [activeBoundary, activeSceneId, setActiveSceneId]);
 
   // Format studio timecode: 00:02.1 / 00:15.0
   const formatTimecode = (sec: number) => {
@@ -199,12 +213,13 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         </div>
 
         {/* Range Scrubber */}
-        <div className="px-0.5">
+        <div className="px-0.5 flex items-center min-h-[44px] touch-none">
           <input
             className="w-full accent-[#84cc16] h-1 cursor-pointer bg-white/[0.06] rounded-full appearance-none"
             max={totalFrames}
             min={0}
             step={1}
+            style={{ touchAction: 'none' }}
             type="range"
             value={currentFrame}
             onChange={(e) => seekFrame(parseInt(e.target.value, 10))}
@@ -219,7 +234,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
             title="Audio Track"
           >
             <div className="flex items-center gap-1 shrink-0 mr-1.5 pointer-events-none">
-              <span className="w-1 h-1 rounded-full bg-[#84cc16] animate-pulse" />
+              <span className="w-1 h-1 rounded-full bg-[#84cc16]" />
               <span className="text-[7.5px] font-mono font-semibold uppercase tracking-wider text-[#84cc16]">
                 Audio
               </span>
@@ -428,7 +443,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
               title="Audio Track (Click to seek)"
             >
               <div className="flex items-center gap-1.5 shrink-0 mr-2 z-10 pointer-events-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#84cc16] animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#84cc16]" />
                 <span className="text-[8px] font-mono font-semibold uppercase tracking-wider text-[#84cc16]">
                   Audio
                 </span>

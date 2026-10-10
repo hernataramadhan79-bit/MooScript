@@ -205,4 +205,38 @@ describe('Store Multi-Project Actions', () => {
     const inList = state.projectsList.find((p) => p.id === state.project.id);
     expect(inList?.title).toBe('Renamed Title');
   });
+
+  it('renameProject updates title in store and persists to Dexie for both active and inactive projects', async () => {
+    // Seed proj-beta in database alongside proj-alpha
+    await saveProjectToDb(TEST_PROJ_2);
+    const store = useMooStore.getState();
+    await store.refreshProjectsList();
+
+    // 1. Rename active project (proj-alpha)
+    expect(store.project.id).toBe('proj-alpha');
+    await store.renameProject('proj-alpha', 'Alpha Brand New Title');
+
+    let state = useMooStore.getState();
+    expect(state.project.title).toBe('Alpha Brand New Title');
+    expect(state.projectsList.find((p) => p.id === 'proj-alpha')?.title).toBe('Alpha Brand New Title');
+
+    // Verify Dexie persistence for active project
+    const loadedAlpha = await loadProjectFromDb('proj-alpha');
+    expect(loadedAlpha).not.toBeNull();
+    expect(loadedAlpha!.title).toBe('Alpha Brand New Title');
+
+    // 2. Rename inactive project (proj-beta)
+    await store.renameProject('proj-beta', 'Beta Brand New Title');
+
+    state = useMooStore.getState();
+    // Active project should still remain proj-alpha
+    expect(state.project.id).toBe('proj-alpha');
+    expect(state.project.title).toBe('Alpha Brand New Title');
+    expect(state.projectsList.find((p) => p.id === 'proj-beta')?.title).toBe('Beta Brand New Title');
+
+    // Verify Dexie persistence for inactive project
+    const loadedBeta = await loadProjectFromDb('proj-beta');
+    expect(loadedBeta).not.toBeNull();
+    expect(loadedBeta!.title).toBe('Beta Brand New Title');
+  });
 });

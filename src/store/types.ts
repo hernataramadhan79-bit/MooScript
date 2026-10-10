@@ -23,10 +23,8 @@ export type DeckTab = 'storyboard' | 'audio' | 'style' | 'export';
 export type PreviewMode = 'compact' | 'theater' | 'ticker';
 
 export interface UiSlice {
-  activeTab: 'script' | 'voice' | 'studio' | 'settings' | DeckTab;
-  setActiveTab: (tab: 'script' | 'voice' | 'studio' | 'settings' | DeckTab) => void;
-  deckTab: DeckTab;
-  setDeckTab: (tab: DeckTab) => void;
+  activeTab: 'ide' | 'generate' | 'edit' | 'audio' | 'ekspor' | 'settings' | DeckTab;
+  setActiveTab: (tab: 'ide' | 'generate' | 'edit' | 'audio' | 'ekspor' | 'settings' | DeckTab) => void;
   previewMode: PreviewMode;
   setPreviewMode: (mode: PreviewMode) => void;
   isSettingsOpen: boolean;
@@ -52,6 +50,7 @@ export interface ProjectSlice {
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<string>;
   updateTitle: (title: string) => void;
+  renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
   toggleGlobalSubtitles: () => void;
   updateThemeFont: (font: 'Jakarta' | 'Mono' | 'Impact') => void;

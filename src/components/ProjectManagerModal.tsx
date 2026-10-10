@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import type { MooProject } from '../types';
 
@@ -15,12 +15,23 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     switchProject,
     duplicateProject,
     deleteProject,
-    updateTitle
+    renameProject
   } = useMooStore();
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !editingId) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, editingId, onClose]);
 
   if (!isOpen) return null;
 
@@ -29,11 +40,10 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     setEditingTitle(p.title);
   };
 
-  const handleSaveRename = (p: MooProject) => {
-    if (editingTitle.trim() && editingTitle.trim() !== p.title) {
-      if (p.id === activeProject.id) {
-        updateTitle(editingTitle.trim());
-      }
+  const handleSaveRename = async (p: MooProject) => {
+    const trimmed = editingTitle.trim();
+    if (trimmed && trimmed !== p.title) {
+      await renameProject(p.id, trimmed);
     }
     setEditingId(null);
   };
@@ -189,7 +199,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
                 {/* Right action buttons */}
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  {isActive && !isEditing && (
+                  {!isEditing && (
                     <button
                       type="button"
                       onClick={() => handleStartRename(p)}

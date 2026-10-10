@@ -19,11 +19,15 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const currentFrame = useMooStore((s) => s.currentFrame);
   const projectAspectRatio = useMooStore((s) => s.project.aspectRatio);
   const updateProjectAspectRatio = useMooStore((s) => s.updateProjectAspectRatio);
+  const previewMode = useMooStore((s) => s.previewMode);
+  const setPreviewMode = useMooStore((s) => s.setPreviewMode);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const theaterIframeRef = useRef<HTMLIFrameElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [scale, setScale] = useState(1);
+  const [theaterScale, setTheaterScale] = useState(1);
   const [isReady, setIsReady] = useState(false);
   const [showSafeZone, setShowSafeZone] = useState(false);
   const [isFit, setIsFit] = useState(true);
@@ -75,23 +79,66 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     return () => ro.disconnect();
   }, [updateScale]);
 
+  // Adjust theater container scale to fit fullscreen viewport
+  const updateTheaterScale = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const paddingX = 48;
+    const paddingY = 80;
+    const availW = Math.max(100, window.innerWidth - paddingX);
+    const availH = Math.max(100, window.innerHeight - paddingY);
+    const scaleX = availW / width;
+    const scaleY = availH / height;
+    setTheaterScale(Math.max(0.1, Math.min(scaleX, scaleY)));
+  }, [width, height]);
+
+  useEffect(() => {
+    if (previewMode !== 'theater') return;
+    updateTheaterScale();
+    window.addEventListener('resize', updateTheaterScale);
+    return () => window.removeEventListener('resize', updateTheaterScale);
+  }, [previewMode, updateTheaterScale]);
+
+  // Escape key listener for exiting Theater mode
+  useEffect(() => {
+    if (previewMode !== 'theater') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewMode('compact');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewMode, setPreviewMode]);
+
   // Handle postMessage communication from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      if (e.source !== iframeRef.current?.contentWindow) return;
       const data = e.data;
       if (!data || !data.type) return;
 
-      if (data.type === 'ready') {
-        setIsReady(true);
-        iframeRef.current?.contentWindow?.postMessage(
-          {
-            type: 'seek',
-            time: latestTimeRef.current,
-            id: latestFrameRef.current
-          },
-          '*'
-        );
+      if (e.source === iframeRef.current?.contentWindow) {
+        if (data.type === 'ready') {
+          setIsReady(true);
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: 'seek',
+              time: latestTimeRef.current,
+              id: latestFrameRef.current
+            },
+            '*'
+          );
+        }
+      } else if (e.source === theaterIframeRef.current?.contentWindow) {
+        if (data.type === 'ready') {
+          theaterIframeRef.current?.contentWindow?.postMessage(
+            {
+              type: 'seek',
+              time: latestTimeRef.current,
+              id: latestFrameRef.current
+            },
+            '*'
+          );
+        }
       }
     };
 
@@ -111,7 +158,17 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         '*'
       );
     }
-  }, [currentFrame, currentTime, isReady]);
+    if (previewMode === 'theater' && theaterIframeRef.current && theaterIframeRef.current.contentWindow) {
+      theaterIframeRef.current.contentWindow.postMessage(
+        {
+          type: 'seek',
+          time: currentTime,
+          id: currentFrame
+        },
+        '*'
+      );
+    }
+  }, [currentFrame, currentTime, isReady, previewMode]);
 
   const handleAspectRatioChange = (ratio: AspectRatio) => {
     setIsFit(true);
@@ -245,6 +302,53 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           </div>
         )}
       </div>
+
+      {/* Fullscreen Theater Mode Overlay */}
+      {previewMode === 'theater' && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none animate-fadeIn">
+          <div className="absolute top-4 right-4 z-50">
+            <button
+              type="button"
+              onClick={() => setPreviewMode('compact')}
+              className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-xl"
+            >
+              <span className="material-symbols-outlined text-[18px]">close_fullscreen</span>
+              <span>Tutup Layar Penuh (Esc)</span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              width: `${width}px`,
+              height: `${height}px`,
+              transform: `scale(${theaterScale})`,
+              transformOrigin: 'center center'
+            }}
+            className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black"
+          >
+            <iframe
+              key={`theater-${projectId}-${width}x${height}`}
+              ref={theaterIframeRef}
+              srcDoc={srcDoc}
+              title="MooScript Theater Mode Stage"
+              sandbox="allow-scripts"
+              onLoad={() => {
+                if (theaterIframeRef.current?.contentWindow) {
+                  theaterIframeRef.current.contentWindow.postMessage(
+                    {
+                      type: 'seek',
+                      time: latestTimeRef.current,
+                      id: latestFrameRef.current
+                    },
+                    '*'
+                  );
+                }
+              }}
+              className="w-full h-full border-0 pointer-events-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

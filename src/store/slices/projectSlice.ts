@@ -6,7 +6,8 @@ import {
   saveProjectToDb,
   loadProjectFromDb,
   listProjectsFromDb,
-  deleteProjectFromDb
+  deleteProjectFromDb,
+  db
 } from '../../db/mooDb';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
 import { stopPlaybackAudio } from './playbackSlice';
@@ -468,7 +469,6 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     switchProject: async (id: string) => {
       get().pause();
       stopPlaybackAudio();
-      if (get().project.id === id) return;
       await flushPendingSave();
 
       let target = await loadProjectFromDb(id);
@@ -582,6 +582,39 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       );
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
+    },
+
+    renameProject: async (id: string, newTitle: string) => {
+      const trimmed = newTitle.trim();
+      if (!trimmed) return;
+      const now = Date.now();
+      const current = get().project;
+      if (current.id === id) {
+        let audioBlob = current.audioBlob;
+        if (!audioBlob) {
+          const fromDb = await db.audioBlobs.get(id);
+          if (fromDb?.blob) {
+            audioBlob = fromDb.blob;
+          }
+        }
+        const updated = { ...current, title: trimmed, audioBlob, updatedAt: now };
+        const updatedList = get().projectsList.map((p) =>
+          p.id === id ? { ...p, title: trimmed, updatedAt: now } : p
+        );
+        set({ project: updated, projectsList: updatedList });
+        await saveProjectToDb(updated);
+      } else {
+        const updatedList = get().projectsList.map((p) =>
+          p.id === id ? { ...p, title: trimmed, updatedAt: now } : p
+        );
+        set({ projectsList: updatedList });
+        const target = await loadProjectFromDb(id);
+        if (target) {
+          target.title = trimmed;
+          target.updatedAt = now;
+          await saveProjectToDb(target);
+        }
+      }
     },
 
     updateThemeFont: (fontFamily) => {

@@ -10,11 +10,11 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 
-export type MobileTab = 'naskah' | 'adegan' | 'mograph' | 'gaya' | 'suara' | 'ekspor';
+export type MobileTab = 'naskah' | 'mograph' | 'style' | 'audio' | 'ekspor';
 export type { InspectorTab };
 
 export const App: React.FC = () => {
-  const { initStore, togglePlay, project, setActiveSceneId } = useMooStore();
+  const { initStore, togglePlay, setActiveSceneId } = useMooStore();
 
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('mograph');
   const [mobileTab, setMobileTab] = useState<MobileTab>('naskah');
@@ -45,23 +45,17 @@ export const App: React.FC = () => {
     setMobileTab('ekspor');
   };
 
-  const handleNavigateToMograph = () => {
-    setInspectorTab('mograph');
-    setMobileTab('mograph');
-  };
-
   const handleEditScene = (sceneId: string) => {
     setActiveSceneId(sceneId);
-    setInspectorTab('adegan');
-    setMobileTab('adegan');
+    setInspectorTab('style');
+    setMobileTab('style');
   };
 
   const mobileTabs: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'naskah', label: 'Naskah', icon: 'edit_note' },
-    { id: 'adegan', label: 'Adegan', icon: 'tune' },
     { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
-    { id: 'gaya', label: 'Gaya', icon: 'palette' },
-    { id: 'suara', label: 'Suara', icon: 'graphic_eq' },
+    { id: 'style', label: 'Gaya', icon: 'tune' },
+    { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
     { id: 'ekspor', label: 'Ekspor', icon: 'download' }
   ];
 
@@ -70,32 +64,18 @@ export const App: React.FC = () => {
       {/* 1. Header Minimalis Pro */}
       <Header onOpenExport={handleOpenExport} />
 
-      {/* 2. Main Studio Workstation Layout */}
+      {/* 2. Main Studio Workstation Layout (Desktop 3-Zone Workstation) */}
       <main className="flex-1 pt-14 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* ================= DESKTOP 3-ZONE LAYOUT ================= */}
-
-        {/* Zona Kiri: Scene Deck (Storyboard & Scene Manager) - Desktop Only */}
+        {/* Zona 1: Storyboard / SceneDeck (Permanent Left on Desktop) */}
         <aside className="hidden lg:flex w-[340px] xl:w-[380px] shrink-0 border-r border-border bg-surface-1 flex-col h-full overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-surface-1/90 backdrop-blur-sm flex items-center justify-between shrink-0 select-none">
-            <span className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[17px] text-accent">edit_note</span>
-              Naskah & Adegan
-            </span>
-            <span className="text-[11px] font-mono text-text-muted px-2 py-0.5 rounded-full bg-surface-2 border border-border">
-              {project.scenes?.length || 0} Adegan
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <SceneDeck
-              onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-              onNavigateToMograph={handleNavigateToMograph}
-              onEditScene={handleEditScene}
-            />
-          </div>
+          <SceneDeck
+            className="h-full overflow-y-auto"
+            onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+            onEditScene={handleEditScene}
+          />
         </aside>
 
-        {/* Zona Tengah: Center Stage (Canvas Viewport + Master Timeline) - Desktop & Mobile */}
+        {/* Zona 2: Center Stage (Canvas Viewport + Master Timeline) - Desktop & Mobile */}
         <section className="flex-1 flex flex-col h-full bg-[#050507] overflow-hidden min-w-0">
           {/* Top Half on Mobile / Full Height Center on Desktop */}
           <div className="hidden lg:flex flex-1 min-h-0 relative items-center justify-center p-2 sm:p-4 overflow-hidden">
@@ -120,49 +100,15 @@ export const App: React.FC = () => {
           {/* Mobile Bottom Workspace: Tabbed Drawer */}
           <div className="flex lg:hidden flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto">
-              {mobileTab === 'naskah' && (
+              {mobileTab === 'naskah' ? (
                 <SceneDeck
-                  className="h-full"
+                  className="h-full overflow-y-auto"
                   onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                  onNavigateToMograph={handleNavigateToMograph}
                   onEditScene={handleEditScene}
                 />
-              )}
-              {mobileTab === 'adegan' && (
+              ) : (
                 <InspectorRack
-                  activeTab="adegan"
-                  onTabChange={(t) => setMobileTab(t)}
-                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                  className="h-full border-0 rounded-none shadow-none"
-                />
-              )}
-              {mobileTab === 'mograph' && (
-                <InspectorRack
-                  activeTab="mograph"
-                  onTabChange={(t) => setMobileTab(t)}
-                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                  className="h-full border-0 rounded-none shadow-none"
-                />
-              )}
-              {mobileTab === 'gaya' && (
-                <InspectorRack
-                  activeTab="gaya"
-                  onTabChange={(t) => setMobileTab(t)}
-                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                  className="h-full border-0 rounded-none shadow-none"
-                />
-              )}
-              {mobileTab === 'suara' && (
-                <InspectorRack
-                  activeTab="suara"
-                  onTabChange={(t) => setMobileTab(t)}
-                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                  className="h-full border-0 rounded-none shadow-none"
-                />
-              )}
-              {mobileTab === 'ekspor' && (
-                <InspectorRack
-                  activeTab="ekspor"
+                  activeTab={mobileTab}
                   onTabChange={(t) => setMobileTab(t)}
                   onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                   className="h-full border-0 rounded-none shadow-none"
@@ -170,8 +116,8 @@ export const App: React.FC = () => {
               )}
             </div>
 
-            {/* Mobile Bottom Navigation Bar (6 Tab) */}
-            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-1 py-1.5 grid grid-cols-6 gap-0.5 select-none">
+            {/* Mobile Bottom Navigation Bar (5 Tab) */}
+            <nav className="shrink-0 border-t border-border bg-surface-1/95 backdrop-blur-md px-1 py-1.5 grid grid-cols-5 gap-0.5 select-none">
               {mobileTabs.map((tab) => {
                 const isActive = mobileTab === tab.id;
                 return (

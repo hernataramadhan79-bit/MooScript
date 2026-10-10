@@ -30,3 +30,6 @@ tsconfig.tsbuildinfo
 # Coverage
 coverage/
 .nyc_output/
+
+# Agents workspace cache
+.agents/
