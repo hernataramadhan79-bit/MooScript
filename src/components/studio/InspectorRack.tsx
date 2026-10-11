@@ -22,6 +22,7 @@ import type {
   LayerOverride,
   ScenePalette
 } from '../../types';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 export type InspectorTab = 'mograph' | 'style' | 'audio' | 'ekspor';
 
@@ -246,8 +247,17 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     exportProgress,
     exportResult,
     startExport,
+    cancelExport,
+    revokeExportResult,
+    cancelAudioGeneration,
+    audioStale,
+    setSettingsOpen,
     addToast
   } = useMooStore();
+
+  const currentLlmProvider = settings.selectedLLMProvider;
+  const currentLlmApiKey = settings.apiKeys[currentLlmProvider] || '';
+  const hasLlmApiKey = Boolean(currentLlmApiKey.trim());
 
   // Active Scene & Layer States
   const scenes = useMemo(() => project.scenes || [], [project.scenes]);
@@ -452,13 +462,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       });
 
       const currentProject = useMooStore.getState().project;
-      const updatedProjectScenes = currentProject.scenes.map((s) => {
-        if (s.id !== activeScene.id) return s;
-        return {
-          ...s,
-          visualIntent: revisedVisualIntent
-        };
-      });
+      // The revision instruction only steers this generation. Persisting it would make
+      // visualIntent grow with every revision ("..., Instruksi perubahan: ...").
+      const updatedProjectScenes = currentProject.scenes;
 
       setProject({
         ...currentProject,
@@ -549,11 +555,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     if (p === 'openai') return 'openai';
     if (p === 'elevenlabs') return 'elevenlabs';
     if (p === 'local') return 'local';
-    return 'gemini';
+    return 'timer';
   }, [settings.selectedTTSProvider]);
 
   const voiceProviders = [
-    { id: 'gemini', label: 'Gemini Flash' },
+    { id: 'timer', label: 'Tanpa Suara (Timer)' },
     { id: 'openai', label: 'OpenAI' },
     { id: 'elevenlabs', label: 'ElevenLabs' },
     { id: 'local', label: 'Offline Lokal' }
@@ -592,7 +598,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    if (val === 'gemini') {
+    if (val === 'timer') {
       updateSettings({ selectedTTSProvider: 'fallback' });
     } else if (val === 'openai') {
       updateSettings({ selectedTTSProvider: 'openai' });
@@ -622,7 +628,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // BGM Presets
   const currentBgmPreset = project.bgm?.preset || 'none';
   const bgmPresets: { value: BgmPreset; label: string }[] = [
-    { value: 'none', label: 'None' },
+    { value: 'none', label: 'Tanpa' },
     { value: 'ambient', label: 'Ambient' },
     { value: 'lofi', label: 'Lofi' },
     { value: 'cinematic', label: 'Cinematic' },
@@ -640,6 +646,49 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // Export Watermark & HUD options
   const [exportWatermark, setExportWatermark] = useState(false);
   const [exportHud, setExportHud] = useState(false);
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+
+  const hasProjectAudio = Boolean(project.audioBlob);
+  const hasNarration = scenes.some((s) => (s.narrationText || s.text || '').trim().length > 0);
+  // Mirrors exporter logic: watermark/HUD only apply to the legacy canvas renderer.
+  const isCompositionExport =
+    (project.renderMode || 'composition') === 'composition' &&
+    Boolean(
+      project.composition?.scenes?.some(
+        (s) => s.status === 'ok' && Boolean(s.html && s.html.trim().length > 0)
+      )
+    );
+
+  // A finished MP4 is only valid for the exact project it was rendered from.
+  // Drop it as soon as anything that affects the output changes.
+  const exportSnapshotRef = useRef<unknown[] | null>(null);
+  useEffect(() => {
+    const snapshot = [
+      project.scenes,
+      project.composition,
+      project.audioBlob,
+      project.width,
+      project.height,
+      project.theme,
+      project.bgm
+    ];
+    const prev = exportSnapshotRef.current;
+    exportSnapshotRef.current = snapshot;
+    if (!prev || prev.every((v, i) => v === snapshot[i])) return;
+    if (useMooStore.getState().isExporting) return;
+    if (useMooStore.getState().exportResult) {
+      revokeExportResult();
+    }
+  }, [
+    project.scenes,
+    project.composition,
+    project.audioBlob,
+    project.width,
+    project.height,
+    project.theme,
+    project.bgm,
+    revokeExportResult
+  ]);
 
   // MP4 Export trigger
   const handleExportMp4 = async () => {
@@ -685,7 +734,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   };
 
   // AI Mograph Generation Workflow
-  const handleGenerateCustomMograph = async () => {
+  const handleGenerateCustomMograph = async (skipConfirm = false) => {
     const currentProject = useMooStore.getState().project;
     const provider = settings.selectedLLMProvider;
     const apiKey = settings.apiKeys[provider] || '';
@@ -701,16 +750,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     // Check if any scene was manually edited by user
     const existingModules = currentProject.composition?.scenes || [];
     const hasUserEdited = existingModules.some((m) => m.userEdited === true);
-    if (hasUserEdited) {
-      const confirmed =
-        typeof window !== 'undefined' && typeof window.confirm === 'function'
-          ? window.confirm(
-              'Beberapa adegan telah diedit secara manual. Menjalankan AI generator akan menimpa perubahan tersebut. Lanjutkan?'
-            )
-          : true;
-      if (!confirmed) {
-        return;
-      }
+    if (hasUserEdited && !skipConfirm) {
+      setShowOverwriteConfirm(true);
+      return;
     }
 
     const startedId = currentProject.id;
@@ -928,29 +970,33 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               : null
           );
 
-          // PROGRESSIVE STORE UPDATE: commit completed scene into the composition
+          // PROGRESSIVE STORE UPDATE: safely merge completed scene into latest composition
+          const latestProj = useMooStore.getState().project;
+          const prevComp = latestProj.composition || runningComp;
           runningComp = {
-            ...runningComp,
-            scenes: runningComp.scenes.map((s, idx) =>
+            ...prevComp,
+            scenes: prevComp.scenes.map((s, idx) =>
               idx === i && finalScenes[i] ? finalScenes[i] : s
             ),
             updatedAt: Date.now()
           };
           useMooStore.getState().setProject(
             {
-              ...useMooStore.getState().project,
+              ...latestProj,
               renderMode: 'composition' as const,
               composition: runningComp
             },
             { keepStale: true }
           );
 
-          // Pacing delay to avoid burst rate limits
-          await new Promise((r) => setTimeout(r, 1000));
+          // Brief 50ms tick to yield UI thread smoothly
+          await new Promise((r) => setTimeout(r, 50));
         }
       };
 
-      await worker();
+      const CONCURRENCY = Math.min(2, total);
+      const workers = Array.from({ length: CONCURRENCY }, () => worker());
+      await Promise.all(workers);
 
       if (controller.signal.aborted) {
         addToast('Pembuatan mograph dibatalkan.', 'info');
@@ -1144,8 +1190,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <button
                       type="button"
                       onClick={handleReviseSingleScene}
-                      disabled={isRevisingScene}
-                      className="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors self-start flex items-center gap-1.5"
+                      disabled={isRevisingScene || !hasLlmApiKey}
+                      title={
+                        !hasLlmApiKey
+                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          : undefined
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors self-start flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
                     >
                       <span className="material-symbols-outlined text-[14px]">refresh</span>
                       Generate Ulang Adegan Ini
@@ -1182,8 +1233,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <button
                       type="button"
                       onClick={handleReviseSingleScene}
-                      disabled={isRevisingScene}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-accent text-on-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50"
+                      disabled={isRevisingScene || !hasLlmApiKey}
+                      title={
+                        !hasLlmApiKey
+                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          : undefined
+                      }
+                      className="flex-1 py-1.5 px-3 rounded-xl bg-accent text-on-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {isRevisingScene ? (
                         <>
@@ -1223,7 +1279,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                   {availableLayers.length === 0 ? (
                     <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed">
-                      {activeCompScene
+                      {activeCompScene?.html
                         ? 'Tidak ada layer yang ditandai data-moo-layer pada adegan ini.'
                         : 'Mograph belum di-generate. Buka tab Mograph untuk membuat visual.'}
                     </div>
@@ -1554,15 +1610,41 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateCustomMograph}
-                  disabled={isCompilingMograph || (project.scenes?.length || 0) === 0}
-                  className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm"
-                >
-                  <span className="material-symbols-outlined text-[18px]">movie_filter</span>
-                  <span>Generate Mograph AI</span>
-                </button>
+                <div className="flex flex-col gap-2.5">
+                  {!hasLlmApiKey && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
+                      <div className="flex items-start gap-2 text-amber-300 text-[11px] leading-relaxed">
+                        <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">key_off</span>
+                        <span>
+                          API Key untuk <strong>{currentLlmProvider.toUpperCase()}</strong> belum diatur. Masukkan API Key di Pengaturan agar AI dapat membuat visual adegan.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettingsOpen(true)}
+                        className="w-full py-1.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">settings</span>
+                        <span>Buka Pengaturan API</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateCustomMograph(false)}
+                    disabled={isCompilingMograph || (project.scenes?.length || 0) === 0 || !hasLlmApiKey}
+                    title={
+                      !hasLlmApiKey
+                        ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan terlebih dahulu`
+                        : undefined
+                    }
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">movie_filter</span>
+                    <span>Generate Mograph AI</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1978,8 +2060,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 <button
                   type="button"
                   onClick={handleAuditionVoice}
-                  className="min-h-[40px] px-3 py-2 rounded-xl bg-surface-2 border border-border hover:bg-surface-3 text-on-surface font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-sm"
-                  title="Dengarkan contoh suara"
+                  disabled={currentVoiceProvider === 'timer'}
+                  className="min-h-[40px] px-3 py-2 rounded-xl bg-surface-2 border border-border hover:bg-surface-3 text-on-surface font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:pointer-events-none"
+                  title={currentVoiceProvider === 'timer' ? 'Mode tanpa suara tidak punya contoh suara' : 'Dengarkan contoh suara'}
                 >
                   <span className="material-symbols-outlined text-[17px] text-accent">volume_up</span>
                   <span>Coba Suara</span>
@@ -1988,7 +2071,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 <button
                   type="button"
                   onClick={() => generateAudio()}
-                  disabled={isGeneratingAudio}
+                  disabled={isGeneratingAudio || !hasNarration}
+                  title={!hasNarration ? 'Tulis naskah adegan terlebih dahulu' : undefined}
                   className="min-h-[40px] px-3 py-2 rounded-xl bg-accent text-on-accent font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
                 >
                   {isGeneratingAudio ? (
@@ -2009,6 +2093,41 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </>
                   )}
                 </button>
+              </div>
+
+              {isGeneratingAudio && (
+                <button
+                  type="button"
+                  onClick={() => cancelAudioGeneration()}
+                  className="w-full py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
+                >
+                  Batalkan Pembuatan Suara
+                </button>
+              )}
+
+              {/* Status audio proyek */}
+              <div
+                className={`p-2.5 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
+                  !hasProjectAudio
+                    ? 'bg-surface-2 border-border text-text-muted'
+                    : audioStale
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      : 'bg-accent/10 border-accent/30 text-accent'
+                }`}
+                role="status"
+              >
+                <span className="material-symbols-outlined text-[16px] shrink-0">
+                  {!hasProjectAudio ? 'volume_off' : audioStale ? 'warning' : 'check_circle'}
+                </span>
+                <span>
+                  {currentVoiceProvider === 'timer'
+                    ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
+                    : !hasProjectAudio
+                      ? 'Suara belum dibuat.'
+                      : audioStale
+                        ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
+                        : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
+                </span>
               </div>
             </div>
 
@@ -2053,8 +2172,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   max="1"
                   step="0.01"
                   value={bgmLevel}
+                  disabled={currentBgmPreset === 'none'}
                   onChange={(e) => updateBgmLevel(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
+                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -2072,8 +2192,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   max="1"
                   step="0.01"
                   value={duckRatio}
+                  disabled={currentBgmPreset === 'none'}
                   onChange={(e) => updateBgmDuckRatio(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
+                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -2114,39 +2235,53 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </div>
             </div>
 
-            {/* Opsi Overlay Ekspor: Watermark & HUD */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Opsi Ekspor
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={exportWatermark}
-                    onChange={(e) => setExportWatermark(e.target.checked)}
-                    className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-[12px] font-semibold text-on-surface">Watermark</span>
-                    <span className="text-[10px] text-text-muted">Logo MooScript</span>
-                  </div>
-                </label>
+            {/* Opsi Overlay Ekspor: hanya berlaku untuk render legacy (canvas) */}
+            {!isCompositionExport && (
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                  Opsi Ekspor
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={exportWatermark}
+                      onChange={(e) => setExportWatermark(e.target.checked)}
+                      className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-[12px] font-semibold text-on-surface">Watermark</span>
+                      <span className="text-[10px] text-text-muted">Logo MooScript</span>
+                    </div>
+                  </label>
 
-                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={exportHud}
-                    onChange={(e) => setExportHud(e.target.checked)}
-                    className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-[12px] font-semibold text-on-surface">HUD Info</span>
-                    <span className="text-[10px] text-text-muted">Overlay Debug/FPS</span>
-                  </div>
-                </label>
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={exportHud}
+                      onChange={(e) => setExportHud(e.target.checked)}
+                      className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-[12px] font-semibold text-on-surface">Info FPS</span>
+                      <span className="text-[10px] text-text-muted">Overlay teknis</span>
+                    </div>
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Peringatan audio sebelum ekspor */}
+            {!hasProjectAudio && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
+                Audio belum dibuat, video akan diekspor tanpa suara. Buka tab Audio untuk membuat suara.
+              </div>
+            )}
+            {hasProjectAudio && audioStale && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
+                Naskah berubah sejak suara dibuat. Buat ulang suara di tab Audio agar video sesuai naskah.
+              </div>
+            )}
 
             {/* Tombol Utama Download Video MP4 */}
             <div className="flex flex-col gap-2.5">
@@ -2161,6 +2296,16 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 </span>
                 <span>{isExporting ? 'Mengekspor Video...' : 'Download Video MP4'}</span>
               </button>
+
+              {isExporting && (
+                <button
+                  type="button"
+                  onClick={() => cancelExport()}
+                  className="w-full py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
+                >
+                  Batalkan Ekspor
+                </button>
+              )}
 
               {/* Progress Bar Ekspor Elegan */}
               {isExporting && exportProgress && (
@@ -2238,6 +2383,22 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
           </div>
         )}
       </div>
+
+      {/* Konfirmasi Timpa Adegan yang Diedit Manual */}
+      <ConfirmModal
+        isOpen={showOverwriteConfirm}
+        onClose={() => setShowOverwriteConfirm(false)}
+        onConfirm={() => {
+          setShowOverwriteConfirm(false);
+          handleGenerateCustomMograph(true);
+        }}
+        title="Timpa Perubahan Manual?"
+        description="Beberapa adegan dalam proyek ini telah diedit secara manual. Menjalankan AI Generator akan menimpa kode adegan tersebut dengan hasil generasi baru. Lanjutkan?"
+        confirmLabel="Timpa & Generate"
+        cancelLabel="Batal"
+        variant="warning"
+        icon="warning"
+      />
     </div>
   );
 };

@@ -47,6 +47,58 @@ const AutoExpandTextarea: React.FC<AutoExpandTextareaProps> = ({
 
 const cleanWord = (w: string): string => w.replace(/^[^\w\s]+|[^\w\s]+$/g, '').toLowerCase();
 
+interface SceneDurationInputProps {
+  duration: number;
+  onCommit: (val: number) => void;
+}
+
+const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCommit }) => {
+  const [localVal, setLocalVal] = useState(duration.toString());
+
+  useEffect(() => {
+    setLocalVal(duration.toString());
+  }, [duration]);
+
+  const commit = () => {
+    const parsed = parseFloat(localVal);
+    if (!isNaN(parsed) && parsed > 0) {
+      const clamped = Math.min(60, Math.max(0.5, Math.round(parsed * 10) / 10));
+      onCommit(clamped);
+      setLocalVal(clamped.toString());
+    } else {
+      setLocalVal(duration.toString());
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-0.5 text-[11px] font-mono text-text-muted shrink-0 ml-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="number"
+        min="0.5"
+        max="30"
+        step="0.5"
+        value={localVal}
+        onChange={(e) => setLocalVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur();
+          } else if (e.key === 'Escape') {
+            setLocalVal(duration.toString());
+            e.currentTarget.blur();
+          }
+        }}
+        className="w-12 bg-surface-2 border border-border/70 focus:border-accent rounded px-1 py-0.5 text-center text-on-surface text-[11px] font-mono focus:outline-none"
+        aria-label="Durasi detik"
+      />
+      <span>s</span>
+    </div>
+  );
+};
+
 export interface SceneDeckProps {
   className?: string;
   onOpenCodeInspector?: (beatId: string) => void;
@@ -214,7 +266,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   {/* Status & Edit Badges */}
                   {compStatus && (
                     <span
-                      className={`text-[8px] px-1 py-0.2 rounded-full font-mono uppercase font-bold shrink-0 ${
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono uppercase font-bold shrink-0 ${
                         compStatus === 'ok'
                           ? 'bg-emerald-500/15 text-emerald-400'
                           : compStatus === 'error'
@@ -226,37 +278,20 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     </span>
                   )}
                   {isEdited && (
-                    <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">
                       edit
                     </span>
                   )}
 
                   {/* Input Durasi Angka */}
-                  <div
-                    className="flex items-center gap-0.5 text-[11px] font-mono text-text-muted shrink-0 ml-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="number"
-                      min="0.5"
-                      max="30"
-                      step="0.5"
-                      value={duration}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (!isNaN(val) && val > 0) {
-                          setSceneDuration(scene.id, val);
-                        }
-                      }}
-                      className="w-11 bg-surface-2 border border-border/70 focus:border-accent rounded px-1 py-0.5 text-center text-on-surface text-[11px] font-mono focus:outline-none"
-                      aria-label="Durasi detik"
-                    />
-                    <span>s</span>
-                  </div>
+                  <SceneDurationInput
+                    duration={duration}
+                    onCommit={(val) => setSceneDuration(scene.id, val)}
+                  />
                 </div>
 
                 {/* Tombol Aksi: Edit Adegan, Code Inspector, Urutan, Duplikat, Hapus */}
-                <div className="flex items-center gap-0.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {onEditScene && (
                     <IconButton
                       icon="tune"
@@ -267,7 +302,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                         setActiveSceneId(scene.id);
                         onEditScene(scene.id);
                       }}
-                      className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px] !text-accent"
+                      className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px] !text-accent"
                     />
                   )}
                   {onOpenCodeInspector && (
@@ -279,7 +314,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                         e.stopPropagation();
                         onOpenCodeInspector(scene.id);
                       }}
-                      className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px]"
+                      className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
                     />
                   )}
                   <IconButton
@@ -291,7 +326,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       e.stopPropagation();
                       reorderScenes(index, index - 1);
                     }}
-                    className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px]"
+                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
                   />
                   <IconButton
                     icon="arrow_downward"
@@ -302,7 +337,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       e.stopPropagation();
                       reorderScenes(index, index + 1);
                     }}
-                    className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px]"
+                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
                   />
                   <IconButton
                     icon="content_copy"
@@ -312,7 +347,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       e.stopPropagation();
                       duplicateScene(scene.id);
                     }}
-                    className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px]"
+                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
                   />
                   <IconButton
                     icon="delete"
@@ -324,7 +359,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       e.stopPropagation();
                       removeScene(scene.id);
                     }}
-                    className="!w-7 !h-7 !min-w-0 !min-h-0 !text-[15px]"
+                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
                   />
                 </div>
               </div>
@@ -431,9 +466,9 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 <input
                   type="range"
                   min="0.5"
-                  max="15"
+                  max="30"
                   step="0.5"
-                  value={Math.min(15, duration)}
+                  value={Math.min(30, duration)}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val) && val > 0) {
@@ -459,7 +494,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           className="w-full py-2.5 px-3 rounded-xl border border-dashed border-border/80 hover:border-border-strong bg-surface-1/40 hover:bg-surface-2 text-text-muted hover:text-on-surface text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] select-none"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
-          <span>+ Tambah Adegan</span>
+          <span>Tambah Adegan</span>
         </button>
 
       </div>

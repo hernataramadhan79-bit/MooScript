@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import type { MooProject } from '../types';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState<MooProject | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -70,15 +72,12 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     await duplicateProject(id);
   };
 
-  const handleDelete = async (e: React.MouseEvent, p: MooProject) => {
+  const handleDelete = (e: React.MouseEvent, p: MooProject) => {
     e.stopPropagation();
     if (projectsList.length <= 1) {
       return;
     }
-    const confirmed = window.confirm(`Delete project "${p.title}"? This cannot be undone.`);
-    if (confirmed) {
-      await deleteProject(p.id);
-    }
+    setProjectToDelete(p);
   };
 
   const formatTimestamp = (ts?: number) => {
@@ -214,9 +213,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     type="button"
                     onClick={(e) => handleDuplicate(e, p.id)}
                     title="Duplikat proyek"
-                    className="w-7 h-7 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+                    className="w-8 h-8 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                    <span className="material-symbols-outlined text-[16px]">content_copy</span>
                   </button>
 
                   <button
@@ -224,9 +223,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     onClick={(e) => handleDelete(e, p)}
                     disabled={projectsList.length <= 1}
                     title={projectsList.length <= 1 ? 'Tidak dapat menghapus proyek satu-satunya' : 'Hapus proyek'}
-                    className="w-7 h-7 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
+                    className="w-8 h-8 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
                   >
-                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
                   </button>
                 </div>
               </div>
@@ -240,6 +239,24 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           <span>Ganti proyek kapan saja</span>
         </div>
       </div>
+
+      {/* Konfirmasi Hapus Proyek */}
+      <ConfirmModal
+        isOpen={Boolean(projectToDelete)}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={async () => {
+          if (projectToDelete) {
+            await deleteProject(projectToDelete.id);
+            setProjectToDelete(null);
+          }
+        }}
+        title="Hapus Proyek"
+        description={`Apakah Anda yakin ingin menghapus proyek "${projectToDelete?.title || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus Proyek"
+        cancelLabel="Batal"
+        variant="danger"
+        icon="delete_forever"
+      />
     </div>
   );
 };

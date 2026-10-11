@@ -10,6 +10,7 @@ import {
   type DeviceCapabilities
 } from '../engine/ai/localTts';
 import type { LLMProvider, PersonaSkill } from '../types';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 interface ProviderModelSelectorProps {
   provider: LLMProvider;
@@ -195,6 +196,8 @@ export const SettingsDrawer: React.FC = () => {
   const [persistenceStatus, setPersistenceStatus] = useState<{ persisted: boolean; supported: boolean } | null>(null);
   const [deviceCaps, setDeviceCaps] = useState<DeviceCapabilities | null>(null);
   const [localModelsSizeBytes, setLocalModelsSizeBytes] = useState<number>(0);
+  const [confirmPurgeModels, setConfirmPurgeModels] = useState(false);
+  const [skillToDelete, setSkillToDelete] = useState<string | null>(null);
 
   // Dynamic models state per provider
   const [providerModels, setProviderModels] = useState<Record<LLMProvider, ProviderModelInfo[]>>({
@@ -252,12 +255,8 @@ export const SettingsDrawer: React.FC = () => {
 
   if (!isSettingsOpen) return null;
 
-  const handlePurgeLocalModels = async () => {
-    if (confirm('Hapus semua cache model suara lokal dari browser?')) {
-      await purgeAllLocalModels();
-      setLocalModelsSizeBytes(0);
-      addToast('Semua cache model suara lokal berhasil dihapus!', 'info');
-    }
+  const handlePurgeLocalModels = () => {
+    setConfirmPurgeModels(true);
   };
 
   const handleTestKey = async (provider: LLMProvider | 'elevenlabs') => {
@@ -368,11 +367,8 @@ export const SettingsDrawer: React.FC = () => {
     setNewSkillPrompt('');
   };
 
-  const handleDeleteSkill = async (id: string) => {
-    if (confirm('Are you sure you want to delete this custom skill?')) {
-      await deleteSkill(id);
-      await refreshSkills();
-    }
+  const handleDeleteSkill = (id: string) => {
+    setSkillToDelete(id);
   };
 
   const cacheMb = (cacheSizeBytes / (1024 * 1024)).toFixed(1);
@@ -1164,6 +1160,42 @@ export const SettingsDrawer: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Konfirmasi Bersihkan Cache Model Suara */}
+      <ConfirmModal
+        isOpen={confirmPurgeModels}
+        onClose={() => setConfirmPurgeModels(false)}
+        onConfirm={async () => {
+          await purgeAllLocalModels();
+          setLocalModelsSizeBytes(0);
+          addToast('Semua cache model suara lokal berhasil dihapus!', 'info');
+        }}
+        title="Hapus Cache Model Suara"
+        description="Apakah Anda yakin ingin menghapus semua cache model suara lokal dari browser? Model akan diunduh ulang saat dibutuhkan."
+        confirmLabel="Hapus Cache"
+        cancelLabel="Batal"
+        variant="danger"
+        icon="delete_sweep"
+      />
+
+      {/* Konfirmasi Hapus Custom Skill */}
+      <ConfirmModal
+        isOpen={Boolean(skillToDelete)}
+        onClose={() => setSkillToDelete(null)}
+        onConfirm={async () => {
+          if (skillToDelete) {
+            await deleteSkill(skillToDelete);
+            await refreshSkills();
+            setSkillToDelete(null);
+            addToast('Custom persona skill berhasil dihapus!', 'info');
+          }
+        }}
+        title="Hapus Custom Persona Skill"
+        description="Apakah Anda yakin ingin menghapus custom persona skill ini? Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Hapus Skill"
+        cancelLabel="Batal"
+        variant="danger"
+        icon="delete"
+      />
     </div>
   );
 };

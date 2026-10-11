@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { AspectRatio } from '../../types';
 import { useMooStore } from '../../store/useMooStore';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
+import { useDebouncedValue } from '../../utils/hooks';
 
 interface CompositionStageProps {
   className?: string;
@@ -43,6 +45,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const latestFrameRef = useRef(currentFrame);
   latestFrameRef.current = currentFrame;
 
+  const theme = useMooStore((s) => s.project.theme);
+
   // Build srcdoc when minimal composition or scenes properties change
   const srcDoc = React.useMemo(() => {
     const minimalProject = {
@@ -51,10 +55,15 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       height,
       fps,
       scenes,
-      composition
+      composition,
+      theme
     } as any;
     return buildCompositionDocument(minimalProject);
-  }, [composition, scenes, width, height, fps, projectId]);
+  }, [composition, scenes, width, height, fps, projectId, theme]);
+
+  // Reloading an iframe on every keystroke makes the preview flash while typing a script.
+  // Debounce the document, but switch instantly when the project or canvas size changes.
+  const shownDoc = useDebouncedValue(srcDoc, 350, `${projectId}-${width}x${height}`);
 
   // Adjust container scale to fit responsive viewport smoothly
   const updateScale = React.useCallback(() => {
@@ -259,7 +268,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         <iframe
           key={`${projectId}-${width}x${height}`}
           ref={iframeRef}
-          srcDoc={srcDoc}
+          srcDoc={shownDoc}
           title="MooScript Composition Stage"
           sandbox="allow-scripts"
           onLoad={() => {
@@ -304,51 +313,54 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       </div>
 
       {/* Fullscreen Theater Mode Overlay */}
-      {previewMode === 'theater' && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none animate-fadeIn">
-          <div className="absolute top-4 right-4 z-50">
-            <button
-              type="button"
-              onClick={() => setPreviewMode('compact')}
-              className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-xl"
-            >
-              <span className="material-symbols-outlined text-[18px]">close_fullscreen</span>
-              <span>Tutup Layar Penuh (Esc)</span>
-            </button>
-          </div>
+      {previewMode === 'theater' &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none animate-fadeIn">
+            <div className="absolute top-4 right-4 z-50">
+              <button
+                type="button"
+                onClick={() => setPreviewMode('compact')}
+                className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-xl"
+              >
+                <span className="material-symbols-outlined text-[18px]">close_fullscreen</span>
+                <span>Tutup Layar Penuh (Esc)</span>
+              </button>
+            </div>
 
-          <div
-            style={{
-              width: `${width}px`,
-              height: `${height}px`,
-              transform: `scale(${theaterScale})`,
-              transformOrigin: 'center center'
-            }}
-            className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black"
-          >
-            <iframe
-              key={`theater-${projectId}-${width}x${height}`}
-              ref={theaterIframeRef}
-              srcDoc={srcDoc}
-              title="MooScript Theater Mode Stage"
-              sandbox="allow-scripts"
-              onLoad={() => {
-                if (theaterIframeRef.current?.contentWindow) {
-                  theaterIframeRef.current.contentWindow.postMessage(
-                    {
-                      type: 'seek',
-                      time: latestTimeRef.current,
-                      id: latestFrameRef.current
-                    },
-                    '*'
-                  );
-                }
+            <div
+              style={{
+                width: `${width}px`,
+                height: `${height}px`,
+                transform: `scale(${theaterScale})`,
+                transformOrigin: 'center center'
               }}
-              className="w-full h-full border-0 pointer-events-none"
-            />
-          </div>
-        </div>
-      )}
+              className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black"
+            >
+              <iframe
+                key={`theater-${projectId}-${width}x${height}`}
+                ref={theaterIframeRef}
+                srcDoc={shownDoc}
+                title="MooScript Theater Mode Stage"
+                sandbox="allow-scripts"
+                onLoad={() => {
+                  if (theaterIframeRef.current?.contentWindow) {
+                    theaterIframeRef.current.contentWindow.postMessage(
+                      {
+                        type: 'seek',
+                        time: latestTimeRef.current,
+                        id: latestFrameRef.current
+                      },
+                      '*'
+                    );
+                  }
+                }}
+                className="w-full h-full border-0 pointer-events-none"
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

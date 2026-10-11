@@ -1,6 +1,7 @@
 import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
 import { compileOverridesCss, compilePaletteVars } from './layers';
+import { buildCaptionScript } from './captions';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 // Local WOFF2 subsets inlined as data-URIs so SVG foreignObject export frames
 // render with correct typography even when Google Fonts is unreachable
@@ -282,6 +283,25 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
     })
   };
 
+  const captionScript = buildCaptionScript(
+    {
+      show: Boolean(project.theme?.showSubtitles),
+      style: project.theme?.captionStyle || 'boxed',
+      position: project.theme?.captionPosition || 'bottom',
+      width,
+      height
+    },
+    resolved.map(({ mod }) => {
+      const ts = timelineScenes.find((s) => s.id === mod.beatId);
+      return {
+        id: mod.beatId,
+        duration: durationOf(mod),
+        text: ts?.narrationText || ts?.text || '',
+        wordTimestamps: ts?.wordTimestamps || []
+      };
+    })
+  );
+
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -368,6 +388,8 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <!-- Scenes Injected Definitions -->
   <script>
     ${scenesJs}
+
+    ${captionScript}
 
     // Auto initialize master timeline
     (function() {

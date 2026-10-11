@@ -232,6 +232,10 @@ export function getRuntimeScript(): string {
       }
       curAccTime += sDur;
     }
+    // Overlay hook (subtitles). Must never break seeking.
+    if (typeof window.__MOO_AFTER_SEEK__ === 'function') {
+      try { window.__MOO_AFTER_SEEK__(t); } catch (e) {}
+    }
   }
 
   window.__MOO_INIT__ = initMasterTimeline;
