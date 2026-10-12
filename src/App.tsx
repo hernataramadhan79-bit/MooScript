@@ -9,13 +9,15 @@ import { CodeInspectorModal } from './features/scene/CodeInspectorModal';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
+import { WelcomeModal } from './components/WelcomeModal';
 import { useMediaQuery } from './utils/hooks';
+import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts';
 
-export type MobileTab = 'naskah' | 'mograph' | 'style' | 'audio' | 'ekspor';
+export type MobileTab = 'naskah' | 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
 export type { InspectorTab };
 
 export const App: React.FC = () => {
-  const { initStore, togglePlay, setActiveSceneId } = useMooStore();
+  const { initStore, setActiveSceneId } = useMooStore();
   // Tailwind lg breakpoint. Only one layout is mounted so stage/timeline/inspector exist once.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -27,30 +29,8 @@ export const App: React.FC = () => {
     initStore().catch((err) => console.error('Failed to init store', err));
   }, [initStore]);
 
-  // Global spacebar listener for playback transport
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        const target = e.target as HTMLElement | null;
-        const tag = target?.tagName?.toLowerCase();
-        if (
-          tag === 'input' ||
-          tag === 'textarea' ||
-          tag === 'select' ||
-          tag === 'button' ||
-          tag === 'a' ||
-          target?.isContentEditable ||
-          target?.closest?.('[role="slider"], [role="dialog"], .cm-editor')
-        ) {
-          return;
-        }
-        e.preventDefault();
-        togglePlay();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay]);
+  // Global workstation keyboard shortcuts
+  useKeyboardShortcuts();
 
   const handleOpenExport = () => {
     setInspectorTab('ekspor');
@@ -63,10 +43,17 @@ export const App: React.FC = () => {
     setMobileTab('style');
   };
 
+  const handleOpenAssets = (sceneId?: string) => {
+    if (sceneId) setActiveSceneId(sceneId);
+    setInspectorTab('asset');
+    setMobileTab('asset');
+  };
+
   const mobileTabs: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'naskah', label: 'Naskah', icon: 'edit_note' },
     { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
     { id: 'style', label: 'Gaya', icon: 'tune' },
+    { id: 'asset', label: 'Aset', icon: 'perm_media' },
     { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
     { id: 'ekspor', label: 'Ekspor', icon: 'download' }
   ];
@@ -86,6 +73,7 @@ export const App: React.FC = () => {
                 className="h-full overflow-y-auto"
                 onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                 onEditScene={handleEditScene}
+                onOpenAssets={handleOpenAssets}
               />
             </aside>
 
@@ -129,6 +117,7 @@ export const App: React.FC = () => {
                     className="h-full overflow-y-auto"
                     onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                     onEditScene={handleEditScene}
+                    onOpenAssets={handleOpenAssets}
                   />
                 ) : (
                   <InspectorRack
@@ -141,7 +130,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Mobile Bottom Navigation Bar (5 Tab) */}
-              <nav className="shrink-0 border-t border-border bg-surface-1 px-1 py-1.5 grid grid-cols-5 gap-0.5 select-none">
+              <nav className="shrink-0 border-t border-border bg-surface-1 px-1 py-1.5 grid grid-cols-6 gap-0.5 select-none">
                 {mobileTabs.map((tab) => {
                   const isActive = mobileTab === tab.id;
                   return (
@@ -181,6 +170,9 @@ export const App: React.FC = () => {
 
       {/* 6. PWA Reload Prompt */}
       <PwaReloadPrompt />
+
+      {/* 7. Welcome */}
+      <WelcomeModal />
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import { fontDataUri } from './fontDataUriPlugin';
 
 export default defineConfig({
+  plugins: [fontDataUri()],
   test: {
     globals: true,
     environment: 'node',

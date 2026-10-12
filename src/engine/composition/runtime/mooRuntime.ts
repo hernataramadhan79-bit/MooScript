@@ -182,10 +182,29 @@ export function getRuntimeScript(): string {
         console.error('Error in scene build(): ' + sceneItem.id, err);
       }
 
-      // Deterministic bidirectional visibility in master timeline
+      // Deterministic bidirectional visibility in master timeline with transition presets
+      const transitionType = sceneItem.transition || 'cut';
       masterTl.set(sceneWrapper, { opacity: 1, visibility: 'visible' }, accumulatedTime);
       if (i < scenes.length - 1) {
-        masterTl.set(sceneWrapper, { opacity: 0, visibility: 'hidden' }, accumulatedTime + duration);
+        if (transitionType === 'fade') {
+          const transDur = Math.min(0.35, duration * 0.25);
+          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
+          masterTl.set(sceneWrapper, { visibility: 'hidden' }, accumulatedTime + duration);
+        } else if (transitionType === 'slide') {
+          const transDur = Math.min(0.4, duration * 0.25);
+          masterTl.to(sceneWrapper, { x: '-100%', duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%' }, accumulatedTime + duration);
+        } else if (transitionType === 'zoom') {
+          const transDur = Math.min(0.35, duration * 0.25);
+          masterTl.to(sceneWrapper, { scale: 1.15, opacity: 0, duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 1 }, accumulatedTime + duration);
+        } else if (transitionType === 'wipe') {
+          const transDur = Math.min(0.35, duration * 0.25);
+          masterTl.to(sceneWrapper, { clipPath: 'inset(0 0 100% 0)', duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'inset(0 0 0% 0)' }, accumulatedTime + duration);
+        } else {
+          masterTl.set(sceneWrapper, { opacity: 0, visibility: 'hidden' }, accumulatedTime + duration);
+        }
       }
 
       masterTl.add(rawSceneTl, accumulatedTime);

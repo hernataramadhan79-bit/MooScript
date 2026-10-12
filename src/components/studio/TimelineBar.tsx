@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { extractWaveformPeaks } from '../../engine/audio/waveform';
 
 interface TimelineBarProps {
   className?: string;
@@ -25,7 +26,9 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     audioStale,
     audioBlobUrl,
     previewMode,
-    setPreviewMode
+    setPreviewMode,
+    waveformPeaks,
+    setWaveformPeaks
   } = useMooStore();
 
   const fps = project.fps || 30;
@@ -127,7 +130,14 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
   };
 
   // Synthetic speech cadence audio waveform bars (deterministic & responsive)
+  // Audio waveform bars: real sampled peaks from audio track, or fallback rhythmic bars
   const waveformBars = useMemo(() => {
+    if (waveformPeaks && waveformPeaks.length > 0) {
+      return waveformPeaks.map((peak) => ({
+        height: Math.max(15, Math.min(100, Math.round(peak * 100)))
+      }));
+    }
+
     const count = 64;
     const bars: { height: number }[] = [];
     for (let i = 0; i < count; i++) {
@@ -138,7 +148,17 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
       bars.push({ height });
     }
     return bars;
-  }, []);
+  }, [waveformPeaks]);
+
+  useEffect(() => {
+    if (project.audioBlob && !waveformPeaks) {
+      extractWaveformPeaks(project.audioBlob).then((peaks) => {
+        if (peaks.length > 0) {
+          setWaveformPeaks(peaks);
+        }
+      }).catch(() => {});
+    }
+  }, [project.audioBlob, waveformPeaks, setWaveformPeaks]);
 
   // 1. COMPACT VIEW (Docked or Mobile)
   const renderCompact = () => (

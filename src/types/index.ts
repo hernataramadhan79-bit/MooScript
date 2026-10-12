@@ -1,4 +1,4 @@
-export type SceneTransition = 'cut' | 'fade' | 'slide';
+export type SceneTransition = 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom';
 export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal';
 export type CaptionPosition = 'top' | 'center' | 'bottom';
 export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi';

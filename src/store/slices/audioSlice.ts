@@ -12,6 +12,7 @@ import {
 import { mixVoiceAndBgm, renderStandaloneBgm } from '../../engine/audio/bgmMixer';
 import { synthesizeLocalTTS } from '../../engine/ai/localTts';
 import { saveProjectToDb } from '../../db/mooDb';
+import { extractWaveformPeaks } from '../../engine/audio/waveform';
 import type { MooStoreState, AudioSlice } from '../types';
 
 let audioAbortController: AbortController | null = null;
@@ -22,6 +23,8 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
   audioStale: false,
   audioProgress: null,
   rawVoiceBlob: null,
+  waveformPeaks: null,
+  setWaveformPeaks: (waveformPeaks) => set({ waveformPeaks }),
 
   generateAudio: async () => {
     const { settings, project, addToast } = get();
@@ -91,6 +94,11 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         audioProgress: null,
         rawVoiceBlob: null
       });
+      if (finalAudioBlob) {
+        extractWaveformPeaks(finalAudioBlob).then((peaks) => set({ waveformPeaks: peaks })).catch(() => {});
+      } else {
+        set({ waveformPeaks: null });
+      }
 
       await saveProjectToDb(finalProject);
       await get().refreshCacheSize();
@@ -218,6 +226,9 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         audioProgress: null,
         rawVoiceBlob: result.audioBlob
       });
+      if (finalAudioBlob) {
+        extractWaveformPeaks(finalAudioBlob).then((peaks) => set({ waveformPeaks: peaks })).catch(() => {});
+      }
 
       await saveProjectToDb(finalProject);
       await get().refreshCacheSize();
@@ -371,6 +382,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         audioBlobUrl: newBlobUrl,
         audioStale: false
       });
+      extractWaveformPeaks(finalAudioBlob).then((peaks) => set({ waveformPeaks: peaks })).catch(() => {});
 
       await saveProjectToDb(updatedProject);
     } catch (err: unknown) {
@@ -419,6 +431,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         audioBlobUrl: newBlobUrl,
         audioStale: false
       });
+      extractWaveformPeaks(bgmBlob).then((peaks) => set({ waveformPeaks: peaks })).catch(() => {});
 
       await saveProjectToDb(updatedProject);
     } catch (err: unknown) {

@@ -47,11 +47,15 @@ self.onmessage = async (e: MessageEvent) => {
         self.postMessage({ type: 'progress', percent: 60, message: 'Menginisialisasi session ONNX (WebGPU/WASM)...' });
 
         // Configure onnxruntime-web execution providers
+        try {
+          ort.env.wasm.numThreads = 1;
+        } catch {
+          // ignore
+        }
         const executionProviders = ['wasm'];
         if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
           executionProviders.unshift('webgpu');
         }
-
         const session = await ort.InferenceSession.create(modelBuffer, {
           executionProviders
         });

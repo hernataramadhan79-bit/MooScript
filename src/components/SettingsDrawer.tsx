@@ -7,6 +7,11 @@ import {
   checkDeviceCapabilities,
   getCachedLocalModelsSizeBytes,
   purgeAllLocalModels,
+  LOCAL_VOICES,
+  isLocalModelCached,
+  downloadLocalModel,
+  purgeLocalModel,
+  type LocalVoice,
   type DeviceCapabilities
 } from '../engine/ai/localTts';
 import type { LLMProvider, PersonaSkill } from '../types';
@@ -198,6 +203,47 @@ export const SettingsDrawer: React.FC = () => {
   const [localModelsSizeBytes, setLocalModelsSizeBytes] = useState<number>(0);
   const [confirmPurgeModels, setConfirmPurgeModels] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<string | null>(null);
+  const [modelCacheMap, setModelCacheMap] = useState<Record<string, boolean>>({});
+  const [downloadingVoiceId, setDownloadingVoiceId] = useState<string | null>(null);
+  const [downloadProgressMap, setDownloadProgressMap] = useState<Record<string, number>>({});
+
+  const refreshModelStatuses = async () => {
+    const statuses: Record<string, boolean> = {};
+    for (const v of LOCAL_VOICES) {
+      statuses[v.id] = await isLocalModelCached(v.id);
+    }
+    setModelCacheMap(statuses);
+    const size = await getCachedLocalModelsSizeBytes();
+    setLocalModelsSizeBytes(size);
+  };
+
+  const handleDownloadVoice = async (voice: LocalVoice) => {
+    setDownloadingVoiceId(voice.id);
+    setDownloadProgressMap((prev) => ({ ...prev, [voice.id]: 0 }));
+    try {
+      await downloadLocalModel(voice.id, (p) => {
+        setDownloadProgressMap((prev) => ({ ...prev, [voice.id]: p.percent }));
+      });
+      addToast(`Model suara "${voice.name}" berhasil diunduh dan siap digunakan offline!`, 'success');
+      await refreshModelStatuses();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Gagal mengunduh model: ${msg}`, 'error');
+    } finally {
+      setDownloadingVoiceId(null);
+    }
+  };
+
+  const handleDeleteVoice = async (voice: LocalVoice) => {
+    try {
+      await purgeLocalModel(voice.id);
+      addToast(`Model suara "${voice.name}" dihapus dari cache.`, 'info');
+      await refreshModelStatuses();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Gagal menghapus model: ${msg}`, 'error');
+    }
+  };
 
   // Dynamic models state per provider
   const [providerModels, setProviderModels] = useState<Record<LLMProvider, ProviderModelInfo[]>>({
@@ -226,6 +272,7 @@ export const SettingsDrawer: React.FC = () => {
       checkStoragePersistence().then(setPersistenceStatus);
       checkDeviceCapabilities().then(setDeviceCaps);
       getCachedLocalModelsSizeBytes().then(setLocalModelsSizeBytes);
+      refreshModelStatuses();
 
       // Lazily inspect models from configured keys if available
       (['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).forEach((prov) => {
@@ -970,6 +1017,98 @@ export const SettingsDrawer: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* 2b. Model Suara Offline (Piper TTS) */}
+          <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3 shadow-sm">
+            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-primary text-[17px]">record_voice_over</span>
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Model Suara Lokal (Offline Piper TTS)
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-400">Zero-Server</span>
+            </div>
+
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              Unduh bobot model suara sekali ke cache browser Anda agar dapat menghasilkan voiceover secara 100% lokal tanpa internet dan tanpa kuota API.
+            </p>
+
+            <div className="space-y-2">
+              {LOCAL_VOICES.map((v) => {
+                const isCached = modelCacheMap[v.id];
+                const isDownloading = downloadingVoiceId === v.id;
+                const progress = downloadProgressMap[v.id] || 0;
+
+                return (
+                  <div
+                    key={v.id}
+                    className="p-3 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-white">{v.name}</span>
+                          <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.08]">
+                            {v.languageLabel}
+                          </span>
+                          {isCached ? (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[11px]">check_circle</span>
+                              Siap Offline
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
+                              Belum Diunduh
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">{v.description}</p>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-400 shrink-0">~{v.sizeMb} MB</span>
+                    </div>
+
+                    {isDownloading ? (
+                      <div className="flex flex-col gap-1 pt-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-primary">
+                          <span>Mengunduh bobot ONNX...</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-white/[0.06] rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-primary h-full transition-all duration-200 rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/[0.04]">
+                        {isCached ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVoice(v)}
+                            className="text-[11px] text-zinc-400 hover:text-red-400 flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">delete</span>
+                            <span>Hapus dari Cache</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadVoice(v)}
+                            className="text-[11px] font-semibold text-black bg-primary hover:bg-lime-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">download</span>
+                            <span>Unduh Model ({v.sizeMb} MB)</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
 

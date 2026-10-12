@@ -7,6 +7,8 @@ import {
   loadProjectFromDb,
   listProjectsFromDb,
   deleteProjectFromDb,
+  saveAssetToDb,
+  listAssetsFromDb,
   db
 } from '../../db/mooDb';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
@@ -358,16 +360,82 @@ function updateNodeInTree(nodes: MotionNode[], nodeId: string, update: Partial<M
   });
 }
 
+let historyPast: MooProject[] = [];
+let historyFuture: MooProject[] = [];
+const MAX_HISTORY = 30;
+
+function snapshotProject(project: MooProject): MooProject {
+  const { audioBlob: _blob, ...rest } = project;
+  return JSON.parse(JSON.stringify(rest));
+}
+
 export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlice> = (set, get) => {
   const triggerSave = (project: MooProject) => {
     scheduleSave(project, (msg) => get().addToast(msg, 'error'));
   };
+  const pushSnapshot = (project: MooProject) => {
+    historyPast.push(snapshotProject(project));
+    if (historyPast.length > MAX_HISTORY) {
+      historyPast.shift();
+    }
+    historyFuture = [];
+    set({ canUndo: true, canRedo: false });
+  };
+
+  const clearHistory = () => {
+    historyPast = [];
+    historyFuture = [];
+    set({ canUndo: false, canRedo: false });
+  };
+
 
   return {
     project: INITIAL_PROJECT,
     projectsList: [INITIAL_PROJECT],
+    canUndo: false,
+    canRedo: false,
+
+    undo: () => {
+      if (historyPast.length === 0) return;
+      const current = get().project;
+      const prev = historyPast.pop();
+      if (!prev) return;
+      historyFuture.push(snapshotProject(current));
+      const restored: MooProject = {
+        ...prev,
+        audioBlob: current.audioBlob
+      };
+      set({
+        project: restored,
+        canUndo: historyPast.length > 0,
+        canRedo: true
+      });
+      triggerSave(restored);
+      get().addToast('Perubahan dibatalkan (Undo)', 'info');
+    },
+
+    redo: () => {
+      if (historyFuture.length === 0) return;
+      const current = get().project;
+      const next = historyFuture.pop();
+      if (!next) return;
+      historyPast.push(snapshotProject(current));
+      const restored: MooProject = {
+        ...next,
+        audioBlob: current.audioBlob
+      };
+      set({
+        project: restored,
+        canUndo: true,
+        canRedo: historyFuture.length > 0
+      });
+      triggerSave(restored);
+      get().addToast('Perubahan dikembalikan (Redo)', 'info');
+    },
+
 
     setProject: (project, options) => {
+      clearHistory();
       set({
         project,
         audioStale: options?.keepStale ? get().audioStale : false
@@ -388,6 +456,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       get().pause();
       stopPlaybackAudio();
       await flushPendingSave();
+      clearHistory();
       const now = Date.now();
       const newId = `proj-${now}-${Math.random().toString(36).slice(2, 7)}`;
       const existingCount = get().projectsList.length;
@@ -450,9 +519,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         currentFrame: 0,
         isPlaying: false,
         previousScenesSnapshot: null,
-        activeSceneId: null
+        activeSceneId: null,
+        assets: []
       });
-
       try {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('mooscript_active_project_id', newId);
@@ -471,6 +540,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       stopPlaybackAudio();
       await flushPendingSave();
 
+      clearHistory();
       let target = await loadProjectFromDb(id);
       if (!target) {
         get().addToast('Project not found in storage', 'error');
@@ -521,9 +591,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
 
       await get().refreshProjectsList();
+      await get().loadAssets(target.id);
       get().addToast(`Switched to "${target.title}"`, 'info');
     },
-
     duplicateProject: async (id: string) => {
       await flushPendingSave();
       const source = id === get().project.id ? get().project : await loadProjectFromDb(id);
@@ -545,11 +615,35 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (source.audioBlob) {
         duplicated.audioBlob = source.audioBlob;
       }
-
       await saveProjectToDb(duplicated);
+      try {
+        const sourceAssets = await listAssetsFromDb(source.id);
+        for (const ast of sourceAssets) {
+          const newAstId = `asset-${now}-${Math.random().toString(36).slice(2, 7)}`;
+          await saveAssetToDb({
+            ...ast,
+            id: newAstId,
+            projectId: dupId,
+            createdAt: now
+          });
+        }
+      } catch (err) {
+        console.error('Failed to duplicate project assets:', err);
+      }
       await get().refreshProjectsList();
       get().addToast(`Duplicated as "${duplicated.title}"`, 'success');
       return dupId;
+    },
+
+    importProject: async (project: MooProject) => {
+      await flushPendingSave();
+      const now = Date.now();
+      const id = `proj-${now}-${Math.random().toString(36).slice(2, 7)}`;
+      const imported: MooProject = { ...project, id, createdAt: now, updatedAt: now, audioBlob: undefined };
+      await saveProjectToDb(imported);
+      await get().refreshProjectsList();
+      get().addToast(`Diimpor sebagai "${imported.title}"`, 'success');
+      return id;
     },
 
     deleteProject: async (id: string) => {
@@ -561,8 +655,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         get().addToast('Cannot delete the last remaining project.', 'warning');
         return;
       }
-
       await deleteProjectFromDb(id);
+      try {
+        await db.assets.where('projectId').equals(id).delete();
+      } catch (err) {
+        console.error('Failed to cleanup project assets:', err);
+      }
 
       if (get().project.id === id) {
         const remaining = list.filter((p) => p.id !== id);
@@ -618,6 +716,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeFont: (fontFamily) => {
+      pushSnapshot(get().project);
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, fontFamily }
@@ -627,6 +726,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeHighlight: (textHighlight) => {
+      pushSnapshot(get().project);
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textHighlight }
@@ -636,6 +736,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeBg: (bg) => {
+      pushSnapshot(get().project);
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, bg }
@@ -645,6 +746,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemePrimary: (textPrimary) => {
+      pushSnapshot(get().project);
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textPrimary }
@@ -654,6 +756,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateProjectAspectRatio: (aspectRatio: AspectRatio) => {
+      pushSnapshot(get().project);
       const currentTier = get().project.resolution || '1080p';
       const sized = applySize(get().project, aspectRatio, currentTier);
       const updated = syncComposition(sized);
@@ -665,6 +768,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeCaptionStyle: (captionStyle: CaptionStyle) => {
+      pushSnapshot(get().project);
       const updated = {
         ...get().project,
         theme: { ...get().project.theme, captionStyle }
@@ -674,6 +778,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeCaptionPosition: (captionPosition: CaptionPosition) => {
+      pushSnapshot(get().project);
       const updated = {
         ...get().project,
         theme: { ...get().project.theme, captionPosition }
@@ -683,6 +788,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateResolution: (res: '1080p' | '720p') => {
+      pushSnapshot(get().project);
       const aspect = get().project.aspectRatio;
       const sized = applySize(get().project, aspect, res);
       const updated = syncComposition(sized);
@@ -695,6 +801,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     toggleGlobalSubtitles: () => {
+      pushSnapshot(get().project);
       const currentVal = Boolean(get().project.theme.showSubtitles);
       const updated = {
         ...get().project,
@@ -707,6 +814,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     updateSceneText: (id, text) => {
       const current = get().project;
+      pushSnapshot(current);
       const hasAudio = !!current.audioBlob;
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== id) return s;
@@ -891,6 +999,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     addScene: () => {
       const current = get().project;
+      pushSnapshot(current);
       const hasAudio = !!current.audioBlob;
       const newId = `sc-${Date.now()}`;
       const defaultText = 'New kinetic motion scene';
@@ -928,6 +1037,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     removeScene: (id) => {
       const current = get().project;
+      pushSnapshot(current);
       const hasAudio = !!current.audioBlob;
       const updatedScenes = current.scenes.filter((s) => s.id !== id);
       const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
@@ -948,6 +1058,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     duplicateScene: (id: string) => {
       const current = get().project;
       const hasAudio = !!current.audioBlob;
+      pushSnapshot(current);
       const idx = current.scenes.findIndex((s) => s.id === id);
       if (idx === -1) return;
       const source = current.scenes[idx];

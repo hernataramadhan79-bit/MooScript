@@ -124,6 +124,76 @@ function findLayerInnerRange(html: string, layerId: string): { start: number; en
   return null;
 }
 
+/** Remove a layer element (and its wrapper container if present) from the scene markup. */
+export function removeLayerFromHtml(html: string, layerId: string): string {
+  if (!html) return '';
+  const re = new RegExp(LAYER_ATTR_RE.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const id = m[3] ?? m[4];
+    if (id !== layerId) continue;
+    const tag = m[1];
+    const elemStart = m.index;
+    let elemEnd = m.index + m[0].length;
+
+    if (!m[0].endsWith('/>')) {
+      const tagRe = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+      tagRe.lastIndex = elemEnd;
+      let depth = 1;
+      let t: RegExpExecArray | null;
+      while ((t = tagRe.exec(html)) !== null) {
+        if (t[0].endsWith('/>')) continue;
+        depth += t[1] ? -1 : 1;
+        if (depth === 0) {
+          elemEnd = t.index + t[0].length;
+          break;
+        }
+      }
+    }
+
+    // Check if wrapped by .moo-asset-container
+    const before = html.slice(0, elemStart);
+    const after = html.slice(elemEnd);
+    const containerOpenMatch = before.match(/(?:\n|\r\n)?\s*<div\b[^>]*class="[^"]*moo-asset-container[^"]*"[^>]*>\s*$/);
+    const containerCloseMatch = after.match(/^\s*<\/div>(?:\n|\r\n)?/);
+
+    if (containerOpenMatch && containerCloseMatch) {
+      const fullStart = elemStart - containerOpenMatch[0].length;
+      const fullEnd = elemEnd + containerCloseMatch[0].length;
+      return (html.slice(0, fullStart) + html.slice(fullEnd)).trim();
+    }
+
+    return (html.slice(0, elemStart) + html.slice(elemEnd)).trim();
+  }
+  return html;
+}
+
+/** Remove an asset from HTML markup either by its layerId or its dataUrl. */
+export function removeAssetFromHtml(html: string, identifier: string): string {
+  if (!html || !identifier) return html;
+  const afterLayer = removeLayerFromHtml(html, identifier);
+  if (afterLayer !== html) return afterLayer;
+
+  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const containerRe = new RegExp(
+    `(?:\\n|\\r\\n)?\\s*<div\\b[^>]*class="[^"]*moo-asset-container[^"]*"[^>]*>[\\s\\S]*?${escaped}[\\s\\S]*?<\\/div>(?:\\n|\\r\\n)?`,
+    'g'
+  );
+  if (containerRe.test(html)) {
+    return html.replace(containerRe, '').trim();
+  }
+
+  const imgRe = new RegExp(
+    `(?:\\n|\\r\\n)?\\s*<img\\b[^>]*src=["']?${escaped}["']?[^>]*>(?:\\n|\\r\\n)?`,
+    'gi'
+  );
+  if (imgRe.test(html)) {
+    return html.replace(imgRe, '').trim();
+  }
+
+  return html;
+}
+
 function escapeText(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

@@ -11,6 +11,7 @@ import {
   getLayerText,
   setLayerText
 } from '../../engine/composition/layers';
+import { isLocalModelCached, downloadLocalModel, getLocalVoice } from '../../engine/ai/localTts';
 import type {
   ThemeTokens,
   CaptionPosition,
@@ -23,8 +24,9 @@ import type {
   ScenePalette
 } from '../../types';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { AssetManagerPanel } from './AssetManagerPanel';
 
-export type InspectorTab = 'mograph' | 'style' | 'audio' | 'ekspor';
+export type InspectorTab = 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
 
 const DebouncedSlider: React.FC<{
   value: number;
@@ -225,6 +227,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     activeSceneId,
     setActiveSceneId,
     updateLayerOverride,
+    removeAssetFromScene,
     updateScenePalette,
     setProject,
     isCompilingMograph,
@@ -328,6 +331,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       color: undefined
     });
     addToast(`Override layer ${activeLayer.label} direset.`, 'info');
+  };
+
+  const handleRemoveLayer = () => {
+    if (!activeScene || !activeLayer) return;
+    removeAssetFromScene(activeLayer.id, activeScene.id);
   };
 
   const handleLayerTextChange = (newText: string) => {
@@ -511,6 +519,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     sceneStatuses: Record<number, 'pending' | 'generating' | 'ok' | 'error'>;
   } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
 
   // Active theme detection
   const isThemeActive = (theme: ThemePresetItem) => {
@@ -595,6 +604,34 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     !ELEVENLABS_VOICE_OPTIONS.slice(0, 5).some((v) => v.id === currentElevenLabsVoice) ||
     currentElevenLabsVoice === 'custom';
   const currentLocalVoice = settings.voiceIds?.local || 'id_ID-news_tts';
+  const [isLocalVoiceCached, setIsLocalVoiceCached] = useState<boolean>(true);
+  const [isDownloadingLocalVoice, setIsDownloadingLocalVoice] = useState<boolean>(false);
+  const [localVoiceDownloadProgress, setLocalVoiceDownloadProgress] = useState<number>(0);
+
+  useEffect(() => {
+    if (currentVoiceProvider === 'local' && currentLocalVoice && currentLocalVoice !== 'fallback') {
+      isLocalModelCached(currentLocalVoice).then(setIsLocalVoiceCached).catch(() => setIsLocalVoiceCached(false));
+    }
+  }, [currentVoiceProvider, currentLocalVoice]);
+
+  const handleDownloadCurrentLocalVoice = async () => {
+    const voice = getLocalVoice(currentLocalVoice);
+    if (!voice) return;
+    setIsDownloadingLocalVoice(true);
+    setLocalVoiceDownloadProgress(0);
+    try {
+      await downloadLocalModel(voice.id, (p) => {
+        setLocalVoiceDownloadProgress(p.percent);
+      });
+      setIsLocalVoiceCached(true);
+      addToast(`Model suara ${voice.name} berhasil diunduh dan siap offline!`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Gagal mengunduh model: ${msg}`, 'error');
+    } finally {
+      setIsDownloadingLocalVoice(false);
+    }
+  };
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -691,18 +728,18 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   ]);
 
   // MP4 Export trigger
-  const handleExportMp4 = async () => {
+  const handleExportMedia = async () => {
     if (isExporting) return;
     if (exportResult?.objectUrl) {
-      triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.mp4`);
-      addToast('Mengunduh video MP4...', 'success');
+      triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.${exportFormat}`);
+      addToast(`Mengunduh video ${exportFormat.toUpperCase()}...`, 'success');
       return;
     }
-    await startExport({ watermark: exportWatermark, hud: exportHud });
+    await startExport({ format: exportFormat, watermark: exportWatermark, hud: exportHud });
     const result = useMooStore.getState().exportResult;
     if (result?.objectUrl) {
-      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.mp4`);
-      addToast('Video MP4 berhasil diunduh.', 'success');
+      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.${exportFormat}`);
+      addToast(`Video ${exportFormat.toUpperCase()} berhasil diunduh.`, 'success');
     }
   };
 
@@ -1056,65 +1093,78 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     <div
       className={`w-full flex flex-col bg-surface-1 border border-border rounded-2xl overflow-hidden select-none ${className}`}
     >
-      {/* 1. Header Tab Studio Minimalis (4 Tab) */}
-      <div className="hidden lg:block p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm">
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
+      {/* 1. Header Tab Studio Minimalis (5 Tab) */}
+      <div className="hidden lg:block p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm shrink-0">
+        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
           <button
             type="button"
             onClick={() => setActiveTab('mograph')}
-            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
+            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
               activeTab === 'mograph'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">movie_filter</span>
-            <span className="truncate">Mograph</span>
+            <span className="material-symbols-outlined text-[17px]">movie_filter</span>
+            <span className="tracking-tight">Mograph</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('style')}
-            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
+            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
               activeTab === 'style'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            <span className="truncate">Gaya & Layer</span>
+            <span className="material-symbols-outlined text-[17px]">tune</span>
+            <span className="tracking-tight">Gaya</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('asset')}
+            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
+              activeTab === 'asset'
+                ? 'bg-surface-3 text-accent shadow-sm'
+                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[17px]">perm_media</span>
+            <span className="tracking-tight">Aset</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('audio')}
-            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
+            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
               activeTab === 'audio'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
-            <span className="truncate">Audio</span>
+            <span className="material-symbols-outlined text-[17px]">graphic_eq</span>
+            <span className="tracking-tight">Audio</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('ekspor')}
-            className={`py-2 px-1 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
+            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
               activeTab === 'ekspor'
                 ? 'bg-surface-3 text-accent shadow-sm'
                 : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">download</span>
-            <span className="truncate">Ekspor</span>
+            <span className="material-symbols-outlined text-[17px]">download</span>
+            <span className="tracking-tight">Ekspor</span>
           </button>
         </div>
       </div>
 
       {/* 2. Isi Panel Tab */}
-      <div className="p-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-220px)]">
+      <div className="p-4 flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">
         {/* ================= TAB GAYA & LAYER (PER-SCENE EDITING, LAYERS & PALETTE) ================= */}
         {activeTab === 'style' && (
           <div className="flex flex-col gap-4">
@@ -1332,15 +1382,26 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={handleResetLayerOverride}
-                              className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors shrink-0"
-                              title="Reset transform ke default"
-                            >
-                              <span className="material-symbols-outlined text-[13px]">restart_alt</span>
-                              Reset
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={handleResetLayerOverride}
+                                className="text-[10px] text-text-muted hover:text-accent flex items-center gap-0.5 transition-colors"
+                                title="Reset transform ke default"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">restart_alt</span>
+                                Reset
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleRemoveLayer}
+                                className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors"
+                                title="Hapus layer ini dari adegan"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">delete</span>
+                                Hapus
+                              </button>
+                            </div>
                           </div>
 
                           {/* Direct Text Editor for Text Layers */}
@@ -1529,6 +1590,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 </div>
               </>
             )}
+
+
+          </div>
+        )}
+
+        {/* ================= TAB ASET MEDIA (UPLOAD & SISIPKAN ASET) ================= */}
+        {activeTab === 'asset' && (
+          <div className="flex flex-col gap-4">
+            <AssetManagerPanel />
           </div>
         )}
 
@@ -1642,7 +1712,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm"
                   >
                     <span className="material-symbols-outlined text-[18px]">movie_filter</span>
-                    <span>Generate Mograph AI</span>
+                    <span>Buat Mograph AI</span>
                   </button>
                 </div>
               )}
@@ -1694,42 +1764,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 />
               </button>
 
-              {/* Gaya & Posisi Subtitel */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-text-muted uppercase font-semibold">
-                    Gaya
-                  </label>
-                  <select
-                    value={currentStyle}
-                    onChange={(e) => updateThemeCaptionStyle(e.target.value as CaptionStyle)}
-                    className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[12px] rounded-lg h-8 px-2 focus:outline-none cursor-pointer"
-                  >
-                    {styleOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-surface-1">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-text-muted uppercase font-semibold">
-                    Posisi
-                  </label>
-                  <select
-                    value={currentPosition}
-                    onChange={(e) => updateThemeCaptionPosition(e.target.value as CaptionPosition)}
-                    className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[12px] rounded-lg h-8 px-2 focus:outline-none cursor-pointer"
-                  >
-                    {positionOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-surface-1">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
             </div>
 
             {/* Alokasi Token Output (Max Tokens) */}
@@ -1790,27 +1824,32 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       key={t.id}
                       type="button"
                       onClick={() => setThemeTokens(t.tokens)}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all active:scale-95 ${
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all active:scale-95 ${
                         isActive
                           ? 'bg-surface-3 border-accent text-on-surface ring-1 ring-accent/30 shadow-sm'
                           : 'bg-surface-2 border-border text-text-muted hover:text-on-surface hover:border-border-strong'
                       }`}
                     >
-                      <div className="flex items-center -space-x-1 shrink-0">
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
-                          style={{ backgroundColor: t.previewColors.bg }}
-                        />
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
-                          style={{ backgroundColor: t.previewColors.primary }}
-                        />
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
-                          style={{ backgroundColor: t.previewColors.accent }}
-                        />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-0.5 p-0.5 rounded bg-black/40 border border-border/80 shrink-0">
+                          <span
+                            className="w-2.5 h-3.5 rounded-xs"
+                            style={{ backgroundColor: t.previewColors.bg }}
+                          />
+                          <span
+                            className="w-2.5 h-3.5 rounded-xs"
+                            style={{ backgroundColor: t.previewColors.primary }}
+                          />
+                          <span
+                            className="w-2.5 h-3.5 rounded-xs"
+                            style={{ backgroundColor: t.previewColors.accent }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-medium truncate text-on-surface">{t.name}</span>
                       </div>
-                      <span className="text-[12px] font-medium truncate">{t.name}</span>
+                      {isActive && (
+                        <span className="material-symbols-outlined text-[15px] text-accent shrink-0">check_circle</span>
+                      )}
                     </button>
                   );
                 })}
@@ -2009,30 +2048,87 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               )}
 
               {currentVoiceProvider === 'local' && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                    Karakter Suara Lokal (Offline)
-                  </span>
-                  <div className="relative">
-                    <select
-                      value={currentLocalVoice}
-                      onChange={(e) =>
-                        updateSettings({
-                          voiceIds: { ...settings.voiceIds, local: e.target.value }
-                        })
-                      }
-                      className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
-                    >
-                      {LOCAL_VOICE_OPTIONS.map((v) => (
-                        <option key={v.id} value={v.id} className="bg-surface-1 text-on-surface">
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                      expand_more
-                    </span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-text-muted uppercase tracking-wider">
+                        Karakter Suara Lokal (Offline)
+                      </span>
+                      <span className="font-mono text-[10px] text-accent">Zero-API</span>
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={currentLocalVoice}
+                        onChange={(e) =>
+                          updateSettings({
+                            voiceIds: { ...settings.voiceIds, local: e.target.value }
+                          })
+                        }
+                        className="w-full bg-surface-2 border border-border focus:border-accent text-on-surface text-[13px] font-medium rounded-xl h-10 px-3 pr-8 appearance-none cursor-pointer focus:outline-none transition-colors"
+                      >
+                        {LOCAL_VOICE_OPTIONS.map((v) => (
+                          <option key={v.id} value={v.id} className="bg-surface-1 text-on-surface">
+                            {v.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined text-[18px] text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        expand_more
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Status & Kontrol Unduh Model Piper */}
+                  {currentLocalVoice !== 'fallback' && (
+                    <div className="p-2.5 rounded-xl border transition-all text-[11px] flex flex-col gap-2 bg-surface-2/60 border-border">
+                      {isLocalVoiceCached ? (
+                        <div className="flex items-center justify-between text-emerald-400 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                            <span>Model tersimpan & siap offline</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-text-muted">
+                            {getLocalVoice(currentLocalVoice)?.sizeMb} MB
+                          </span>
+                        </div>
+                      ) : isDownloadingLocalVoice ? (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-mono text-accent">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[15px] animate-spin">sync</span>
+                              <span>Mengunduh bobot ONNX...</span>
+                            </span>
+                            <span>{localVoiceDownloadProgress}%</span>
+                          </div>
+                          <div className="w-full bg-surface-3 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-accent h-full transition-all duration-200 rounded-full"
+                              style={{ width: `${localVoiceDownloadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-start gap-1.5 text-text-muted leading-relaxed text-[11px]">
+                            <span className="material-symbols-outlined text-[16px] text-accent shrink-0 mt-0.5">
+                              download_for_offline
+                            </span>
+                            <span>
+                              Model ini ({getLocalVoice(currentLocalVoice)?.sizeMb} MB) belum tersimpan di browser. Unduh sekali agar dapat bersuara tanpa internet.
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleDownloadCurrentLocalVoice}
+                            className="w-full py-2 px-3 rounded-lg bg-accent text-on-accent text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">download</span>
+                            <span>Unduh Model ({getLocalVoice(currentLocalVoice)?.sizeMb} MB)</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2235,6 +2331,37 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </div>
             </div>
 
+            {/* Format Video Kontainer */}
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                Format Video
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('mp4')}
+                  className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
+                    exportFormat === 'mp4'
+                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
+                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                  }`}
+                >
+                  ★ MP4 (H.264)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('webm')}
+                  className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
+                    exportFormat === 'webm'
+                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
+                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                  }`}
+                >
+                  WebM (VP9)
+                </button>
+              </div>
+            </div>
+
             {/* Opsi Overlay Ekspor: hanya berlaku untuk render legacy (canvas) */}
             {!isCompositionExport && (
               <div className="flex flex-col gap-2">
@@ -2287,14 +2414,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             <div className="flex flex-col gap-2.5">
               <button
                 type="button"
-                onClick={handleExportMp4}
+                onClick={handleExportMedia}
                 disabled={isExporting}
                 className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">
                   {isExporting ? 'sync' : 'download'}
                 </span>
-                <span>{isExporting ? 'Mengekspor Video...' : 'Download Video MP4'}</span>
+                <span>{isExporting ? 'Mengekspor Video...' : `Unduh Video ${exportFormat.toUpperCase()}`}</span>
               </button>
 
               {isExporting && (

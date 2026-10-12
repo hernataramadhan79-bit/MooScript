@@ -2,6 +2,7 @@ import {
   Output,
   BufferTarget,
   Mp4OutputFormat,
+  WebMOutputFormat,
   CanvasSource,
   AudioBufferSource,
   EncodedVideoPacketSource,
@@ -30,7 +31,10 @@ export interface ExportResult {
   warnings: string[];
 }
 
+export type ExportContainerFormat = 'mp4' | 'webm';
+
 export interface ExportOptions {
+  format?: ExportContainerFormat;
   hud?: boolean;
   watermark?: boolean;
   useAudioDuration?: boolean;
@@ -275,10 +279,11 @@ export async function exportMooProjectToMP4(
   }
 
   // 4. Initialize Mediabunny Output with in-memory fastStart
+  const isWebm = opts?.format === 'webm';
   const target = new BufferTarget();
   const output = new Output({
     target,
-    format: new Mp4OutputFormat({ fastStart: 'in-memory' })
+    format: isWebm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' })
   });
 
   const hasGeneratedCompositionScenes = Boolean(
@@ -432,7 +437,7 @@ export async function exportMooProjectToMP4(
 
       let objectUrl: string | null = null;
       try {
-        const blob = new Blob([buffer], { type: 'video/mp4' });
+        const blob = new Blob([buffer], { type: isWebm ? 'video/webm' : 'video/mp4' });
         objectUrl = URL.createObjectURL(blob);
 
         onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
@@ -476,7 +481,7 @@ export async function exportMooProjectToMP4(
   }
 
   const videoSource = new CanvasSource(rawCanvas as HTMLCanvasElement, {
-    codec: 'avc',
+    codec: isWebm ? 'vp9' : 'avc',
     bitrate
   });
   output.addVideoTrack(videoSource);
@@ -484,7 +489,7 @@ export async function exportMooProjectToMP4(
   let audioSource: AudioBufferSource | null = null;
   if (hasAudioTrack && targetAudioBuffer) {
     audioSource = new AudioBufferSource({
-      codec: 'aac',
+      codec: isWebm ? 'opus' : 'aac',
       bitrate: 128_000
     });
     output.addAudioTrack(audioSource);
@@ -573,7 +578,7 @@ export async function exportMooProjectToMP4(
 
     let objectUrl: string | null = null;
     try {
-      const blob = new Blob([buffer], { type: 'video/mp4' });
+      const blob = new Blob([buffer], { type: isWebm ? 'video/webm' : 'video/mp4' });
       objectUrl = URL.createObjectURL(blob);
 
       onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });

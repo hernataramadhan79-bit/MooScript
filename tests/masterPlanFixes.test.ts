@@ -89,11 +89,14 @@ describe('Master Plan regression suite', () => {
       }
     });
 
-    it('inlines WOFF2 @font-face and loads Google Fonts non-blocking', () => {
+    it('inlines WOFF2 @font-face (incl. real Syne) and makes no remote font requests', () => {
       const doc = buildCompositionDocument(baseProject());
       expect(doc).toContain('@font-face');
       expect(doc).toContain('Plus Jakarta Sans');
-      expect(doc).toContain("media=\"print\" onload=\"this.media='all'\"");
+      expect(doc).toMatch(/font-family:'Syne';font-style:normal;font-weight:700;[^}]*src:url\('data:font\/woff2;base64,/);
+      expect(doc).toMatch(/font-family:'Syne';font-style:normal;font-weight:800;[^}]*src:url\('data:font\/woff2;base64,/);
+      expect(doc).not.toContain('fonts.googleapis.com');
+      expect(doc).not.toContain('fonts.gstatic.com');
     });
 
     it('adds a responsive auto-scale script in standalone mode only', () => {

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import type { MooProject } from '../types';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { flushPendingSave } from '../store/slices/projectSlice';
+import { loadProjectFromDb } from '../db/mooDb';
+import { MAX_BACKUP_BYTES, parseProjectBackup, serializeProjectBackup } from '../db/projectBackup';
+import { safeFileName, triggerFileDownload } from '../utils/fileUtils';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -16,7 +20,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     switchProject,
     duplicateProject,
     deleteProject,
-    renameProject
+    renameProject,
+    importProject,
+    addToast
   } = useMooStore();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -72,6 +78,39 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     await duplicateProject(id);
   };
 
+  const handleExport = async (e: React.MouseEvent, p: MooProject) => {
+    e.stopPropagation();
+    try {
+      await flushPendingSave();
+      const full = p.id === activeProject.id ? activeProject : await loadProjectFromDb(p.id);
+      if (!full) {
+        addToast('Proyek tidak ditemukan.', 'error');
+        return;
+      }
+      const blob = new Blob([serializeProjectBackup(full)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      triggerFileDownload(url, `${safeFileName(full.title)}.mooscript.json`);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Gagal mengunduh cadangan.', 'error');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > MAX_BACKUP_BYTES) {
+      addToast('Berkas terlalu besar (maks 20 MB).', 'error');
+      return;
+    }
+    try {
+      await importProject(parseProjectBackup(await file.text()));
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Gagal mengimpor proyek.', 'error');
+    }
+  };
+
   const handleDelete = (e: React.MouseEvent, p: MooProject) => {
     e.stopPropagation();
     if (projectsList.length <= 1) {
@@ -113,6 +152,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           </div>
 
           <div className="flex items-center gap-2">
+            <label className="px-3 h-8 rounded-lg border border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
+              <span className="material-symbols-outlined text-[16px]">upload_file</span>
+              <span>Impor</span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={handleImport}
+              />
+            </label>
             <button
               type="button"
               onClick={handleCreate}
@@ -211,6 +260,15 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
                   <button
                     type="button"
+                    onClick={(e) => handleExport(e, p)}
+                    title="Unduh cadangan proyek"
+                    className="w-8 h-8 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={(e) => handleDuplicate(e, p.id)}
                     title="Duplikat proyek"
                     className="w-8 h-8 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
@@ -236,7 +294,14 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
         {/* Footer info */}
         <div className="px-5 py-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-[11px] font-mono text-zinc-500">
           <span>Penyimpanan Lokal</span>
-          <span>Ganti proyek kapan saja</span>
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white"
+          >
+            Kebijakan Privasi
+          </a>
         </div>
       </div>
 

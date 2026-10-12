@@ -13,10 +13,13 @@ import type {
   CameraMovement,
   AspectRatio,
   ThemeTokens,
-  MotionNode
+  MotionNode,
+  LayerOverride,
+  ScenePalette
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
+import type { AssetRecord } from '../db/mooDb';
 
 export type DeckTab = 'storyboard' | 'audio' | 'style' | 'export';
 
@@ -49,6 +52,7 @@ export interface ProjectSlice {
   switchProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<string>;
+  importProject: (project: MooProject) => Promise<string>;
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
@@ -63,8 +67,8 @@ export interface ProjectSlice {
   updateSceneText: (id: string, text: string) => void;
   updateSceneVisualIntent: (sceneId: string, visualIntent: string) => void;
   updateSceneVisualConcept: (sceneId: string, visualConcept: string) => void;
-  updateLayerOverride: (sceneId: string, layerId: string, override: Partial<import('../types').LayerOverride>) => void;
-  updateScenePalette: (sceneId: string, palette: Partial<import('../types').ScenePalette>) => void;
+  updateLayerOverride: (sceneId: string, layerId: string, override: Partial<LayerOverride>) => void;
+  updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => void;
   updateSceneCamera: (sceneId: string, camera: CameraMovement) => void;
   toggleSceneSubtitles: (sceneId: string) => void;
   toggleWordFocus: (sceneId: string, word: string) => void;
@@ -82,6 +86,10 @@ export interface ProjectSlice {
   updateSceneNode: (sceneId: string, nodeId: string, update: Partial<MotionNode>) => void;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
 }
 
 export interface ScriptSlice {
@@ -105,6 +113,8 @@ export interface AudioSlice {
   auditionVoice: (provider?: TTSProvider, voiceId?: string) => Promise<void>;
   remixAudio: () => Promise<void>;
   generateBgmOnlyAudio: () => Promise<void>;
+  waveformPeaks: number[] | null;
+  setWaveformPeaks: (peaks: number[] | null) => void;
 }
 
 export interface PlaybackSlice {
@@ -148,6 +158,16 @@ export interface BgmSlice {
   updateBgmDuckRatio: (duckRatio: number) => Promise<void> | void;
 }
 
+export interface AssetSlice {
+  assets: AssetRecord[];
+  isLoadingAssets: boolean;
+  loadAssets: (projectId?: string) => Promise<void>;
+  addAsset: (file: File) => Promise<AssetRecord | null>;
+  deleteAsset: (id: string) => Promise<void>;
+  insertAssetIntoScene: (asset: AssetRecord, sceneId?: string) => void;
+  removeAssetFromScene: (assetDataUrlOrLayerId: string, sceneId?: string) => void;
+}
+
 export type MooStoreState = UiSlice &
   ProjectSlice &
   ScriptSlice &
@@ -155,4 +175,5 @@ export type MooStoreState = UiSlice &
   PlaybackSlice &
   ExportSlice &
   SettingsSlice &
-  BgmSlice;
+  BgmSlice &
+  AssetSlice;

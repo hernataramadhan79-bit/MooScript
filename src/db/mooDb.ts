@@ -280,3 +280,30 @@ export async function requestPersistentStorage(): Promise<{ persisted: boolean; 
   }
   return { persisted: false, supported: false };
 }
+
+export async function saveAssetToDb(asset: AssetRecord): Promise<void> {
+  try {
+    await db.assets.put(asset);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('saveAssetToDb error:', err);
+    throw new Error(`Gagal menyimpan aset ke IndexedDB (${msg})`);
+  }
+}
+
+export async function listAssetsFromDb(projectId: string): Promise<AssetRecord[]> {
+  try {
+    return await db.assets.where('projectId').equals(projectId).sortBy('createdAt');
+  } catch (err: unknown) {
+    console.error('listAssetsFromDb error:', err);
+    return [];
+  }
+}
+
+export async function deleteAssetFromDb(id: string): Promise<void> {
+  try {
+    await db.assets.delete(id);
+  } catch (err: unknown) {
+    console.error('deleteAssetFromDb error:', err);
+  }
+}

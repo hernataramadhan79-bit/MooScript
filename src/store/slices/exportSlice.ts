@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import { exportMooProjectToMP4, type ExportOptions } from '../../engine/export/mp4Exporter';
+import type { ExportOptions } from '../../engine/export/mp4Exporter';
 import type { MooStoreState, ExportSlice } from '../types';
 
 let exportAbortController: AbortController | null = null;
@@ -16,7 +16,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
     const scenes = get().project.scenes;
     if (!scenes || scenes.length === 0) {
-      get().addToast('Cannot export: project has no scenes.', 'warning');
+      get().addToast('Gagal mengekspor: proyek belum memiliki adegan.', 'warning');
       return;
     }
 
@@ -32,10 +32,12 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     const localController = exportAbortController;
     set({
       isExporting: true,
-      exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Starting export...' }
+      exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Memulai ekspor...' }
     });
 
     try {
+      // Dynamic import is deliberate: keeps mediabunny + the MP4 encoder out of the initial bundle.
+      const { exportMooProjectToMP4 } = await import('../../engine/export/mp4Exporter');
       const result = await exportMooProjectToMP4(
         get().project,
         (progress) => set({ exportProgress: progress }),
@@ -52,7 +54,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
       if (!isAborted) {
         const message = err instanceof Error ? err.message : String(err);
-        get().addToast(`MP4 Export failed: ${message}`, 'error');
+        get().addToast(`Ekspor MP4 gagal: ${message}`, 'error');
       }
     } finally {
       if (exportAbortController === localController) {
@@ -66,6 +68,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
       exportAbortController.abort();
       exportAbortController = null;
     }
+    get().addToast('Ekspor dibatalkan.', 'info');
     set({ isExporting: false, exportProgress: null });
   },
 

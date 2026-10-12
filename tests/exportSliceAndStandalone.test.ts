@@ -257,7 +257,7 @@ describe('Export Store Slice (Phase 5a, 5c)', () => {
     await useMooStore.getState().startExport();
 
     expect(useMooStore.getState().isExporting).toBe(false);
-    expect(toastSpy).toHaveBeenCalledWith('Cannot export: project has no scenes.', 'warning');
+    expect(toastSpy).toHaveBeenCalledWith('Gagal mengekspor: proyek belum memiliki adegan.', 'warning');
   });
 
   it('cancelExport aborts export and resets isExporting to false', () => {

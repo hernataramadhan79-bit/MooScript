@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#131315" />
+    <title>Kebijakan Privasi & Ketentuan | MooScript Studio</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px 20px 64px;
+        background: #131315;
+        color: #f4f4f5;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin: 32px 0 8px;
+        color: #fff;
+      }
+      p,
+      li {
+        color: #d4d4d8;
+      }
+      a {
+        color: #a5b4fc;
+      }
+      code {
+        background: #1f1f23;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      .meta {
+        color: #a1a1aa;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">&larr; Kembali ke MooScript Studio</a></p>
+      <h1>Kebijakan Privasi &amp; Ketentuan</h1>
+      <p class="meta">Terakhir diperbarui: 2026-10-12</p>
+
+      <h2>1. Data lokal</h2>
+      <p>
+        Proyek, audio, dan pengaturan Anda disimpan di IndexedDB browser pada perangkat Anda sendiri.
+        MooScript Studio tidak memiliki server aplikasi, akun pengguna, analitik, maupun cookie pelacak.
+      </p>
+
+      <h2>2. API key</h2>
+      <p>
+        API key disimpan di IndexedDB perangkat (mode &ldquo;Persisten&rdquo;) atau di sessionStorage
+        (mode &ldquo;Sesi&rdquo;; terhapus saat tab ditutup). Key tidak pernah dikirim ke server MooScript;
+        key hanya dikirim langsung dari browser Anda ke provider yang Anda pilih. Mode Persisten menyimpan
+        key sebagai teks biasa di perangkat, jadi hindari memakainya di komputer bersama.
+      </p>
+
+      <h2>3. Permintaan jaringan</h2>
+      <p>Aplikasi hanya dapat menghubungi alamat berikut (dibatasi oleh Content Security Policy):</p>
+      <ul>
+        <li><code>generativelanguage.googleapis.com</code> (Google Gemini)</li>
+        <li><code>api.openai.com</code> (OpenAI)</li>
+        <li><code>api.groq.com</code> (Groq)</li>
+        <li><code>api.anthropic.com</code> (Anthropic)</li>
+        <li><code>openrouter.ai</code> (OpenRouter)</li>
+        <li><code>api.elevenlabs.io</code> (ElevenLabs)</li>
+        <li>
+          <code>huggingface.co</code> dan <code>xethub.hf.co</code> (hanya saat mengunduh model suara
+          lokal)
+        </li>
+      </ul>
+      <p>
+        Permintaan ke provider AI hanya terjadi bila Anda memakai fitur terkait, dan tunduk pada
+        kebijakan privasi provider tersebut.
+      </p>
+
+      <h2>4. Penghapusan data</h2>
+      <p>
+        Hapus data lewat fitur &ldquo;Clear site data&rdquo; di browser, atau lewat tombol hapus proyek
+        dan hapus cache audio di Pengaturan. Browser tertentu (misalnya Safari) dapat menghapus data situs
+        secara otomatis; gunakan fitur Unduh Cadangan di Manajer Proyek untuk menyimpan salinan.
+      </p>
+
+      <h2>5. Ketentuan penggunaan</h2>
+      <ul>
+        <li>MooScript Studio dilisensikan di bawah lisensi MIT.</li>
+        <li>Perangkat lunak disediakan apa adanya, tanpa jaminan apa pun.</li>
+        <li>Anda bertanggung jawab atas biaya pemakaian API provider yang Anda gunakan.</li>
+        <li>Anda wajib mematuhi ketentuan layanan masing-masing provider AI.</li>
+        <li>Anda bertanggung jawab atas konten yang Anda hasilkan dan publikasikan.</li>
+      </ul>
+
+      <h2>6. Kontak</h2>
+      <p>
+        Pertanyaan atau laporan masalah:
+        <a href="https://github.com/hernataramadhan79-bit/MooScript/issues" rel="noopener noreferrer"
+          >github.com/hernataramadhan79-bit/MooScript/issues</a
+        >
+      </p>
+    </main>
+  </body>
+</html>

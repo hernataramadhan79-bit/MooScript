@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import type { SceneTransition } from '../../types';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 
@@ -103,12 +104,14 @@ export interface SceneDeckProps {
   className?: string;
   onOpenCodeInspector?: (beatId: string) => void;
   onEditScene?: (sceneId: string) => void;
+  onOpenAssets?: (sceneId: string) => void;
 }
 
 export const SceneDeck: React.FC<SceneDeckProps> = ({
   className = '',
   onOpenCodeInspector,
-  onEditScene
+  onEditScene,
+  onOpenAssets
 }) => {
   const {
     project,
@@ -120,6 +123,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     updateSceneVisualConcept,
     toggleWordFocus,
     setSceneDuration,
+    setSceneTransition,
     reorderScenes,
     scriptPrompt,
     setScriptPrompt,
@@ -217,11 +221,6 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           const startSec = scenes.slice(0, index).reduce((acc, s) => acc + (s.durationInSeconds || 3), 0);
           const narration = scene.narrationText ?? scene.text ?? '';
           const duration = Math.min(30, Math.max(0.5, scene.durationInSeconds || 3));
-          const visualTitle = scene.visualIntent
-            ? scene.visualIntent.length > 24
-              ? scene.visualIntent.slice(0, 24) + '...'
-              : scene.visualIntent
-            : `Adegan #${index + 1}`;
 
           const words = narration.trim().split(/\s+/).filter(Boolean);
           const focusSet = new Set((scene.focusWords || []).map(cleanWord));
@@ -237,6 +236,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           const compStatus = compScene?.status;
 
           return (
+            <React.Fragment key={scene.id}>
             <div
               key={scene.id}
               ref={(el) => {
@@ -253,32 +253,32 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   : 'bg-surface-1 border-border/70 hover:border-border hover:bg-surface-1/90'
               }`}
             >
-              {/* Header Kartu: Identitas, Durasi, dan Tombol Aksi */}
-              <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="px-1.5 py-0.5 rounded bg-surface-3 text-accent font-mono text-[11px] font-semibold shrink-0 select-none">
+              {/* Header Kartu: Identitas, Durasi, dan Kontrol Manajemen */}
+              <div className="flex items-center justify-between pb-2 border-b border-border/40 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md bg-surface-3 text-accent font-mono text-[11px] font-bold shrink-0 select-none">
                     #{index + 1}
-                  </span>
-                  <span className="text-[12px] font-medium text-on-surface truncate max-w-[100px] sm:max-w-[130px]">
-                    {visualTitle}
                   </span>
 
                   {/* Status & Edit Badges */}
                   {compStatus && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono uppercase font-bold shrink-0 ${
+                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase font-bold shrink-0 border ${
                         compStatus === 'ok'
-                          ? 'bg-emerald-500/15 text-emerald-400'
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                           : compStatus === 'error'
-                            ? 'bg-rose-500/15 text-rose-400'
-                            : 'bg-zinc-500/15 text-zinc-400'
+                            ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            : 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
                       }`}
                     >
                       {compStatus}
                     </span>
                   )}
                   {isEdited && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0 border border-amber-500/30"
+                      title="Adegan telah disunting manual"
+                    >
                       edit
                     </span>
                   )}
@@ -290,77 +290,43 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   />
                 </div>
 
-                {/* Tombol Aksi: Edit Adegan, Code Inspector, Urutan, Duplikat, Hapus */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {onEditScene && (
-                    <IconButton
-                      icon="tune"
-                      aria-label="Edit Adegan"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveSceneId(scene.id);
-                        onEditScene(scene.id);
-                      }}
-                      className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px] !text-accent"
-                    />
-                  )}
-                  {onOpenCodeInspector && (
-                    <IconButton
-                      icon="code"
-                      aria-label="Inspeksi Kode Mograph"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenCodeInspector(scene.id);
-                      }}
-                      className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
-                    />
-                  )}
-                  <IconButton
-                    icon="arrow_upward"
-                    aria-label="Geser ke atas"
-                    size="sm"
+                {/* Tombol Manajemen Adegan: Urutan, Duplikat, Hapus */}
+                <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
                     disabled={index === 0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      reorderScenes(index, index - 1);
-                    }}
-                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
-                  />
-                  <IconButton
-                    icon="arrow_downward"
-                    aria-label="Geser ke bawah"
-                    size="sm"
+                    onClick={() => reorderScenes(index, index - 1)}
+                    title="Geser adegan ke atas"
+                    className="w-7 h-7 rounded-lg hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">arrow_upward</span>
+                  </button>
+                  <button
+                    type="button"
                     disabled={index === scenes.length - 1}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      reorderScenes(index, index + 1);
-                    }}
-                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
-                  />
-                  <IconButton
-                    icon="content_copy"
-                    aria-label="Duplikat adegan"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      duplicateScene(scene.id);
-                    }}
-                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
-                  />
-                  <IconButton
-                    icon="delete"
-                    aria-label="Hapus adegan"
-                    size="sm"
-                    variant="danger"
+                    onClick={() => reorderScenes(index, index + 1)}
+                    title="Geser adegan ke bawah"
+                    className="w-7 h-7 rounded-lg hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">arrow_downward</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => duplicateScene(scene.id)}
+                    title="Duplikat adegan"
+                    className="w-7 h-7 rounded-lg hover:bg-surface-3 text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                  </button>
+                  <button
+                    type="button"
                     disabled={scenes.length <= 1}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeScene(scene.id);
-                    }}
-                    className="!w-8 !h-8 !min-w-8 !min-h-8 !text-[16px]"
-                  />
+                    onClick={() => removeScene(scene.id)}
+                    title="Hapus adegan"
+                    className="w-7 h-7 rounded-lg hover:bg-rose-500/15 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-rose-400 flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                  </button>
                 </div>
               </div>
 
@@ -458,31 +424,96 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 )}
               </div>
 
-              {/* Slider Durasi Adegan */}
-              <div
-                className="flex items-center gap-2 pt-0.5 px-0.5 text-text-faint text-[11px] font-mono"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="range"
-                  min="0.5"
-                  max="30"
-                  step="0.5"
-                  value={Math.min(30, duration)}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    if (!isNaN(val) && val > 0) {
-                      setSceneDuration(scene.id, val);
-                    }
-                  }}
-                  className="flex-1 h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
-                  aria-label={`Durasi adegan #${index + 1}`}
-                />
-                <span className="w-9 text-right font-medium text-text-muted select-none">
-                  {duration.toFixed(1)}s
-                </span>
+              {/* Footer Kartu: Akses Cepat Alat Desain & Slider Durasi */}
+              <div className="flex flex-col gap-2 pt-1 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+                {/* Bar Akses Cepat Alat Adegan */}
+                <div className="grid grid-cols-3 gap-1">
+                  {onEditScene && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSceneId(scene.id);
+                        onEditScene(scene.id);
+                      }}
+                      className="py-1 px-1.5 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[11px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      title="Sesuaikan Gaya & Layer adegan ini"
+                    >
+                      <span className="material-symbols-outlined text-[14px] text-accent">tune</span>
+                      <span>Gaya</span>
+                    </button>
+                  )}
+                  {onOpenAssets && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSceneId(scene.id);
+                        onOpenAssets(scene.id);
+                      }}
+                      className="py-1 px-1.5 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[11px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      title="Sisipkan Aset / Media ke adegan ini"
+                    >
+                      <span className="material-symbols-outlined text-[14px] text-accent">perm_media</span>
+                      <span>Aset</span>
+                    </button>
+                  )}
+                  {onOpenCodeInspector && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCodeInspector(scene.id)}
+                      className="py-1 px-1.5 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[11px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      title="Buka Editor Kode Mograph"
+                    >
+                      <span className="material-symbols-outlined text-[14px] text-accent">code</span>
+                      <span>Kode</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Slider Durasi Adegan */}
+                <div className="flex items-center gap-2 px-0.5 text-text-faint text-[10px] font-mono">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="30"
+                    step="0.5"
+                    value={Math.min(30, duration)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        setSceneDuration(scene.id, val);
+                      }
+                    }}
+                    className="flex-1 h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
+                    aria-label={`Durasi adegan #${index + 1}`}
+                  />
+                  <span className="w-8 text-right font-medium text-text-muted select-none">
+                    {duration.toFixed(1)}s
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Transisi Antar Adegan */}
+            {index < scenes.length - 1 && (
+              <div className="flex items-center justify-center my-1.5">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[10px] text-text-muted hover:border-accent/40 transition-colors">
+                  <span className="material-symbols-outlined text-[13px] text-accent">swap_horiz</span>
+                  <span className="font-medium">Transisi:</span>
+                  <select
+                    value={scene.transition || 'cut'}
+                    onChange={(e) => setSceneTransition(scene.id, e.target.value as SceneTransition)}
+                    className="bg-transparent text-on-surface font-semibold focus:outline-none cursor-pointer"
+                  >
+                    <option value="cut" className="bg-surface-1">Cut (Langsung)</option>
+                    <option value="fade" className="bg-surface-1">Fade (Pudar)</option>
+                    <option value="slide" className="bg-surface-1">Slide (Geser)</option>
+                    <option value="zoom" className="bg-surface-1">Zoom (Perbesar)</option>
+                    <option value="wipe" className="bg-surface-1">Wipe (Sapuan)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
           );
         })
       )}

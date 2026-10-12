@@ -112,29 +112,34 @@ class MockVideoEncoder extends MockEventTarget {
   static isConfigSupported = vi.fn().mockResolvedValue({ supported: true, config: {} });
   encodeQueueSize = 0;
   state: 'unconfigured' | 'configured' | 'closed' = 'unconfigured';
-  output: (chunk: any, meta?: any) => void;
-  error: (err: any) => void;
+  output: (chunk: unknown, meta?: unknown) => void;
+  error: (err: unknown) => void;
+  private configuredCodec = 'avc1.4d002a';
 
-  constructor(init: { output: (chunk: any, meta?: any) => void; error: (err: any) => void }) {
+  constructor(init: { output: (chunk: unknown, meta?: unknown) => void; error: (err: unknown) => void }) {
     super();
     this.output = init.output;
     this.error = init.error;
   }
 
-  configure() {
+  configure(config?: { codec?: string }) {
     this.state = 'configured';
+    if (config?.codec) {
+      this.configuredCodec = config.codec;
+    }
   }
 
-  encode(frame: MockVideoFrame, _opts?: any) {
+  encode(frame: MockVideoFrame, _opts?: unknown) {
     const chunk = new MockEncodedVideoChunk({
       type: 'key',
       timestamp: frame.timestamp,
       duration: frame.duration,
       data: new Uint8Array(100)
     });
+    const isVp9 = this.configuredCodec.startsWith('vp');
     this.output(chunk, {
       decoderConfig: {
-        codec: 'avc1.4d002a',
+        codec: isVp9 ? 'vp09.00.10.08' : 'avc1.4d002a',
         codedWidth: 1080,
         codedHeight: 1920,
         description: new Uint8Array([1, 2, 3, 4])
@@ -324,6 +329,21 @@ describe('MP4 Exporter Engine (Mediabunny)', () => {
     expect(result.objectUrl).toBe('blob:mock-export-url');
     expect(result.blob).toBeInstanceOf(Blob);
     expect(progressUpdates.length).toBeGreaterThan(5);
+    expect(progressUpdates[progressUpdates.length - 1]).toBe(100);
+  });
+
+  it('supports exporting to WebM container format when requested', async () => {
+    const progressUpdates: number[] = [];
+
+    const result = await exportMooProjectToMP4(
+      TEST_PROJECT,
+      (progress) => progressUpdates.push(progress.percent),
+      undefined,
+      { format: 'webm', hud: false, watermark: false }
+    );
+
+    expect(result).toBeDefined();
+    expect(result.blob.type).toBe('video/webm');
     expect(progressUpdates[progressUpdates.length - 1]).toBe(100);
   });
 

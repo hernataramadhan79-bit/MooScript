@@ -9,7 +9,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
-  const { project, settings, setSettingsOpen, updateTitle } = useMooStore();
+  const { project, settings, setSettingsOpen, updateTitle, canUndo, canRedo, undo, redo } = useMooStore();
 
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -101,6 +101,23 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                 size="sm"
                 onClick={() => setShowProjectModal(true)}
               />
+
+              <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                <IconButton
+                  icon="undo"
+                  aria-label="Batalkan (Ctrl+Z)"
+                  size="sm"
+                  disabled={!canUndo}
+                  onClick={undo}
+                />
+                <IconButton
+                  icon="redo"
+                  aria-label="Ulangi (Ctrl+Y)"
+                  size="sm"
+                  disabled={!canRedo}
+                  onClick={redo}
+                />
+              </div>
             </div>
           </div>
 

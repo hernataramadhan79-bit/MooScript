@@ -3,14 +3,15 @@ import { getRuntimeScript } from './runtime/mooRuntime';
 import { compileOverridesCss, compilePaletteVars } from './layers';
 import { buildCaptionScript } from './captions';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
-// Local WOFF2 subsets inlined as data-URIs so SVG foreignObject export frames
-// render with correct typography even when Google Fonts is unreachable
-// (foreignObject isolates external <link> fonts; data: URIs always resolve).
-import jakarta400 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-400-normal.woff2?inline';
-import jakarta700 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-700-normal.woff2?inline';
-import jakarta800 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-800-normal.woff2?inline';
-import mono400 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?inline';
-import mono700 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2?inline';
+// Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
+// and SVG foreignObject export frames render correct typography with zero network access.
+import jakarta400 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-400-normal.woff2?datauri';
+import jakarta700 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-700-normal.woff2?datauri';
+import jakarta800 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-800-normal.woff2?datauri';
+import mono400 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?datauri';
+import mono700 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2?datauri';
+import syne700 from '@fontsource/syne/files/syne-latin-700-normal.woff2?datauri';
+import syne800 from '@fontsource/syne/files/syne-latin-800-normal.woff2?datauri';
 
 const EMBEDDED_FONT_CSS = `
 @font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:400;font-display:swap;src:url('${jakarta400}') format('woff2');}
@@ -19,7 +20,8 @@ const EMBEDDED_FONT_CSS = `
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('${mono400}') format('woff2');}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url('${mono700}') format('woff2');}
 /* Offline fallbacks for display typefaces so foreignObject and offline PWA never render system serif */
-@font-face{font-family:'Syne';font-style:normal;font-weight:700 800;font-display:swap;src:url('${jakarta800}') format('woff2');}
+@font-face{font-family:'Syne';font-style:normal;font-weight:700;font-display:swap;src:url('${syne700}') format('woff2');}
+@font-face{font-family:'Syne';font-style:normal;font-weight:800;font-display:swap;src:url('${syne800}') format('woff2');}
 @font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:700 800;font-display:swap;src:url('${jakarta800}') format('woff2');}
 `;
 
@@ -278,6 +280,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
       return {
         id: mod.beatId,
         duration: durationOf(mod),
+        transition: ts?.transition || 'cut',
         wordTimestamps: ts?.wordTimestamps || []
       };
     })
@@ -307,12 +310,8 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
-  <!-- Google Fonts for Typography (non-blocking fallback; local WOFF2 above is the primary source) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Syne:wght@700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <!-- GSAP Inlined Core -->
   <script>
     ${gsapScript}
