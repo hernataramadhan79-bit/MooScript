@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode } from '../../types';
 import { CURRENT_SCHEMA_VERSION, BUILTIN_THEMES, migrateLegacyScene } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 import {
@@ -782,6 +782,24 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updated = {
         ...get().project,
         theme: { ...get().project.theme, captionPosition }
+      };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    updateSubtitleCustomization: (customization: Partial<SubtitleCustomization>) => {
+      pushSnapshot(get().project);
+      const current = get().project.theme.subtitleCustomization || {};
+      const updatedTheme = {
+        ...get().project.theme,
+        subtitleCustomization: {
+          ...current,
+          ...customization
+        }
+      };
+      const updated = {
+        ...get().project,
+        theme: updatedTheme
       };
       set({ project: updated });
       triggerSave(updated);

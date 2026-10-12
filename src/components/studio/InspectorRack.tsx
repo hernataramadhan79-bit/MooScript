@@ -11,7 +11,7 @@ import {
   getLayerText,
   setLayerText
 } from '../../engine/composition/layers';
-import { isLocalModelCached, downloadLocalModel, getLocalVoice } from '../../engine/ai/localTts';
+import { isLocalModelCached, downloadLocalModel, getLocalVoice, purgeLocalModel } from '../../engine/ai/localTts';
 import type {
   ThemeTokens,
   CaptionPosition,
@@ -235,11 +235,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     updateThemeFont,
     updateThemeCaptionPosition,
     updateThemeCaptionStyle,
+    updateSubtitleCustomization,
     toggleGlobalSubtitles,
     setThemeTokens,
     updateSettings,
     isGeneratingAudio,
     generateAudio,
+    cancelAudioGeneration,
+    deleteAudio,
     audioProgress,
     auditionVoice,
     updateBgmPreset,
@@ -252,7 +255,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     startExport,
     cancelExport,
     revokeExportResult,
-    cancelAudioGeneration,
     audioStale,
     setSettingsOpen,
     addToast
@@ -542,21 +544,25 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   ];
 
   // Text position options
-  const currentPosition = project.theme?.captionPosition || 'center';
+  const currentPosition = project.theme?.captionPosition || 'bottom';
   const positionOptions: { value: CaptionPosition; label: string }[] = [
-    { value: 'top', label: 'Atas' },
+    { value: 'bottom', label: 'Bawah' },
     { value: 'center', label: 'Tengah' },
-    { value: 'bottom', label: 'Bawah' }
+    { value: 'top', label: 'Atas' }
   ];
 
   // Text style options
   const currentStyle = project.theme?.captionStyle || 'boxed';
   const styleOptions: { value: CaptionStyle; label: string }[] = [
-    { value: 'boxed', label: 'Kotak' },
-    { value: 'karaoke', label: 'Highlight Kata' },
-    { value: 'bold-pop', label: 'Bold Pop' },
-    { value: 'minimal', label: 'Bersih' }
+    { value: 'boxed', label: 'Kotak (Klasik)' },
+    { value: 'karaoke', label: 'Highlight (Neon)' },
+    { value: 'bold-pop', label: 'Bold Pop (Viral)' },
+    { value: 'minimal', label: 'Minimalis' },
+    { value: 'outline', label: 'Kontras Outline' }
   ];
+
+  const subCust = project.theme?.subtitleCustomization || {};
+  const activeHighlightColor = subCust.activeColor || project.theme?.textHighlight || '#84cc16';
 
   // Voice provider mapping
   const currentVoiceProvider = useMemo(() => {
@@ -593,9 +599,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   ];
 
   const LOCAL_VOICE_OPTIONS = [
-    { id: 'id_ID-news_tts', label: 'Ayu / Kokoro (id_ID-news_tts)' },
-    { id: 'en_US-lessac', label: 'Lessac (en_US-lessac)' },
-    { id: 'fallback', label: 'WebSpeech / Standar Browser (fallback)' }
+    { id: 'id_ID-news_tts', label: 'Ayu (id_ID) - Narasi Berita & Edukasi' },
+    { id: 'en_US-lessac', label: 'Lessac (en_US) - Storyteller & Narasi' },
+    { id: 'fallback', label: 'WebSpeech - Standar Suara Browser (Live)' }
   ];
 
   const currentOpenAIVoice = settings.voiceIds?.openai || 'alloy';
@@ -630,6 +636,19 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       addToast(`Gagal mengunduh model: ${msg}`, 'error');
     } finally {
       setIsDownloadingLocalVoice(false);
+    }
+  };
+
+  const handlePurgeCurrentLocalVoice = async () => {
+    const voice = getLocalVoice(currentLocalVoice);
+    if (!voice) return;
+    try {
+      await purgeLocalModel(voice.id);
+      setIsLocalVoiceCached(false);
+      addToast(`Model suara ${voice.name} dihapus dari cache browser.`, 'info');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Gagal menghapus model: ${msg}`, 'error');
     }
   };
 
@@ -1733,11 +1752,16 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </button>
             )}
 
-            {/* Subtitel Global & Resolusi */}
+            {/* Subtitel Global & Kustomisasi Lengkap */}
             <div className="flex flex-col gap-3 pt-1 border-t border-border">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Subtitel & Format
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                  Kustomisasi Subtitel
+                </span>
+                <span className="text-[10px] font-mono text-accent">
+                  {project.theme.showSubtitles ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </div>
 
               {/* Toggle Subtitel Global */}
               <button
@@ -1754,16 +1778,270 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     {project.theme.showSubtitles ? 'subtitles' : 'subtitles_off'}
                   </span>
                   <span className="text-[12px] font-medium">
-                    {project.theme.showSubtitles ? 'Subtitel Aktif' : 'Subtitel Nonaktif'}
+                    {project.theme.showSubtitles ? 'Tampilkan Subtitel di Video' : 'Sembunyikan Subtitel'}
                   </span>
                 </div>
                 <span
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-2.5 h-2.5 rounded-full ${
                     project.theme.showSubtitles ? 'bg-accent' : 'bg-zinc-600'
                   }`}
                 />
               </button>
 
+              {/* Panel Kustomisasi Subtitel Lengkap */}
+              {project.theme.showSubtitles && (
+                <div className="flex flex-col gap-3.5 p-3 rounded-2xl bg-surface-2/70 border border-border mt-1">
+                  {/* 1. Live Subtitle Preview */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                      Pratinjau Tampilan
+                    </span>
+                    <div className="w-full h-16 rounded-xl bg-black/80 border border-border/80 flex items-center justify-center p-2 overflow-hidden relative">
+                      <div
+                        className={`text-center font-bold transition-all ${
+                          subCust.uppercase ? 'uppercase' : ''
+                        }`}
+                        style={{
+                          fontSize: `${Math.round(14 * (subCust.fontScale || 1.0))}px`,
+                          padding: currentStyle === 'boxed' ? '4px 12px' : '0',
+                          borderRadius: currentStyle === 'boxed' ? '8px' : '0',
+                          backgroundColor:
+                            currentStyle === 'boxed'
+                              ? `rgba(9, 9, 11, ${subCust.bgOpacity !== undefined ? subCust.bgOpacity : 0.65})`
+                              : 'transparent',
+                          textShadow:
+                            currentStyle === 'outline'
+                              ? '0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000'
+                              : currentStyle === 'karaoke'
+                                ? `0 0 12px ${activeHighlightColor}`
+                                : '0 2px 8px rgba(0,0,0,0.8)'
+                        }}
+                      >
+                        <span style={{ color: subCust.textColor || '#ffffff' }}>MooScript </span>
+                        <span
+                          style={{
+                            color: activeHighlightColor,
+                            transform: currentStyle === 'bold-pop' ? 'scale(1.15)' : 'none',
+                            display: 'inline-block'
+                          }}
+                        >
+                          Studio
+                        </span>
+                        <span style={{ color: subCust.textColor || '#ffffff' }}> AI</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Gaya Tampilan (Style Presets) */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                      Gaya Subtitel
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {styleOptions.map((opt) => {
+                        const isSelected = currentStyle === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => updateThemeCaptionStyle(opt.value)}
+                            className={`py-2 px-2.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all text-left ${
+                              isSelected
+                                ? 'bg-surface-3 border-accent text-accent font-semibold shadow-sm'
+                                : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[15px] shrink-0">
+                              {opt.value === 'boxed'
+                                ? 'crop_7_5'
+                                : opt.value === 'karaoke'
+                                  ? 'music_note'
+                                  : opt.value === 'bold-pop'
+                                    ? 'bolt'
+                                    : opt.value === 'outline'
+                                      ? 'border_style'
+                                      : 'short_text'}
+                            </span>
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. Posisi Layar */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                      Posisi di Layar
+                    </span>
+                    <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-3/80 border border-border">
+                      {positionOptions.map((pos) => {
+                        const isSelected = currentPosition === pos.value;
+                        return (
+                          <button
+                            key={pos.value}
+                            type="button"
+                            onClick={() => updateThemeCaptionPosition(pos.value)}
+                            className={`py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                              isSelected
+                                ? 'bg-surface-2 text-accent font-bold shadow-sm'
+                                : 'text-text-muted hover:text-on-surface'
+                            }`}
+                          >
+                            {pos.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 4. Ukuran Huruf (Font Scale) */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-text-muted font-medium">Ukuran Teks</span>
+                      <span className="font-mono text-on-surface font-semibold">
+                        {Math.round((subCust.fontScale || 1.0) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.7"
+                      max="1.6"
+                      step="0.05"
+                      value={subCust.fontScale || 1.0}
+                      onChange={(e) => updateSubtitleCustomization({ fontScale: parseFloat(e.target.value) })}
+                      className="w-full h-1.5 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
+                    />
+                    <div className="flex items-center gap-1 pt-0.5">
+                      {[
+                        { label: 'S (80%)', val: 0.8 },
+                        { label: 'M (100%)', val: 1.0 },
+                        { label: 'L (125%)', val: 1.25 },
+                        { label: 'XL (150%)', val: 1.5 }
+                      ].map((item) => (
+                        <button
+                          key={item.val}
+                          type="button"
+                          onClick={() => updateSubtitleCustomization({ fontScale: item.val })}
+                          className={`flex-1 py-1 rounded-lg text-[10px] font-mono border transition-all ${
+                            Math.abs((subCust.fontScale || 1.0) - item.val) < 0.05
+                              ? 'bg-accent/15 border-accent text-accent font-bold'
+                              : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 5. Warna Kata Aktif & Teks */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                      Warna Sorotan Kata Aktif
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { color: '#84cc16', name: 'Lime' },
+                        { color: '#eab308', name: 'Kuning' },
+                        { color: '#06b6d4', name: 'Cyan' },
+                        { color: '#f97316', name: 'Oranye' },
+                        { color: '#ec4899', name: 'Pink' },
+                        { color: '#ffffff', name: 'Putih' }
+                      ].map((c) => {
+                        const isSelected = (subCust.activeColor || project.theme.textHighlight || '#84cc16') === c.color;
+                        return (
+                          <button
+                            key={c.color}
+                            type="button"
+                            onClick={() => updateSubtitleCustomization({ activeColor: c.color })}
+                            className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                              isSelected ? 'border-white scale-110 shadow-sm' : 'border-transparent hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: c.color }}
+                            title={c.name}
+                          />
+                        );
+                      })}
+                      <input
+                        type="color"
+                        value={subCust.activeColor || project.theme.textHighlight || '#84cc16'}
+                        onChange={(e) => updateSubtitleCustomization({ activeColor: e.target.value })}
+                        className="w-7 h-7 rounded-full bg-transparent border border-border cursor-pointer overflow-hidden p-0"
+                        title="Pilih warna kustom"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 6. Pacing & Casing (Format Kata) */}
+                  <div className="flex flex-col gap-2 pt-1 border-t border-border/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-text-muted">Huruf Besar (UPPERCASE)</span>
+                      <button
+                        type="button"
+                        onClick={() => updateSubtitleCustomization({ uppercase: !subCust.uppercase })}
+                        className={`w-9 h-5 rounded-full transition-colors relative ${
+                          subCust.uppercase ? 'bg-accent' : 'bg-surface-3 border border-border'
+                        }`}
+                      >
+                        <span
+                          className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                            subCust.uppercase ? 'right-1' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-text-muted">Kata per Frasa</span>
+                      <div className="flex items-center gap-1">
+                        {[
+                          { label: '3 (Cepat)', count: 3 },
+                          { label: '4 (Sedang)', count: 4 },
+                          { label: '5 (Panjang)', count: 5 }
+                        ].map((chunk) => {
+                          const isSelected = (subCust.maxWordsPerChunk || 4) === chunk.count;
+                          return (
+                            <button
+                              key={chunk.count}
+                              type="button"
+                              onClick={() => updateSubtitleCustomization({ maxWordsPerChunk: chunk.count })}
+                              className={`py-1 px-2 rounded-lg text-[10px] border transition-all ${
+                                isSelected
+                                  ? 'bg-accent/15 border-accent text-accent font-bold'
+                                  : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                              }`}
+                            >
+                              {chunk.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Opasitas Kotak (jika style boxed) */}
+                    {currentStyle === 'boxed' && (
+                      <div className="flex flex-col gap-1 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-text-muted">Opasitas Latar Kotak</span>
+                          <span className="font-mono text-on-surface font-semibold">
+                            {Math.round((subCust.bgOpacity !== undefined ? subCust.bgOpacity : 0.65) * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1.0"
+                          step="0.05"
+                          value={subCust.bgOpacity !== undefined ? subCust.bgOpacity : 0.65}
+                          onChange={(e) => updateSubtitleCustomization({ bgOpacity: parseFloat(e.target.value) })}
+                          className="w-full h-1.5 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Alokasi Token Output (Max Tokens) */}
@@ -2085,11 +2363,21 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         <div className="flex items-center justify-between text-emerald-400 font-medium">
                           <span className="flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                            <span>Model tersimpan & siap offline</span>
+                            <span>Model siap offline</span>
                           </span>
-                          <span className="text-[10px] font-mono text-text-muted">
-                            {getLocalVoice(currentLocalVoice)?.sizeMb} MB
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-text-muted">
+                              {getLocalVoice(currentLocalVoice)?.sizeMb} MB
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handlePurgeCurrentLocalVoice}
+                              className="p-1 rounded hover:bg-rose-500/10 text-text-muted hover:text-rose-400 transition-colors"
+                              title="Hapus file model dari cache browser"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">delete</span>
+                            </button>
+                          </div>
                         </div>
                       ) : isDownloadingLocalVoice ? (
                         <div className="flex flex-col gap-1.5">
@@ -2129,6 +2417,49 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       )}
                     </div>
                   )}
+
+                  {/* Kustomisasi Akustik Piper ONNX */}
+                  {currentLocalVoice !== 'fallback' && (
+                    <div className="p-2.5 rounded-xl border border-border/80 bg-surface-2/40 flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                        Kustomisasi Akustik Piper
+                      </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-text-muted">Variasi Intonasi (Ekspresivitas)</span>
+                          <span className="font-mono text-on-surface text-[10px]">
+                            {(settings.piperNoiseScale ?? 0.667).toFixed(2)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1.0"
+                          step="0.05"
+                          value={settings.piperNoiseScale ?? 0.667}
+                          onChange={(e) => updateSettings({ piperNoiseScale: parseFloat(e.target.value) })}
+                          className="w-full h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-text-muted">Variasi Ritme / Fonem</span>
+                          <span className="font-mono text-on-surface text-[10px]">
+                            {(settings.piperNoiseW ?? 0.8).toFixed(2)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1.0"
+                          step="0.05"
+                          value={settings.piperNoiseW ?? 0.8}
+                          onChange={(e) => updateSettings({ piperNoiseW: parseFloat(e.target.value) })}
+                          className="w-full h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2149,6 +2480,23 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   onChange={(e) => updateSettings({ speed: parseFloat(e.target.value) })}
                   className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
                 />
+                {/* Preset Chips Kecepatan */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  {[0.8, 1.0, 1.25, 1.5].map((spd) => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => updateSettings({ speed: spd })}
+                      className={`flex-1 py-1 text-[10px] font-mono rounded-lg border transition-all ${
+                        Math.abs((settings.speed ?? 1.05) - spd) < 0.03
+                          ? 'bg-accent/15 border-accent text-accent font-bold'
+                          : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                      }`}
+                    >
+                      {spd}x
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Tombol Audisi & Generate Suara */}
@@ -2203,7 +2551,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
               {/* Status audio proyek */}
               <div
-                className={`p-2.5 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
+                className={`p-2.5 rounded-xl border text-[11px] leading-relaxed flex flex-col gap-2 ${
                   !hasProjectAudio
                     ? 'bg-surface-2 border-border text-text-muted'
                     : audioStale
@@ -2212,18 +2560,32 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 }`}
                 role="status"
               >
-                <span className="material-symbols-outlined text-[16px] shrink-0">
-                  {!hasProjectAudio ? 'volume_off' : audioStale ? 'warning' : 'check_circle'}
-                </span>
-                <span>
-                  {currentVoiceProvider === 'timer'
-                    ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
-                    : !hasProjectAudio
-                      ? 'Suara belum dibuat.'
-                      : audioStale
-                        ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
-                        : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
-                </span>
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[16px] shrink-0">
+                    {!hasProjectAudio ? 'volume_off' : audioStale ? 'warning' : 'check_circle'}
+                  </span>
+                  <span className="flex-1">
+                    {currentVoiceProvider === 'timer'
+                      ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
+                      : !hasProjectAudio
+                        ? 'Suara belum dibuat.'
+                        : audioStale
+                          ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
+                          : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
+                  </span>
+                </div>
+
+                {hasProjectAudio && (
+                  <button
+                    type="button"
+                    onClick={() => deleteAudio()}
+                    className="w-full py-1.5 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
+                    title="Hapus trek audio dari proyek"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <span>Hapus Suara Proyek</span>
+                  </button>
+                )}
               </div>
             </div>
 

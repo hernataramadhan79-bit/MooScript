@@ -2,6 +2,7 @@ import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../.
 import { getRuntimeScript } from './runtime/mooRuntime';
 import { compileOverridesCss, compilePaletteVars } from './layers';
 import { buildCaptionScript } from './captions';
+import { createPendingSceneModule } from './sync';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
 // and SVG foreignObject export frames render correct typography with zero network access.
@@ -103,6 +104,9 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
     if (mod) {
       orderedModules.push(mod);
       used.add(mod.beatId);
+    } else {
+      orderedModules.push(createPendingSceneModule(projScene.id, projScene.durationInSeconds || 3));
+      used.add(projScene.id);
     }
   }
   for (const mod of comp.scenes) {
@@ -292,7 +296,8 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
       style: project.theme?.captionStyle || 'boxed',
       position: project.theme?.captionPosition || 'bottom',
       width,
-      height
+      height,
+      subtitleCustomization: project.theme?.subtitleCustomization
     },
     resolved.map(({ mod }) => {
       const ts = timelineScenes.find((s) => s.id === mod.beatId);

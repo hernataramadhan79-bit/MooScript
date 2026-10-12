@@ -64,7 +64,6 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   // Reloading an iframe on every keystroke makes the preview flash while typing a script.
   // Debounce the document, but switch instantly when the project or canvas size changes.
   const shownDoc = useDebouncedValue(srcDoc, 350, `${projectId}-${width}x${height}`);
-
   // Adjust container scale to fit responsive viewport smoothly
   const updateScale = React.useCallback(() => {
     if (!containerRef.current) return;

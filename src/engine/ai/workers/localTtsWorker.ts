@@ -7,7 +7,17 @@ const CACHE_NAME = 'mooscript-tts-models-v1';
 const sessionCache = new Map<string, { session: ort.InferenceSession; config: any }>();
 
 self.onmessage = async (e: MessageEvent) => {
-  const { type, text, voiceId, speed, modelUrl, configUrl, sampleRate = 22050 } = e.data;
+  const {
+    type,
+    text,
+    voiceId,
+    speed = 1.0,
+    noiseScale = 0.667,
+    noiseW = 0.8,
+    modelUrl,
+    configUrl,
+    sampleRate = 22050
+  } = e.data;
 
   if (type === 'synthesize') {
     try {
@@ -44,18 +54,19 @@ self.onmessage = async (e: MessageEvent) => {
           modelBuffer = await mdlRes.arrayBuffer();
         }
 
-        self.postMessage({ type: 'progress', percent: 60, message: 'Menginisialisasi session ONNX (WebGPU/WASM)...' });
+        self.postMessage({ type: 'progress', percent: 60, message: 'Menginisialisasi session ONNX WASM...' });
 
-        // Configure onnxruntime-web execution providers
+        // Configure onnxruntime-web execution providers & WASM paths
         try {
           ort.env.wasm.numThreads = 1;
-        } catch {
-          // ignore
+          const origin = typeof location !== 'undefined' ? location.origin : '';
+          ort.env.wasm.wasmPaths = origin ? `${origin}/onnx/` : 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/';
+        } catch (wasmConfigErr) {
+          console.warn('Configuring ort wasm env:', wasmConfigErr);
         }
+
+        // Piper VITS requires WASM execution provider (WebGPU lacks support for dynamic slice/gather ops)
         const executionProviders = ['wasm'];
-        if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
-          executionProviders.unshift('webgpu');
-        }
         const session = await ort.InferenceSession.create(modelBuffer, {
           executionProviders
         });
@@ -81,7 +92,9 @@ self.onmessage = async (e: MessageEvent) => {
       const inputTensor = new ort.Tensor('int64', BigInt64Array.from(phonemeIds.map(BigInt)), [1, phonemeIds.length]);
       const lengthTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(phonemeIds.length)]), [1]);
       const lengthScale = 1.0 / Math.max(0.5, Math.min(2.0, speed || 1.0));
-      const scalesTensor = new ort.Tensor('float32', Float32Array.from([0.667, lengthScale, 0.8]), [3]);
+      const safeNoiseScale = Math.max(0.1, Math.min(1.2, noiseScale || 0.667));
+      const safeNoiseW = Math.max(0.1, Math.min(1.2, noiseW || 0.8));
+      const scalesTensor = new ort.Tensor('float32', Float32Array.from([safeNoiseScale, lengthScale, safeNoiseW]), [3]);
 
       const feeds: Record<string, ort.Tensor> = {
         input: inputTensor,
@@ -147,10 +160,30 @@ async function textToPhonemeIds(
   };
 
   if (voiceId.startsWith('id_ID') || voiceId.includes('indotts')) {
-    // Indonesian: Direct character mapping as mapped in id_ID-news_tts-medium
-    const cleaned = text.toLowerCase().normalize('NFD');
+    // Indonesian: Normalize text, substitute standard Indonesian digraphs to Piper phoneme symbols
+    let cleaned = text
+      .toLowerCase()
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    // Map Indonesian digraphs to phonetic IPA tokens present in id_ID-news_tts phoneme_id_map
+    // ng -> ŋ (U+014B), ny -> ɲ (U+0272), sy -> ʃ (U+0283), kh -> x (U+0078)
+    cleaned = cleaned
+      .replace(/ng/g, 'ŋ')
+      .replace(/ny/g, 'ɲ')
+      .replace(/sy/g, 'ʃ')
+      .replace(/kh/g, 'x');
+
     for (const char of cleaned) {
-      pushMapped(char);
+      if (phonemeIdMap[char]) {
+        rawIds.push(...phonemeIdMap[char]);
+      } else if (char === 'g' && (phonemeIdMap['g'] || phonemeIdMap['ɡ'])) {
+        const gIds = phonemeIdMap['g'] || phonemeIdMap['ɡ'];
+        if (gIds) rawIds.push(...gIds);
+      } else if (char === ' ') {
+        rawIds.push(spaceId);
+      }
     }
   } else {
     // English or other languages: Use phonemizer for eSpeak IPA conversion
@@ -158,13 +191,21 @@ async function textToPhonemeIds(
       const phones = await phonemize(text, 'en-us');
       const fullPhones = phones.join(' ');
       for (const char of fullPhones) {
-        pushMapped(char);
+        if (phonemeIdMap[char]) {
+          rawIds.push(...phonemeIdMap[char]);
+        } else if (char === ' ') {
+          rawIds.push(spaceId);
+        }
       }
     } catch (phonemizeErr) {
       console.warn('Phonemizer failed, falling back to direct character mapping:', phonemizeErr);
       const cleaned = text.toLowerCase();
       for (const char of cleaned) {
-        pushMapped(char);
+        if (phonemeIdMap[char]) {
+          rawIds.push(...phonemeIdMap[char]);
+        } else if (char === ' ') {
+          rawIds.push(spaceId);
+        }
       }
     }
   }

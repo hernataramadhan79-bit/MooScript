@@ -7,6 +7,7 @@ import type {
   SceneTransition,
   CaptionStyle,
   CaptionPosition,
+  SubtitleCustomization,
   BgmPreset,
   ToastNotification,
   TTSProvider,
@@ -64,6 +65,7 @@ export interface ProjectSlice {
   updateProjectAspectRatio: (aspectRatio: AspectRatio) => void;
   updateThemeCaptionStyle: (style: CaptionStyle) => void;
   updateThemeCaptionPosition: (position: CaptionPosition) => void;
+  updateSubtitleCustomization: (customization: Partial<SubtitleCustomization>) => void;
   updateSceneText: (id: string, text: string) => void;
   updateSceneVisualIntent: (sceneId: string, visualIntent: string) => void;
   updateSceneVisualConcept: (sceneId: string, visualConcept: string) => void;
@@ -110,6 +112,7 @@ export interface AudioSlice {
   rawVoiceBlob?: Blob | null;
   generateAudio: () => Promise<void>;
   cancelAudioGeneration: () => void;
+  deleteAudio: () => Promise<void>;
   auditionVoice: (provider?: TTSProvider, voiceId?: string) => Promise<void>;
   remixAudio: () => Promise<void>;
   generateBgmOnlyAudio: () => Promise<void>;

@@ -1,11 +1,59 @@
-import { defineConfig } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fontDataUri } from './fontDataUriPlugin';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function onnxWasmPlugin(): Plugin {
+  const onnxDist = path.resolve(__dirname, 'node_modules/onnxruntime-web/dist');
+  const wasmFiles = [
+    'ort-wasm-simd-threaded.wasm',
+    'ort-wasm-simd-threaded.mjs',
+    'ort-wasm-simd-threaded.jsep.wasm',
+    'ort-wasm-simd-threaded.jsep.mjs'
+  ];
+
+  return {
+    name: 'onnx-wasm-plugin',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url && req.url.startsWith('/onnx/')) {
+          const fileName = req.url.replace(/^\/onnx\//, '').split('?')[0];
+          const filePath = path.join(onnxDist, fileName);
+          if (wasmFiles.includes(fileName) && fs.existsSync(filePath)) {
+            if (fileName.endsWith('.wasm')) {
+              res.setHeader('Content-Type', 'application/wasm');
+            } else if (fileName.endsWith('.mjs') || fileName.endsWith('.js')) {
+              res.setHeader('Content-Type', 'application/javascript');
+            }
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+        }
+        next();
+      });
+    },
+    buildStart() {
+      const publicOnnx = path.resolve(__dirname, 'public/onnx');
+      if (!fs.existsSync(publicOnnx)) {
+        fs.mkdirSync(publicOnnx, { recursive: true });
+      }
+      for (const file of wasmFiles) {
+        const src = path.join(onnxDist, file);
+        const dest = path.join(publicOnnx, file);
+        if (fs.existsSync(src) && !fs.existsSync(dest)) {
+          fs.copyFileSync(src, dest);
+        }
+      }
+    }
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    onnxWasmPlugin(),
     fontDataUri(),
     react(),
     VitePWA({

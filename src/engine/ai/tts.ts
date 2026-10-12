@@ -1,6 +1,6 @@
 import type { WordTimestamp, Scene, MooProject, EngineSettings, TTSProvider } from '../../types';
 import { getCachedSceneAudio, putCachedSceneAudio } from '../../db/mooDb';
-import { synthesizeLocalTTS } from './localTts';
+import { synthesizeLocalTTS, pcmFloat32ToWavBlob } from './localTts';
 
 export interface TTSResult {
   audioBlob: Blob;
@@ -553,6 +553,8 @@ export async function generateSceneAudio(params: {
   elevenLabsModel?: string;
   speed?: number;
   stability?: number;
+  noiseScale?: number;
+  noiseW?: number;
   paddingSeconds?: number;
   signal?: AbortSignal;
 }): Promise<SceneAudioSegment> {
@@ -705,6 +707,8 @@ export async function generateSceneAudio(params: {
       text: rawText,
       voiceId: voiceId || 'id_ID-news_tts',
       speed,
+      noiseScale: params.noiseScale,
+      noiseW: params.noiseW,
       signal
     });
 
@@ -741,11 +745,14 @@ export async function generateSceneAudio(params: {
       fromCache: false
     };
   } else {
-    // Fallback: procedural ambient synth per scene
+    // Fallback or Timer: deterministic timing with silence (never an ambient sine drone)
     const estimatedDuration = calculateFallbackSceneDuration(rawText);
-    audioBlob = await generateSyntheticAmbientAudio(estimatedDuration);
+    const sampleRate = 22050;
+    const totalSamples = Math.max(1, Math.round(estimatedDuration * sampleRate));
+    const silence = new Float32Array(totalSamples);
+    audioBlob = pcmFloat32ToWavBlob(silence, sampleRate);
     const audioBuffer = await decodeAudioBlob(audioBlob);
-    const audioDuration = Math.round(audioBuffer.duration * 100) / 100;
+    const audioDuration = Math.round(estimatedDuration * 100) / 100;
     const paddedDuration = Math.round((audioDuration + paddingSeconds) * 100) / 100;
     const words = computeDeterministicWordAlignment(rawText, audioDuration, 0);
 
@@ -918,10 +925,11 @@ export async function generateProjectAudioPerScene(params: {
           elevenLabsModel: settings.elevenLabsModel,
           speed: settings.speed,
           stability: settings.stability,
+          noiseScale: settings.piperNoiseScale,
+          noiseW: settings.piperNoiseW,
           paddingSeconds,
           signal: internalAbortController.signal
         });
-
         segments[idx] = seg;
         if (seg.fromCache) {
           cacheHitCount++;

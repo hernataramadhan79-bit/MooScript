@@ -1,4 +1,4 @@
-import type { CaptionPosition, CaptionStyle } from '../../types';
+import type { CaptionPosition, CaptionStyle, SubtitleCustomization } from '../../types';
 
 export interface CaptionConfig {
   show: boolean;
@@ -6,6 +6,7 @@ export interface CaptionConfig {
   position: CaptionPosition;
   width: number;
   height: number;
+  subtitleCustomization?: SubtitleCustomization;
 }
 
 export interface CaptionSceneMeta {
@@ -66,13 +67,20 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
   var SCENES = ${json(scenes)};
   ${CAPTION_CHUNK_SRC}
   ${CAPTION_FALLBACK_SRC}
+  var CUST = CFG.subtitleCustomization || {};
+  var scale = Math.max(0.6, Math.min(2.0, CUST.fontScale || 1.0));
+  var baseFontRatio = CFG.style === 'bold-pop' ? 0.068 : CFG.style === 'minimal' ? 0.048 : 0.054;
+  var fontPx = Math.round(CFG.width * baseFontRatio * scale);
+  var activeCol = CUST.activeColor || 'var(--moo-accent,#84cc16)';
+  var textCol = CUST.textColor || '#ffffff';
+  var isUpper = Boolean(CUST.uppercase || CFG.style === 'bold-pop');
+  var yOff = Math.round((CUST.yOffsetPercent || 0) * 0.01 * CFG.height);
 
-  var fontPx = Math.round(CFG.width * (CFG.style === 'bold-pop' ? 0.068 : 0.054));
   var posCss = CFG.position === 'top'
-    ? 'top:' + Math.round(CFG.height * 0.1) + 'px;'
+    ? 'top:' + Math.round(CFG.height * 0.1 + yOff) + 'px;'
     : CFG.position === 'center'
-      ? 'top:50%;transform:translateY(-50%);'
-      : 'bottom:' + Math.round(CFG.height * 0.14) + 'px;';
+      ? 'top:calc(50% + ' + yOff + 'px);transform:translateY(-50%);'
+      : 'bottom:' + Math.round(CFG.height * 0.14 - yOff) + 'px;';
 
   function ensureLayer() {
     var stage = document.getElementById('moo-stage');
@@ -93,18 +101,23 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
   function wordStyle(isActive) {
     var base = 'display:inline-block;margin:0 ' + Math.round(fontPx * 0.12) + 'px;';
     if (CFG.style === 'karaoke') {
-      return base + 'font-weight:800;color:' + (isActive ? 'var(--moo-accent,#84cc16)' : '#ffffff') +
+      return base + 'font-weight:800;color:' + (isActive ? activeCol : textCol) +
         ';text-shadow:0 3px 14px rgba(0,0,0,.75);';
     }
     if (CFG.style === 'bold-pop') {
       return base + 'font-weight:800;text-transform:uppercase;letter-spacing:.01em;color:' +
-        (isActive ? 'var(--moo-accent,#84cc16)' : '#ffffff') +
-        ';text-shadow:0 4px 0 rgba(0,0,0,.55);' + (isActive ? 'transform:scale(1.12);' : '');
+        (isActive ? activeCol : textCol) +
+        ';text-shadow:0 4px 0 rgba(0,0,0,.55);' + (isActive ? 'transform:scale(1.15);' : '');
     }
     if (CFG.style === 'minimal') {
-      return base + 'font-weight:600;color:#ffffff;text-shadow:0 2px 12px rgba(0,0,0,.8);';
+      return base + 'font-weight:600;color:' + (isActive ? activeCol : textCol) +
+        ';text-shadow:0 2px 12px rgba(0,0,0,.8);';
     }
-    return base + 'font-weight:700;color:' + (isActive ? 'var(--moo-accent,#84cc16)' : '#ffffff') + ';';
+    if (CFG.style === 'outline') {
+      return base + 'font-weight:900;color:' + (isActive ? activeCol : textCol) +
+        ';-webkit-text-stroke:2px #000000;text-shadow:0 3px 0 #000000, 0 5px 12px rgba(0,0,0,.75);';
+    }
+    return base + 'font-weight:700;color:' + (isActive ? activeCol : textCol) + ';';
   }
 
   var lastKey = null;
@@ -124,7 +137,8 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
       var words = sc.wordTimestamps && sc.wordTimestamps.length
         ? sc.wordTimestamps
         : mooEvenWords(sc.text, durations[sceneIdx] || sc.duration);
-      chunk = mooPickChunk(words, local, CFG.style === 'bold-pop' ? 3 : 5);
+      var maxChunkWords = CUST.maxWordsPerChunk || (CFG.style === 'bold-pop' ? 3 : 5);
+      chunk = mooPickChunk(words, local, maxChunkWords);
     }
     var key = chunk ? sceneIdx + ':' + chunk.words.join(' ') + ':' + chunk.active : '';
     if (key === lastKey) return;
@@ -134,14 +148,16 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
     var box = document.createElement('div');
     var boxCss = 'text-align:center;line-height:1.25;font-size:' + fontPx + 'px;max-width:100%;';
     if (CFG.style === 'boxed') {
-      boxCss += 'background:rgba(0,0,0,.62);border-radius:' + Math.round(fontPx * 0.4) + 'px;padding:' +
-        Math.round(fontPx * 0.3) + 'px ' + Math.round(fontPx * 0.5) + 'px;';
+      var bgOp = CUST.bgOpacity !== undefined ? CUST.bgOpacity : 0.62;
+      boxCss += 'background:rgba(0,0,0,' + bgOp + ');border-radius:' + Math.round(fontPx * 0.4) + 'px;padding:' +
+        Math.round(fontPx * 0.3) + 'px ' + Math.round(fontPx * 0.5) + 'px;backdrop-filter:blur(4px);';
     }
     box.setAttribute('style', boxCss);
     for (var w = 0; w < chunk.words.length; w++) {
       var span = document.createElement('span');
       span.setAttribute('style', wordStyle(w === chunk.active));
-      span.textContent = chunk.words[w];
+      var wordTxt = isUpper ? chunk.words[w].toUpperCase() : chunk.words[w];
+      span.textContent = wordTxt;
       box.appendChild(span);
     }
     layer.appendChild(box);

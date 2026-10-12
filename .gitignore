@@ -33,3 +33,6 @@ coverage/
 
 # Agents workspace cache
 .agents/
+
+# ONNX runtime wasm binaries (generated from node_modules)
+public/onnx/

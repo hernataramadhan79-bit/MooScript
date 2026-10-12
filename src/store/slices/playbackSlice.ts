@@ -7,6 +7,21 @@ let playbackStartTime = 0;
 let playbackStartFrame = 0;
 let isAudioMasterActive = false;
 
+function getPlaybackTotalDuration(project: any): number {
+  if (project?.audioDuration && project.audioDuration > 0) {
+    return project.audioDuration;
+  }
+  const calculated = (project?.scenes || []).reduce(
+    (sum: number, s: any) => sum + (s.durationInSeconds || 3),
+    0
+  );
+  if (calculated > 0) return calculated;
+  if (project?.composition?.duration && project.composition.duration > 0) {
+    return project.composition.duration;
+  }
+  return 10;
+}
+
 function cancelPlaybackRaf() {
   if (playbackRafId !== null) {
     cancelAnimationFrame(playbackRafId);
@@ -40,7 +55,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
 
   seekFrame: (currentFrame) => {
     const fps = get().project.fps || 30;
-    const totalDuration = get().project.audioDuration || 10;
+    const totalDuration = getPlaybackTotalDuration(get().project);
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
     const clamped = Math.max(0, Math.min(currentFrame, maxFrames));
 
@@ -72,7 +87,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
 
     const state = get();
     const fps = state.project.fps || 30;
-    const totalDuration = state.project.audioDuration || 10;
+    const totalDuration = getPlaybackTotalDuration(state.project);
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
 
     let startFrame = state.currentFrame;
@@ -92,7 +107,15 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
     set({ isPlaying: true });
 
     // Sync audio if available
-    const blobUrl = state.audioBlobUrl;
+    let blobUrl = state.audioBlobUrl;
+    if (!blobUrl && state.project.audioBlob) {
+      try {
+        blobUrl = URL.createObjectURL(state.project.audioBlob);
+        set({ audioBlobUrl: blobUrl });
+      } catch {
+        // ignore
+      }
+    }
     if (blobUrl) {
       if (!playbackAudioElement) {
         playbackAudioElement = new Audio(blobUrl);
@@ -132,7 +155,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
       }
 
       const currentFps = get().project.fps || 30;
-      const currentTotalDuration = get().project.audioDuration || 10;
+      const currentTotalDuration = getPlaybackTotalDuration(get().project);
       const currentMaxFrames = Math.max(1, Math.round(currentTotalDuration * currentFps));
 
       let targetFrame: number;

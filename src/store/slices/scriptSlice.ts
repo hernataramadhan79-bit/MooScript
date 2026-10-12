@@ -111,19 +111,31 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       });
 
       const totalDur = newScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
+      const oldUrl = get().audioBlobUrl;
+      if (oldUrl) {
+        try {
+          URL.revokeObjectURL(oldUrl);
+        } catch {
+          // ignore
+        }
+      }
       const updatedProject: MooProject = {
         ...get().project,
         title: storyboard.title || get().project.title,
         scenes: newScenes,
+        audioBlob: undefined,
         audioDuration: totalDur
       };
       const syncedProject = syncComposition(updatedProject);
 
       set({
         project: syncedProject,
+        audioBlobUrl: null,
+        rawVoiceBlob: null,
+        waveformPeaks: null,
         previousScenesSnapshot: currentScenes,
         isGeneratingScript: false,
-        audioStale: !!get().project.audioBlob
+        audioStale: false
       });
       await saveProjectToDb(syncedProject);
       addToast('AI Storyboard generated successfully!', 'success');

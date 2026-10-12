@@ -10,7 +10,8 @@ import {
   computeDeterministicWordAlignment
 } from '../../engine/ai/tts';
 import { mixVoiceAndBgm, renderStandaloneBgm } from '../../engine/audio/bgmMixer';
-import { synthesizeLocalTTS } from '../../engine/ai/localTts';
+import { synthesizeLocalTTS, isLocalModelCached } from '../../engine/ai/localTts';
+import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb } from '../../db/mooDb';
 import { extractWaveformPeaks } from '../../engine/audio/waveform';
 import type { MooStoreState, AudioSlice } from '../types';
@@ -38,7 +39,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       project.scenes.map((s) => [s.id, s.narrationText || s.text || ''])
     );
 
-    if (settings.selectedTTSProvider === 'fallback') {
+    if (settings.selectedTTSProvider === 'fallback' || settings.selectedTTSProvider === 'timer') {
       if (get().audioBlobUrl) {
         URL.revokeObjectURL(get().audioBlobUrl!);
       }
@@ -79,12 +80,12 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         }
       }
 
-      const finalProject = {
+      const finalProject = syncComposition({
         ...latest,
         scenes: mergedScenes,
         audioBlob: finalAudioBlob,
         audioDuration: roundedDuration
-      };
+      });
 
       set({
         project: finalProject,
@@ -211,12 +212,12 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         URL.revokeObjectURL(get().audioBlobUrl!);
       }
 
-      const finalProject = {
+      const finalProject = syncComposition({
         ...latest,
         scenes: mergedScenes,
         audioBlob: finalAudioBlob,
         audioDuration: result.totalDuration
-      };
+      });
 
       set({
         project: finalProject,
@@ -266,6 +267,37 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
     set({ isGeneratingAudio: false, audioProgress: null });
   },
 
+  deleteAudio: async () => {
+    const { project, audioBlobUrl, addToast } = get();
+    if (audioBlobUrl) {
+      try {
+        URL.revokeObjectURL(audioBlobUrl);
+      } catch {
+        // ignore
+      }
+    }
+    const updatedProject = syncComposition({
+      ...project,
+      audioBlob: undefined,
+      audioDuration: 0,
+      scenes: project.scenes.map((s) => ({
+        ...s,
+        wordTimestamps: []
+      }))
+    });
+    set({
+      project: updatedProject,
+      audioBlobUrl: null,
+      rawVoiceBlob: null,
+      waveformPeaks: null,
+      audioStale: false,
+      audioProgress: null
+    });
+    await saveProjectToDb(updatedProject);
+    await get().refreshCacheSize();
+    addToast('Audio proyek berhasil dihapus.', 'info');
+  },
+
   auditionVoice: async (providerOverride?: TTSProvider, voiceOverride?: string) => {
     const { settings, addToast } = get();
     const provider = providerOverride || settings.selectedTTSProvider;
@@ -276,50 +308,88 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         : provider === 'elevenlabs'
         ? settings.voiceIds?.elevenlabs
         : settings.voiceIds?.openai);
+
+    if (provider === 'timer') {
+      addToast('Mode Tanpa Suara (Timer) menghitung durasi adegan tanpa narasi suara.', 'info');
+      return;
+    }
+
     const sampleText =
-      provider === 'local' && (voice?.startsWith('id_') || !voice)
+      (provider === 'local' && (voice?.startsWith('id_') || !voice)) || provider === 'fallback'
         ? 'MooScript Studio generator motion graphics deterministik di browser.'
         : 'MooScript Studio client-side motion graphics engine.';
+
+    // WebSpeech / Browser native speech support
+    if (provider === 'fallback' || voice === 'fallback') {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(sampleText);
+        utterance.lang = sampleText.includes('MooScript') && sampleText.includes('deterministik') ? 'id-ID' : 'en-US';
+        utterance.rate = Math.max(0.5, Math.min(2.0, settings.speed || 1.0));
+        window.speechSynthesis.speak(utterance);
+        addToast('Memutar suara menggunakan WebSpeech browser.', 'info');
+        return;
+      }
+    }
 
     try {
       let audioBlob: Blob;
       if (provider === 'local') {
+        const targetVoiceId = voice || 'id_ID-news_tts';
+        const cached = await isLocalModelCached(targetVoiceId);
+        if (!cached) {
+          // Play browser speech as sample preview instead of downloading 60MB unexpectedly
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(sampleText);
+            utterance.lang = targetVoiceId.startsWith('id_') ? 'id-ID' : 'en-US';
+            utterance.rate = Math.max(0.5, Math.min(2.0, settings.speed || 1.0));
+            window.speechSynthesis.speak(utterance);
+            addToast(`Model lokal belum diunduh. Memutar contoh dengan WebSpeech browser. Silakan klik Unduh Model untuk suara Piper offline.`, 'info');
+            return;
+          }
+        }
         const res = await synthesizeLocalTTS({
           text: sampleText,
-          voiceId: voice || 'id_ID-news_tts',
+          voiceId: targetVoiceId,
           speed: settings.speed || 1.05
         });
         audioBlob = res.audioBlob;
       } else if (provider === 'openai') {
         const key = settings.apiKeys.openai;
         if (!key) {
-          addToast('OpenAI API key missing in Settings. Playing preview chime.', 'warning');
-          audioBlob = await generateSyntheticAmbientAudio(1.5);
-        } else {
-          audioBlob = await generateOpenAITTS({
-            apiKey: key,
-            text: sampleText,
-            voice: voice || 'alloy',
-            speed: settings.speed || 1.05
-          });
+          addToast('OpenAI API key belum diisi di Pengaturan.', 'warning');
+          return;
         }
+        audioBlob = await generateOpenAITTS({
+          apiKey: key,
+          text: sampleText,
+          voice: voice || 'alloy',
+          speed: settings.speed || 1.05
+        });
       } else if (provider === 'elevenlabs') {
         const key = settings.apiKeys.elevenlabs;
         if (!key) {
-          addToast('ElevenLabs API key missing in Settings. Playing preview chime.', 'warning');
-          audioBlob = await generateSyntheticAmbientAudio(1.5);
-        } else {
-          const res = await generateElevenLabsTTS({
-            apiKey: key.trim(),
-            voiceId: voice || '21m00Tcm4TlvDq8ikWAM',
-            modelId: settings.elevenLabsModel || 'eleven_flash_v2_5',
-            text: sampleText,
-            stability: settings.stability
-          });
-          audioBlob = res.audioBlob;
+          addToast('ElevenLabs API key belum diisi di Pengaturan.', 'warning');
+          return;
         }
+        const res = await generateElevenLabsTTS({
+          apiKey: key.trim(),
+          voiceId: voice || '21m00Tcm4TlvDq8ikWAM',
+          modelId: settings.elevenLabsModel || 'eleven_flash_v2_5',
+          text: sampleText,
+          stability: settings.stability
+        });
+        audioBlob = res.audioBlob;
       } else {
-        audioBlob = await generateSyntheticAmbientAudio(2.0);
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(sampleText);
+          window.speechSynthesis.speak(utterance);
+          return;
+        }
+        addToast('Penyedia suara tidak valid.', 'warning');
+        return;
       }
 
       const url = URL.createObjectURL(audioBlob);
@@ -330,7 +400,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       await audio.play();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Audition failed: ${msg}`, 'error');
+      addToast(`Audisi gagal: ${msg}`, 'error');
     }
   },
 

@@ -308,10 +308,12 @@ export async function synthesizeLocalTTS(params: {
   text: string;
   voiceId: string;
   speed?: number;
+  noiseScale?: number;
+  noiseW?: number;
   signal?: AbortSignal;
   onProgress?: (progress: { percent: number; message: string }) => void;
 }): Promise<TTSResult> {
-  const { text, voiceId, speed = 1.05, signal, onProgress } = params;
+  const { text, voiceId, speed = 1.05, noiseScale, noiseW, signal, onProgress } = params;
   const rawText = text.trim();
   if (!rawText) {
     throw new Error('Text cannot be empty for TTS synthesis.');
@@ -345,8 +347,6 @@ export async function synthesizeLocalTTS(params: {
     );
   }
 
-  // Use procedural synthesis in environments where WebWorker/ONNX is unavailable (e.g. Node tests, mock mode)
-  // or if worker synthesis falls back
   let synthData: { samples: Float32Array; sampleRate: number; duration: number };
 
   if (isBrowser && typeof Worker !== 'undefined') {
@@ -355,14 +355,18 @@ export async function synthesizeLocalTTS(params: {
         text: rawText,
         voice,
         speed,
+        noiseScale,
+        noiseW,
         signal,
         onProgress
       });
-    } catch (workerErr) {
-      console.warn('Worker synthesis encountered an issue, using high-fidelity local fallback:', workerErr);
-      synthData = generateProceduralSpeechAudio(rawText, voice.sampleRate, speed);
+    } catch (workerErr: any) {
+      // Never mask browser inference errors with a procedural buzzing tone
+      const message = workerErr?.message || String(workerErr);
+      throw new Error(`Gagal melakukan sintesis suara lokal (${voice.name}): ${message}`);
     }
   } else {
+    // Environment without WebWorker/browser (e.g. Node tests / Vitest)
     synthData = generateProceduralSpeechAudio(rawText, voice.sampleRate, speed);
   }
 
@@ -384,11 +388,12 @@ async function runWorkerSynthesis(params: {
   text: string;
   voice: LocalVoice;
   speed: number;
+  noiseScale?: number;
+  noiseW?: number;
   signal?: AbortSignal;
   onProgress?: (progress: { percent: number; message: string }) => void;
 }): Promise<{ samples: Float32Array; sampleRate: number; duration: number }> {
-  const { text, voice, speed, signal, onProgress } = params;
-
+  const { text, voice, speed, noiseScale, noiseW, signal, onProgress } = params;
   return new Promise((resolve, reject) => {
     let worker: Worker | null = null;
     try {
@@ -445,6 +450,8 @@ async function runWorkerSynthesis(params: {
       text,
       voiceId: voice.id,
       speed,
+      noiseScale,
+      noiseW,
       modelUrl: voice.modelUrl,
       configUrl: voice.configUrl,
       sampleRate: voice.sampleRate

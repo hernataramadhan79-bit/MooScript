@@ -1473,25 +1473,25 @@ export class CanvasRenderer {
     if (!text) return;
 
     ctx.save();
+    const style = project.theme.captionStyle || 'boxed';
+    const position = project.theme.captionPosition || 'bottom';
+    const cust = project.theme.subtitleCustomization || {};
+
+    const fontScale = Math.max(0.6, Math.min(2.0, cust.fontScale || 1.0));
+    const baseFontRatio = style === 'bold-pop' ? 0.052 : style === 'minimal' ? 0.038 : 0.044;
+    const fontSize = Math.round(width * baseFontRatio * fontScale);
+    const subH = Math.round(fontSize * 2.1);
+
     const safeBottom = Math.round(height * (220 / 1920));
-    const subY = height - safeBottom - 70;
-    const subW = width - 160;
-    const subX = 80;
-    const subH = 68;
+    const yOffset = Math.round((cust.yOffsetPercent || 0) * 0.01 * height);
+    const subY = position === 'top'
+      ? Math.round(height * 0.1) + yOffset
+      : position === 'center'
+        ? Math.round(height * 0.5 - subH / 2) + yOffset
+        : height - safeBottom - subH - 20 + yOffset;
 
-    // Semi-transparent pill
-    ctx.fillStyle = '#09090be6';
-    ctx.beginPath();
-    if (ctx.roundRect) {
-      ctx.roundRect(subX, subY, subW, subH, 16);
-    } else {
-      ctx.rect(subX, subY, subW, subH);
-    }
-    ctx.fill();
-
-    ctx.strokeStyle = '#27272a';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    const maxChunkWords = cust.maxWordsPerChunk || (style === 'bold-pop' ? 3 : 5);
+    const words = text.split(/\s+/).filter(Boolean);
 
     // Determine active word
     let activeWordIndex = -1;
@@ -1503,29 +1503,92 @@ export class CanvasRenderer {
           break;
         }
       }
+      if (activeWordIndex === -1) {
+        for (let j = timestamps.length - 1; j >= 0; j--) {
+          if (sceneElapsed >= timestamps[j].start) {
+            if (sceneElapsed <= timestamps[j].end + 0.6) activeWordIndex = j;
+            break;
+          }
+        }
+      }
+    } else if (scene.durationInSeconds > 0) {
+      const step = scene.durationInSeconds / words.length;
+      activeWordIndex = Math.min(words.length - 1, Math.floor(sceneElapsed / step));
     }
 
-    ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+    if (activeWordIndex === -1 && sceneElapsed > 0.5) {
+      ctx.restore();
+      return;
+    }
+    const safeActive = Math.max(0, activeWordIndex);
+    const chunkStart = Math.floor(safeActive / maxChunkWords) * maxChunkWords;
+    const chunkWords = words.slice(chunkStart, chunkStart + maxChunkWords);
+    const activeInChunk = safeActive - chunkStart;
+
+    const isUpper = Boolean(cust.uppercase || style === 'bold-pop');
+    const highlight = cust.activeColor || project.theme.textHighlight || '#84cc16';
+    const textPrimary = cust.textColor || project.theme.textPrimary || '#f4f4f5';
+
+    ctx.font = `${style === 'bold-pop' || style === 'outline' ? '900' : '700'} ${fontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.textBaseline = 'middle';
 
-    const words = text.split(/\s+/);
+    // Compute total width of chunk
     const spaceW = ctx.measureText(' ').width;
     let totalTextW = 0;
-    for (const w of words) totalTextW += ctx.measureText(w).width + spaceW;
+    const measuredWords = chunkWords.map((w) => {
+      const displayWord = isUpper ? w.toUpperCase() : w;
+      const wWidth = ctx.measureText(displayWord).width;
+      totalTextW += wWidth;
+      return { word: displayWord, width: wWidth };
+    });
+    totalTextW += spaceW * Math.max(0, measuredWords.length - 1);
 
-    let curX = Math.max(subX + 24, (width - totalTextW) / 2);
-    const highlight = project.theme.textHighlight || '#84cc16';
-    const textPrimary = project.theme.textPrimary || '#f4f4f5';
+    const subW = Math.min(width - 80, totalTextW + fontSize * 1.2);
+    const subX = (width - subW) / 2;
 
-    for (let i = 0; i < words.length; i++) {
-      const w = words[i];
-      const wWidth = ctx.measureText(w).width;
-      if (curX + wWidth > subX + subW - 24) break; // Keep inside pill
+    // Background pill if boxed
+    if (style === 'boxed') {
+      const bgOpacity = cust.bgOpacity !== undefined ? cust.bgOpacity : 0.65;
+      ctx.fillStyle = `rgba(9, 9, 11, ${bgOpacity})`;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(subX, subY, subW, subH, Math.round(fontSize * 0.4));
+      } else {
+        ctx.rect(subX, subY, subW, subH);
+      }
+      ctx.fill();
+      ctx.strokeStyle = `rgba(39, 39, 42, ${bgOpacity * 0.8})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
 
-      ctx.fillStyle = i === activeWordIndex ? highlight : textPrimary;
-      ctx.globalAlpha = i === activeWordIndex ? 1.0 : 0.65;
-      ctx.fillText(w, curX, subY + subH / 2);
-      curX += wWidth + spaceW;
+    let curX = (width - totalTextW) / 2;
+    const centerY = subY + subH / 2;
+
+    for (let i = 0; i < measuredWords.length; i++) {
+      const item = measuredWords[i];
+      const isActive = i === activeInChunk;
+
+      ctx.save();
+      if (style === 'outline') {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(3, Math.round(fontSize * 0.12));
+        ctx.strokeText(item.word, curX, centerY);
+      } else if (style === 'karaoke' && isActive) {
+        ctx.shadowColor = highlight;
+        ctx.shadowBlur = 12;
+      } else if (style === 'minimal') {
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+      }
+
+      ctx.fillStyle = isActive ? highlight : textPrimary;
+      ctx.globalAlpha = isActive ? 1.0 : style === 'boxed' ? 0.75 : 0.85;
+      ctx.fillText(item.word, curX, centerY);
+      ctx.restore();
+
+      curX += item.width + spaceW;
     }
 
     ctx.restore();

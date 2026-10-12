@@ -1,6 +1,25 @@
 export type SceneTransition = 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom';
-export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal';
+export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal' | 'outline';
 export type CaptionPosition = 'top' | 'center' | 'bottom';
+
+export interface SubtitleCustomization {
+  /** Font size multiplier: 0.8 (kecil), 1.0 (normal), 1.25 (besar), 1.5 (ekstra besar). Default 1.0. */
+  fontScale?: number;
+  /** Custom active highlight word color. Defaults to theme textHighlight or #84cc16. */
+  activeColor?: string;
+  /** Custom inactive base text color. Defaults to #ffffff. */
+  textColor?: string;
+  /** Custom box background color. Defaults to #000000. */
+  bgColor?: string;
+  /** Background box opacity: 0.0 (transparan) s/d 1.0 (pekat). Default 0.65. */
+  bgOpacity?: number;
+  /** Whether to transform subtitle text to UPPERCASE (popular short-form video style). */
+  uppercase?: boolean;
+  /** Maximum words shown per phrase/chunk. Default 4. */
+  maxWordsPerChunk?: number;
+  /** Vertical position offset percentage (-20% s/d +20%). Default 0. */
+  yOffsetPercent?: number;
+}
 export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi';
 
 // Legacy (pre-generative) vocabulary. Kept ONLY so old projects can be read & migrated.
@@ -649,6 +668,7 @@ export interface MooProject {
     captionStyle: CaptionStyle;
     captionPosition: CaptionPosition;
     showSubtitles?: boolean;
+    subtitleCustomization?: SubtitleCustomization;
   };
   themeTokens?: ThemeTokens;
   /** Storyboard beats placed on the timeline (the composition is stored separately). */
@@ -676,7 +696,7 @@ export interface PersonaSkill {
 }
 
 export type LLMProvider = 'gemini' | 'openai' | 'groq' | 'anthropic' | 'openrouter';
-export type TTSProvider = 'openai' | 'elevenlabs' | 'fallback' | 'local';
+export type TTSProvider = 'openai' | 'elevenlabs' | 'fallback' | 'local' | 'timer';
 
 export interface EngineSettings {
   apiKeys: {
@@ -706,6 +726,10 @@ export interface EngineSettings {
   elevenLabsModel?: string;
   speed: number;
   stability: number;
+  /** Piper ONNX acoustic expressiveness (noise_scale). Default 0.667. */
+  piperNoiseScale?: number;
+  /** Piper ONNX phoneme duration variation (noise_w). Default 0.8. */
+  piperNoiseW?: number;
   duckingDb: number;
   fps: number;
 }
