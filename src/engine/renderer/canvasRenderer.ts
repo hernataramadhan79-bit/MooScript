@@ -338,6 +338,30 @@ export class CanvasRenderer {
       if (slideX !== 0) {
         ctx.translate(slideX, 0);
       }
+    } else if (transition === 'zoom') {
+      let scale = 1.0;
+      let alpha = 1.0;
+      if (sceneIndex > 0 && sceneElapsed < transDuration) {
+        const factor = easeInOutQuad(clamp(sceneElapsed / transDuration, 0, 1));
+        scale = 0.92 + factor * 0.08;
+        alpha = factor;
+      }
+      if (sceneIndex < project.scenes.length - 1 && remaining < transDuration) {
+        const factor = easeInOutQuad(clamp(remaining / transDuration, 0, 1));
+        scale = 1.0 + (1 - factor) * 0.15;
+        alpha = factor;
+      }
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = clamp(ctx.globalAlpha * alpha, 0, 1);
+    } else if (transition === 'wipe') {
+      let alpha = 1.0;
+      if (sceneIndex > 0 && sceneElapsed < transDuration) {
+        alpha = easeInOutQuad(clamp(sceneElapsed / transDuration, 0, 1));
+      }
+      if (sceneIndex < project.scenes.length - 1 && remaining < transDuration) {
+        alpha = easeInOutQuad(clamp(remaining / transDuration, 0, 1));
+      }
+      ctx.globalAlpha = clamp(ctx.globalAlpha * alpha, 0, 1);
     }
 
     ctx.translate(-width / 2, -height / 2);

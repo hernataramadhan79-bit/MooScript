@@ -45,7 +45,11 @@ export function getRuntimeScript(): string {
   // 3. MOO global API for scene modules
   window.MOO = {
     scene: function(id, definition) {
-      window.__MOO_SCENES__.push({ id: id, definition: definition });
+      window.__MOO_SCENES__.push({
+        id: id,
+        definition: definition,
+        transition: (definition && definition.transition) || 'cut'
+      });
     }
   };
 
@@ -130,13 +134,14 @@ export function getRuntimeScript(): string {
       return mm.duration || 3.0;
     });
 
+    // Phase 1: Create all scene wrapper DOM elements first
+    const sceneElements = [];
     for (let i = 0; i < scenes.length; i++) {
       const sceneItem = scenes[i];
       const def = sceneItem.definition;
       const meta = (compositionMeta?.scenes || []).find(function(m) { return m.id === sceneItem.id; }) || {};
       const duration = meta.duration || 3.0;
 
-      // Create container for scene
       const sceneWrapper = document.createElement('div');
       sceneWrapper.className = 'moo-scene-wrapper';
       sceneWrapper.id = 'scene-' + sceneItem.id;
@@ -144,13 +149,43 @@ export function getRuntimeScript(): string {
       sceneWrapper.style.inset = '0';
       sceneWrapper.style.width = '100%';
       sceneWrapper.style.height = '100%';
-      sceneWrapper.style.opacity = i === 0 ? '1' : '0';
-      sceneWrapper.style.visibility = i === 0 ? 'visible' : 'hidden';
       sceneWrapper.style.pointerEvents = 'none';
       sceneWrapper.style.overflow = 'hidden';
+      sceneWrapper.style.opacity = i === 0 ? '1' : '0';
+      sceneWrapper.style.visibility = i === 0 ? 'visible' : 'hidden';
       sceneWrapper.innerHTML = def.html || '';
 
       stageElem.appendChild(sceneWrapper);
+      sceneElements.push({
+        wrapper: sceneWrapper,
+        item: sceneItem,
+        def: def,
+        meta: meta,
+        duration: duration
+      });
+    }
+
+    // Phase 2: Set initial state at t=0 for all scene wrappers in master timeline
+    for (let i = 0; i < sceneElements.length; i++) {
+      masterTl.set(sceneElements[i].wrapper, {
+        visibility: i === 0 ? 'visible' : 'hidden',
+        opacity: i === 0 ? 1 : 0,
+        zIndex: 1,
+        x: '0%',
+        scale: 1,
+        clipPath: 'none'
+      }, 0);
+    }
+
+    // Phase 3: Build individual scene timelines and inter-scene transitions
+    for (let i = 0; i < sceneElements.length; i++) {
+      const current = sceneElements[i];
+      const sceneWrapper = current.wrapper;
+      const def = current.def;
+      const meta = current.meta;
+      const duration = current.duration;
+      const transitionType = current.item.transition || current.def.transition || meta.transition || 'cut';
+      const next = sceneElements[i + 1];
 
       // Context passed to build(tl, root, ctx)
       const scenePrng = createPrng(i + 1);
@@ -167,7 +202,6 @@ export function getRuntimeScript(): string {
         index: i
       };
 
-      // Create scene child timeline with target safety
       const rawSceneTl = window.gsap.timeline();
       const safeSceneTl = makeSafeTimeline(rawSceneTl);
       const safeGsap = makeSafeGsap(window.gsap);
@@ -179,35 +213,47 @@ export function getRuntimeScript(): string {
           fn(safeSceneTl, sceneWrapper, ctx, safeGsap);
         }
       } catch (err) {
-        console.error('Error in scene build(): ' + sceneItem.id, err);
+        console.error('Error in scene build(): ' + current.item.id, err);
       }
 
-      // Deterministic bidirectional visibility in master timeline with transition presets
-      const transitionType = sceneItem.transition || 'cut';
-      masterTl.set(sceneWrapper, { opacity: 1, visibility: 'visible' }, accumulatedTime);
-      if (i < scenes.length - 1) {
+      // Add child scene timeline at accumulatedTime
+      masterTl.add(rawSceneTl, accumulatedTime);
+
+      // Inter-scene transitions
+      if (next) {
+        const transDur = Math.min(0.4, Math.max(0.2, duration * 0.25));
+        const transStart = accumulatedTime + duration - transDur;
+        const transEnd = accumulatedTime + duration;
+
         if (transitionType === 'fade') {
-          const transDur = Math.min(0.35, duration * 0.25);
-          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
-          masterTl.set(sceneWrapper, { visibility: 'hidden' }, accumulatedTime + duration);
+          // Crossfade: Next scene appears underneath, current scene fades out
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transStart);
+          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
+          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.inOut' }, transStart);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
         } else if (transitionType === 'slide') {
-          const transDur = Math.min(0.4, duration * 0.25);
-          masterTl.to(sceneWrapper, { x: '-100%', duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%' }, accumulatedTime + duration);
+          // Push slide: Next scene enters from right, current scene slides left
+          masterTl.fromTo(next.wrapper, { x: '100%', visibility: 'visible', opacity: 1, zIndex: 2 }, { x: '0%', duration: transDur, ease: 'power2.inOut' }, transStart);
+          masterTl.to(sceneWrapper, { x: '-100%', duration: transDur, ease: 'power2.inOut' }, transStart);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%', zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
-          const transDur = Math.min(0.35, duration * 0.25);
-          masterTl.to(sceneWrapper, { scale: 1.15, opacity: 0, duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 1 }, accumulatedTime + duration);
+          // Zoom transition: Next scene zooms from 0.92 to 1.0, current scene zooms to 1.15 and fades
+          masterTl.fromTo(next.wrapper, { scale: 0.92, visibility: 'visible', opacity: 0, zIndex: 1 }, { scale: 1, opacity: 1, duration: transDur, ease: 'power2.out' }, transStart);
+          masterTl.to(sceneWrapper, { scale: 1.15, opacity: 0, duration: transDur, ease: 'power2.in' }, transStart);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 0, zIndex: 1 }, transEnd);
         } else if (transitionType === 'wipe') {
-          const transDur = Math.min(0.35, duration * 0.25);
-          masterTl.to(sceneWrapper, { clipPath: 'inset(0 0 100% 0)', duration: transDur, ease: 'power2.inOut' }, accumulatedTime + duration - transDur);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'inset(0 0 0% 0)' }, accumulatedTime + duration);
+          // Vertical wipe: Next scene visible underneath, current scene wipes away
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transStart);
+          masterTl.fromTo(sceneWrapper, { clipPath: 'inset(0% 0% 0% 0%)', zIndex: 2 }, { clipPath: 'inset(0% 0% 100% 0%)', duration: transDur, ease: 'power2.inOut' }, transStart);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'none', zIndex: 1 }, transEnd);
         } else {
-          masterTl.set(sceneWrapper, { opacity: 0, visibility: 'hidden' }, accumulatedTime + duration);
+          // Default cut: Instant switch at end of scene
+          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         }
       }
 
-      masterTl.add(rawSceneTl, accumulatedTime);
       accumulatedTime += duration;
     }
 
@@ -236,20 +282,6 @@ export function getRuntimeScript(): string {
     virtualTimeSeconds = t;
     if (masterTl) {
       masterTl.seek(t, false);
-    }
-    // Explicitly enforce scene wrapper visibility so boundary/zero-duration issues never hide active scenes
-    var allScenes = window.__MOO_SCENES__ || [];
-    var curAccTime = 0;
-    for (var idx = 0; idx < allScenes.length; idx++) {
-      var sItem = allScenes[idx];
-      var sWrap = document.getElementById('scene-' + sItem.id);
-      var sDur = (window.__MOO_SCENE_DURATIONS__ && window.__MOO_SCENE_DURATIONS__[idx]) || 3.0;
-      var isVisible = (t >= curAccTime && (t < curAccTime + sDur || idx === allScenes.length - 1));
-      if (sWrap) {
-        sWrap.style.opacity = isVisible ? '1' : '0';
-        sWrap.style.visibility = isVisible ? 'visible' : 'hidden';
-      }
-      curAccTime += sDur;
     }
     // Overlay hook (subtitles). Must never break seeking.
     if (typeof window.__MOO_AFTER_SEEK__ === 'function') {

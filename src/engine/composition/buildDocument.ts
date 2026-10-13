@@ -143,11 +143,13 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
   // its own try/catch so a syntax error in one scene can never take down the whole composition.
   const scenesJs = resolved
     .map(({ mod, html, buildJs }, idx) => {
+      const ts = timelineScenes.find((s) => s.id === mod.beatId);
       return `
 // Register Scene ${idx + 1}
 MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   html: ${safeJson(html || '')},
-  buildSrc: ${safeJson(buildJs || '')}
+  buildSrc: ${safeJson(buildJs || '')},
+  transition: ${safeJson(ts?.transition || 'cut')}
 });
 `;
     })

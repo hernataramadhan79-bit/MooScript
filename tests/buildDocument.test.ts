@@ -71,4 +71,49 @@ describe('Composition Document Builder', () => {
     expect(script).toContain('frame_error');
     expect(script).toContain('encodeURIComponent(svgString)');
   });
+
+  it('correctly injects and handles scene transitions (fade, slide, zoom, wipe) in composition document and runtime', () => {
+    const mockProject: MooProject = {
+      id: 'test-trans-proj',
+      title: 'Test Transitions',
+      aspectRatio: '9:16',
+      fps: 30,
+      width: 1080,
+      height: 1920,
+      theme: {
+        bg: '#09090b',
+        textPrimary: '#ffffff',
+        textHighlight: '#84cc16',
+        fontFamily: 'Jakarta',
+        captionStyle: 'boxed',
+        captionPosition: 'center'
+      },
+      scenes: [
+        { id: 'sc-1', narrationText: 'Scene 1', durationInSeconds: 3, wordTimestamps: [], transition: 'fade' },
+        { id: 'sc-2', narrationText: 'Scene 2', durationInSeconds: 3, wordTimestamps: [], transition: 'slide' }
+      ],
+      audioDuration: 6,
+      composition: {
+        id: 'comp-trans',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        scenes: [
+          { beatId: 'sc-1', html: '<div>1</div>', css: '', buildJs: 'tl.to(".x", {});', status: 'ok', version: 1 },
+          { beatId: 'sc-2', html: '<div>2</div>', css: '', buildJs: 'tl.to(".y", {});', status: 'ok', version: 1 }
+        ],
+        createdAt: Date.now()
+      }
+    };
+
+    const doc = buildCompositionDocument(mockProject);
+    expect(doc).toContain('"transition":"fade"');
+    expect(doc).toContain('"transition":"slide"');
+
+    const runtime = getRuntimeScript();
+    expect(runtime).toContain("transitionType === 'fade'");
+    expect(runtime).toContain("transitionType === 'slide'");
+    expect(runtime).toContain("transitionType === 'zoom'");
+    expect(runtime).toContain("transitionType === 'wipe'");
+  });
 });
