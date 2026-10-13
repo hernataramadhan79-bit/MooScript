@@ -161,11 +161,11 @@ ${contextSnippet ? `=== KONTINUITAS DENGAN SCENE LAIN ===\n${contextSnippet}\n` 
   * Font Display: var(--moo-font-display, '${styleBrief.fontDisplay || 'Plus Jakarta Sans'}')
 
 === PERSYARATAN ELEMEN & KODE ===
-1. Wajib representasikan Visual Intent & Konsep pengguna secara nyata (buat diagram interaktif, ilustrasi SVG grafis, bentuk geometris kinetik, atau alur visual yang nyata). JANGAN sekadar kartu teks statis.
+1. Wajib representasikan Visual Intent & Konsep pengguna secara nyata (buat diagram interaktif, ilustrasi SVG grafis, bentuk geometris kinetik, atau alur visual yang nyata). JANGAN sekadar kartu teks statis di tengah layar.
 2. Tandai elemen-elemen penting dengan atribut data-moo-layer="layer-id" (misal data-moo-layer="airplane", data-moo-layer="streamline", data-moo-layer="headline").
 3. Wadah utama harus berukuran 100% x 100% dan ter-scope dengan class .scene-s${beatIndex + 1}.
 4. Kode GSAP dieksekusi langsung di runtime dengan parameter (tl, root, ctx, gsap). JANGAN deklarasikan ulang 'const tl' atau 'const root'. Langsung panggil tl.to(...), tl.from(...), atau tl.fromTo(...) dalam durasi maksimal ctx.dur.
-5. EFISIENSI & KUALITAS TINGGI: Tuliskan kode yang bersih, padat, dan elegan (~30-60 baris total). Hasilkan HANYA 3 blok kode murni tanpa kata pembuka atau penutup tambahan.
+5. KEKAYAAN VISUAL & KUALITAS TINGGI: Tuliskan kode yang ekspresif, berbobot, dan modular. Rancang elemen visual yang kaya dan representatif (multi-path SVG, grafik skematik, layer visual bergerak, atau tipografi kinetik). Bebaskan komposisi (bisa full-bleed, absolute coordinates, split layout, atau SVG stage) sesuai topik adegan. Hasilkan HANYA 3 blok kode murni tanpa kata pembuka atau penutup tambahan.
 
 === FORMAT OUTPUT WAJIB ===
 Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tambahan di luar blok):
@@ -183,7 +183,7 @@ Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tamba
   height: 100%;
   position: relative;
   overflow: hidden;
-  display: flex;
+  /* Rancang layout bebas yang sesuai dengan konsep visual adegan */
   ...
 }
 \`\`\`
@@ -191,7 +191,8 @@ Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tamba
 \`\`\`javascript
 // Function signature: (tl, root, ctx, gsap)
 // root adalah elemen wadah scene. ctx.dur adalah durasi (${durationSec.toFixed(1)}s).
-tl.from(root.querySelector(".scene-s${beatIndex + 1}"), { opacity: 0, duration: 0.3 })
+// Animasikan elemen-elemen visual dan teks secara terkoordinasi dan sinematik:
+tl.from(...)
   ...
 \`\`\`
 `;

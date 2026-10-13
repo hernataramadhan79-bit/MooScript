@@ -31,44 +31,53 @@ export function resolveSkillIcon(icon?: string): string {
 
 export const BUILTIN_SKILLS: PersonaSkill[] = [
   {
+    id: 'skill-creative-director',
+    name: 'Creative Director',
+    icon: 'palette',
+    description: 'Adaptif, ekspresif, dan visual-first. Bebas template kaku.',
+    systemPrompt: `Style: Adaptif, ekspresif, dan berfokus pada kekuatan penceritaan visual yang segar.
+Pacing: Mengalir dinamis sesuai emosi dan konteks topik cerita pengguna.
+Tone: Sutradara kreatif yang mengutamakan analogi visual konkret, metafora orisinal, dan kejelasan konsep.
+Vocabulary: Alami, variatif, dan persuasif tanpa batasan kata sempit.
+Motion Personality: Gerakan kinetik organik dan sinematik yang mengekspresikan esensi ide secara hidup.`,
+    isBuiltin: true
+  },
+  {
     id: 'skill-tech-explainer',
     name: 'Tech Explainer',
     icon: 'bolt',
-    description: 'Fast tempo, punchy words, concise architectural logic.',
-    systemPrompt: `Style: High-velocity technical explanation.
-Pacing: Fast, energetic, zero fluff.
-Tone: Expert systems engineer breaking down a hard technical concept.
-Vocabulary: Use crisp modern tech terms (WebCodecs, zero-server, latency, memory-safety, pipeline).
-Word limit: 12-18 words per scene.
-Highlight words: Core verbs and technologies.
-Motion Personality: Precise, snappy, high information density with schematic diagrams and animated vector flows.`,
+    description: 'Penjelasan sistematis, tajam, dengan logika visual berstruktur.',
+    systemPrompt: `Style: Penjelasan konsep dan teknologi secara jernih, tajam, dan berenergi.
+Pacing: Mantap, lugas, mengalir terstruktur tanpa basa-basi berlebih.
+Tone: Pakar yang menguraikan konsep rumit menjadi analogi logis yang mudah dipahami.
+Vocabulary: Istilah relevan dan akurat sesuai topik teknis yang dibahas secara proporsional.
+Highlight words: Kata kerja kunci, mekanisme, dan konsep inti.
+Motion Personality: Presisi, snappy, kaya diagram alur, skematik visual, dan transisi vektor kinetik.`,
     isBuiltin: true
   },
   {
     id: 'skill-viral-hook',
     name: 'Viral Hook',
     icon: 'psychology',
-    description: 'Aggressive first 3 seconds, curiosity gap phrasing.',
-    systemPrompt: `Style: Addictive short-form hook format.
-Pacing: Rapid-fire opening curiosity gap followed by rapid revelations.
-Tone: Provocative, dramatic, counter-intuitive insight.
-Structure: Scene 1 MUST be an irresistible pattern interrupt.
-Word limit: 10-16 words per scene.
-Highlight words: Surprising revelations, paradoxes, numbers.
-Motion Personality: Punchy camera moves, high-contrast focal points, and dramatic visual transformations.`,
+    description: 'Hook 3 detik pertama yang kuat, format penceritaan memikat.',
+    systemPrompt: `Style: Format penceritaan short-form dengan daya pikat dan retensi tinggi.
+Pacing: Pembuka memikat rasa ingin tahu (curiosity gap) diikuti perkembangan cerita yang dinamis.
+Tone: Provokatif, dramatis, dan penuh wawasan menarik.
+Structure: Scene 1 wajib menjadi pemikat perhatian utama (pattern interrupt).
+Highlight words: Poin kejutan, paradoks, angka kunci, dan kata aksi.
+Motion Personality: Pergerakan kamera dinamis, titik fokus berkontras tinggi, dan transformasi visual dramatis.`,
     isBuiltin: true
   },
   {
     id: 'skill-chill-lofi',
     name: 'Chill Lofi Story',
     icon: 'auto_awesome',
-    description: 'Relaxed cadence, poetic sentences, subtle kinetic transitions.',
-    systemPrompt: `Style: Reflective, serene, contemplative storytelling.
-Pacing: Measured and smooth with breathing room.
-Tone: Calm, aesthetic, thoughtful.
-Word limit: 14-22 words per scene.
-Highlight words: Emotional anchors and evocative metaphors.
-Motion Personality: Smooth spatial drift, organic floating shapes, warm ambient lighting, and gentle parallax.`,
+    description: 'Tempo tenang, kalimat puitis dan estetis, transisi halus.',
+    systemPrompt: `Style: Narasi reflektif, tenang, dan kontemplatif dengan ruang estetis.
+Pacing: Mengalir santai dan teratur, memberi ruang bernapas bagi penonton.
+Tone: Tenang, hangat, puitis, dan berwawasan mendalam.
+Highlight words: Jangkar emosional dan metafora visual bermakna.
+Motion Personality: Spatial drift halus, elemen mengambang organik, dan transisi parallax lembut.`,
     isBuiltin: true
   }
 ];

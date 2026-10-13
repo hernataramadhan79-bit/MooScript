@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import type { SceneTransition } from '../../types';
+import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 
@@ -138,6 +139,9 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     assignAssetToScene,
     removeAssetFromSceneBeat,
     updateSceneAssetRole,
+    skills,
+    activeSkillId,
+    setSettingsOpen
   } = useMooStore();
 
   const scenes = project.scenes || [];
@@ -192,7 +196,26 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
             className="w-full bg-surface-2 border border-border focus:border-accent rounded-lg px-2.5 py-1.5 text-[12px] sm:text-[13px] text-text placeholder:text-text-faint resize-none focus:outline-none transition-all leading-snug max-h-16 overflow-y-auto"
           />
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between gap-2">
+            {(() => {
+              const activeSkill = skills.find((s) => s.id === activeSkillId) || skills[0];
+              return (
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-1 hover:bg-surface-3 text-[11px] text-text-muted hover:text-accent border border-border transition-all truncate max-w-[180px]"
+                  title="Ganti atau sesuaikan Persona Sutradara di Pengaturan"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-accent shrink-0">
+                    {activeSkill ? resolveSkillIcon(activeSkill.icon) : 'palette'}
+                  </span>
+                  <span className="truncate">
+                    Gaya: <strong className="text-text font-medium">{activeSkill?.name || 'Creative'}</strong>
+                  </span>
+                </button>
+              );
+            })()}
+
             <Button
               variant="primary"
               size="sm"
@@ -207,7 +230,6 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           </div>
         </div>
       </div>
-
       {/* 2. Daftar Kartu Adegan (Scene Storyboard) */}
       <div className="flex flex-col gap-2">
         {scenes.length === 0 ? (

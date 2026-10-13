@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
-import { exportSkillToJson, importSkillFromJson, addCustomSkill, deleteSkill } from '../engine/skills/skillManager';
+import { exportSkillToJson, importSkillFromJson, addCustomSkill, deleteSkill, resolveSkillIcon } from '../engine/skills/skillManager';
 import { checkStoragePersistence, requestPersistentStorage } from '../db/mooDb';
 import { testProviderApiKey, fetchAvailableModels, DEFAULT_PROVIDER_MODELS, type ProviderModelInfo } from '../engine/ai/llm';
 import {
@@ -182,6 +182,8 @@ export const SettingsDrawer: React.FC = () => {
     updateSettings,
     updateApiKey,
     skills,
+    activeSkillId,
+    setActiveSkillId,
     refreshSkills,
     cacheSizeBytes,
     clearCache,
@@ -291,6 +293,10 @@ export const SettingsDrawer: React.FC = () => {
     if (!isSettingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (showAddSkillModal) {
+          setShowAddSkillModal(false);
+          return;
+        }
         setSettingsOpen(false);
       }
     };
@@ -986,45 +992,65 @@ export const SettingsDrawer: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              {skills.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-white text-xs truncate">{s.name}</span>
-                      {s.isBuiltin && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400">
-                          Bawaan
-                        </span>
-                      )}
+              {skills.map((s) => {
+                const isActive = s.id === activeSkillId;
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => {
+                      setActiveSkillId(s.id);
+                      addToast(`Persona aktif: ${s.name}`, 'info');
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
+                      isActive
+                        ? 'bg-primary/10 border-primary/50 shadow-sm'
+                        : 'bg-black/40 border-white/[0.06] hover:border-white/[0.15]'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center shrink-0 text-primary">
+                      <span className="material-symbols-outlined text-[16px]">
+                        {resolveSkillIcon(s.icon)}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-zinc-400 truncate block mt-0.5">{s.description}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleExportSkill(s)}
-                      title="Ekspor Skill JSON"
-                      className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">file_download</span>
-                    </button>
-                    {!s.isBuiltin && (
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-white text-xs truncate">{s.name}</span>
+                        {isActive && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary text-black font-extrabold uppercase">
+                            Aktif
+                          </span>
+                        )}
+                        {s.isBuiltin && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400">
+                            Bawaan
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-zinc-400 truncate block mt-0.5">{s.description}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={() => handleDeleteSkill(s.id)}
-                        title="Hapus Skill"
-                        className="w-7 h-7 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                        onClick={() => handleExportSkill(s)}
+                        title="Ekspor Skill JSON"
+                        className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                       >
-                        <span className="material-symbols-outlined text-[15px]">delete</span>
+                        <span className="material-symbols-outlined text-[15px]">file_download</span>
                       </button>
-                    )}
+                      {!s.isBuiltin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSkill(s.id)}
+                          title="Hapus Skill"
+                          className="w-7 h-7 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -1135,92 +1161,114 @@ export const SettingsDrawer: React.FC = () => {
 
       {/* Add Custom Skill Modal */}
       {showAddSkillModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#141418] border border-white/[0.1] rounded-2xl p-4 space-y-3 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
-              <h3 className="text-sm font-bold text-white">Create Custom Persona Skill</h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowAddSkillModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#141418] border border-white/[0.1] rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
+                <h3 className="text-sm font-bold text-white">Buat Persona Sutradara Kustom</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowAddSkillModal(false)}
-                className="text-zinc-400 hover:text-white"
+                className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                title="Tutup"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
-                <label className="text-[10px] text-zinc-400 block mb-0.5">Skill Name</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Nama Persona</label>
                 <input
                   type="text"
-                  placeholder="e.g. 🚀 SaaS Launch Hook"
+                  placeholder="misal: 🚀 SaaS Launch Hook"
                   value={newSkillName}
                   onChange={(e) => setNewSkillName(e.target.value)}
-                  className="w-full bg-black/60 border border-white/[0.08] rounded-lg p-2 text-xs text-white focus:outline-none focus:border-primary"
+                  className="w-full bg-black/60 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-zinc-400 block mb-0.5">Skill Icon</label>
-                <div className="flex gap-1.5 pt-0.5">
-                  {['sparkles', 'zap', 'brain', 'flame', 'code', 'mascot'].map((icon) => (
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1.5">Ikon Persona</label>
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {[
+                    { id: 'sparkles', label: 'Kreatif' },
+                    { id: 'zap', label: 'Energetik' },
+                    { id: 'brain', label: 'Wawasan' },
+                    { id: 'flame', label: 'Viral' },
+                    { id: 'palette', label: 'Estetika' },
+                    { id: 'code', label: 'Teknikal' },
+                    { id: 'mascot', label: 'Karakter' }
+                  ].map((item) => (
                     <button
-                      key={icon}
+                      key={item.id}
                       type="button"
-                      onClick={() => setNewSkillIcon(icon)}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center border text-xs transition-colors ${
-                        newSkillIcon === icon
-                          ? 'border-primary bg-primary/20 text-primary'
-                          : 'border-white/[0.08] bg-black/40 text-zinc-400 hover:text-white'
+                      onClick={() => setNewSkillIcon(item.id)}
+                      title={item.label}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
+                        newSkillIcon === item.id
+                          ? 'border-primary bg-primary/20 text-primary ring-1 ring-primary/40 shadow-sm'
+                          : 'border-white/[0.08] bg-black/40 text-zinc-400 hover:text-white hover:border-white/20 hover:bg-white/[0.04]'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[15px]">{icon}</span>
+                      <span className="material-symbols-outlined text-[18px] leading-none shrink-0 pointer-events-none">
+                        {resolveSkillIcon(item.id)}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] text-zinc-400 block mb-0.5">Short Description</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Deskripsi Singkat</label>
                 <input
                   type="text"
-                  placeholder="e.g. High-conversion product demo script"
+                  placeholder="misal: Format demo produk berkonversi tinggi"
                   value={newSkillDesc}
                   onChange={(e) => setNewSkillDesc(e.target.value)}
-                  className="w-full bg-black/60 border border-white/[0.08] rounded-lg p-2 text-xs text-white focus:outline-none focus:border-primary"
+                  className="w-full bg-black/60 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-zinc-400 block mb-0.5">System Prompt Instructions</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Instruksi System Prompt</label>
                 <textarea
-                  placeholder="Instruct the director on tone, cadence, sentence structure, and vocabulary..."
+                  placeholder="Arahkan sutradara terkait tone, cadence, struktur kalimat, vocabulary, dan ritme penceritaan..."
                   value={newSkillPrompt}
                   onChange={(e) => setNewSkillPrompt(e.target.value)}
-                  className="w-full h-20 bg-black/60 border border-white/[0.08] rounded-lg p-2 text-xs text-white focus:outline-none focus:border-primary resize-none"
+                  className="w-full h-24 bg-black/60 border border-white/[0.1] rounded-xl p-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary resize-none leading-relaxed transition-colors"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.08]">
+            <div className="flex justify-end gap-2 pt-2.5 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setShowAddSkillModal(false)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                className="px-3.5 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.04] transition-colors"
               >
-                Cancel
+                Batal
               </button>
               <button
                 type="button"
                 onClick={handleCreateSkill}
-                className="px-4 py-1.5 text-xs font-bold rounded-lg bg-primary text-black hover:bg-lime-300"
+                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-primary text-black hover:bg-lime-300 shadow-md transition-colors"
               >
-                Save Skill
+                Simpan Persona
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Konfirmasi Bersihkan Cache Model Suara */}
       <ConfirmModal
         isOpen={confirmPurgeModels}
