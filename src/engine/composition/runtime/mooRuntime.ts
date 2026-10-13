@@ -187,6 +187,16 @@ export function getRuntimeScript(): string {
       const transitionType = current.item.transition || current.def.transition || meta.transition || 'cut';
       const next = sceneElements[i + 1];
 
+      // Ensure current scene wrapper is unconditionally visible and reset at accumulatedTime
+      masterTl.set(sceneWrapper, {
+        visibility: 'visible',
+        opacity: 1,
+        zIndex: 1,
+        x: '0%',
+        scale: 1,
+        clipPath: 'none'
+      }, accumulatedTime);
+
       // Context passed to build(tl, root, ctx)
       const scenePrng = createPrng(i + 1);
       const ctx = {
@@ -226,31 +236,46 @@ export function getRuntimeScript(): string {
         const transEnd = accumulatedTime + duration;
 
         if (transitionType === 'fade') {
-          // Crossfade: Next scene appears underneath, current scene fades out
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transStart);
+          // Crossfade: Next scene appears underneath at transStart, current scene fades out
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
           masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.inOut' }, transStart);
           masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'slide') {
-          // Push slide: Next scene enters from right, current scene slides left
-          masterTl.fromTo(next.wrapper, { x: '100%', visibility: 'visible', opacity: 1, zIndex: 2 }, { x: '0%', duration: transDur, ease: 'power2.inOut' }, transStart);
+          // Push slide: Next scene enters from right, current scene slides left (immediateRender: false avoids premature offscreen state)
+          masterTl.fromTo(next.wrapper,
+            { x: '100%', visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' },
+            { x: '0%', duration: transDur, ease: 'power2.inOut', immediateRender: false },
+            transStart
+          );
           masterTl.to(sceneWrapper, { x: '-100%', duration: transDur, ease: 'power2.inOut' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%', zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { zIndex: 1 }, transEnd);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
           // Zoom transition: Next scene zooms from 0.92 to 1.0, current scene zooms to 1.15 and fades
-          masterTl.fromTo(next.wrapper, { scale: 0.92, visibility: 'visible', opacity: 0, zIndex: 1 }, { scale: 1, opacity: 1, duration: transDur, ease: 'power2.out' }, transStart);
+          masterTl.fromTo(next.wrapper,
+            { scale: 0.92, visibility: 'visible', opacity: 0, zIndex: 1, x: '0%', clipPath: 'none' },
+            { scale: 1, opacity: 1, duration: transDur, ease: 'power2.out', immediateRender: false },
+            transStart
+          );
           masterTl.to(sceneWrapper, { scale: 1.15, opacity: 0, duration: transDur, ease: 'power2.in' }, transStart);
           masterTl.set(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 0, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', scale: 1, opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'wipe') {
           // Vertical wipe: Next scene visible underneath, current scene wipes away
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transStart);
-          masterTl.fromTo(sceneWrapper, { clipPath: 'inset(0% 0% 0% 0%)', zIndex: 2 }, { clipPath: 'inset(0% 0% 100% 0%)', duration: transDur, ease: 'power2.inOut' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'none', zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTl.fromTo(sceneWrapper,
+            { clipPath: 'inset(0% 0% 0% 0%)', zIndex: 2 },
+            { clipPath: 'inset(0% 0% 100% 0%)', duration: transDur, ease: 'power2.inOut', immediateRender: false },
+            transStart
+          );
+          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'none', opacity: 0, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else {
           // Default cut: Instant switch at end of scene
           masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transEnd);
         }
       }
 
