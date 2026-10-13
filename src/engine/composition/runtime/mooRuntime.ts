@@ -288,6 +288,20 @@ export function getRuntimeScript(): string {
       const t = Number(data.time) || 0;
       seekTo(t);
       window.parent.postMessage({ type: 'seeked', id: data.id, time: t }, '*');
+    } else if (data.type === 'highlight_layer') {
+      const layerId = data.layerId;
+      let styleTag = document.getElementById('moo-layer-highlight-style');
+      if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'moo-layer-highlight-style';
+        document.head.appendChild(styleTag);
+      }
+      if (layerId) {
+        const safeId = String(layerId).replace(/[^a-zA-Z0-9_ -]/g, '');
+        styleTag.textContent = '[data-moo-layer="' + safeId + '"] { outline: 2px dashed #84cc16 !important; outline-offset: 4px; }';
+      } else {
+        styleTag.textContent = '';
+      }
     } else if (data.type === 'capture_frame' || data.type === 'capture') {
       const t = Number(data.time) || 0;
       seekTo(t);

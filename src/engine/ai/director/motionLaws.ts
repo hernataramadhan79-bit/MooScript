@@ -1,3 +1,5 @@
+import type { SceneAssetAttachment } from '../../../types';
+
 /**
  * Core Motion Graphics Director Laws & Prompts
  * 
@@ -83,6 +85,7 @@ export interface SceneCodegenParams {
     backgroundLanguage: string;
   };
   wordTimestamps?: Array<{ word: string; start: number; end: number }>;
+  assignedAssets?: SceneAssetAttachment[];
 }
 
 export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
@@ -102,6 +105,22 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
     focusWords,
     styleBrief
   } = params;
+  const assignedAssets = params.assignedAssets || [];
+  let assetsSnippet = '';
+  if (assignedAssets.length > 0) {
+    assetsSnippet = `\n=== ASET MEDIA DILAMPIRKAN PENGGUNA (INTEGRASI WAJIB) ===\nPengguna melampirkan aset gambar untuk adegan ini yang WAJIB dimasukkan ke dalam layout dan animasi:\n` +
+      assignedAssets.map((asset, i) =>
+`- Aset ${i + 1}: "${asset.assetName}" (Peran: ${asset.role})
+  Arahan Gerak: ${asset.motionGuidance || 'Animasikan secara natural menyatu dengan penceritaan'}
+  Aturan Integrasi:
+  1. Masukkan elemen HTML:
+     <div class="moo-asset-frame" data-moo-layer="asset-${asset.assetId}">
+       <img src="${asset.dataUrl}" alt="${asset.assetName}" class="moo-asset-img" />
+     </div>
+  2. Berikan CSS styling yang kohesif pada .moo-asset-frame dan .moo-asset-img (misal: kartu berbayang, frame bercahaya, ukuran proporsional, atau potongan transparan).
+  3. Animasikan dengan GSAP (tl.from / tl.to) terkoordinasi dengan teks dan grafik adegan!`
+      ).join('\n') + '\n';
+  }
 
   const elementsList = visualElements && visualElements.length > 0 ? visualElements.join(', ') : 'Elemen visual geometris & ilustratif custom';
 
@@ -128,6 +147,7 @@ ${motionIntent ? `- Arahan Gerak: "${motionIntent}"\n` : ''}
 ${cameraIntent ? `- Arahan Kamera: "${cameraIntent}"\n` : ''}
 - Durasi scene: ${durationSec.toFixed(1)} detik.
 - Aspek Rasio: ${aspectRatio}
+${assetsSnippet}
 
 ${contextSnippet ? `=== KONTINUITAS DENGAN SCENE LAIN ===\n${contextSnippet}\n` : ''}
 === PALET WARNA & ATMOSFER (BEBAS SESUAI TOPIK — JANGAN DEFAULT HIJAU) ===

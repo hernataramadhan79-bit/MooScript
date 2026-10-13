@@ -15,6 +15,14 @@ export function sanitizeLayerId(id: string): string {
   return String(id).trim().replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
+export function escapeLayerAttrSelector(id: string): string {
+  const str = String(id).trim();
+  if (!/^[a-zA-Z0-9_\s-]+$/.test(str)) {
+    return sanitizeLayerId(str);
+  }
+  return str.replace(/["\\]/g, '\\$&');
+}
+
 function humanize(id: string): string {
   const spaced = id.replace(/[-_]+/g, ' ').trim();
   return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : id;
@@ -97,6 +105,14 @@ export function getLayerText(html: string, layerId: string): string {
 export function setLayerText(html: string, layerId: string, text: string): string {
   const range = findLayerInnerRange(html, layerId);
   if (!range) return html;
+  const inner = html.slice(range.start, range.end);
+  // Check if inner content is wrapped in a single wrapper element (e.g. <span class="accent">...</span>)
+  const singleTagMatch = inner.match(/^(\s*<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>)([\s\S]*?)(<\/\2>\s*)$/);
+  if (singleTagMatch) {
+    const openTag = singleTagMatch[1];
+    const closeTag = singleTagMatch[4];
+    return html.slice(0, range.start) + openTag + escapeText(text) + closeTag + html.slice(range.end);
+  }
   return html.slice(0, range.start) + escapeText(text) + html.slice(range.end);
 }
 
@@ -225,40 +241,169 @@ export function compileOverridesCss(sceneDomId: string, overrides?: Record<strin
   const rules: string[] = [];
   for (const [rawId, o] of Object.entries(overrides)) {
     if (!o) continue;
-    const id = sanitizeLayerId(rawId);
+    const selectorVal = escapeLayerAttrSelector(rawId);
+    const sanitized = sanitizeLayerId(rawId);
+    const selector = selectorVal !== sanitized
+      ? `#${safeDomId} [data-moo-layer="${selectorVal}"], #${safeDomId} [data-moo-layer="${sanitized}"]`
+      : `#${safeDomId} [data-moo-layer="${selectorVal}"]`;
     const decls: string[] = [];
+
+    if (o.hidden === true) {
+      decls.push('display: none !important');
+    }
+
     const x = num(o.x);
     const y = num(o.y);
     if ((x !== undefined && x !== 0) || (y !== undefined && y !== 0)) {
       decls.push(`translate: ${x ?? 0}px ${y ?? 0}px`);
     }
+
     const sc = num(o.scale);
-    if (sc !== undefined && sc !== 1) decls.push(`scale: ${sc}`);
-    const rot = num(o.rotation);
-    if (rot !== undefined && rot !== 0) decls.push(`rotate: ${rot}deg`);
-    const op = num(o.opacity);
-    if (op !== undefined && op !== 1) decls.push(`filter: opacity(${Math.min(1, Math.max(0, op))})`);
-    if (typeof o.color === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$/.test(o.color.trim())) {
-      decls.push(`color: ${o.color.trim()} !important`, `fill: ${o.color.trim()} !important`);
+    if (sc !== undefined && sc !== 1) {
+      const sx = o.flipX ? -sc : sc;
+      const sy = o.flipY ? -sc : sc;
+      if (sx === sy) {
+        decls.push(`scale: ${sx}`);
+      } else {
+        decls.push(`scale: ${sx} ${sy}`);
+      }
+    } else if (o.flipX || o.flipY) {
+      const base = sc ?? 1;
+      const sx = o.flipX ? -base : base;
+      const sy = o.flipY ? -base : base;
+      if (sx === sy) {
+        decls.push(`scale: ${sx}`);
+      } else {
+        decls.push(`scale: ${sx} ${sy}`);
+      }
     }
+
+    const rot = num(o.rotation);
+    if (rot !== undefined && rot !== 0) {
+      decls.push(`rotate: ${rot}deg`);
+    }
+
+    const op = num(o.opacity);
+    if (op !== undefined && op !== 1) {
+      decls.push(`filter: opacity(${Math.min(1, Math.max(0, op))})`);
+    }
+
+    const zi = num(o.zIndex);
+    if (zi !== undefined) {
+      decls.push(`z-index: ${zi} !important`);
+    }
+
+    const fs = num(o.fontSizeScale);
+    if (fs !== undefined && fs !== 1) {
+      decls.push(`font-size: calc(100% * ${fs}) !important`);
+    }
+
+    if (o.textAlign && ['left', 'center', 'right'].includes(o.textAlign)) {
+      decls.push(`text-align: ${o.textAlign} !important`);
+    }
+
+    const br = num(o.borderRadius);
+    if (br !== undefined) {
+      decls.push(`border-radius: ${br}px !important`);
+    }
+
+    const col = typeof o.color === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$/.test(o.color.trim())
+      ? o.color.trim()
+      : undefined;
+
+    if (col) {
+      decls.push(`color: ${col} !important`, `fill: ${col} !important`, `border-color: ${col} !important`);
+      if (o.layerType === 'shape') {
+        decls.push(`background-color: ${col} !important`);
+      }
+    }
+
     if (decls.length) {
-      rules.push(`#${safeDomId} [data-moo-layer="${id}"] { ${decls.join('; ')}; }`);
+      rules.push(`${selector} { ${decls.join('; ')}; }`);
+    }
+
+    if (col) {
+      const childSelector = selectorVal !== sanitized
+        ? `#${safeDomId} [data-moo-layer="${selectorVal}"] *, #${safeDomId} [data-moo-layer="${sanitized}"] *`
+        : `#${safeDomId} [data-moo-layer="${selectorVal}"] *`;
+      const svgSelector = selectorVal !== sanitized
+        ? `#${safeDomId} [data-moo-layer="${selectorVal}"] :is(svg, path, circle, rect, polygon, ellipse), #${safeDomId} :is(path, circle, rect, polygon, ellipse)[data-moo-layer="${selectorVal}"], #${safeDomId} [data-moo-layer="${sanitized}"] :is(svg, path, circle, rect, polygon, ellipse), #${safeDomId} :is(path, circle, rect, polygon, ellipse)[data-moo-layer="${sanitized}"]`
+        : `#${safeDomId} [data-moo-layer="${selectorVal}"] :is(svg, path, circle, rect, polygon, ellipse), #${safeDomId} :is(path, circle, rect, polygon, ellipse)[data-moo-layer="${selectorVal}"]`;
+      const shapeSelector = selectorVal !== sanitized
+        ? `#${safeDomId} [data-moo-layer="${selectorVal}"]:is([class*="bar"], [class*="line"], [class*="dot"], [class*="divider"], [class*="shape"], :empty), #${safeDomId} [data-moo-layer="${sanitized}"]:is([class*="bar"], [class*="line"], [class*="dot"], [class*="divider"], [class*="shape"], :empty)`
+        : `#${safeDomId} [data-moo-layer="${selectorVal}"]:is([class*="bar"], [class*="line"], [class*="dot"], [class*="divider"], [class*="shape"], :empty)`;
+
+      rules.push(
+        `${childSelector} { color: ${col} !important; }`,
+        `${svgSelector} { fill: ${col} !important; stroke: ${col} !important; }`,
+        `${shapeSelector} { background-color: ${col} !important; }`
+      );
+    }
+
+    if (zi !== undefined) {
+      const relSelector = selectorVal !== sanitized
+        ? `#${safeDomId} [data-moo-layer="${selectorVal}"]:not([class*="absolute"]), #${safeDomId} [data-moo-layer="${sanitized}"]:not([class*="absolute"])`
+        : `#${safeDomId} [data-moo-layer="${selectorVal}"]:not([class*="absolute"])`;
+      rules.push(`${relSelector} { position: relative; }`);
     }
   }
   return rules.join('\n');
 }
 
-export function compilePaletteVars(palette: Partial<ScenePalette> | undefined): string {
-  if (!palette) return '';
-  const safe = (v?: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$/.test(v.trim()) ? v.trim() : undefined);
+function sanitizePaletteColor(v?: string): string | undefined {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$/.test(v.trim()) ? v.trim() : undefined;
+}
+
+export function compilePaletteVars(
+  paletteOrDomId: string | Partial<ScenePalette> | undefined,
+  maybePalette?: Partial<ScenePalette>
+): string {
+  if (typeof paletteOrDomId === 'string') {
+    return compileScenePaletteCss(paletteOrDomId, maybePalette);
+  }
+  if (!paletteOrDomId) return '';
   const parts: string[] = [];
-  const bg = safe(palette.bg);
-  const primary = safe(palette.primary);
-  const accent = safe(palette.accent);
-  const text = safe(palette.text);
+  const bg = sanitizePaletteColor(paletteOrDomId.bg);
+  const primary = sanitizePaletteColor(paletteOrDomId.primary);
+  const accent = sanitizePaletteColor(paletteOrDomId.accent);
+  const text = sanitizePaletteColor(paletteOrDomId.text);
   if (bg) parts.push(`--moo-bg: ${bg}`);
   if (primary) parts.push(`--moo-primary: ${primary}`);
   if (accent) parts.push(`--moo-accent: ${accent}`);
   if (text) parts.push(`--moo-text: ${text}`);
   return parts.join('; ');
+}
+
+export function compileScenePaletteCss(sceneDomId: string, palette: Partial<ScenePalette> | undefined): string {
+  if (!palette) return '';
+  const safeDomId = String(sceneDomId).trim().replace(/[^a-zA-Z0-9_-]/g, '-');
+  const bg = sanitizePaletteColor(palette.bg);
+  const primary = sanitizePaletteColor(palette.primary);
+  const accent = sanitizePaletteColor(palette.accent);
+  const text = sanitizePaletteColor(palette.text);
+
+  if (!bg && !primary && !accent && !text) return '';
+
+  const vars = compilePaletteVars(palette);
+  const lines: string[] = [];
+  lines.push(`#${safeDomId} {`);
+  if (vars) lines.push(`  ${vars};`);
+  if (bg) lines.push(`  background-color: var(--moo-bg) !important;`);
+  if (text) lines.push(`  color: var(--moo-text);`);
+  lines.push(`}`);
+
+  if (bg) {
+    lines.push(`#${safeDomId} > div:first-child, #${safeDomId} [class*="container"], #${safeDomId} [class*="root"] { background-color: var(--moo-bg) !important; }`);
+  }
+  if (accent) {
+    lines.push(`#${safeDomId} .accent, #${safeDomId} [class*="accent"], #${safeDomId} [class*="highlight"], #${safeDomId} [class*="badge"] { color: var(--moo-accent) !important; border-color: var(--moo-accent) !important; }`);
+  }
+  if (primary) {
+    lines.push(`#${safeDomId} [class*="primary"], #${safeDomId} h1, #${safeDomId} h2 { color: var(--moo-primary) !important; }`);
+  }
+  if (text) {
+    lines.push(`#${safeDomId} [class*="sub"], #${safeDomId} [class*="narration"], #${safeDomId} p { color: var(--moo-text) !important; }`);
+  }
+
+  return lines.join('\n');
 }

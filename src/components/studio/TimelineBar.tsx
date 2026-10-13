@@ -163,19 +163,70 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
   // 1. COMPACT VIEW (Docked or Mobile)
   const renderCompact = () => (
     <div
-      className={`flex flex-col justify-between p-2 bg-[#0a0b0e]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-lg select-none min-w-0 w-full gap-2 ${className}`}
+      className={`flex flex-col justify-between px-2 py-1.5 bg-[#0a0b0e]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-lg select-none min-w-0 w-full gap-1.5 ${className}`}
     >
-      {/* Top: Studio Timecode & Active Shot Pill */}
-      <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/70 border border-white/[0.08]">
+      {/* Row 1: Transport Controls + Timecode + Active Shot + Theater */}
+      <div className="flex items-center justify-between gap-1 text-[10px] font-mono">
+        <div className="flex items-center gap-1">
+          {/* Step Back (1 frame) */}
+          <button
+            type="button"
+            onClick={() => seekFrame(Math.max(0, currentFrame - 1))}
+            title="Step back 1 frame"
+            className="w-6 h-6 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
+          >
+            <span className="material-symbols-outlined text-[14px]">skip_previous</span>
+          </button>
+
+          {/* Play / Pause */}
+          <button
+            type="button"
+            onClick={togglePlay}
+            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            className="h-6 px-2 rounded-md bg-[#84cc16] hover:bg-[#9ae62e] text-black font-semibold flex items-center gap-0.5 active:scale-95 text-[10px] shadow-sm shadow-[#84cc16]/20"
+          >
+            <span className="material-symbols-outlined text-[15px] font-bold">
+              {isPlaying ? 'pause' : 'play_arrow'}
+            </span>
+            <span className="hidden sm:inline text-[8px] font-mono opacity-80 uppercase">Space</span>
+          </button>
+
+          {/* Step Forward (1 frame) */}
+          <button
+            type="button"
+            onClick={() => seekFrame(Math.min(totalFrames, currentFrame + 1))}
+            title="Step forward 1 frame"
+            className="w-6 h-6 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
+          >
+            <span className="material-symbols-outlined text-[14px]">skip_next</span>
+          </button>
+
+          {/* Loop */}
+          <button
+            type="button"
+            onClick={toggleLoop}
+            title={isLooping ? 'Loop enabled' : 'Loop disabled'}
+            className={`w-6 h-6 rounded-md active:scale-90 flex items-center justify-center border transition-colors ${
+              isLooping
+                ? 'bg-[#84cc16]/15 border-[#84cc16]/40 text-[#84cc16]'
+                : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.06] text-zinc-400'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[13px]">repeat</span>
+          </button>
+        </div>
+
+        {/* Center Timecode */}
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/70 border border-white/[0.08]">
           <span className="font-bold text-zinc-100">{formatTimecode(currentTimeSec)}</span>
           <span className="text-zinc-600">/</span>
           <span className="text-zinc-400">{formatTimecode(totalDuration)}</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Right: Active Shot + Theater */}
+        <div className="flex items-center gap-1">
           {activeIndex >= 0 && sceneBoundaries[activeIndex] && (
-            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/25">
+            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/25">
               Shot {sceneBoundaries[activeIndex].shotNumber}
             </span>
           )}
@@ -191,9 +242,9 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         </div>
       </div>
 
-      {/* Middle: Scene Track & Scrubber */}
+      {/* Row 2: Scene Track & Scrubber */}
       <div className="space-y-1">
-        <div className="relative h-7 w-full rounded bg-black/60 border border-white/[0.08] overflow-hidden flex items-stretch">
+        <div className="relative h-5 w-full rounded bg-black/60 border border-white/[0.08] overflow-hidden flex items-stretch">
           {sceneBoundaries.map((scene, idx) => {
             const isCurrentPlaying = idx === activeIndex;
             const isSelected = activeSceneId === scene.id;
@@ -213,7 +264,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
                 }`}
               >
                 <span
-                  className={`text-[9px] font-mono font-semibold truncate ${
+                  className={`text-[8.5px] font-mono font-semibold truncate ${
                     isSelected || isCurrentPlaying ? 'text-[#84cc16]' : 'text-zinc-400 group-hover:text-zinc-200'
                   }`}
                 >
@@ -233,7 +284,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         </div>
 
         {/* Range Scrubber */}
-        <div className="px-0.5 flex items-center min-h-[44px] touch-none">
+        <div className="px-0.5 py-0.5 flex items-center touch-none">
           <input
             className="w-full accent-[#84cc16] h-1 cursor-pointer bg-white/[0.06] rounded-full appearance-none"
             max={totalFrames}
@@ -250,12 +301,12 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         {isAudioActive && (
           <div
             onClick={handleTrackScrub}
-            className="relative h-4 w-full rounded bg-black/50 border border-white/[0.06] overflow-hidden flex items-center px-1.5 cursor-pointer select-none group"
+            className="relative h-3.5 w-full rounded bg-black/50 border border-white/[0.06] overflow-hidden flex items-center px-1.5 cursor-pointer select-none group"
             title="Audio Track"
           >
             <div className="flex items-center gap-1 shrink-0 mr-1.5 pointer-events-none">
               <span className="w-1 h-1 rounded-full bg-[#84cc16]" />
-              <span className="text-[7.5px] font-mono font-semibold uppercase tracking-wider text-[#84cc16]">
+              <span className="text-[7px] font-mono font-semibold uppercase tracking-wider text-[#84cc16]">
                 Audio
               </span>
             </div>
@@ -280,62 +331,6 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
             />
           </div>
         )}
-      </div>
-
-      {/* Bottom: Transport Controls */}
-      <div className="flex items-center justify-between gap-1 pt-0.5">
-        <div className="flex items-center gap-1">
-          {/* Step Back (1 frame) */}
-          <button
-            type="button"
-            onClick={() => seekFrame(Math.max(0, currentFrame - 1))}
-            title="Step back 1 frame"
-            className="w-7 h-7 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
-          >
-            <span className="material-symbols-outlined text-[15px]">skip_previous</span>
-          </button>
-
-          {/* Play / Pause */}
-          <button
-            type="button"
-            onClick={togglePlay}
-            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            className="h-7 px-2.5 rounded-md bg-[#84cc16] hover:bg-[#9ae62e] text-black font-semibold flex items-center gap-1 active:scale-95 text-[11px] shadow-sm shadow-[#84cc16]/20"
-          >
-            <span className="material-symbols-outlined text-[16px] font-bold">
-              {isPlaying ? 'pause' : 'play_arrow'}
-            </span>
-            <span className="text-[9px] font-mono opacity-80 uppercase">Space</span>
-          </button>
-
-          {/* Step Forward (1 frame) */}
-          <button
-            type="button"
-            onClick={() => seekFrame(Math.min(totalFrames, currentFrame + 1))}
-            title="Step forward 1 frame"
-            className="w-7 h-7 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
-          >
-            <span className="material-symbols-outlined text-[15px]">skip_next</span>
-          </button>
-
-          {/* Loop */}
-          <button
-            type="button"
-            onClick={toggleLoop}
-            title={isLooping ? 'Loop enabled' : 'Loop disabled'}
-            className={`w-7 h-7 rounded-md active:scale-90 flex items-center justify-center border transition-colors ${
-              isLooping
-                ? 'bg-[#84cc16]/15 border-[#84cc16]/40 text-[#84cc16]'
-                : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.06] text-zinc-400'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[14px]">repeat</span>
-          </button>
-        </div>
-
-        <div className="text-[10px] font-mono text-zinc-400">
-          <span className="text-zinc-200">{currentFrame}</span>/{totalFrames}f
-        </div>
       </div>
     </div>
   );

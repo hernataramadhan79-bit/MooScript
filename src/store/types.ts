@@ -16,7 +16,8 @@ import type {
   ThemeTokens,
   MotionNode,
   LayerOverride,
-  ScenePalette
+  ScenePalette,
+  SceneAssetAttachment
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
@@ -42,6 +43,8 @@ export interface UiSlice {
   removeToast: (id: string) => void;
   isCompilingMograph: boolean;
   setIsCompilingMograph: (isCompiling: boolean) => void;
+  selectedLayerId: string | null;
+  setSelectedLayerId: (id: string | null) => void;
 }
 
 export interface ProjectSlice {
@@ -92,6 +95,9 @@ export interface ProjectSlice {
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
+  assignAssetToScene: (sceneId: string, attachment: SceneAssetAttachment) => void;
+  removeAssetFromSceneBeat: (sceneId: string, assetId: string) => void;
+  updateSceneAssetRole: (sceneId: string, assetId: string, role: SceneAssetAttachment['role'], guidance?: string) => void;
 }
 
 export interface ScriptSlice {
@@ -161,13 +167,21 @@ export interface BgmSlice {
   updateBgmDuckRatio: (duckRatio: number) => Promise<void> | void;
 }
 
+export type AssetAnimationPreset = 'pop' | 'slide' | 'float' | 'zoom';
+export type AssetFramePreset = 'cutout' | 'bento' | 'avatar';
+
+export interface InsertAssetOptions {
+  animationPreset?: AssetAnimationPreset;
+  framePreset?: AssetFramePreset;
+}
+
 export interface AssetSlice {
   assets: AssetRecord[];
   isLoadingAssets: boolean;
   loadAssets: (projectId?: string) => Promise<void>;
   addAsset: (file: File) => Promise<AssetRecord | null>;
   deleteAsset: (id: string) => Promise<void>;
-  insertAssetIntoScene: (asset: AssetRecord, sceneId?: string) => void;
+  insertAssetIntoScene: (asset: AssetRecord, sceneId?: string, options?: InsertAssetOptions) => void;
   removeAssetFromScene: (assetDataUrlOrLayerId: string, sceneId?: string) => void;
 }
 

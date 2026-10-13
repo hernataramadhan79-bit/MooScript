@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment } from '../../types';
 import { CURRENT_SCHEMA_VERSION, BUILTIN_THEMES, migrateLegacyScene } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 import {
@@ -34,22 +34,22 @@ export const DEFAULT_COMPOSITION: Composition = {
       duration: 3.2,
       html: `<div class="sc1-container">
   <div class="sc1-grid-bg"></div>
-  <div class="sc1-badge">MOOSCRIPT ZERO-SERVER</div>
-  <h1 class="sc1-headline">
+  <div class="sc1-badge" data-moo-layer="badge">MOOSCRIPT ZERO-SERVER</div>
+  <h1 class="sc1-headline" data-moo-layer="headline">
     <span class="sc1-word w1">ZERO</span>
     <span class="sc1-word w2">SERVER</span>
     <span class="sc1-word w3 accent">RENDERING</span>
   </h1>
-  <p class="sc1-sub">Directly inside your browser tabs</p>
+  <p class="sc1-sub" data-moo-layer="subtitle">Directly inside your browser tabs</p>
 </div>`,
       css: `.sc1-container {
   width: 100%; height: 100%;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   position: relative; overflow: hidden;
-  background: radial-gradient(circle at 50% 40%, #181824 0%, #09090b 100%);
+  background: radial-gradient(circle at 50% 40%, #181824 0%, var(--moo-bg, #09090b) 100%);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  color: #f4f4f5; text-align: center; padding: 60px;
+  color: var(--moo-text, #f4f4f5); text-align: center; padding: 60px;
 }
 .sc1-grid-bg {
   position: absolute; inset: 0;
@@ -61,7 +61,7 @@ export const DEFAULT_COMPOSITION: Composition = {
 .sc1-badge {
   position: relative; z-index: 2;
   font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700;
-  color: #84cc16; background: rgba(132,204,22,0.12);
+  color: var(--moo-accent, #84cc16); background: rgba(132,204,22,0.12);
   border: 1px solid rgba(132,204,22,0.3); padding: 10px 28px;
   border-radius: 9999px; letter-spacing: 0.15em; margin-bottom: 40px;
 }
@@ -71,11 +71,11 @@ export const DEFAULT_COMPOSITION: Composition = {
   display: flex; flex-direction: column; gap: 12px;
 }
 .sc1-word.accent {
-  color: #84cc16; text-shadow: 0 0 35px rgba(132,204,22,0.45);
+  color: var(--moo-accent, #84cc16); text-shadow: 0 0 35px rgba(132,204,22,0.45);
 }
 .sc1-sub {
   position: relative; z-index: 2;
-  margin-top: 40px; font-size: 32px; color: #a1a1aa; max-width: 800px; font-weight: 500;
+  margin-top: 40px; font-size: 32px; color: var(--moo-text, #a1a1aa); max-width: 800px; font-weight: 500;
 }`,
       buildJs: `tl.from(root.querySelector(".sc1-badge"), { y: -30, opacity: 0, duration: 0.6, ease: "back.out(1.7)" })
   .from(root.querySelectorAll(".sc1-word"), { y: 60, opacity: 0, scale: 0.9, stagger: 0.18, duration: 0.7, ease: "power3.out" }, "-=0.3")
@@ -89,7 +89,7 @@ export const DEFAULT_COMPOSITION: Composition = {
       beatId: 'sc-2',
       duration: 3.6,
       html: `<div class="sc2-container">
-  <div class="sc2-terminal">
+  <div class="sc2-terminal" data-moo-layer="terminal">
     <div class="sc2-bar">
       <span class="sc2-dot red"></span>
       <span class="sc2-dot yellow"></span>
@@ -101,14 +101,14 @@ export const DEFAULT_COMPOSITION: Composition = {
       <div class="sc2-line line2">&nbsp;&nbsp;output: chunk =&gt; muxer.add(chunk),</div>
       <div class="sc2-line line3">&nbsp;&nbsp;error: e =&gt; console.error(e)</div>
       <div class="sc2-line line4">});</div>
-      <div class="sc2-line line5 accent"><span class="sc2-comment">// Deterministic hardware acceleration</span></div>
+      <div class="sc2-line line5 accent" data-moo-layer="metric"><span class="sc2-comment">// Deterministic hardware acceleration</span></div>
     </div>
   </div>
 </div>`,
       css: `.sc2-container {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  background: #09090b; padding: 50px;
+  background: var(--moo-bg, #09090b); padding: 50px;
   font-family: 'JetBrains Mono', monospace;
 }
 .sc2-terminal {
@@ -127,10 +127,10 @@ export const DEFAULT_COMPOSITION: Composition = {
 .sc2-dot.green { background: #10b981; }
 .sc2-title { margin-left: 12px; font-size: 20px; color: #71717a; }
 .sc2-body { padding: 36px; font-size: 26px; line-height: 1.6; color: #e4e4e7; }
-.sc2-kw { color: #84cc16; font-weight: 700; }
+  color: var(--moo-accent, #84cc16); font-weight: 700;
 .sc2-fn { color: #38bdf8; }
 .sc2-comment { color: #71717a; font-style: italic; }
-.sc2-line.accent { margin-top: 20px; color: #84cc16; }`,
+  margin-top: 20px; color: var(--moo-accent, #84cc16); }`,
       buildJs: `tl.from(root.querySelector(".sc2-terminal"), { scale: 0.85, opacity: 0, y: 50, duration: 0.8, ease: "power3.out" })
   .from(root.querySelectorAll(".sc2-line"), { opacity: 0, x: -20, stagger: 0.15, duration: 0.5, ease: "power2.out" }, "-=0.3");`,
       status: 'ok',
@@ -142,30 +142,30 @@ export const DEFAULT_COMPOSITION: Composition = {
       beatId: 'sc-3',
       duration: 3.2,
       html: `<div class="sc3-container">
-  <div class="sc3-card">
-    <div class="sc3-metric-val">60 FPS</div>
-    <div class="sc3-metric-lbl">Hardware Export Throughput</div>
-    <div class="sc3-badge">ZERO MEMORY LEAKS</div>
+  <div class="sc3-card" data-moo-layer="card">
+    <div class="sc3-metric-val" data-moo-layer="metric">60 FPS</div>
+    <div class="sc3-metric-lbl" data-moo-layer="metric-label">Hardware Export Throughput</div>
+    <div class="sc3-badge" data-moo-layer="badge">ZERO MEMORY LEAKS</div>
   </div>
 </div>`,
       css: `.sc3-container {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 50% 50%, #1a1e12 0%, #09090b 100%);
+  background: radial-gradient(circle at 50% 50%, #1a1e12 0%, var(--moo-bg, #09090b) 100%);
   font-family: 'Plus Jakarta Sans', sans-serif; padding: 50px;
 }
 .sc3-card {
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 60px 50px; border-radius: 36px;
-  background: rgba(24, 24, 27, 0.7); border: 2px solid rgba(132, 204, 22, 0.3);
+  background: rgba(24, 24, 27, 0.7); border: 2px solid var(--moo-accent, rgba(132, 204, 22, 0.3));
   backdrop-filter: blur(20px); box-shadow: 0 0 80px rgba(132, 204, 22, 0.15);
 }
 .sc3-metric-val {
-  font-size: 130px; font-weight: 800; color: #84cc16;
+  font-size: 130px; font-weight: 800; color: var(--moo-accent, #84cc16);
   letter-spacing: -0.04em; text-shadow: 0 0 50px rgba(132, 204, 22, 0.4);
 }
 .sc3-metric-lbl {
-  font-size: 32px; font-weight: 600; color: #f4f4f5; margin-top: 10px;
+  font-size: 32px; font-weight: 600; color: var(--moo-text, #f4f4f5); margin-top: 10px;
 }
 .sc3-badge {
   margin-top: 36px; font-family: 'JetBrains Mono', monospace; font-size: 20px;
@@ -1264,6 +1264,57 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     selectedNodeId: null,
-    setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id })
+    setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id }),
+    assignAssetToScene: (sceneId: string, attachment: SceneAssetAttachment) => {
+      const current = get().project;
+      const updatedScenes = current.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        const existing = s.assignedAssets || [];
+        const filtered = existing.filter((a) => a.assetId !== attachment.assetId);
+        return {
+          ...s,
+          assignedAssets: [...filtered, attachment]
+        };
+      });
+      const updated = { ...current, scenes: updatedScenes };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    removeAssetFromSceneBeat: (sceneId: string, assetId: string) => {
+      const current = get().project;
+      const updatedScenes = current.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        return {
+          ...s,
+          assignedAssets: (s.assignedAssets || []).filter((a) => a.assetId !== assetId)
+        };
+      });
+      const updated = { ...current, scenes: updatedScenes };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    updateSceneAssetRole: (sceneId: string, assetId: string, role: SceneAssetAttachment['role'], guidance?: string) => {
+      const current = get().project;
+      const updatedScenes = current.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        const updatedAssets = (s.assignedAssets || []).map((a) => {
+          if (a.assetId !== assetId) return a;
+          return {
+            ...a,
+            role,
+            ...(guidance !== undefined ? { motionGuidance: guidance } : {})
+          };
+        });
+        return {
+          ...s,
+          assignedAssets: updatedAssets
+        };
+      });
+      const updated = { ...current, scenes: updatedScenes };
+      set({ project: updated });
+      triggerSave(updated);
+    },
   };
 };

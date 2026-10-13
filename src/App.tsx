@@ -100,21 +100,20 @@ export const App: React.FC = () => {
         ) : (
           <section className="flex-1 flex flex-col h-full bg-[#050507] overflow-hidden min-w-0">
             {/* Mobile Top Viewport: Stage Preview + Compact Timeline */}
-            <div className="flex flex-none h-[42vh] sm:h-[46vh] bg-[#050507] flex-col border-b border-border">
-              <div className="flex-1 min-h-0 relative flex items-center justify-center p-2 overflow-hidden">
+            <div className="flex flex-none h-[38vh] sm:h-[42vh] bg-[#050507] flex-col border-b border-border">
+              <div className="flex-1 min-h-0 relative flex items-center justify-center p-1 overflow-hidden">
                 <CompositionStage className="w-full h-full" />
               </div>
-              <div className="shrink-0 p-1.5 bg-surface-1/40 border-t border-border/30">
-                <TimelineBar />
+              <div className="shrink-0 px-1.5 py-1 bg-surface-1/40 border-t border-border/30">
+                <TimelineBar compact />
               </div>
             </div>
 
             {/* Mobile Bottom Workspace: Tabbed Drawer */}
             <div className="flex flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden">
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {mobileTab === 'naskah' ? (
                   <SceneDeck
-                    className="h-full overflow-y-auto"
                     onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
                     onEditScene={handleEditScene}
                     onOpenAssets={handleOpenAssets}

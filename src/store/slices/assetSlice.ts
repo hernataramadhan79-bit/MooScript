@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MooStoreState, AssetSlice } from '../types';
+import type { MooStoreState, AssetSlice, InsertAssetOptions } from '../types';
 import type { AssetRecord } from '../../db/mooDb';
 import { saveAssetToDb, listAssetsFromDb, deleteAssetFromDb } from '../../db/mooDb';
 import { syncComposition } from '../../engine/composition/sync';
@@ -70,7 +70,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     get().addToast('Aset dihapus.', 'info');
   },
 
-  insertAssetIntoScene: (asset: AssetRecord, sceneId?: string) => {
+  insertAssetIntoScene: (asset: AssetRecord, sceneId?: string, options?: InsertAssetOptions) => {
     const current = get().project;
     const targetId = sceneId || get().activeSceneId || current.scenes[0]?.id;
     if (!targetId) {
@@ -84,21 +84,42 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     const activeComp = current.composition || syncComposition(current).composition;
     if (!activeComp) return;
 
+    const animPreset = options?.animationPreset || 'pop';
+    const framePreset = options?.framePreset || 'cutout';
+
+    let frameStyle = 'max-width:480px;max-height:480px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 15px 30px rgba(0,0,0,0.6));';
+    if (framePreset === 'bento') {
+      frameStyle = 'max-width:440px;max-height:440px;object-fit:contain;padding:16px;border-radius:24px;background:rgba(24,24,27,0.85);border:1px solid rgba(255,255,255,0.12);box-shadow:0 20px 40px rgba(0,0,0,0.5);';
+    } else if (framePreset === 'avatar') {
+      frameStyle = 'width:320px;height:320px;object-fit:cover;border-radius:9999px;border:3px solid var(--moo-accent,#84cc16);box-shadow:0 10px 30px rgba(0,0,0,0.5);';
+    }
+
     const compScenes = activeComp.scenes.map((s) => {
       if (s.beatId !== targetId) return s;
 
       const existingMatches = (s.html || '').match(/data-moo-layer="asset(?:-[0-9]+)?"/g);
       const layerId = existingMatches && existingMatches.length > 0 ? `asset-${existingMatches.length + 1}` : 'asset';
 
-      const imgHtml = `\n<div class="moo-asset-container" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${asset.name}" style="max-width:480px;max-height:480px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 10px 25px rgba(0,0,0,0.5));" /></div>`;
+      const imgHtml = `\n<div class="moo-asset-container" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${asset.name}" style="${frameStyle}" /></div>`;
 
-      const defaultBuildJs = 'tl.from(".moo-asset-container", { opacity: 0, scale: 0.85, duration: 0.6, ease: "back.out(1.4)" });';
+      let animJs = 'tl.from(".moo-asset-container", { scale: 0, opacity: 0, duration: 0.7, ease: "back.out(1.7)" });';
+      if (animPreset === 'slide') {
+        animJs = 'tl.from(".moo-asset-container", { y: 100, opacity: 0, duration: 0.6, ease: "power3.out" });';
+      } else if (animPreset === 'float') {
+        animJs = 'tl.from(".moo-asset-container", { scale: 0.8, opacity: 0, duration: 0.6, ease: "power2.out" }).to(".moo-asset-container", { y: -15, repeat: -1, yoyo: true, duration: 1.5, ease: "sine.inOut" });';
+      } else if (animPreset === 'zoom') {
+        animJs = 'tl.from(".moo-asset-container", { scale: 1.5, opacity: 0, duration: 0.5, ease: "power2.out" });';
+      }
+
+      const mergedBuildJs = s.buildJs && s.buildJs.trim()
+        ? `${s.buildJs}\n${animJs}`
+        : animJs;
 
       return {
         ...s,
         html: s.html ? s.html + imgHtml : imgHtml,
         css: s.css || '.moo-asset-container { pointer-events: auto; }',
-        buildJs: s.buildJs && s.buildJs.trim() ? s.buildJs : defaultBuildJs,
+        buildJs: mergedBuildJs,
         status: 'ok' as const,
         userEdited: true,
         version: (s.version || 1) + 1

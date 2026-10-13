@@ -16,6 +16,8 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
 
   selectedNodeId: null,
   setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),
+  selectedLayerId: null,
+  setSelectedLayerId: (selectedLayerId) => set({ selectedLayerId }),
 
   setActiveTab: (tab) => {
     if (tab === 'settings') {

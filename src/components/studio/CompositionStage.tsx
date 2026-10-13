@@ -23,6 +23,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const updateProjectAspectRatio = useMooStore((s) => s.updateProjectAspectRatio);
   const previewMode = useMooStore((s) => s.previewMode);
   const setPreviewMode = useMooStore((s) => s.setPreviewMode);
+  const selectedLayerId = useMooStore((s) => s.selectedLayerId);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const theaterIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -73,8 +74,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     if (isFit) {
       const scaleX = clientWidth / width;
       const scaleY = clientHeight / height;
-      const bestScale = Math.min(scaleX, scaleY) * 0.95; // 5% padding
-      setScale(Math.max(0.1, bestScale));
+      const bestScale = Math.min(scaleX, scaleY) * 0.94; // 6% padding
+      setScale(Math.max(0.05, bestScale));
     } else {
       setScale(1);
     }
@@ -178,6 +179,20 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     }
   }, [currentFrame, currentTime, isReady, previewMode]);
 
+  // Highlight selected layer inside iframe runtime
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'highlight_layer', layerId: selectedLayerId },
+      '*'
+    );
+    if (previewMode === 'theater' && theaterIframeRef.current?.contentWindow) {
+      theaterIframeRef.current.contentWindow.postMessage(
+        { type: 'highlight_layer', layerId: selectedLayerId },
+        '*'
+      );
+    }
+  }, [selectedLayerId, isReady, previewMode]);
+
   const handleAspectRatioChange = (ratio: AspectRatio) => {
     setIsFit(true);
     updateProjectAspectRatio?.(ratio);
@@ -188,15 +203,12 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full flex items-center justify-center overflow-hidden p-2 select-none ${className}`}
-    >
-      {/* Floating Studio Controls */}
-      <div className="absolute top-3 inset-x-0 z-30 flex items-center justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1.5 p-1 rounded-xl bg-black/75 backdrop-blur-md border border-white/10 shadow-2xl">
+    <div className={`relative w-full h-full flex flex-col overflow-hidden select-none ${className}`}>
+      {/* Studio Controls Bar: Non-overlapping top strip (compact split on mobile, centered pill on desktop) */}
+      <div className="shrink-0 w-full z-30 flex items-center justify-between lg:justify-center px-2 pt-1 pb-0.5 lg:py-1.5">
+        <div className="w-full lg:w-auto flex items-center justify-between lg:justify-center gap-1 lg:gap-1.5 lg:p-1 lg:rounded-xl lg:bg-black/75 lg:backdrop-blur-md lg:border lg:border-white/10 lg:shadow-2xl">
           {/* Aspect Ratio Selector */}
-          <div className="flex items-center rounded-lg bg-white/[0.04] p-0.5 border border-white/[0.06]">
+          <div className="flex items-center rounded-md lg:rounded-lg bg-black/80 lg:bg-white/[0.04] p-0.5 border border-white/10 lg:border-white/[0.06]">
             {ASPECT_RATIOS.map((ratio) => {
               const isSelected = currentAspect === ratio;
               return (
@@ -204,7 +216,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                   key={ratio}
                   type="button"
                   onClick={() => handleAspectRatioChange(ratio)}
-                  className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-150 ${
+                  className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 ${
                     isSelected
                       ? 'bg-white/15 text-white shadow-sm font-semibold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
@@ -217,53 +229,61 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
             })}
           </div>
 
-          <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+          <div className="hidden lg:block w-[1px] h-3.5 bg-white/10 mx-0.5" />
 
-          {/* Safe Zone Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowSafeZone((v) => !v)}
-            title="Batas Medsos"
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-150 flex items-center gap-1.5 ${
-              showSafeZone
-                ? 'bg-lime-500/20 text-[#84cc16] border border-lime-500/30 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[15px]">smartphone</span>
-            <span className="hidden sm:inline">Batas Medsos</span>
-          </button>
+          {/* Right Controls Group on Mobile (Safe Zone + Zoom/Fit) */}
+          <div className="flex items-center gap-1 rounded-md lg:rounded-none bg-black/80 lg:bg-transparent p-0.5 lg:p-0 border border-white/10 lg:border-0">
+            {/* Safe Zone Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowSafeZone((v) => !v)}
+              title="Batas Medsos"
+              className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 flex items-center gap-1 ${
+                showSafeZone
+                  ? 'bg-lime-500/20 text-[#84cc16] border border-lime-500/30 shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[12px] lg:text-[15px]">smartphone</span>
+              <span className="hidden sm:inline">Batas Medsos</span>
+            </button>
 
-          <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+            <div className="w-[1px] h-3 bg-white/10" />
 
-          {/* Zoom / Fit Button */}
-          <button
-            type="button"
-            onClick={handleToggleZoom}
-            title={isFit ? 'Perbesar 100%' : 'Fit ke Layar'}
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-150 flex items-center gap-1.5 ${
-              !isFit
-                ? 'bg-white/15 text-white border border-white/20 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[15px]">fit_screen</span>
-            <span className="text-[10px] font-mono text-zinc-400">{Math.round(scale * 100)}%</span>
-          </button>
+            {/* Zoom / Fit Button */}
+            <button
+              type="button"
+              onClick={handleToggleZoom}
+              title={isFit ? 'Perbesar 100%' : 'Fit ke Layar'}
+              className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 flex items-center gap-1 ${
+                !isFit
+                  ? 'bg-white/15 text-white border border-white/20 shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[12px] lg:text-[15px]">fit_screen</span>
+              <span className="text-[9px] lg:text-[10px] font-mono text-zinc-400">{Math.round(scale * 100)}%</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Composition Canvas Container */}
+      {/* Dedicated Canvas Area (Never overlapped by controls) */}
       <div
-        style={{
-          width: `${width}px`,
-          height: `${height}px`,
-          transform: `scale(${scale})`,
-          transformOrigin: 'center center',
-          transition: 'transform 0.15s ease-out'
-        }}
-        className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-border bg-black transition-transform duration-150 ease-out"
+        ref={containerRef}
+        className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden p-1"
       >
+        {/* Composition Canvas Container */}
+        <div
+          style={{
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.15s ease-out'
+          }}
+          className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-border bg-black transition-transform duration-150 ease-out"
+        >
         <iframe
           key={`${projectId}-${width}x${height}`}
           ref={iframeRef}
@@ -309,6 +329,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Fullscreen Theater Mode Overlay */}

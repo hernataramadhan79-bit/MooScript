@@ -582,6 +582,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     previousSceneSummary,
     nextSceneSummary,
     focusWords: beat.focusWords,
+    assignedAssets: beat.assignedAssets,
     styleBrief: {
       palette: styleBrief.palette,
       fontDisplay: styleBrief.fontDisplay,

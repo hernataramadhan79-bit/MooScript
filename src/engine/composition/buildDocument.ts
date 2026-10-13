@@ -1,6 +1,6 @@
 import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
-import { compileOverridesCss, compilePaletteVars } from './layers';
+import { compileOverridesCss, compilePaletteVars, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
@@ -133,8 +133,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
   const scenesCss = resolved
     .map(({ mod, css }, idx) => {
       const domId = toDomId(mod.beatId);
-      const paletteVars = compilePaletteVars(mod.palette);
-      const paletteRule = paletteVars ? `#${domId} { ${paletteVars}; }` : '';
+      const paletteRule = compileScenePaletteCss(domId, mod.palette);
       const overrides = compileOverridesCss(domId, mod.overrides);
       return `/* Scene ${idx + 1} (${mod.beatId}) */\n${css || ''}\n${paletteRule}\n${overrides}`;
     })

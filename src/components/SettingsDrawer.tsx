@@ -42,18 +42,18 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
   const quickPills = models.slice(0, 5);
 
   return (
-    <div className="pt-1.5 space-y-1.5 border-t border-white/[0.04]">
-      <div className="flex items-center justify-between text-[10px]">
+    <div className="pt-2.5 mt-2 space-y-2 border-t border-white/[0.06]">
+      <div className="flex items-center justify-between gap-2 text-[10px]">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-zinc-400 font-medium shrink-0">Model:</span>
+          <span className="text-zinc-400 font-medium shrink-0">Model Aktif:</span>
           <span
-            className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 truncate max-w-[150px] sm:max-w-[210px]"
+            className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/25 truncate max-w-[160px] sm:max-w-[220px]"
             title={`Model aktif: ${currentModel}`}
           >
             {currentModel}
           </span>
           {!isKnown && currentModel && (
-            <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
               Custom
             </span>
           )}
@@ -64,9 +64,9 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           disabled={isScanning || !apiKey.trim()}
           onClick={onScan}
           title={apiKey.trim() ? 'Pindai model aktif langsung dari API provider' : 'Masukkan API Key terlebih dahulu'}
-          className="text-[9px] font-mono text-zinc-400 hover:text-primary flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-colors disabled:opacity-30 disabled:hover:text-zinc-400 shrink-0"
+          className="text-[10px] font-mono text-zinc-300 hover:text-primary flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors disabled:opacity-30 shrink-0"
         >
-          <span className={`material-symbols-outlined text-[11px] ${isScanning ? 'animate-spin' : ''}`}>
+          <span className={`material-symbols-outlined text-[12px] ${isScanning ? 'animate-spin' : ''}`}>
             {isScanning ? 'progress_activity' : 'sync'}
           </span>
           <span>
@@ -85,7 +85,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           <select
             value={currentModel}
             onChange={(e) => onSelectModel(e.target.value)}
-            className="w-full bg-black/60 rounded px-2 py-1 text-[10px] font-mono text-zinc-200 border border-white/[0.08] focus:outline-none focus:border-primary/50 cursor-pointer appearance-none pr-6"
+            className="w-full bg-black/70 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-zinc-200 border border-white/[0.1] focus:outline-none focus:border-primary/50 cursor-pointer appearance-none pr-7"
           >
             {!isKnown && currentModel && (
               <option value={currentModel}>Custom: {currentModel}</option>
@@ -96,14 +96,14 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-zinc-400">
-            <span className="material-symbols-outlined text-[14px]">expand_more</span>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
+            <span className="material-symbols-outlined text-[15px]">expand_more</span>
           </div>
         </div>
       )}
 
       {/* Quick pill buttons row */}
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 pt-0.5">
         {quickPills.map((m) => {
           const isSelected = currentModel === m.id;
           return (
@@ -112,19 +112,14 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
               type="button"
               onClick={() => onSelectModel(m.id)}
               title={m.description ? `${m.label} (${m.id})\n${m.description}` : `${m.label} (${m.id})`}
-              className={`px-1.5 sm:px-2 py-0.5 rounded text-[9px] font-mono border transition-all active:scale-95 flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded-md text-[9.5px] font-mono border transition-all active:scale-95 flex items-center gap-1 ${
                 isSelected
-                  ? 'bg-primary/20 text-primary border-primary/60 font-semibold shadow-[0_0_8px_rgba(158,233,57,0.15)]'
-                  : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:bg-white/[0.06] hover:text-zinc-200 hover:border-white/[0.12]'
+                  ? 'bg-primary/20 text-primary border-primary/60 font-semibold'
+                  : 'bg-white/[0.03] text-zinc-400 border-white/[0.07] hover:bg-white/[0.07] hover:text-zinc-200'
               }`}
             >
               {isSelected && <span className="text-[7px] text-primary">●</span>}
               <span className="truncate max-w-[130px]">{m.label}</span>
-              {m.isRecommended && !isSelected && (
-                <span className="text-[7px] font-sans px-1 rounded bg-primary/10 text-primary/80 uppercase tracking-tighter">
-                  rec
-                </span>
-              )}
             </button>
           );
         })}
@@ -133,23 +128,23 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
         <button
           type="button"
           onClick={() => setShowCustom(!showCustom)}
-          className={`px-1.5 py-0.5 rounded text-[9px] font-mono border transition-colors ${
+          className={`px-2 py-0.5 rounded-md text-[9.5px] font-mono border transition-colors ${
             showCustom || !isKnown
-              ? 'bg-white/[0.1] text-zinc-200 border-white/[0.2]'
-              : 'bg-white/[0.02] text-zinc-500 border-white/[0.04] hover:text-zinc-400'
+              ? 'bg-white/[0.12] text-zinc-200 border-white/[0.25]'
+              : 'bg-white/[0.03] text-zinc-400 border-white/[0.07] hover:text-zinc-200'
           }`}
-          title="Ketik manual model ID (preview / experimental / fine-tuned)"
+          title="Ketik manual model ID"
         >
-          {showCustom ? '✕ Tutup' : '+ Custom'}
+          {showCustom ? '✕ Tutup' : '+ Model Kustom'}
         </button>
       </div>
 
       {/* Custom Model Input */}
       {showCustom && (
-        <div className="flex items-center gap-1 pt-1 animate-fadeIn">
+        <div className="flex items-center gap-1.5 pt-1 animate-fadeIn">
           <input
             type="text"
-            placeholder="ID model (misal: gemini-2.5-flash)..."
+            placeholder="Ketik ID model (misal: gemini-2.5-flash)..."
             value={customVal}
             onChange={(e) => setCustomVal(e.target.value)}
             onKeyDown={(e) => {
@@ -158,7 +153,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
                 setShowCustom(false);
               }
             }}
-            className="flex-1 bg-black/60 rounded px-2 py-1 text-[10px] font-mono text-zinc-100 border border-white/[0.1] focus:outline-none focus:border-primary/50"
+            className="flex-1 bg-black/70 rounded-lg px-2.5 py-1 text-[11px] font-mono text-zinc-100 border border-white/[0.12] focus:outline-none focus:border-primary/50"
           />
           <button
             type="button"
@@ -169,9 +164,9 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
                 setShowCustom(false);
               }
             }}
-            className="px-2 py-1 rounded bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-mono font-bold border border-primary/40 disabled:opacity-40"
+            className="px-2.5 py-1 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-mono font-bold border border-primary/40 disabled:opacity-40"
           >
-            Pilih
+            Pakai
           </button>
         </div>
       )}
@@ -206,6 +201,9 @@ export const SettingsDrawer: React.FC = () => {
   const [modelCacheMap, setModelCacheMap] = useState<Record<string, boolean>>({});
   const [downloadingVoiceId, setDownloadingVoiceId] = useState<string | null>(null);
   const [downloadProgressMap, setDownloadProgressMap] = useState<Record<string, number>>({});
+  const [expandedProvider, setExpandedProvider] = useState<LLMProvider | null>(
+    settings.selectedLLMProvider || 'gemini'
+  );
 
   const refreshModelStatuses = async () => {
     const statuses: Record<string, boolean> = {};
@@ -444,40 +442,92 @@ export const SettingsDrawer: React.FC = () => {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4 text-xs">
-          {/* 1. API Keys */}
-          <section className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 sm:space-y-3 shadow-sm">
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-primary text-[15px] sm:text-[17px]">key</span>
-                <span className="text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider">
-                  Kunci API AI
-                </span>
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 text-xs">
+          {/* KONTAINER 1: KONFIGURASI UTAMA AI */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3.5 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[18px]">neurology</span>
+                <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                  1. Konfigurasi Utama AI
+                </h3>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Pilih penyedia AI utama yang digunakan untuk menyusun naskah & kode Mograph.
+              </p>
+            </div>
+
+            {/* Primary AI Provider */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-zinc-300 block">Penyedia AI Utama</span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {(['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).map((prov) => {
+                  const isSelected = settings.selectedLLMProvider === prov;
+                  const hasKey = Boolean(settings.apiKeys[prov]?.trim());
+                  const label =
+                    prov === 'gemini'
+                      ? 'Gemini'
+                      : prov === 'openai'
+                        ? 'OpenAI'
+                        : prov === 'groq'
+                          ? 'Groq'
+                          : prov === 'anthropic'
+                            ? 'Anthropic'
+                            : 'OpenRouter';
+                  return (
+                    <button
+                      key={prov}
+                      type="button"
+                      onClick={() => {
+                        updateSettings({ selectedLLMProvider: prov });
+                        setExpandedProvider(prov);
+                      }}
+                      className={`py-2 px-2.5 rounded-xl text-[11px] font-semibold border transition-all flex items-center justify-between sm:justify-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-primary/15 text-primary border-primary/50 shadow-sm'
+                          : 'bg-black/40 text-zinc-400 border-white/[0.07] hover:text-zinc-200 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <span className="truncate">{label}</span>
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          hasKey ? 'bg-emerald-400' : 'bg-zinc-600'
+                        }`}
+                        title={hasKey ? 'API Key sudah diisi' : 'API Key belum diisi'}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Storage Mode */}
-            <div className="flex flex-col gap-1 p-2 sm:p-2.5 rounded-lg bg-black/50 border border-white/[0.06]">
-              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-300">Penyimpanan Kunci</span>
-              <div className="grid grid-cols-2 gap-1.5 sm:gap-2 pt-0.5">
+            <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-zinc-300">Mode Penyimpanan Kunci API</span>
+                <span className="text-[10px] font-mono text-zinc-400">
+                  {settings.apiKeyStorage === 'session' ? 'Sementara (RAM)' : 'Lokal Browser'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
                   onClick={() => updateSettings({ apiKeyStorage: 'persistent' })}
-                  className={`py-1 sm:py-1.5 px-2 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold border transition-all ${
+                  className={`py-1.5 px-2.5 rounded-lg text-[11px] font-semibold border transition-all ${
                     settings.apiKeyStorage !== 'session'
-                      ? 'bg-primary/10 text-primary border-primary/40'
-                      : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
+                      ? 'bg-primary/15 text-primary border-primary/40'
+                      : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-zinc-200'
                   }`}
                 >
-                  Permanen
+                  Permanen (Tersimpan)
                 </button>
                 <button
                   type="button"
                   onClick={() => updateSettings({ apiKeyStorage: 'session' })}
-                  className={`py-1 sm:py-1.5 px-2 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold border transition-all ${
+                  className={`py-1.5 px-2.5 rounded-lg text-[11px] font-semibold border transition-all ${
                     settings.apiKeyStorage === 'session'
-                      ? 'bg-primary/10 text-primary border-primary/40'
-                      : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
+                      ? 'bg-primary/15 text-primary border-primary/40'
+                      : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-zinc-200'
                   }`}
                 >
                   Sesi Ini Saja
@@ -485,61 +535,27 @@ export const SettingsDrawer: React.FC = () => {
               </div>
             </div>
 
-            {/* Primary AI Provider */}
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-400">Penyedia AI Utama</span>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-1.5">
-                {(['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).map((prov) => {
-                  const isSelected = settings.selectedLLMProvider === prov;
-                  return (
-                    <button
-                      key={prov}
-                      type="button"
-                      onClick={() => updateSettings({ selectedLLMProvider: prov })}
-                      className={`py-1 sm:py-1.5 px-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold border capitalize transition-all truncate ${
-                        isSelected
-                          ? 'bg-primary/10 text-primary border-primary/40'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.06]'
-                      }`}
-                    >
-                      {prov === 'gemini'
-                        ? 'Gemini'
-                        : prov === 'openai'
-                          ? 'OpenAI'
-                          : prov === 'groq'
-                            ? 'Groq'
-                            : prov === 'anthropic'
-                              ? 'Anthropic'
-                              : 'OpenRouter'}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Token Output Budget (Max Output Tokens) */}
-            <div className="flex flex-col gap-1.5 p-2 sm:p-2.5 rounded-lg bg-black/50 border border-white/[0.06]">
-              <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                <span className="font-medium text-zinc-300 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px] text-primary">data_thresholding</span>
+            <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-primary">data_thresholding</span>
                   Batas Panjang Respons (Max Tokens)
                 </span>
-                <span className="font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                  {settings.maxOutputTokens || 2048}
+                <span className="font-mono font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[11px]">
+                  {settings.maxOutputTokens || 2048} tok
                 </span>
               </div>
-              <div className="flex items-center gap-3 pt-0.5">
-                <input
-                  type="range"
-                  min={512}
-                  max={8192}
-                  step={256}
-                  value={settings.maxOutputTokens || 2048}
-                  onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
-                  className="w-full accent-primary h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+              <input
+                type="range"
+                min={512}
+                max={8192}
+                step={256}
+                value={settings.maxOutputTokens || 2048}
+                onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
+                className="w-full accent-primary h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="grid grid-cols-4 gap-1.5">
                 {[1024, 2048, 4096, 8192].map((tokenPreset) => {
                   const isCurrent = (settings.maxOutputTokens || 2048) === tokenPreset;
                   return (
@@ -547,7 +563,7 @@ export const SettingsDrawer: React.FC = () => {
                       key={tokenPreset}
                       type="button"
                       onClick={() => updateSettings({ maxOutputTokens: tokenPreset })}
-                      className={`py-1 px-1.5 rounded-md text-[10px] font-mono font-semibold border transition-all ${
+                      className={`py-1 px-1.5 rounded-lg text-[10px] font-mono font-semibold border transition-all ${
                         isCurrent
                           ? 'bg-primary/20 text-primary border-primary/40'
                           : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:bg-white/[0.08] hover:text-zinc-200'
@@ -559,482 +575,308 @@ export const SettingsDrawer: React.FC = () => {
                 })}
               </div>
             </div>
-
-            {/* Keys Input Form */}
-            <div className="space-y-3 pt-1">
-              {/* Gemini */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">Gemini API Key</span>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.gemini ? 'text' : 'password'}
-                    value={settings.apiKeys.gemini || ''}
-                    onChange={(e) => updateApiKey('gemini', e.target.value)}
-                    onBlur={() => {
-                      if (settings.apiKeys.gemini?.trim()) handleScanModels('gemini');
-                    }}
-                    placeholder="AIzaSy..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('gemini')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.gemini ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.gemini || !settings.apiKeys.gemini}
-                    onClick={() => handleTestKey('gemini')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.gemini ? 'animate-spin' : ''}`}>
-                      {testingKey.gemini ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.gemini ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.gemini && (
-                    <span className={`text-[10px] font-mono ${testResults.gemini.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.gemini.success ? '✓ Valid' : '✗ ' + testResults.gemini.message}
-                    </span>
-                  )}
-                </div>
-
-                {/* Gemini Model Selector Pills */}
-                <ProviderModelSelector
-                  provider="gemini"
-                  apiKey={settings.apiKeys.gemini || ''}
-                  currentModel={settings.geminiModel}
-                  models={providerModels.gemini}
-                  isScanning={scanningModels.gemini}
-                  onSelectModel={(modelId) => {
-                    updateSettings({ geminiModel: modelId });
-                    addToast(`Model Gemini diubah ke ${modelId}`, 'info');
-                  }}
-                  onScan={() => handleScanModels('gemini')}
-                />
-              </div>
-
-              {/* OpenAI */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">OpenAI API Key (GPT & TTS)</span>
-                  <a
-                    href="https://platform.openai.com/api-keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.openai ? 'text' : 'password'}
-                    value={settings.apiKeys.openai || ''}
-                    onChange={(e) => updateApiKey('openai', e.target.value)}
-                    onBlur={() => {
-                      if (settings.apiKeys.openai?.trim()) handleScanModels('openai');
-                    }}
-                    placeholder="sk-proj-..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('openai')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.openai ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.openai || !settings.apiKeys.openai}
-                    onClick={() => handleTestKey('openai')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.openai ? 'animate-spin' : ''}`}>
-                      {testingKey.openai ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.openai ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.openai && (
-                    <span className={`text-[10px] font-mono ${testResults.openai.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.openai.success ? '✓ Valid' : '✗ ' + testResults.openai.message}
-                    </span>
-                  )}
-                </div>
-
-                {/* OpenAI Model Selector Pills */}
-                <ProviderModelSelector
-                  provider="openai"
-                  apiKey={settings.apiKeys.openai || ''}
-                  currentModel={settings.openaiModel}
-                  models={providerModels.openai}
-                  isScanning={scanningModels.openai}
-                  onSelectModel={(modelId) => {
-                    updateSettings({ openaiModel: modelId });
-                    addToast(`Model OpenAI diubah ke ${modelId}`, 'info');
-                  }}
-                  onScan={() => handleScanModels('openai')}
-                />
-              </div>
-
-              {/* Groq */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">Groq API Key (Ultra-Fast)</span>
-                  <a
-                    href="https://console.groq.com/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.groq ? 'text' : 'password'}
-                    value={settings.apiKeys.groq || ''}
-                    onChange={(e) => updateApiKey('groq', e.target.value)}
-                    onBlur={() => {
-                      if (settings.apiKeys.groq?.trim()) handleScanModels('groq');
-                    }}
-                    placeholder="gsk_..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('groq')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.groq ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.groq || !settings.apiKeys.groq}
-                    onClick={() => handleTestKey('groq')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.groq ? 'animate-spin' : ''}`}>
-                      {testingKey.groq ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.groq ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.groq && (
-                    <span className={`text-[10px] font-mono ${testResults.groq.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.groq.success ? '✓ Valid' : '✗ ' + testResults.groq.message}
-                    </span>
-                  )}
-                </div>
-
-                {/* Groq Model Selector Pills */}
-                <ProviderModelSelector
-                  provider="groq"
-                  apiKey={settings.apiKeys.groq || ''}
-                  currentModel={settings.groqModel}
-                  models={providerModels.groq}
-                  isScanning={scanningModels.groq}
-                  onSelectModel={(modelId) => {
-                    updateSettings({ groqModel: modelId });
-                    addToast(`Model Groq diubah ke ${modelId}`, 'info');
-                  }}
-                  onScan={() => handleScanModels('groq')}
-                />
-              </div>
-
-              {/* Anthropic */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">Anthropic API Key (Claude 3.7)</span>
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.anthropic ? 'text' : 'password'}
-                    value={settings.apiKeys.anthropic || ''}
-                    onChange={(e) => updateApiKey('anthropic', e.target.value)}
-                    onBlur={() => {
-                      if (settings.apiKeys.anthropic?.trim()) handleScanModels('anthropic');
-                    }}
-                    placeholder="sk-ant-api03-..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('anthropic')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.anthropic ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.anthropic || !settings.apiKeys.anthropic}
-                    onClick={() => handleTestKey('anthropic')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.anthropic ? 'animate-spin' : ''}`}>
-                      {testingKey.anthropic ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.anthropic ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.anthropic && (
-                    <span className={`text-[10px] font-mono ${testResults.anthropic.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.anthropic.success ? '✓ Valid' : '✗ ' + testResults.anthropic.message}
-                    </span>
-                  )}
-                </div>
-
-                {/* Anthropic Model Selector Pills */}
-                <ProviderModelSelector
-                  provider="anthropic"
-                  apiKey={settings.apiKeys.anthropic || ''}
-                  currentModel={settings.anthropicModel || 'claude-3-7-sonnet-20250219'}
-                  models={providerModels.anthropic}
-                  isScanning={scanningModels.anthropic}
-                  onSelectModel={(modelId) => {
-                    updateSettings({ anthropicModel: modelId });
-                    addToast(`Model Anthropic diubah ke ${modelId}`, 'info');
-                  }}
-                  onScan={() => handleScanModels('anthropic')}
-                />
-              </div>
-
-              {/* OpenRouter */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">OpenRouter API Key (Multi-Model)</span>
-                  <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.openrouter ? 'text' : 'password'}
-                    value={settings.apiKeys.openrouter || ''}
-                    onChange={(e) => updateApiKey('openrouter', e.target.value)}
-                    onBlur={() => {
-                      if (settings.apiKeys.openrouter?.trim()) handleScanModels('openrouter');
-                    }}
-                    placeholder="sk-or-v1-..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('openrouter')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.openrouter ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.openrouter || !settings.apiKeys.openrouter}
-                    onClick={() => handleTestKey('openrouter')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.openrouter ? 'animate-spin' : ''}`}>
-                      {testingKey.openrouter ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.openrouter ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.openrouter && (
-                    <span className={`text-[10px] font-mono ${testResults.openrouter.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.openrouter.success ? '✓ Valid' : '✗ ' + testResults.openrouter.message}
-                    </span>
-                  )}
-                </div>
-
-                {/* OpenRouter Model Selector Pills */}
-                <ProviderModelSelector
-                  provider="openrouter"
-                  apiKey={settings.apiKeys.openrouter || ''}
-                  currentModel={settings.openrouterModel || 'anthropic/claude-3.7-sonnet'}
-                  models={providerModels.openrouter}
-                  isScanning={scanningModels.openrouter}
-                  onSelectModel={(modelId) => {
-                    updateSettings({ openrouterModel: modelId });
-                    addToast(`Model OpenRouter diubah ke ${modelId}`, 'info');
-                  }}
-                  onScan={() => handleScanModels('openrouter')}
-                />
-              </div>
-
-              {/* ElevenLabs */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">ElevenLabs API Key (Word Timestamps)</span>
-                  <a
-                    href="https://elevenlabs.io/app/settings/api-keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-primary hover:underline"
-                  >
-                    Dapatkan Kunci ↗
-                  </a>
-                </div>
-                <div className="relative flex items-center bg-black/60 rounded-lg border border-white/[0.08] px-3 py-1.5">
-                  <input
-                    type={visibleKeys.elevenlabs ? 'text' : 'password'}
-                    value={settings.apiKeys.elevenlabs || ''}
-                    onChange={(e) => updateApiKey('elevenlabs', e.target.value)}
-                    placeholder="xi-api-key..."
-                    className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleVisibility('elevenlabs')}
-                    className="p-1 text-zinc-400 hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {visibleKeys.elevenlabs ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    disabled={testingKey.elevenlabs || !settings.apiKeys.elevenlabs}
-                    onClick={() => handleTestKey('elevenlabs')}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/[0.08] flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <span className={`material-symbols-outlined text-[12px] ${testingKey.elevenlabs ? 'animate-spin' : ''}`}>
-                      {testingKey.elevenlabs ? 'progress_activity' : 'network_check'}
-                    </span>
-                    <span>{testingKey.elevenlabs ? 'Verifying...' : 'Test Key'}</span>
-                  </button>
-                  {testResults.elevenlabs && (
-                    <span className={`text-[10px] font-mono ${testResults.elevenlabs.success ? 'text-emerald-400' : 'text-red-400'} truncate max-w-[200px]`}>
-                      {testResults.elevenlabs.success ? '✓ Valid' : '✗ ' + testResults.elevenlabs.message}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
           </section>
 
-          {/* 2. Persona Skills */}
-          <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3 shadow-sm">
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-primary text-[17px]">psychology</span>
-                <span className="text-xs font-semibold text-white uppercase tracking-wider">Gaya Penulisan</span>
-              </div>
+          {/* KONTAINER 2: KUNCI API & MODEL PER PROVIDER (KARTU TERPISAH & AKORDEON RAPI) */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
               <div className="flex items-center gap-2">
-                <label className="text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer flex items-center gap-0.5">
-                  <span className="material-symbols-outlined text-[13px]">file_upload</span>
-                  Impor
-                  <input accept=".json" className="hidden" type="file" onChange={handleImportSkill} />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddSkillModal(true)}
-                  className="text-[10px] font-mono text-primary hover:text-lime-300 flex items-center gap-0.5"
-                >
-                  <span className="material-symbols-outlined text-[13px]">add</span>
-                  Baru
-                </button>
+                <span className="material-symbols-outlined text-primary text-[18px]">key</span>
+                <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                  2. Kunci API & Model per Provider
+                </h3>
               </div>
+              <p className="text-[11px] text-zinc-400">
+                Ketuk salah satu kartu penyedia AI di bawah untuk memasukkan API Key dan memilih model.
+              </p>
             </div>
 
-            <div className="space-y-1.5">
-              {skills.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-2.5 rounded-lg bg-black/40 border border-white/[0.06] flex items-center justify-between gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-white text-xs truncate">{s.name}</span>
-                      {s.isBuiltin && (
-                        <span className="text-[9px] font-mono px-1 rounded bg-white/[0.06] text-zinc-400">Bawaan</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-zinc-400 truncate block">{s.description}</span>
-                  </div>
+            <div className="space-y-2.5">
+              {([
+                {
+                  id: 'gemini' as LLMProvider,
+                  title: 'Google Gemini',
+                  subtitle: 'Cepat & Multimodal',
+                  placeholder: 'AIzaSy...',
+                  url: 'https://aistudio.google.com/app/apikey',
+                  currentModel: settings.geminiModel,
+                  onSelectModel: (m: string) => {
+                    updateSettings({ geminiModel: m });
+                    addToast(`Model Gemini diubah ke ${m}`, 'info');
+                  }
+                },
+                {
+                  id: 'openai' as LLMProvider,
+                  title: 'OpenAI (GPT & TTS)',
+                  subtitle: 'GPT-4o & Suara OpenAI',
+                  placeholder: 'sk-proj-...',
+                  url: 'https://platform.openai.com/api-keys',
+                  currentModel: settings.openaiModel,
+                  onSelectModel: (m: string) => {
+                    updateSettings({ openaiModel: m });
+                    addToast(`Model OpenAI diubah ke ${m}`, 'info');
+                  }
+                },
+                {
+                  id: 'groq' as LLMProvider,
+                  title: 'Groq Cloud',
+                  subtitle: 'Inferensi LPU Ultra-Cepat',
+                  placeholder: 'gsk_...',
+                  url: 'https://console.groq.com/keys',
+                  currentModel: settings.groqModel,
+                  onSelectModel: (m: string) => {
+                    updateSettings({ groqModel: m });
+                    addToast(`Model Groq diubah ke ${m}`, 'info');
+                  }
+                },
+                {
+                  id: 'anthropic' as LLMProvider,
+                  title: 'Anthropic Claude',
+                  subtitle: 'Claude Sonnet & Haiku',
+                  placeholder: 'sk-ant-api03-...',
+                  url: 'https://console.anthropic.com/settings/keys',
+                  currentModel: settings.anthropicModel || 'claude-3-7-sonnet-20250219',
+                  onSelectModel: (m: string) => {
+                    updateSettings({ anthropicModel: m });
+                    addToast(`Model Anthropic diubah ke ${m}`, 'info');
+                  }
+                },
+                {
+                  id: 'openrouter' as LLMProvider,
+                  title: 'OpenRouter',
+                  subtitle: 'Akses Multi-Model Terpadu',
+                  placeholder: 'sk-or-v1-...',
+                  url: 'https://openrouter.ai/keys',
+                  currentModel: settings.openrouterModel || 'anthropic/claude-3.7-sonnet',
+                  onSelectModel: (m: string) => {
+                    updateSettings({ openrouterModel: m });
+                    addToast(`Model OpenRouter diubah ke ${m}`, 'info');
+                  }
+                }
+              ]).map((p) => {
+                const isPrimary = settings.selectedLLMProvider === p.id;
+                const isExpanded = expandedProvider === p.id;
+                const keyVal = settings.apiKeys[p.id] || '';
+                const hasKey = Boolean(keyVal.trim());
+                const testRes = testResults[p.id];
 
-                  <div className="flex items-center gap-1 shrink-0">
+                return (
+                  <div
+                    key={p.id}
+                    className={`rounded-xl border transition-all overflow-hidden ${
+                      isPrimary
+                        ? 'bg-primary/[0.04] border-primary/40 shadow-sm'
+                        : isExpanded
+                          ? 'bg-black/50 border-white/[0.14]'
+                          : 'bg-black/35 border-white/[0.07] hover:border-white/[0.12]'
+                    }`}
+                  >
+                    {/* Card Header (Accordion Toggle) */}
                     <button
                       type="button"
-                      onClick={() => handleExportSkill(s)}
-                      title="Ekspor Skill JSON"
-                      className="w-6 h-6 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                      onClick={() => setExpandedProvider(isExpanded ? null : p.id)}
+                      className="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-left select-none"
                     >
-                      <span className="material-symbols-outlined text-[15px]">file_download</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <span className="text-xs font-bold text-white">{p.title}</span>
+                        {isPrimary && (
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/40">
+                            Utama
+                          </span>
+                        )}
+                        <span
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                            hasKey
+                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                              : 'bg-zinc-500/10 text-zinc-400 border-white/[0.06]'
+                          }`}
+                        >
+                          {hasKey ? '✓ Kunci Terisi' : 'Belum Diatur'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="hidden sm:inline font-mono text-[10px] text-zinc-400 truncate max-w-[120px]">
+                          {p.currentModel}
+                        </span>
+                        <span className="material-symbols-outlined text-[18px] text-zinc-400">
+                          {isExpanded ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </div>
                     </button>
-                    {!s.isBuiltin && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSkill(s.id)}
-                        title="Hapus Skill"
-                        className="w-6 h-6 rounded text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">delete</span>
-                      </button>
+
+                    {/* Card Body */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-1.5 border-t border-white/[0.06] space-y-2.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-zinc-400">{p.subtitle}</span>
+                          <a
+                            href={p.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-0.5"
+                          >
+                            <span>Dapatkan Kunci API</span>
+                            <span>↗</span>
+                          </a>
+                        </div>
+
+                        {/* Input + Inline Test Key Button */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative flex-1 flex items-center bg-black/70 rounded-lg border border-white/[0.1] px-2.5 py-1.5 focus-within:border-primary/50">
+                            <input
+                              type={visibleKeys[p.id] ? 'text' : 'password'}
+                              value={keyVal}
+                              onChange={(e) => updateApiKey(p.id, e.target.value)}
+                              onBlur={() => {
+                                if (keyVal.trim()) handleScanModels(p.id);
+                              }}
+                              placeholder={p.placeholder}
+                              className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleVisibility(p.id)}
+                              className="p-0.5 text-zinc-400 hover:text-white shrink-0 ml-1"
+                              title={visibleKeys[p.id] ? 'Sembunyikan kunci' : 'Tampilkan kunci'}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                {visibleKeys[p.id] ? 'visibility_off' : 'visibility'}
+                              </span>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={testingKey[p.id] || !hasKey}
+                            onClick={() => handleTestKey(p.id)}
+                            className="h-8 px-2.5 text-[10px] font-mono font-semibold rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/[0.1] flex items-center gap-1 disabled:opacity-40 shrink-0 transition-colors"
+                          >
+                            <span className={`material-symbols-outlined text-[13px] ${testingKey[p.id] ? 'animate-spin' : ''}`}>
+                              {testingKey[p.id] ? 'progress_activity' : 'network_check'}
+                            </span>
+                            <span>{testingKey[p.id] ? 'Uji...' : 'Test Key'}</span>
+                          </button>
+                        </div>
+
+                        {testRes && (
+                          <div
+                            className={`text-[10px] font-mono px-2 py-1 rounded bg-black/40 border ${
+                              testRes.success
+                                ? 'text-emerald-400 border-emerald-500/30'
+                                : 'text-red-400 border-red-500/30'
+                            }`}
+                          >
+                            {testRes.success ? '✓ Kunci API Valid & Aktif' : '✗ ' + testRes.message}
+                          </div>
+                        )}
+
+                        {/* Model Selector */}
+                        <ProviderModelSelector
+                          provider={p.id}
+                          apiKey={keyVal}
+                          currentModel={p.currentModel}
+                          models={providerModels[p.id]}
+                          isScanning={scanningModels[p.id]}
+                          onSelectModel={p.onSelectModel}
+                          onScan={() => handleScanModels(p.id)}
+                        />
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
-          {/* 2b. Model Suara Offline (Piper TTS) */}
-          <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3 shadow-sm">
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-primary text-[17px]">record_voice_over</span>
-                <span className="text-xs font-semibold text-white uppercase tracking-wider">
-                  Model Suara Lokal (Offline Piper TTS)
-                </span>
+          {/* KONTAINER 3: KUNCI API SUARA CLOUD (ELEVENLABS) */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[18px]">graphic_eq</span>
+                  <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                    3. Kunci API Suara Cloud (ElevenLabs)
+                  </h3>
+                </div>
+                <a
+                  href="https://elevenlabs.io/app/settings/api-keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-semibold text-primary hover:underline"
+                >
+                  Dapatkan Kunci ↗
+                </a>
               </div>
-              <span className="text-[10px] font-mono text-zinc-400">Zero-Server</span>
+              <p className="text-[11px] text-zinc-400">
+                Opsional — Digunakan khusus jika Anda memilih penyedia suara ElevenLabs di Tab Suara.
+              </p>
             </div>
 
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              Unduh bobot model suara sekali ke cache browser Anda agar dapat menghasilkan voiceover secara 100% lokal tanpa internet dan tanpa kuota API.
-            </p>
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1 flex items-center bg-black/70 rounded-lg border border-white/[0.1] px-2.5 py-1.5 focus-within:border-primary/50">
+                <input
+                  type={visibleKeys.elevenlabs ? 'text' : 'password'}
+                  value={settings.apiKeys.elevenlabs || ''}
+                  onChange={(e) => updateApiKey('elevenlabs', e.target.value)}
+                  placeholder="xi-api-key..."
+                  className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleVisibility('elevenlabs')}
+                  className="p-0.5 text-zinc-400 hover:text-white shrink-0 ml-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {visibleKeys.elevenlabs ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={testingKey.elevenlabs || !settings.apiKeys.elevenlabs}
+                onClick={() => handleTestKey('elevenlabs')}
+                className="h-8 px-2.5 text-[10px] font-mono font-semibold rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/[0.1] flex items-center gap-1 disabled:opacity-40 shrink-0 transition-colors"
+              >
+                <span className={`material-symbols-outlined text-[13px] ${testingKey.elevenlabs ? 'animate-spin' : ''}`}>
+                  {testingKey.elevenlabs ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{testingKey.elevenlabs ? 'Uji...' : 'Test Key'}</span>
+              </button>
+            </div>
+
+            {testResults.elevenlabs && (
+              <div
+                className={`text-[10px] font-mono px-2 py-1 rounded bg-black/40 border ${
+                  testResults.elevenlabs.success
+                    ? 'text-emerald-400 border-emerald-500/30'
+                    : 'text-red-400 border-red-500/30'
+                }`}
+              >
+                {testResults.elevenlabs.success ? '✓ Kunci ElevenLabs Valid' : '✗ ' + testResults.elevenlabs.message}
+              </div>
+            )}
+          </section>
+
+          {/* KONTAINER 4: MODEL SUARA LOKAL (OFFLINE PIPER TTS) */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[18px]">record_voice_over</span>
+                  <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                    4. Model Suara Lokal (Offline TTS)
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-300 border border-white/[0.08]">
+                  Zero-Server
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Unduh model suara sekali ke cache browser untuk membuat voiceover 100% lokal tanpa kuota API.
+              </p>
+            </div>
 
             <div className="space-y-2">
               {LOCAL_VOICES.map((v) => {
@@ -1045,12 +887,12 @@ export const SettingsDrawer: React.FC = () => {
                 return (
                   <div
                     key={v.id}
-                    className="p-3 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col gap-2"
+                    className="p-3 rounded-xl bg-black/40 border border-white/[0.07] flex flex-col gap-2"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-white">{v.name}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-white">{v.name}</span>
                           <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.08]">
                             {v.languageLabel}
                           </span>
@@ -1065,7 +907,7 @@ export const SettingsDrawer: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">{v.description}</p>
+                        <p className="text-[10px] text-zinc-400 mt-1">{v.description}</p>
                       </div>
                       <span className="text-[10px] font-mono text-zinc-400 shrink-0">~{v.sizeMb} MB</span>
                     </div>
@@ -1084,12 +926,12 @@ export const SettingsDrawer: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/[0.04]">
+                      <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-white/[0.05]">
                         {isCached ? (
                           <button
                             type="button"
                             onClick={() => handleDeleteVoice(v)}
-                            className="text-[11px] text-zinc-400 hover:text-red-400 flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] transition-colors"
+                            className="text-[11px] text-zinc-400 hover:text-red-400 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] transition-colors"
                           >
                             <span className="material-symbols-outlined text-[13px]">delete</span>
                             <span>Hapus dari Cache</span>
@@ -1112,84 +954,164 @@ export const SettingsDrawer: React.FC = () => {
             </div>
           </section>
 
-          {/* 3. Storage & Cache */}
-          <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 shadow-sm">
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-zinc-400 text-[17px]">storage</span>
-                <span className="text-xs font-semibold text-white uppercase tracking-wider">
-                  Penyimpanan & Cache
-                </span>
+          {/* KONTAINER 5: GAYA PENULISAN (PERSONA SKILLS) */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
+                  <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                    5. Gaya Penulisan Naskah (Persona)
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-mono px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:text-white cursor-pointer flex items-center gap-1 transition-colors">
+                    <span className="material-symbols-outlined text-[13px]">file_upload</span>
+                    <span>Impor</span>
+                    <input accept=".json" className="hidden" type="file" onChange={handleImportSkill} />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSkillModal(true)}
+                    className="text-[10px] font-mono px-2 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 flex items-center gap-1 font-semibold transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">add</span>
+                    <span>Buat Baru</span>
+                  </button>
+                </div>
               </div>
+              <p className="text-[11px] text-zinc-400">
+                Preset instruksi karakter sutradara AI saat menghasilkan storyboard naskah.
+              </p>
             </div>
 
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Cache Suara:</span>
-              <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={async () => {
-                  await clearCache();
-                  addToast('Cache suara berhasil dibersihkan!', 'info');
-                }}
-                className="h-7 px-2.5 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-zinc-300 rounded-lg hover:bg-white/[0.1] active:scale-95 transition-all flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-                <span>Bersihkan Cache</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handlePurgeLocalModels}
-                className="h-7 px-2.5 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-red-300 rounded-lg hover:bg-red-500/20 active:scale-95 transition-all flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[14px]">delete</span>
-                <span>Hapus Model Suara ({(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB)</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-xs">
-              <span className="text-zinc-400 text-[11px]">Proteksi Penyimpanan:</span>
-              {persistenceStatus?.persisted ? (
-                <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded">
-                  Aktif
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleRequestPersistence}
-                  className="text-[10px] font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2 py-0.5 rounded transition-colors"
+            <div className="space-y-1.5">
+              {skills.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-2"
                 >
-                  Aktifkan
-                </button>
-              )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-white text-xs truncate">{s.name}</span>
+                      {s.isBuiltin && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400">
+                          Bawaan
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-zinc-400 truncate block mt-0.5">{s.description}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleExportSkill(s)}
+                      title="Ekspor Skill JSON"
+                      className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">file_download</span>
+                    </button>
+                    {!s.isBuiltin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSkill(s.id)}
+                        title="Hapus Skill"
+                        className="w-7 h-7 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">delete</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
 
-          {/* 4. Hardware Stats */}
-          <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2.5 shadow-sm">
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-              <span className="text-xs font-semibold text-white uppercase tracking-wider">Perangkat</span>
+          {/* KONTAINER 6: PENYIMPANAN, CACHE & PERANGKAT */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[18px]">storage</span>
+                <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
+                  6. Penyimpanan, Cache & Perangkat
+                </h3>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Kelola memori cache lokal browser dan status kemampuan perangkat keras Anda.
+              </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Grafis</span>
-                <span className={`text-xs font-mono font-bold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-zinc-200'}`}>
-                  {deviceCaps?.hasWebGpu ? 'Tinggi' : 'Standar'}
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-400">Ukuran Cache Audio TTS:</span>
+                <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-400">Ukuran Model Suara Lokal:</span>
+                <span className="font-mono text-zinc-200 font-semibold">
+                  {(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB
                 </span>
               </div>
-              <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Memori</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await clearCache();
+                    addToast('Cache suara berhasil dibersihkan!', 'info');
+                  }}
+                  className="py-2 px-3 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-zinc-200 rounded-xl hover:bg-white/[0.1] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                  <span>Bersihkan Cache Audio</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePurgeLocalModels}
+                  className="py-2 px-3 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-red-300 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                  <span>Hapus Model Suara Lokal</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-xs">
+                <span className="text-zinc-400 text-[11px]">Proteksi Penyimpanan Browser:</span>
+                {persistenceStatus?.persisted ? (
+                  <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-md">
+                    ✓ Aktif
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRequestPersistence}
+                    className="text-[10px] font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2.5 py-0.5 rounded-md transition-colors"
+                  >
+                    Aktifkan Proteksi
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Hardware Stats */}
+            <div className="grid grid-cols-3 gap-2 text-center pt-1">
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
+                <span className="text-[10px] text-zinc-400">Akselerasi GPU</span>
+                <span className={`text-xs font-mono font-bold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-zinc-200'}`}>
+                  {deviceCaps?.hasWebGpu ? 'WebGPU Aktif' : 'Standar'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
+                <span className="text-[10px] text-zinc-400">Memori Sistem</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
                   {deviceCaps?.deviceMemoryGb ? `~${deviceCaps.deviceMemoryGb} GB` : 'Standar'}
                 </span>
               </div>
-              <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">CPU</span>
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
+                <span className="text-[10px] text-zinc-400">Inti CPU</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
                   {deviceCaps?.hardwareConcurrency || 4} Core
                 </span>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import type { AssetRecord } from '../../db/mooDb';
+import type { AssetAnimationPreset, AssetFramePreset } from '../../store/types';
 import { MAX_ASSET_BYTES } from '../../store/slices/assetSlice';
 
 export const AssetManagerPanel: React.FC = () => {
@@ -16,6 +17,8 @@ export const AssetManagerPanel: React.FC = () => {
   const insertAssetIntoScene = useMooStore((s) => s.insertAssetIntoScene);
   const removeAssetFromScene = useMooStore((s) => s.removeAssetFromScene);
   const addToast = useMooStore((s) => s.addToast);
+  const [selectedAnimPreset, setSelectedAnimPreset] = React.useState<AssetAnimationPreset>('pop');
+  const [selectedFramePreset, setSelectedFramePreset] = React.useState<AssetFramePreset>('cutout');
 
   useEffect(() => {
     if (activeProject.id) {
@@ -46,7 +49,10 @@ export const AssetManagerPanel: React.FC = () => {
   const targetCompScene = activeProject.composition?.scenes.find((s) => s.beatId === targetSceneId);
 
   const handleInsert = (asset: AssetRecord) => {
-    insertAssetIntoScene(asset, targetSceneId);
+    insertAssetIntoScene(asset, targetSceneId, {
+      animationPreset: selectedAnimPreset,
+      framePreset: selectedFramePreset
+    });
   };
 
   const handleRemove = (asset: AssetRecord) => {
@@ -113,6 +119,62 @@ export const AssetManagerPanel: React.FC = () => {
           </select>
         </div>
       )}
+
+      {/* Preset Animasi & Bingkai untuk Penyisipan */}
+      <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-surface-1 border border-border">
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+            Preset Animasi Kemunculan
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+            {[
+              { id: 'pop', label: 'Pop In (Elastic)' },
+              { id: 'slide', label: 'Slide Up' },
+              { id: 'float', label: 'Floating Loop' },
+              { id: 'zoom', label: 'Zoom Punch' }
+            ].map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setSelectedAnimPreset(preset.id as AssetAnimationPreset)}
+                className={`py-1 px-1.5 rounded-lg text-[10px] font-medium border text-center transition-all ${
+                  selectedAnimPreset === preset.id
+                    ? 'bg-accent/15 border-accent text-accent font-bold'
+                    : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1 pt-1 border-t border-border/50">
+          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+            Preset Bingkai Gambar
+          </span>
+          <div className="grid grid-cols-3 gap-1">
+            {[
+              { id: 'cutout', label: 'Cutout (Bayangan)' },
+              { id: 'bento', label: 'Bento Card' },
+              { id: 'avatar', label: 'Avatar Bulat' }
+            ].map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setSelectedFramePreset(preset.id as AssetFramePreset)}
+                className={`py-1 px-1.5 rounded-lg text-[10px] font-medium border text-center transition-all ${
+                  selectedFramePreset === preset.id
+                    ? 'bg-accent/15 border-accent text-accent font-bold'
+                    : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Galeri / List Aset */}
       {isLoadingAssets ? (

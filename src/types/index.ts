@@ -62,6 +62,7 @@ export interface StoryBeat {
   mood?: string;
   durationHint?: number;
   locked?: boolean;
+  assignedAssets?: SceneAssetAttachment[];
 }
 
 export interface WordTimestamp {
@@ -264,6 +265,7 @@ export interface Scene {
   emphasis?: string[];
   mood?: string;
   locked?: boolean;
+  assignedAssets?: SceneAssetAttachment[];
 
   /** @deprecated legacy — migration only */
   layout?: LegacyLayoutType;
@@ -590,6 +592,22 @@ export interface LayerOverride {
   rotation?: number; // deg
   opacity?: number; // 0..1 multiplier
   color?: string;
+  zIndex?: number;
+  hidden?: boolean;
+  flipX?: boolean;
+  flipY?: boolean;
+  fontSizeScale?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  borderRadius?: number;
+  layerType?: EditableLayerType;
+}
+
+export interface SceneAssetAttachment {
+  assetId: string;
+  assetName: string;
+  dataUrl: string;
+  role: 'logo' | 'product' | 'screenshot' | 'character' | 'badge' | 'background';
+  motionGuidance?: string;
 }
 
 export interface ScenePalette {

@@ -116,76 +116,6 @@ export interface InspectorRackProps {
   onOpenCodeInspector?: (beatId: string) => void;
 }
 
-interface ThemePresetItem {
-  id: string;
-  name: string;
-  previewColors: { bg: string; primary: string; accent: string };
-  tokens: ThemeTokens;
-}
-
-const THEME_PRESETS: ThemePresetItem[] = [
-  {
-    id: 'dark-minimal',
-    name: 'Dark Minimal',
-    previewColors: { bg: '#09090b', primary: '#f4f4f5', accent: '#a1a1aa' },
-    tokens: {
-      id: 'dark-minimal',
-      name: 'Dark Minimal',
-      bg: '#09090b',
-      surface: '#18181b',
-      primary: '#f4f4f5',
-      accent: '#ffffff',
-      text: '#fafafa',
-      muted: '#71717a'
-    }
-  },
-  {
-    id: 'lime-cyber',
-    name: 'Lime Cyber',
-    previewColors: { bg: '#0d0d0e', primary: '#84cc16', accent: '#a3e635' },
-    tokens: {
-      id: 'lime-cyber',
-      name: 'Lime Cyber',
-      bg: '#0d0d0e',
-      surface: '#18181b',
-      primary: '#84cc16',
-      accent: '#a3e635',
-      text: '#f4f4f5',
-      muted: '#71717a'
-    }
-  },
-  {
-    id: 'mono-swiss',
-    name: 'Mono Swiss',
-    previewColors: { bg: '#000000', primary: '#ffffff', accent: '#e4e4e7' },
-    tokens: {
-      id: 'mono-swiss',
-      name: 'Mono Swiss',
-      bg: '#000000',
-      surface: '#121212',
-      primary: '#ffffff',
-      accent: '#e4e4e7',
-      text: '#ffffff',
-      muted: '#a1a1aa'
-    }
-  },
-  {
-    id: 'warm-editorial',
-    name: 'Warm Editorial',
-    previewColors: { bg: '#1c1017', primary: '#f43f5e', accent: '#fb923c' },
-    tokens: {
-      id: 'warm-editorial',
-      name: 'Warm Editorial',
-      bg: '#1c1017',
-      surface: '#2c1824',
-      primary: '#f43f5e',
-      accent: '#fb923c',
-      text: '#fff1f2',
-      muted: '#fda4af'
-    }
-  }
-];
-
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -284,7 +214,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     return mergeEditableLayers(activeCompScene.editableLayers, activeCompScene.html);
   }, [activeCompScene?.editableLayers, activeCompScene?.html]);
 
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const selectedLayerId = useMooStore((s) => s.selectedLayerId);
+  const setSelectedLayerId = useMooStore((s) => s.setSelectedLayerId);
+
+  useEffect(() => {
+    setSelectedLayerId(null);
+  }, [activeScene?.id, setSelectedLayerId]);
 
   const activeLayer = useMemo(() => {
     if (!availableLayers.length) return null;
@@ -294,6 +229,23 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const currentOverrides = activeCompScene?.overrides || {};
   const activeLayerOverride = activeLayer ? currentOverrides[activeLayer.id] || {} : {};
   const currentPalette = activeCompScene?.palette || {};
+  // Local debounced state for layer text editing
+  const [localLayerText, setLocalLayerText] = useState<string>('');
+  useEffect(() => {
+    if (activeLayer && activeLayer.type === 'text' && activeCompScene?.html) {
+      setLocalLayerText(getLayerText(activeCompScene.html, activeLayer.id));
+    } else {
+      setLocalLayerText('');
+    }
+  }, [activeLayer?.id, activeCompScene?.html]);
+
+  const commitLayerText = (text: string) => {
+    if (!activeCompScene?.html || !activeLayer) return;
+    const current = getLayerText(activeCompScene.html, activeLayer.id);
+    if (current === text) return;
+    handleLayerTextChange(text);
+  };
+
 
   // Single Scene AI Revision States
   const [revisionPrompt, setRevisionPrompt] = useState<string>('');
@@ -317,9 +269,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     }
   };
 
-  const handleOverrideChange = (prop: keyof LayerOverride, val: number | string | undefined) => {
+  const handleOverrideChange = (prop: keyof LayerOverride, val: number | string | boolean | undefined) => {
     if (!activeScene || !activeLayer) return;
-    updateLayerOverride(activeScene.id, activeLayer.id, { [prop]: val });
+    updateLayerOverride(activeScene.id, activeLayer.id, {
+      [prop]: val,
+      layerType: activeLayer.type
+    });
   };
 
   const handleResetLayerOverride = () => {
@@ -330,7 +285,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       scale: 1,
       rotation: 0,
       opacity: 1,
-      color: undefined
+      color: undefined,
+      zIndex: undefined,
+      hidden: false,
+      flipX: false,
+      flipY: false,
+      fontSizeScale: 1,
+      textAlign: undefined,
+      borderRadius: undefined,
+      layerType: activeLayer.type
     });
     addToast(`Override layer ${activeLayer.label} direset.`, 'info');
   };
@@ -417,7 +380,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
           motionIntent: activeScene.motionIntent,
           cameraIntent: activeScene.camera,
           durationHint: activeScene.durationInSeconds || 3.5,
-          focusWords: activeScene.focusWords
+          focusWords: activeScene.focusWords,
+          assignedAssets: activeScene.assignedAssets,
         },
         index: activeSceneIndex >= 0 ? activeSceneIndex : 0,
         total: scenes.length,
@@ -523,32 +487,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
 
-  // Active theme detection
-  const isThemeActive = (theme: ThemePresetItem) => {
-    const currentId = project.themeTokens?.id;
-    const currentName = project.themeTokens?.name?.toLowerCase();
-    if (currentId === theme.id) return true;
-    if (currentName === theme.name.toLowerCase()) return true;
-    if (theme.id === 'lime-cyber' && currentId === 'brutalist-lime') return true;
-    if (theme.id === 'warm-editorial' && currentId === 'sunset-editorial') return true;
-    if (theme.id === 'dark-minimal' && currentId === 'minimal-monochrome') return true;
-    return false;
-  };
-
-  // Font options mapping
-  const currentFont = project.theme?.fontFamily || 'Jakarta';
-  const fontOptions: { value: 'Jakarta' | 'Mono' | 'Impact'; label: string }[] = [
-    { value: 'Jakarta', label: 'Plus Jakarta' },
-    { value: 'Mono', label: 'JetBrains Mono' },
-    { value: 'Impact', label: 'Syne Bold' }
-  ];
-
   // Text position options
   const currentPosition = project.theme?.captionPosition || 'bottom';
   const positionOptions: { value: CaptionPosition; label: string }[] = [
-    { value: 'bottom', label: 'Bawah' },
+    { value: 'top', label: 'Atas' },
     { value: 'center', label: 'Tengah' },
-    { value: 'top', label: 'Atas' }
+    { value: 'bottom', label: 'Bawah' }
   ];
 
   // Text style options
@@ -944,7 +888,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 motionIntent: beat.motionIntent,
                 cameraIntent: beat.camera,
                 durationHint: beat.durationInSeconds || 3.5,
-                focusWords: beat.focusWords
+                focusWords: beat.focusWords,
+                assignedAssets: beat.assignedAssets,
               },
               index: i,
               total,
@@ -1385,10 +1330,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                       {/* Controls for Active Layer */}
                       {activeLayer && (
-                        <div className="p-3 rounded-xl bg-surface-1 border border-border space-y-3">
-                          <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
+                        <div className="p-3 rounded-xl bg-surface-1 border border-border space-y-3.5">
+                          {/* Header Layer & Quick Tools */}
+                          <div className="flex items-center justify-between pb-2 border-b border-border/40">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="material-symbols-outlined text-accent text-[16px] shrink-0">
+                              <span className="material-symbols-outlined text-accent text-[17px] shrink-0">
                                 {getLayerIcon(activeLayer.type)}
                               </span>
                               <div className="min-w-0">
@@ -1401,149 +1347,437 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Visibility Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => handleOverrideChange('hidden', !activeLayerOverride.hidden)}
+                                className={`p-1 rounded-lg border text-[11px] transition-colors ${
+                                  activeLayerOverride.hidden
+                                    ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                                    : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                                }`}
+                                title={activeLayerOverride.hidden ? 'Layer tersembunyi (Klik untuk tampilkan)' : 'Sembunyikan layer'}
+                              >
+                                <span className="material-symbols-outlined text-[15px]">
+                                  {activeLayerOverride.hidden ? 'visibility_off' : 'visibility'}
+                                </span>
+                              </button>
+
+                              {/* Z-Index Controls */}
+                              <div className="flex items-center gap-0.5 bg-surface-2 border border-border rounded-lg p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('zIndex', Math.max(0, (activeLayerOverride.zIndex || 0) - 1))}
+                                  className="p-0.5 rounded hover:bg-surface-3 text-text-muted hover:text-on-surface transition-colors"
+                                  title="Kirim ke Belakang (Z-Index -1)"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">arrow_downward</span>
+                                </button>
+                                <span className="text-[10px] font-mono px-1 text-on-surface">
+                                  Z:{activeLayerOverride.zIndex ?? 0}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('zIndex', (activeLayerOverride.zIndex || 0) + 1)}
+                                  className="p-0.5 rounded hover:bg-surface-3 text-text-muted hover:text-on-surface transition-colors"
+                                  title="Bawa ke Depan (Z-Index +1)"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">arrow_upward</span>
+                                </button>
+                              </div>
+
+                              {/* Reset & Delete */}
                               <button
                                 type="button"
                                 onClick={handleResetLayerOverride}
-                                className="text-[10px] text-text-muted hover:text-accent flex items-center gap-0.5 transition-colors"
+                                className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-accent transition-colors"
                                 title="Reset transform ke default"
                               >
-                                <span className="material-symbols-outlined text-[13px]">restart_alt</span>
-                                Reset
+                                <span className="material-symbols-outlined text-[15px]">restart_alt</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={handleRemoveLayer}
-                                className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors"
+                                className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-rose-400 transition-colors"
                                 title="Hapus layer ini dari adegan"
                               >
-                                <span className="material-symbols-outlined text-[13px]">delete</span>
-                                Hapus
+                                <span className="material-symbols-outlined text-[15px]">delete</span>
                               </button>
                             </div>
                           </div>
 
-                          {/* Direct Text Editor for Text Layers */}
-                          {activeLayer.type === 'text' && activeCompScene?.html && (
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                                Konten Teks
-                              </span>
-                              <input
-                                type="text"
-                                value={getLayerText(activeCompScene.html, activeLayer.id)}
-                                onChange={(e) => handleLayerTextChange(e.target.value)}
-                                className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-[12px] text-on-surface focus:outline-none focus:border-accent"
-                              />
+                          {/* Kontrol Khusus Layer Teks */}
+                          {activeLayer.type === 'text' && (
+                            <div className="space-y-2 p-2.5 rounded-xl bg-surface-2/50 border border-border/70">
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
+                                  Konten Teks (Debounced)
+                                </span>
+                                <input
+                                  type="text"
+                                  value={localLayerText}
+                                  onChange={(e) => setLocalLayerText(e.target.value)}
+                                  onBlur={() => commitLayerText(localLayerText)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') commitLayerText(localLayerText);
+                                  }}
+                                  placeholder="Ketik teks layer di sini..."
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-surface-1 border border-border text-[12px] text-on-surface focus:outline-none focus:border-accent"
+                                />
+                              </div>
+
+                              {/* Ukuran Teks (fontSizeScale) */}
+                              <div className="space-y-1 pt-1 border-t border-border/50">
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
+                                  <span>Ukuran Font</span>
+                                  <span className="text-accent">{Math.round((activeLayerOverride.fontSizeScale || 1.0) * 100)}%</span>
+                                </div>
+                                <DebouncedSlider
+                                  min={0.5}
+                                  max={2.5}
+                                  step={0.05}
+                                  value={activeLayerOverride.fontSizeScale || 1.0}
+                                  onChangeComplete={(val) => handleOverrideChange('fontSizeScale', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
+                                <div className="flex items-center gap-1 pt-0.5">
+                                  {[0.8, 1.0, 1.25, 1.5, 2.0].map((sc) => (
+                                    <button
+                                      key={sc}
+                                      type="button"
+                                      onClick={() => handleOverrideChange('fontSizeScale', sc)}
+                                      className={`flex-1 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                                        Math.abs((activeLayerOverride.fontSizeScale || 1.0) - sc) < 0.05
+                                          ? 'bg-accent/15 border-accent text-accent font-bold'
+                                          : 'bg-surface-1 border-border text-text-muted hover:text-on-surface'
+                                      }`}
+                                    >
+                                      {Math.round(sc * 100)}%
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Perataan Teks (textAlign) */}
+                              <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                                <span className="text-[10px] text-text-muted font-medium">Perataan Teks</span>
+                                <div className="flex items-center gap-1 bg-surface-1 p-0.5 rounded-lg border border-border">
+                                  {(['left', 'center', 'right'] as const).map((align) => {
+                                    const isSel = (activeLayerOverride.textAlign || 'center') === align;
+                                    return (
+                                      <button
+                                        key={align}
+                                        type="button"
+                                        onClick={() => handleOverrideChange('textAlign', align)}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                                          isSel ? 'bg-surface-3 text-accent font-bold shadow-xs' : 'text-text-muted hover:text-on-surface'
+                                        }`}
+                                      >
+                                        {align === 'left' ? 'Kiri' : align === 'center' ? 'Tengah' : 'Kanan'}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           )}
 
                           {/* Position X and Y */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Pos X</span>
-                                <span className="text-accent">{activeLayerOverride.x || 0}px</span>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
+                              <span className="font-semibold uppercase tracking-wider text-[9px]">Posisi Koordinat</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('x', 0)}
+                                  className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
+                                  title="Rata Tengah X"
+                                >
+                                  X=0
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('y', 0)}
+                                  className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
+                                  title="Rata Tengah Y"
+                                >
+                                  Y=0
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleOverrideChange('x', 0);
+                                    handleOverrideChange('y', 0);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
+                                  title="Pusat Canvas"
+                                >
+                                  Pusat
+                                </button>
                               </div>
-                              <DebouncedSlider
-                                min={-300}
-                                max={300}
-                                step={2}
-                                value={activeLayerOverride.x || 0}
-                                onChangeComplete={(val) => handleOverrideChange('x', val)}
-                                className="w-full accent-accent h-1 cursor-pointer"
-                              />
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Pos Y</span>
-                                <span className="text-accent">{activeLayerOverride.y || 0}px</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Pos X</span>
+                                  <input
+                                    type="number"
+                                    min={-960}
+                                    max={960}
+                                    value={activeLayerOverride.x || 0}
+                                    onChange={(e) => handleOverrideChange('x', parseFloat(e.target.value) || 0)}
+                                    className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
+                                  />
+                                </div>
+                                <DebouncedSlider
+                                  min={-960}
+                                  max={960}
+                                  step={2}
+                                  value={activeLayerOverride.x || 0}
+                                  onChangeComplete={(val) => handleOverrideChange('x', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
                               </div>
-                              <DebouncedSlider
-                                min={-300}
-                                max={300}
-                                step={2}
-                                value={activeLayerOverride.y || 0}
-                                onChangeComplete={(val) => handleOverrideChange('y', val)}
-                                className="w-full accent-accent h-1 cursor-pointer"
-                              />
+
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Pos Y</span>
+                                  <input
+                                    type="number"
+                                    min={-1080}
+                                    max={1080}
+                                    value={activeLayerOverride.y || 0}
+                                    onChange={(e) => handleOverrideChange('y', parseFloat(e.target.value) || 0)}
+                                    className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
+                                  />
+                                </div>
+                                <DebouncedSlider
+                                  min={-1080}
+                                  max={1080}
+                                  step={2}
+                                  value={activeLayerOverride.y || 0}
+                                  onChangeComplete={(val) => handleOverrideChange('y', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
+                              </div>
                             </div>
                           </div>
 
-                          {/* Scale and Rotation */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Skala</span>
-                                <span className="text-accent">{activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}x</span>
+                          {/* Scale, Rotation, and Flip */}
+                          <div className="space-y-1.5 pt-1 border-t border-border/40">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Skala</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={0.1}
+                                      max={3.5}
+                                      step={0.05}
+                                      value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
+                                      onChange={(e) => handleOverrideChange('scale', parseFloat(e.target.value) || 1.0)}
+                                      className="w-11 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOverrideChange('scale', 1.0)}
+                                      className="text-[9px] px-1 py-0.2 rounded bg-surface-2 border border-border text-text-muted hover:text-accent"
+                                      title="Reset 1.0x"
+                                    >
+                                      1x
+                                    </button>
+                                  </div>
+                                </div>
+                                <DebouncedSlider
+                                  min={0.1}
+                                  max={3.5}
+                                  step={0.05}
+                                  value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
+                                  onChangeComplete={(val) => handleOverrideChange('scale', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
                               </div>
-                              <DebouncedSlider
-                                min={0.1}
-                                max={2.5}
-                                step={0.05}
-                                value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
-                                onChangeComplete={(val) => handleOverrideChange('scale', val)}
-                                className="w-full accent-accent h-1 cursor-pointer"
-                              />
+
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Rotasi</span>
+                                  <input
+                                    type="number"
+                                    min={-180}
+                                    max={180}
+                                    step={5}
+                                    value={activeLayerOverride.rotation || 0}
+                                    onChange={(e) => handleOverrideChange('rotation', parseFloat(e.target.value) || 0)}
+                                    className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
+                                  />
+                                </div>
+                                <DebouncedSlider
+                                  min={-180}
+                                  max={180}
+                                  step={5}
+                                  value={activeLayerOverride.rotation || 0}
+                                  onChangeComplete={(val) => handleOverrideChange('rotation', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
+                                <div className="flex items-center gap-1 pt-0.5">
+                                  {[0, 90, 180, -90].map((deg) => (
+                                    <button
+                                      key={deg}
+                                      type="button"
+                                      onClick={() => handleOverrideChange('rotation', deg)}
+                                      className={`flex-1 py-0.2 rounded text-[8px] font-mono border transition-all ${
+                                        (activeLayerOverride.rotation || 0) === deg
+                                          ? 'bg-accent/15 border-accent text-accent font-bold'
+                                          : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                                      }`}
+                                    >
+                                      {deg}°
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Rotasi</span>
-                                <span className="text-accent">{activeLayerOverride.rotation || 0}°</span>
+                            {/* Flip Buttons */}
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[10px] text-text-muted font-medium">Balik Arah (Flip):</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('flipX', !activeLayerOverride.flipX)}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-all ${
+                                    activeLayerOverride.flipX
+                                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                                  }`}
+                                  title="Balik Horisontal (Flip H)"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">swap_horiz</span>
+                                  <span>Flip H</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOverrideChange('flipY', !activeLayerOverride.flipY)}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-all ${
+                                    activeLayerOverride.flipY
+                                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                                  }`}
+                                  title="Balik Vertikal (Flip V)"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">swap_vert</span>
+                                  <span>Flip V</span>
+                                </button>
                               </div>
-                              <DebouncedSlider
-                                min={-180}
-                                max={180}
-                                step={5}
-                                value={activeLayerOverride.rotation || 0}
-                                onChangeComplete={(val) => handleOverrideChange('rotation', val)}
-                                className="w-full accent-accent h-1 cursor-pointer"
-                              />
                             </div>
                           </div>
 
-                          {/* Opacity and Color */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
+                          {/* Border Radius for Shape & Box & Group */}
+                          {(activeLayer.type === 'shape' || activeLayer.type === 'group' || activeLayer.type === 'image') && (
+                            <div className="space-y-1 pt-1 border-t border-border/40">
                               <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Transparansi</span>
-                                <span className="text-accent">
-                                  {Math.round((activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0) * 100)}%
-                                </span>
+                                <span>Kelengkungan Sudut</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={64}
+                                    value={activeLayerOverride.borderRadius || 0}
+                                    onChange={(e) => handleOverrideChange('borderRadius', parseFloat(e.target.value) || 0)}
+                                    className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
+                                  />
+                                  <span className="text-[9px]">px</span>
+                                </div>
                               </div>
                               <DebouncedSlider
                                 min={0}
-                                max={1}
-                                step={0.05}
-                                value={activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0}
-                                onChangeComplete={(val) => handleOverrideChange('opacity', val)}
+                                max={64}
+                                step={2}
+                                value={activeLayerOverride.borderRadius || 0}
+                                onChangeComplete={(val) => handleOverrideChange('borderRadius', val)}
                                 className="w-full accent-accent h-1 cursor-pointer"
                               />
+                              <div className="flex items-center gap-1 pt-0.5">
+                                {[0, 8, 16, 24, 32].map((r) => (
+                                  <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => handleOverrideChange('borderRadius', r)}
+                                    className={`flex-1 py-0.2 rounded text-[8px] font-mono border transition-all ${
+                                      (activeLayerOverride.borderRadius || 0) === r
+                                        ? 'bg-accent/15 border-accent text-accent font-bold'
+                                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                                    }`}
+                                  >
+                                    {r}px
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Opacity and Color */}
+                          <div className="space-y-2 pt-1 border-t border-border/40">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Transparansi</span>
+                                  <span className="text-accent">
+                                    {Math.round((activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0) * 100)}%
+                                  </span>
+                                </div>
+                                <DebouncedSlider
+                                  min={0}
+                                  max={1}
+                                  step={0.05}
+                                  value={activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0}
+                                  onChangeComplete={(val) => handleOverrideChange('opacity', val)}
+                                  className="w-full accent-accent h-1 cursor-pointer"
+                                />
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                                  <span>Warna Layer</span>
+                                  <span className="text-accent text-[9px]">{activeLayerOverride.color || 'Bawaan'}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <DebouncedColor
+                                    value={activeLayerOverride.color || '#84cc16'}
+                                    onChangeComplete={(val) => handleOverrideChange('color', val)}
+                                    className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                                  />
+                                  {activeLayerOverride.color && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOverrideChange('color', undefined)}
+                                      className="text-[9px] text-text-muted hover:text-on-surface"
+                                    >
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Warna Layer</span>
-                                <span className="text-accent text-[9px]">{activeLayerOverride.color || 'Bawaan'}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <DebouncedColor
-                                  value={activeLayerOverride.color || '#84cc16'}
-                                  onChangeComplete={(val) => handleOverrideChange('color', val)}
-                                  className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent"
+                            {/* Quick color palette chips */}
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span className="text-[9px] text-text-muted mr-1">Palet Cepat:</span>
+                              {['#84cc16', '#38bdf8', '#f59e0b', '#ef4444', '#ec4899', '#ffffff'].map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => handleOverrideChange('color', c)}
+                                  className={`w-4 h-4 rounded-full border transition-transform ${
+                                    activeLayerOverride.color === c ? 'border-white scale-125' : 'border-border/60 hover:scale-110'
+                                  }`}
+                                  style={{ backgroundColor: c }}
+                                  title={c}
                                 />
-                                {activeLayerOverride.color && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOverrideChange('color', undefined)}
-                                    className="text-[9px] text-text-muted hover:text-on-surface"
-                                  >
-                                    Reset
-                                  </button>
-                                )}
-                              </div>
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -1752,51 +1986,41 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </button>
             )}
 
-            {/* Subtitel Global & Kustomisasi Lengkap */}
-            <div className="flex flex-col gap-3 pt-1 border-t border-border">
+            {/* ================= PENGATURAN SUBTITEL VIDEO ================= */}
+            <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
+              {/* Header & Toggle Utama */}
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                  Kustomisasi Subtitel
+                <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-accent">subtitles</span>
+                  Pengaturan Subtitel Video
                 </span>
-                <span className="text-[10px] font-mono text-accent">
-                  {project.theme.showSubtitles ? 'Aktif' : 'Nonaktif'}
-                </span>
+                <button
+                  type="button"
+                  onClick={toggleGlobalSubtitles}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border flex items-center gap-1.5 transition-all select-none ${
+                    project.theme.showSubtitles
+                      ? 'bg-accent/15 border-accent text-accent font-semibold'
+                      : 'bg-surface-1 border-border text-text-muted hover:text-on-surface'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      project.theme.showSubtitles ? 'bg-accent' : 'bg-zinc-600'
+                    }`}
+                  />
+                  <span>{project.theme.showSubtitles ? 'Aktif' : 'Nonaktif'}</span>
+                </button>
               </div>
 
-              {/* Toggle Subtitel Global */}
-              <button
-                type="button"
-                onClick={toggleGlobalSubtitles}
-                className={`w-full py-2 px-3 rounded-xl border flex items-center justify-between transition-all select-none ${
-                  project.theme.showSubtitles
-                    ? 'bg-surface-3 border-accent text-on-surface ring-1 ring-accent/30'
-                    : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">
-                    {project.theme.showSubtitles ? 'subtitles' : 'subtitles_off'}
-                  </span>
-                  <span className="text-[12px] font-medium">
-                    {project.theme.showSubtitles ? 'Tampilkan Subtitel di Video' : 'Sembunyikan Subtitel'}
-                  </span>
-                </div>
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    project.theme.showSubtitles ? 'bg-accent' : 'bg-zinc-600'
-                  }`}
-                />
-              </button>
-
-              {/* Panel Kustomisasi Subtitel Lengkap */}
+              {/* Panel Kustomisasi Subtitel Terpadu */}
               {project.theme.showSubtitles && (
-                <div className="flex flex-col gap-3.5 p-3 rounded-2xl bg-surface-2/70 border border-border mt-1">
+                <div className="flex flex-col gap-3.5 pt-1">
                   {/* 1. Live Subtitle Preview */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Pratinjau Tampilan
+                      Pratinjau Langsung
                     </span>
-                    <div className="w-full h-16 rounded-xl bg-black/80 border border-border/80 flex items-center justify-center p-2 overflow-hidden relative">
+                    <div className="w-full h-16 rounded-xl bg-black/90 border border-border flex items-center justify-center p-2 overflow-hidden relative shadow-inner">
                       <div
                         className={`text-center font-bold transition-all ${
                           subCust.uppercase ? 'uppercase' : ''
@@ -1832,10 +2056,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
                   </div>
 
-                  {/* 2. Gaya Tampilan (Style Presets) */}
+                  {/* 2. Pilihan Gaya Tampilan (Style Presets) */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Gaya Subtitel
+                      Pilihan Gaya Tampilan
                     </span>
                     <div className="grid grid-cols-2 gap-1.5">
                       {styleOptions.map((opt) => {
@@ -1869,12 +2093,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
                   </div>
 
-                  {/* 3. Posisi Layar */}
+                  {/* 3. Tata Letak & Posisi */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Posisi di Layar
+                      Tata Letak & Posisi
                     </span>
-                    <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-3/80 border border-border">
+                    <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
                       {positionOptions.map((pos) => {
                         const isSelected = currentPosition === pos.value;
                         return (
@@ -1884,7 +2108,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             onClick={() => updateThemeCaptionPosition(pos.value)}
                             className={`py-1.5 rounded-lg text-[11px] font-medium transition-all ${
                               isSelected
-                                ? 'bg-surface-2 text-accent font-bold shadow-sm'
+                                ? 'bg-surface-3 text-accent font-bold shadow-sm'
                                 : 'text-text-muted hover:text-on-surface'
                             }`}
                           >
@@ -1895,10 +2119,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
                   </div>
 
-                  {/* 4. Ukuran Huruf (Font Scale) */}
-                  <div className="flex flex-col gap-1.5">
+                  {/* 4. Tipografi & Ukuran */}
+                  <div className="flex flex-col gap-2 pt-1 border-t border-border/60">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-text-muted font-medium">Ukuran Teks</span>
+                      <span className="text-text-muted font-medium">Ukuran Huruf</span>
                       <span className="font-mono text-on-surface font-semibold">
                         {Math.round((subCust.fontScale || 1.0) * 100)}%
                       </span>
@@ -1912,7 +2136,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       onChange={(e) => updateSubtitleCustomization({ fontScale: parseFloat(e.target.value) })}
                       className="w-full h-1.5 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
                     />
-                    <div className="flex items-center gap-1 pt-0.5">
+                    <div className="flex items-center gap-1">
                       {[
                         { label: 'S (80%)', val: 0.8 },
                         { label: 'M (100%)', val: 1.0 },
@@ -1933,12 +2157,29 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         </button>
                       ))}
                     </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] text-text-muted">Huruf Besar (UPPERCASE)</span>
+                      <button
+                        type="button"
+                        onClick={() => updateSubtitleCustomization({ uppercase: !subCust.uppercase })}
+                        className={`w-9 h-5 rounded-full transition-colors relative ${
+                          subCust.uppercase ? 'bg-accent' : 'bg-surface-3 border border-border'
+                        }`}
+                      >
+                        <span
+                          className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                            subCust.uppercase ? 'right-1' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* 5. Warna Kata Aktif & Teks */}
-                  <div className="flex flex-col gap-1.5">
+                  {/* 5. Warna Sorotan Kata */}
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-border/60">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Warna Sorotan Kata Aktif
+                      Warna Sorotan Kata
                     </span>
                     <div className="flex items-center gap-1.5">
                       {[
@@ -1973,32 +2214,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
                   </div>
 
-                  {/* 6. Pacing & Casing (Format Kata) */}
+                  {/* 6. Ritme & Pacing Teks */}
                   <div className="flex flex-col gap-2 pt-1 border-t border-border/60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-text-muted">Huruf Besar (UPPERCASE)</span>
-                      <button
-                        type="button"
-                        onClick={() => updateSubtitleCustomization({ uppercase: !subCust.uppercase })}
-                        className={`w-9 h-5 rounded-full transition-colors relative ${
-                          subCust.uppercase ? 'bg-accent' : 'bg-surface-3 border border-border'
-                        }`}
-                      >
-                        <span
-                          className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                            subCust.uppercase ? 'right-1' : 'left-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-text-muted">Kata per Frasa</span>
+                      <span className="text-text-muted">Ritme Kata per Frasa</span>
                       <div className="flex items-center gap-1">
                         {[
-                          { label: '3 (Cepat)', count: 3 },
-                          { label: '4 (Sedang)', count: 4 },
-                          { label: '5 (Panjang)', count: 5 }
+                          { label: '3 kata', count: 3 },
+                          { label: '4 kata', count: 4 },
+                          { label: '5 kata', count: 5 }
                         ].map((chunk) => {
                           const isSelected = (subCust.maxWordsPerChunk || 4) === chunk.count;
                           return (
@@ -2021,7 +2245,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                     {/* Opasitas Kotak (jika style boxed) */}
                     {currentStyle === 'boxed' && (
-                      <div className="flex flex-col gap-1 pt-1">
+                      <div className="flex flex-col gap-1 pt-1 border-t border-border/40">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="text-text-muted">Opasitas Latar Kotak</span>
                           <span className="font-mono text-on-surface font-semibold">
@@ -2045,9 +2269,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             </div>
 
             {/* Alokasi Token Output (Max Tokens) */}
-            <div className="flex flex-col gap-2 pt-1 border-t border-border">
+            <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-text-muted uppercase tracking-wider">
+                <span className="font-semibold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-accent">token</span>
                   Alokasi Token AI
                 </span>
                 <span className="font-mono text-accent font-semibold">
@@ -2082,130 +2307,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       }`}
                     >
                       {tok}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="w-full h-px bg-border my-2" />
-
-            {/* Tema Visual */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Tema
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {THEME_PRESETS.map((t) => {
-                  const isActive = isThemeActive(t);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setThemeTokens(t.tokens)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all active:scale-95 ${
-                        isActive
-                          ? 'bg-surface-3 border-accent text-on-surface ring-1 ring-accent/30 shadow-sm'
-                          : 'bg-surface-2 border-border text-text-muted hover:text-on-surface hover:border-border-strong'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex items-center gap-0.5 p-0.5 rounded bg-black/40 border border-border/80 shrink-0">
-                          <span
-                            className="w-2.5 h-3.5 rounded-xs"
-                            style={{ backgroundColor: t.previewColors.bg }}
-                          />
-                          <span
-                            className="w-2.5 h-3.5 rounded-xs"
-                            style={{ backgroundColor: t.previewColors.primary }}
-                          />
-                          <span
-                            className="w-2.5 h-3.5 rounded-xs"
-                            style={{ backgroundColor: t.previewColors.accent }}
-                          />
-                        </div>
-                        <span className="text-[11px] font-medium truncate text-on-surface">{t.name}</span>
-                      </div>
-                      {isActive && (
-                        <span className="material-symbols-outlined text-[15px] text-accent shrink-0">check_circle</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Tipografi */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Tipografi
-              </span>
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-surface-2 border border-border">
-                {fontOptions.map((f) => {
-                  const isSelected = currentFont === f.value;
-                  return (
-                    <button
-                      key={f.value}
-                      type="button"
-                      onClick={() => updateThemeFont(f.value)}
-                      className={`py-2 px-1 rounded-lg text-[12px] font-medium text-center truncate transition-all active:scale-95 ${
-                        isSelected
-                          ? 'bg-surface-3 text-accent font-semibold shadow-sm'
-                          : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Posisi Teks */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Posisi Teks
-              </span>
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-surface-2 border border-border">
-                {positionOptions.map((p) => {
-                  const isSelected = currentPosition === p.value;
-                  return (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => updateThemeCaptionPosition(p.value)}
-                      className={`py-2 px-1 rounded-lg text-[12px] font-medium text-center transition-all active:scale-95 ${
-                        isSelected
-                          ? 'bg-surface-3 text-accent font-semibold shadow-sm'
-                          : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Gaya Teks */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Gaya Teks
-              </span>
-              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
-                {styleOptions.map((s) => {
-                  const isSelected = currentStyle === s.value;
-                  return (
-                    <button
-                      key={s.value}
-                      type="button"
-                      onClick={() => updateThemeCaptionStyle(s.value)}
-                      className={`py-2 px-1 rounded-lg text-[11px] font-medium text-center truncate transition-all active:scale-95 ${
-                        isSelected
-                          ? 'bg-surface-3 text-accent font-semibold shadow-sm'
-                          : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-                      }`}
-                    >
-                      {s.label}
                     </button>
                   );
                 })}
