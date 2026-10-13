@@ -3,7 +3,6 @@ import { useMooStore } from '../../store/useMooStore';
 import type { SceneTransition } from '../../types';
 import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { Button } from '../ui/Button';
-import { IconButton } from '../ui/IconButton';
 
 interface AutoExpandTextareaProps {
   value: string;

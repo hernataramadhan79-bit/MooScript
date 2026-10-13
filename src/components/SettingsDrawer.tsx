@@ -302,7 +302,7 @@ export const SettingsDrawer: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSettingsOpen, setSettingsOpen]);
+  }, [isSettingsOpen, setSettingsOpen, showAddSkillModal]);
 
   if (!isSettingsOpen) return null;
 

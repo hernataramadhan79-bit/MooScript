@@ -149,15 +149,6 @@ async function textToPhonemeIds(
 
   // Raw token stream first (no framing yet)
   const rawIds: number[] = [];
-  const pushMapped = (char: string) => {
-    if (phonemeIdMap[char]) {
-      rawIds.push(...phonemeIdMap[char]);
-    } else if (char === ' ') {
-      rawIds.push(spaceId);
-    } else {
-      rawIds.push(padId);
-    }
-  };
 
   if (voiceId.startsWith('id_ID') || voiceId.includes('indotts')) {
     // Indonesian: Normalize text, substitute standard Indonesian digraphs to Piper phoneme symbols

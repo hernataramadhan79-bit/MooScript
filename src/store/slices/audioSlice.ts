@@ -3,7 +3,6 @@ import type { TTSProvider } from '../../types';
 import {
   generateOpenAITTS,
   generateElevenLabsTTS,
-  generateSyntheticAmbientAudio,
   generateProjectAudioPerScene,
   decodeAudioBlob,
   calculateFallbackSceneDuration,

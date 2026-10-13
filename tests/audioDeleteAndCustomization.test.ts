@@ -31,7 +31,6 @@ describe('Offline TTS Fix & Audio Deletion Tests', () => {
   });
   describe('deleteAudio store action', () => {
     it('clears project audioBlob, audioDuration, rawVoiceBlob, waveformPeaks and scene timestamps', async () => {
-      const store = useMooStore.getState();
 
       const initialProject: MooProject = {
         id: 'test-delete-audio-project',

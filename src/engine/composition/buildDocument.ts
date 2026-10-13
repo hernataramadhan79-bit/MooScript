@@ -1,6 +1,6 @@
 import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
-import { compileOverridesCss, compilePaletteVars, compileScenePaletteCss } from './layers';
+import { compileOverridesCss, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';

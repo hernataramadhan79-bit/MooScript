@@ -13,7 +13,6 @@ import {
 } from '../../engine/composition/layers';
 import { isLocalModelCached, downloadLocalModel, getLocalVoice, purgeLocalModel } from '../../engine/ai/localTts';
 import type {
-  ThemeTokens,
   CaptionPosition,
   CaptionStyle,
   BgmPreset,
@@ -162,12 +161,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     setProject,
     isCompilingMograph,
     setIsCompilingMograph,
-    updateThemeFont,
     updateThemeCaptionPosition,
     updateThemeCaptionStyle,
     updateSubtitleCustomization,
     toggleGlobalSubtitles,
-    setThemeTokens,
     updateSettings,
     isGeneratingAudio,
     generateAudio,
@@ -237,7 +234,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     } else {
       setLocalLayerText('');
     }
-  }, [activeLayer?.id, activeCompScene?.html]);
+  }, [activeLayer, activeCompScene?.html]);
 
   const commitLayerText = (text: string) => {
     if (!activeCompScene?.html || !activeLayer) return;

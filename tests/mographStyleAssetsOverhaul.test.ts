@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   escapeLayerAttrSelector,
-  sanitizeLayerId,
   compileOverridesCss,
   compilePaletteVars,
   compileScenePaletteCss,
-  getLayerText,
   setLayerText
 } from '../src/engine/composition/layers';
 import { buildSceneCodegenPrompt } from '../src/engine/ai/director/motionLaws';
