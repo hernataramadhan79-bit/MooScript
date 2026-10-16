@@ -3,6 +3,8 @@ import { getRuntimeScript } from './runtime/mooRuntime';
 import { compileOverridesCss, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
+import { compileProceduralScene } from './proceduralCompiler';
+import type { Scene } from '../../types';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
 // and SVG foreignObject export frames render correct typography with zero network access.
@@ -57,20 +59,34 @@ function toDomId(sceneId: string): string {
   return `scene-${sceneId}`;
 }
 
-/** Neutral status surface for scenes that have not been generated (or failed). This is NOT a visual template. */
-function statusPlaceholder(scene: GeneratedScene, text?: string): { html: string; css: string; buildJs: string } {
+/** Live fallback surface for scenes that have not been custom-compiled by AI yet, or status surface for error/generating. */
+function statusPlaceholder(
+  scene: GeneratedScene,
+  ts: Scene | undefined,
+  index: number,
+  total: number
+): { html: string; css: string; buildJs: string } {
+  if (scene.status === 'pending' && ts) {
+    const proc = compileProceduralScene(ts, index, total, scene.palette, 'auto');
+    return {
+      html: proc.html,
+      css: proc.css,
+      buildJs: proc.buildJs
+    };
+  }
+  const text = ts?.narrationText || ts?.text || '';
   const label =
     scene.status === 'generating'
-      ? 'Generating motion graphics…'
+      ? 'Sedang merancang motion graphics…'
       : scene.status === 'error'
-        ? 'Scene generation failed'
-        : 'Not generated yet';
+        ? 'Kompilasi adegan gagal'
+        : 'Adegan siap dikompilasi';
   const detail =
     scene.status === 'error' && scene.errors?.length
       ? scene.errors[0]
       : text && text.trim()
         ? text.trim()
-        : 'Run Generate Mograph or Regenerate Scene';
+        : 'Klik Bangun Visual Instan atau Buat Mograph AI';
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return {
     html: `<div class="moo-status-card" data-moo-placeholder="${scene.status}"><div class="moo-status-title">${esc(label)}</div><div class="moo-status-detail">${esc(detail.slice(0, 160))}</div></div>`,
@@ -118,11 +134,12 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
     return ts?.durationInSeconds || mod.duration || 3;
   };
 
-  const resolved = orderedModules.map((mod) => {
+  const resolved = orderedModules.map((mod, idx) => {
     const ts = timelineScenes.find((s) => s.id === mod.beatId);
-    const sceneText = ts?.narrationText || ts?.text || '';
     const needsPlaceholder = mod.status !== 'ok' || !(mod.html || '').trim();
-    const src = needsPlaceholder ? statusPlaceholder(mod, sceneText) : { html: mod.html, css: mod.css, buildJs: mod.buildJs };
+    const src = needsPlaceholder
+      ? statusPlaceholder(mod, ts, idx, orderedModules.length)
+      : { html: mod.html, css: mod.css, buildJs: mod.buildJs };
     return { mod, ...src };
   });
 
@@ -306,7 +323,8 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
         id: mod.beatId,
         duration: durationOf(mod),
         text: ts?.narrationText || ts?.text || '',
-        wordTimestamps: ts?.wordTimestamps || []
+        wordTimestamps: ts?.wordTimestamps || [],
+        showSubtitles: ts?.showSubtitles
       };
     })
   );

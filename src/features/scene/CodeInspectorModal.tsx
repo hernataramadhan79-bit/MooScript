@@ -96,7 +96,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       }
     };
 
-    useMooStore.getState().setProject(updatedProject, { keepStale: true });
+    useMooStore.getState().setProject(updatedProject, { keepStale: true, preserveHistory: true });
 
     addToast('Perubahan kode mograph berhasil diterapkan!', 'success');
     onClose();

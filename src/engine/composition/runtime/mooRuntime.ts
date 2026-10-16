@@ -202,10 +202,12 @@ export function getRuntimeScript(): string {
       const ctx = {
         dur: duration,
         words: meta.wordTimestamps || [],
-        at: function(word) {
+        at: function(word, occurrence) {
           if (!meta.wordTimestamps) return 0;
           const clean = String(word).toLowerCase().trim();
-          const match = meta.wordTimestamps.find(w => String(w.word).toLowerCase().includes(clean));
+          const matches = meta.wordTimestamps.filter(w => String(w.word).toLowerCase().includes(clean));
+          const idx = typeof occurrence === 'number' && occurrence > 0 ? Math.min(occurrence, matches.length - 1) : 0;
+          const match = matches[idx];
           return match ? Math.max(0, match.start) : 0;
         },
         rand: scenePrng,
@@ -302,6 +304,48 @@ export function getRuntimeScript(): string {
     }, '*');
   }
 
+  function computeLayerRects(targetSceneId) {
+    const stageEl = document.getElementById('moo-stage') || document.getElementById('moo-viewport');
+    if (!stageEl) return [];
+    const stageRect = stageEl.getBoundingClientRect();
+    const scaleX = (stageEl.clientWidth || 1080) / Math.max(1, stageRect.width || 1080);
+    const scaleY = (stageEl.clientHeight || 1920) / Math.max(1, stageRect.height || 1920);
+
+    let container = null;
+    if (targetSceneId) {
+      container = document.getElementById('scene-' + targetSceneId);
+    }
+    if (!container) {
+      const allWrappers = stageEl.querySelectorAll('[data-scene-id]');
+      for (let i = 0; i < allWrappers.length; i++) {
+        const st = window.getComputedStyle(allWrappers[i]);
+        if (st.visibility !== 'hidden' && parseFloat(st.opacity || '1') > 0.05) {
+          container = allWrappers[i];
+          break;
+        }
+      }
+    }
+    if (!container) return [];
+
+    const nodes = container.querySelectorAll('[data-moo-layer]');
+    const rects = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      const id = el.getAttribute('data-moo-layer');
+      if (!id) continue;
+      const r = el.getBoundingClientRect();
+      rects.push({
+        id: id,
+        tagName: (el.tagName || 'div').toLowerCase(),
+        x: Math.round((r.left - stageRect.left) * scaleX),
+        y: Math.round((r.top - stageRect.top) * scaleY),
+        width: Math.max(16, Math.round(r.width * scaleX)),
+        height: Math.max(16, Math.round(r.height * scaleY))
+      });
+    }
+    return rects;
+  }
+
   function seekTo(t) {
     t = Number(t) || 0;
     virtualTimeSeconds = t;
@@ -345,6 +389,9 @@ export function getRuntimeScript(): string {
       const t = Number(data.time) || 0;
       seekTo(t);
       window.parent.postMessage({ type: 'seeked', id: data.id, time: t }, '*');
+    } else if (data.type === 'query_layer_rects') {
+      const rects = computeLayerRects(data.sceneId);
+      window.parent.postMessage({ type: 'layer_rects', sceneId: data.sceneId, rects: rects }, '*');
     } else if (data.type === 'highlight_layer') {
       const layerId = data.layerId;
       let styleTag = document.getElementById('moo-layer-highlight-style');
@@ -449,11 +496,20 @@ export function getRuntimeScript(): string {
             sharedExportCtx.fillStyle = mooBg;
             sharedExportCtx.fillRect(0, 0, width, height);
             sharedExportCtx.drawImage(img, 0, 0, width, height);
-            const dataUrl = sharedExportCanvas.toDataURL('image/png');
             img.onload = null;
             img.onerror = null;
             img.src = '';
-            window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
+            if (data.preferBitmap && typeof window.createImageBitmap === 'function') {
+              window.createImageBitmap(sharedExportCanvas).then(function(bitmap) {
+                window.parent.postMessage({ type: 'frame', id: data.id, bitmap: bitmap }, '*', [bitmap]);
+              }).catch(function() {
+                const dataUrl = sharedExportCanvas.toDataURL('image/png');
+                window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
+              });
+            } else {
+              const dataUrl = sharedExportCanvas.toDataURL('image/png');
+              window.parent.postMessage({ type: 'frame', id: data.id, dataUrl: dataUrl }, '*');
+            }
           } catch (err) {
             img.onload = null;
             img.onerror = null;

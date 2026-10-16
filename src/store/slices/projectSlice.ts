@@ -14,6 +14,11 @@ import {
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
+import {
+  compileProceduralScene,
+  compileProceduralProject,
+  type ProceduralArchetype
+} from '../../engine/composition/proceduralCompiler';
 import type { MooStoreState, ProjectSlice } from '../types';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
@@ -435,7 +440,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
 
     setProject: (project, options) => {
-      clearHistory();
+      if (options?.preserveHistory) {
+        pushSnapshot(get().project);
+      } else {
+        clearHistory();
+      }
       set({
         project,
         audioStale: options?.keepStale ? get().audioStale : false
@@ -883,8 +892,10 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateLayerOverride: (sceneId: string, layerId: string, override: Partial<LayerOverride>) => {
-      const comp = get().project.composition;
+      const currentProj = get().project;
+      const comp = currentProj.composition || syncComposition(currentProj).composition;
       if (!comp) return;
+      pushSnapshot(currentProj);
       const updatedScenes = comp.scenes.map((mod) => {
         if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
         const currentOverrides = mod.overrides || {};
@@ -905,16 +916,50 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         updatedAt: Date.now()
       };
       const updatedProject: MooProject = {
-        ...get().project,
+        ...currentProj,
         composition: updatedComp
       };
       set({ project: updatedProject });
       triggerSave(updatedProject);
     },
 
-    updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => {
-      const comp = get().project.composition;
+    resetLayerOverride: (sceneId: string, layerId?: string) => {
+      const currentProj = get().project;
+      const comp = currentProj.composition;
       if (!comp) return;
+      pushSnapshot(currentProj);
+      const updatedScenes = comp.scenes.map((mod) => {
+        if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+        if (!layerId) {
+          return {
+            ...mod,
+            overrides: {}
+          };
+        }
+        const nextOverrides = { ...(mod.overrides || {}) };
+        delete nextOverrides[layerId];
+        return {
+          ...mod,
+          overrides: nextOverrides
+        };
+      });
+      const updatedProject: MooProject = {
+        ...currentProj,
+        composition: {
+          ...comp,
+          scenes: updatedScenes,
+          updatedAt: Date.now()
+        }
+      };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+    },
+
+    updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => {
+      const currentProj = get().project;
+      const comp = currentProj.composition || syncComposition(currentProj).composition;
+      if (!comp) return;
+      pushSnapshot(currentProj);
       const updatedScenes = comp.scenes.map((mod) => {
         if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
         return {
@@ -932,11 +977,55 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         updatedAt: Date.now()
       };
       const updatedProject: MooProject = {
-        ...get().project,
+        ...currentProj,
         composition: updatedComp
       };
       set({ project: updatedProject });
       triggerSave(updatedProject);
+    },
+
+    compileSceneProcedural: (sceneId: string, archetype: ProceduralArchetype = 'auto') => {
+      const current = get().project;
+      const idx = current.scenes.findIndex((s) => s.id === sceneId);
+      if (idx === -1) return;
+      pushSnapshot(current);
+      const synced = current.composition ? current : syncComposition(current);
+      const comp = synced.composition!;
+      const existingMod = comp.scenes.find((m) => m.beatId === sceneId);
+      const generated = compileProceduralScene(
+        current.scenes[idx],
+        idx,
+        current.scenes.length,
+        existingMod?.palette,
+        archetype
+      );
+      const nextScenes = comp.scenes.map((m) => (m.beatId === sceneId ? generated : m));
+      if (!nextScenes.some((m) => m.beatId === sceneId)) {
+        nextScenes.push(generated);
+      }
+      const updatedProject: MooProject = {
+        ...synced,
+        renderMode: 'composition',
+        composition: {
+          ...comp,
+          scenes: nextScenes,
+          updatedAt: Date.now()
+        },
+        updatedAt: Date.now()
+      };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+      get().addToast(`Visual adegan #${idx + 1} berhasil dibangun secara instan!`, 'success');
+    },
+
+    compileAllScenesProcedural: (archetype: ProceduralArchetype = 'auto', overwriteExisting = true) => {
+      const current = get().project;
+      if (current.scenes.length === 0) return;
+      pushSnapshot(current);
+      const updatedProject = compileProceduralProject(current, archetype, overwriteExisting);
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+      get().addToast(`Seluruh ${current.scenes.length} adegan berhasil dibangun secara instan!`, 'success');
     },
 
     updateSceneCamera: (sceneId: string, camera: CameraMovement) => {
@@ -990,28 +1079,33 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updated);
     },
 
-    setSceneDuration: (sceneId, durationInSeconds) => {
+    setSceneDuration: (sceneId, durationInSeconds, allowWithAudio = false) => {
       const current = get().project;
       const hasAudio = !!current.audioBlob;
-      if (hasAudio) {
+      if (hasAudio && !allowWithAudio) {
         set({ audioStale: true });
         return;
       }
+      pushSnapshot(current);
+      const clampedDuration = Math.max(0.5, Math.min(60, Math.round(durationInSeconds * 10) / 10));
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         return {
           ...s,
-          durationInSeconds,
-          wordTimestamps: computeDeterministicWordAlignment(s.narrationText || s.text || '', durationInSeconds)
+          durationInSeconds: clampedDuration,
+          wordTimestamps: computeDeterministicWordAlignment(s.narrationText || s.text || '', clampedDuration)
         };
       });
-      const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
-      const updated: MooProject = {
+      const totalDur = Math.round(updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0) * 100) / 100;
+      const updated: MooProject = syncComposition({
         ...current,
         scenes: updatedScenes,
-        audioDuration: totalDur
-      };
-      set({ project: updated });
+        audioDuration: hasAudio ? current.audioDuration : totalDur
+      });
+      set({
+        project: updated,
+        audioStale: hasAudio ? true : get().audioStale
+      });
       triggerSave(updated);
     },
 

@@ -25,7 +25,7 @@ const AutoExpandTextarea: React.FC<AutoExpandTextareaProps> = ({
     const el = textareaRef.current;
     if (el) {
       el.style.height = '0px';
-      el.style.height = `${Math.min(96, Math.max(28, el.scrollHeight))}px`;
+      el.style.height = `${Math.min(140, Math.max(34, el.scrollHeight))}px`;
     }
   }, [value]);
 
@@ -36,12 +36,12 @@ const AutoExpandTextarea: React.FC<AutoExpandTextareaProps> = ({
       onChange={(e) => {
         onChange(e.target.value);
         e.target.style.height = '0px';
-        e.target.style.height = `${Math.min(96, Math.max(28, e.target.scrollHeight))}px`;
+        e.target.style.height = `${Math.min(140, Math.max(34, e.target.scrollHeight))}px`;
       }}
       onFocus={onFocus}
       placeholder={placeholder}
       rows={1}
-      className={`w-full bg-surface-2/50 border border-border/50 focus:border-accent/60 text-[12px] sm:text-[13px] text-text placeholder:text-text-faint/60 leading-snug resize-none focus:outline-none focus:ring-0 px-2.5 py-1.5 rounded-lg transition-colors overflow-y-auto max-h-24 ${className}`}
+      className={`w-full bg-surface-2/40 hover:bg-surface-2/60 focus:bg-surface-2/80 border border-border/40 focus:border-accent/60 text-[13px] text-text placeholder:text-text-faint/60 leading-relaxed resize-none focus:outline-none px-2.5 py-2 rounded-lg transition-colors overflow-y-auto max-h-36 ${className}`}
     />
   );
 };
@@ -73,8 +73,9 @@ const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCom
 
   return (
     <div
-      className="flex items-center gap-0.5 text-[11px] font-mono text-text-muted shrink-0 ml-1"
+      className="flex items-center text-[11px] font-mono text-text-muted bg-surface-2/80 border border-border/60 hover:border-border rounded-md px-1.5 py-0.5 transition-colors shrink-0"
       onClick={(e) => e.stopPropagation()}
+      title="Durasi tayang adegan (detik)"
     >
       <input
         type="number"
@@ -92,10 +93,10 @@ const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCom
             e.currentTarget.blur();
           }
         }}
-        className="w-12 bg-surface-2 border border-border/70 focus:border-accent rounded px-1 py-0.5 text-center text-on-surface text-[11px] font-mono focus:outline-none"
+        className="w-8 bg-transparent text-center text-text font-medium text-[11px] font-mono focus:outline-none"
         aria-label="Durasi detik"
       />
-      <span>s</span>
+      <span className="text-[10px] text-text-faint select-none">s</span>
     </div>
   );
 };
@@ -140,7 +141,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     updateSceneAssetRole,
     skills,
     activeSkillId,
-    setSettingsOpen
+    setSettingsOpen,
+    compileSceneProcedural
   } = useMooStore();
 
   const scenes = project.scenes || [];
@@ -166,18 +168,18 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
   return (
     <div className={`flex flex-col gap-2.5 p-2.5 sm:p-3.5 w-full ${className}`}>
-      {/* 1. Generator Naskah AI (Kompak & Responsif) */}
-      <div className="p-2.5 sm:p-3 rounded-xl bg-surface-1 border border-border flex flex-col gap-2">
+      {/* 1. Generator Naskah & Ide Cerita */}
+      <div className="p-3 rounded-xl bg-surface-1 border border-border/80 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-on-surface flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[15px] text-accent">auto_awesome</span>
-            Generator Naskah AI
+          <span className="text-[11px] font-semibold text-text flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[15px] text-accent">subtitles</span>
+            Ide Cerita & Naskah
           </span>
           {previousScenesSnapshot && previousScenesSnapshot.length > 0 && (
             <button
               type="button"
               onClick={() => undoGenerateScript()}
-              className="text-[10px] font-medium text-text-muted hover:text-on-surface flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-2 border border-border transition-colors"
+              className="text-[10px] font-medium text-text-muted hover:text-text flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-2 border border-border transition-colors"
               title="Kembalikan naskah sebelumnya"
             >
               <span className="material-symbols-outlined text-[13px]">undo</span>
@@ -186,13 +188,13 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <textarea
             value={scriptPrompt}
             onChange={(e) => setScriptPrompt(e.target.value)}
             placeholder="Tulis topik atau naskah video..."
             rows={2}
-            className="w-full bg-surface-2 border border-border focus:border-accent rounded-lg px-2.5 py-1.5 text-[12px] sm:text-[13px] text-text placeholder:text-text-faint resize-none focus:outline-none transition-all leading-snug max-h-16 overflow-y-auto"
+            className="w-full bg-surface-2/70 border border-border/70 focus:border-accent rounded-lg px-2.5 py-1.5 text-[12px] text-text placeholder:text-text-faint resize-none focus:outline-none transition-all leading-snug max-h-20 overflow-y-auto"
           />
 
           <div className="flex items-center justify-between gap-2">
@@ -202,10 +204,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 <button
                   type="button"
                   onClick={() => setSettingsOpen(true)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-1 hover:bg-surface-3 text-[11px] text-text-muted hover:text-accent border border-border transition-all truncate max-w-[180px]"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-2/60 hover:bg-surface-3 text-[11px] text-text-muted hover:text-text border border-border/60 transition-all truncate max-w-[170px]"
                   title="Ganti atau sesuaikan Persona Sutradara di Pengaturan"
                 >
-                  <span className="material-symbols-outlined text-[14px] text-accent shrink-0">
+                  <span className="material-symbols-outlined text-[14px] text-text-muted shrink-0">
                     {activeSkill ? resolveSkillIcon(activeSkill.icon) : 'palette'}
                   </span>
                   <span className="truncate">
@@ -218,13 +220,13 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
             <Button
               variant="primary"
               size="sm"
-              icon="auto_awesome"
+              icon="movie_creation"
               isLoading={isGeneratingScript}
               disabled={!scriptPrompt.trim() || isGeneratingScript}
               onClick={() => generateScript()}
-              className="!py-1.5 !px-3 !text-[12px] !min-h-[32px] w-full sm:w-auto"
+              className="!py-1.5 !px-3 !text-[12px] !min-h-[30px] whitespace-nowrap shrink-0"
             >
-              Buat Adegan Otomatis
+              Susun Adegan
             </Button>
           </div>
         </div>
@@ -290,30 +292,25 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   : 'bg-surface-1 border-border/70 hover:border-border hover:bg-surface-1/90'
               }`}
             >
-              {/* Header Kartu: Identitas, Durasi, dan Kontrol Manajemen */}
-              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 gap-1.5">
-                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-md bg-surface-3 text-accent font-mono text-[11px] font-bold shrink-0 select-none">
-                    #{index + 1}
+              {/* Header Kartu: Identitas, Status, Durasi, dan Kontrol Manajemen */}
+              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-mono text-[11px] font-bold shrink-0 select-none">
+                    #{String(index + 1).padStart(2, '0')}
                   </span>
 
-                  {/* Status & Edit Badges */}
-                  {compStatus && (
+                  {/* Status error only (per R-09: don't badge normal status) */}
+                  {compStatus === 'error' && (
                     <span
-                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase font-bold shrink-0 border ${
-                        compStatus === 'ok'
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                          : compStatus === 'error'
-                            ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-                            : 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
-                      }`}
+                      className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase font-bold shrink-0 bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                      title="Kesalahan kompilasi adegan"
                     >
-                      {compStatus}
+                      error
                     </span>
                   )}
                   {isEdited && (
                     <span
-                      className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0 border border-amber-500/30"
+                      className="text-[9px] px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-mono shrink-0 border border-border"
                       title="Adegan telah disunting manual"
                     >
                       edit
@@ -323,7 +320,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   {/* Input Durasi Angka */}
                   <SceneDurationInput
                     duration={duration}
-                    onCommit={(val) => setSceneDuration(scene.id, val)}
+                    onCommit={(val) => setSceneDuration(scene.id, val, true)}
                   />
                 </div>
 
@@ -334,35 +331,35 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     disabled={index === 0}
                     onClick={() => reorderScenes(index, index - 1)}
                     title="Geser adegan ke atas"
-                    className="w-7 h-7 rounded-lg hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">arrow_upward</span>
+                    <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
                   </button>
                   <button
                     type="button"
                     disabled={index === scenes.length - 1}
                     onClick={() => reorderScenes(index, index + 1)}
                     title="Geser adegan ke bawah"
-                    className="w-7 h-7 rounded-lg hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">arrow_downward</span>
+                    <span className="material-symbols-outlined text-[14px]">arrow_downward</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => duplicateScene(scene.id)}
                     title="Duplikat adegan"
-                    className="w-7 h-7 rounded-lg hover:bg-surface-3 text-text-muted hover:text-on-surface flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md hover:bg-surface-3 text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
                   </button>
                   <button
                     type="button"
                     disabled={scenes.length <= 1}
                     onClick={() => removeScene(scene.id)}
                     title="Hapus adegan"
-                    className="w-7 h-7 rounded-lg hover:bg-rose-500/15 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-rose-400 flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md hover:bg-rose-500/15 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-rose-400 flex items-center justify-center transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
                   </button>
                 </div>
               </div>
@@ -377,71 +374,83 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 />
               </div>
 
-              {/* Baris Aksi Cepat & Toggle Detail (Ringkas & Efisien) */}
-              <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+              {/* Baris Aksi & Studio Toolbar (Sleek, Anti-Slop, Non-Colliding) */}
+              <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={() => toggleDetail(scene.id)}
-                  className={`py-1 px-2 rounded-lg border text-[10px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors select-none ${
+                  className={`h-7 px-2 rounded-md border text-[11px] font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 select-none ${
                     isDetailOpen
-                      ? 'bg-accent/15 border-accent/40 text-accent font-semibold'
-                      : 'bg-surface-2/60 hover:bg-surface-2 border-border/50 text-text-muted hover:text-on-surface'
+                      ? 'bg-surface-3 border-accent/40 text-text font-semibold'
+                      : 'bg-surface-2/60 hover:bg-surface-2 border-border/50 text-text-muted hover:text-text'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px] text-accent">
+                  <span className="material-symbols-outlined text-[14px] text-text-muted">
                     {isDetailOpen ? 'expand_less' : 'tune'}
                   </span>
                   <span>Detail & Aset</span>
                   {(scene.visualIntent || scene.visualConcept || (scene.focusWords?.length || 0) > 0) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent" title="Memiliki arahan visual / kata kunci" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Memiliki arahan visual / kata kunci" />
                   )}
                   {(scene.assignedAssets?.length || 0) > 0 && (
-                    <span className="text-[9px] px-1 rounded-full bg-accent/20 text-accent font-mono font-bold">
+                    <span className="text-[9px] px-1 rounded-full bg-surface-3 text-text-muted font-mono font-bold shrink-0">
                       {scene.assignedAssets?.length}
                     </span>
                   )}
                 </button>
 
-                <div className="flex items-center gap-1">
-                  {onEditScene && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSceneId(scene.id);
-                        onEditScene(scene.id);
-                      }}
-                      className="py-1 px-2 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[10px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors"
-                      title="Sesuaikan Gaya & Layer adegan ini"
-                    >
-                      <span className="material-symbols-outlined text-[13px] text-accent">palette</span>
-                      <span>Gaya</span>
-                    </button>
-                  )}
-                  {onOpenAssets && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSceneId(scene.id);
-                        onOpenAssets(scene.id);
-                      }}
-                      className="py-1 px-2 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[10px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors"
-                      title="Sisipkan Aset / Media ke adegan ini"
-                    >
-                      <span className="material-symbols-outlined text-[13px] text-accent">perm_media</span>
-                      <span>Aset</span>
-                    </button>
-                  )}
-                  {onOpenCodeInspector && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenCodeInspector(scene.id)}
-                      className="py-1 px-2 rounded-lg bg-surface-2/60 hover:bg-surface-3 hover:text-accent border border-border/50 text-text-muted text-[10px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors"
-                      title="Buka Editor Kode Mograph"
-                    >
-                      <span className="material-symbols-outlined text-[13px] text-accent">code</span>
-                      <span>Kode</span>
-                    </button>
-                  )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSceneId(scene.id);
+                      compileSceneProcedural(scene.id, 'auto');
+                    }}
+                    className="h-7 px-2.5 rounded-md bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
+                    title="Susun visual motion graphics instan tanpa kuota API (berdasarkan konteks naskah)"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">bolt</span>
+                    <span>Visual</span>
+                  </button>
+
+                  <div className="flex items-center bg-surface-2/70 border border-border/50 rounded-md p-0.5 shrink-0">
+                    {onEditScene && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSceneId(scene.id);
+                          onEditScene(scene.id);
+                        }}
+                        className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+                        title="Gaya & Layer Adegan"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">palette</span>
+                      </button>
+                    )}
+                    {onOpenAssets && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSceneId(scene.id);
+                          onOpenAssets(scene.id);
+                        }}
+                        className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+                        title="Sisipkan Aset / Media"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">perm_media</span>
+                      </button>
+                    )}
+                    {onOpenCodeInspector && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCodeInspector(scene.id)}
+                        className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+                        title="Editor Kode Mograph"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">code</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -667,7 +676,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         if (!isNaN(val) && val > 0) {
-                          setSceneDuration(scene.id, val);
+                          setSceneDuration(scene.id, val, true);
                         }
                       }}
                       className="flex-1 h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
@@ -683,20 +692,24 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
             {/* Transisi Antar Adegan */}
             {index < scenes.length - 1 && (
-              <div className="flex items-center justify-center my-1.5">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[10px] text-text-muted hover:border-accent/40 transition-colors">
-                  <span className="material-symbols-outlined text-[13px] text-accent">swap_horiz</span>
-                  <span className="font-medium">Transisi:</span>
+              <div className="relative flex items-center justify-center my-1 select-none">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-border/40" />
+                </div>
+                <div className="relative flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-1 border border-border/70 text-[10px] text-text-muted hover:border-border transition-colors">
+                  <span className="material-symbols-outlined text-[12px] text-text-faint">swap_horiz</span>
+                  <span className="text-[10px] text-text-muted">Transisi:</span>
                   <select
                     value={scene.transition || 'cut'}
                     onChange={(e) => setSceneTransition(scene.id, e.target.value as SceneTransition)}
-                    className="bg-transparent text-on-surface font-semibold focus:outline-none cursor-pointer"
+                    className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer pr-1"
+                    aria-label={`Transisi dari adegan ${index + 1}`}
                   >
-                    <option value="cut" className="bg-surface-1">Cut (Langsung)</option>
-                    <option value="fade" className="bg-surface-1">Fade (Pudar)</option>
-                    <option value="slide" className="bg-surface-1">Slide (Geser)</option>
-                    <option value="zoom" className="bg-surface-1">Zoom (Perbesar)</option>
-                    <option value="wipe" className="bg-surface-1">Wipe (Sapuan)</option>
+                    <option value="cut" className="bg-surface-1 text-text">Cut (Langsung)</option>
+                    <option value="fade" className="bg-surface-1 text-text">Fade (Pudar)</option>
+                    <option value="slide" className="bg-surface-1 text-text">Slide (Geser)</option>
+                    <option value="zoom" className="bg-surface-1 text-text">Zoom (Perbesar)</option>
+                    <option value="wipe" className="bg-surface-1 text-text">Wipe (Sapuan)</option>
                   </select>
                 </div>
               </div>

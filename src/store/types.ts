@@ -22,6 +22,7 @@ import type {
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
 import type { AssetRecord } from '../db/mooDb';
+import type { ProceduralArchetype } from '../engine/composition/proceduralCompiler';
 
 export type DeckTab = 'storyboard' | 'audio' | 'style' | 'export';
 
@@ -50,7 +51,7 @@ export interface UiSlice {
 export interface ProjectSlice {
   project: MooProject;
   projectsList: MooProject[];
-  setProject: (project: MooProject, options?: { keepStale?: boolean }) => void;
+  setProject: (project: MooProject, options?: { keepStale?: boolean; preserveHistory?: boolean }) => void;
   refreshProjectsList: () => Promise<void>;
   createNewProject: (title?: string) => Promise<string>;
   switchProject: (id: string) => Promise<void>;
@@ -73,14 +74,17 @@ export interface ProjectSlice {
   updateSceneVisualIntent: (sceneId: string, visualIntent: string) => void;
   updateSceneVisualConcept: (sceneId: string, visualConcept: string) => void;
   updateLayerOverride: (sceneId: string, layerId: string, override: Partial<LayerOverride>) => void;
+  resetLayerOverride: (sceneId: string, layerId?: string) => void;
   updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => void;
+  compileSceneProcedural: (sceneId: string, archetype?: ProceduralArchetype) => void;
+  compileAllScenesProcedural: (archetype?: ProceduralArchetype, overwriteExisting?: boolean) => void;
   updateSceneCamera: (sceneId: string, camera: CameraMovement) => void;
   toggleSceneSubtitles: (sceneId: string) => void;
   toggleWordFocus: (sceneId: string, word: string) => void;
   setSceneMotionPreset: (sceneId: string, preset: MotionPreset) => void;
   setSceneTransition: (sceneId: string, transition: SceneTransition) => void;
   setSceneIcon: (sceneId: string, icon: string) => void;
-  setSceneDuration: (sceneId: string, duration: number) => void;
+  setSceneDuration: (sceneId: string, duration: number, allowWithAudio?: boolean) => void;
   addScene: () => void;
   duplicateScene: (id: string) => void;
   removeScene: (id: string) => void;
@@ -117,6 +121,7 @@ export interface AudioSlice {
   audioProgress: AudioProgressInfo | null;
   rawVoiceBlob?: Blob | null;
   generateAudio: () => Promise<void>;
+  uploadCustomAudio: (file: File) => Promise<void>;
   cancelAudioGeneration: () => void;
   deleteAudio: () => Promise<void>;
   auditionVoice: (provider?: TTSProvider, voiceId?: string) => Promise<void>;

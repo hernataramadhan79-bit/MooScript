@@ -14,6 +14,7 @@ export interface CaptionSceneMeta {
   duration: number;
   text: string;
   wordTimestamps: { word: string; start: number; end: number }[];
+  showSubtitles?: boolean;
 }
 
 /**
@@ -76,6 +77,17 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
   var isUpper = Boolean(CUST.uppercase || CFG.style === 'bold-pop');
   var yOff = Math.round((CUST.yOffsetPercent || 0) * 0.01 * CFG.height);
 
+  function hexToRgba(hex, alpha) {
+    var clean = String(hex || '#000000').replace('#', '');
+    if (clean.length === 3) {
+      clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+    }
+    var r = parseInt(clean.slice(0, 2), 16) || 0;
+    var g = parseInt(clean.slice(2, 4), 16) || 0;
+    var b = parseInt(clean.slice(4, 6), 16) || 0;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
   var posCss = CFG.position === 'top'
     ? 'top:' + Math.round(CFG.height * 0.1 + yOff) + 'px;'
     : CFG.position === 'center'
@@ -134,11 +146,13 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
     var chunk = null;
     if (sceneIdx >= 0) {
       var sc = SCENES[sceneIdx];
-      var words = sc.wordTimestamps && sc.wordTimestamps.length
-        ? sc.wordTimestamps
-        : mooEvenWords(sc.text, durations[sceneIdx] || sc.duration);
-      var maxChunkWords = CUST.maxWordsPerChunk || (CFG.style === 'bold-pop' ? 3 : 5);
-      chunk = mooPickChunk(words, local, maxChunkWords);
+      if (sc.showSubtitles !== false) {
+        var words = sc.wordTimestamps && sc.wordTimestamps.length
+          ? sc.wordTimestamps
+          : mooEvenWords(sc.text, durations[sceneIdx] || sc.duration);
+        var maxChunkWords = CUST.maxWordsPerChunk || (CFG.style === 'bold-pop' ? 3 : 5);
+        chunk = mooPickChunk(words, local, maxChunkWords);
+      }
     }
     var key = chunk ? sceneIdx + ':' + chunk.words.join(' ') + ':' + chunk.active : '';
     if (key === lastKey) return;
@@ -149,7 +163,8 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
     var boxCss = 'text-align:center;line-height:1.25;font-size:' + fontPx + 'px;max-width:100%;';
     if (CFG.style === 'boxed') {
       var bgOp = CUST.bgOpacity !== undefined ? CUST.bgOpacity : 0.62;
-      boxCss += 'background:rgba(0,0,0,' + bgOp + ');border-radius:' + Math.round(fontPx * 0.4) + 'px;padding:' +
+      var bgCol = CUST.bgColor ? hexToRgba(CUST.bgColor, bgOp) : 'rgba(0,0,0,' + bgOp + ')';
+      boxCss += 'background:' + bgCol + ';border-radius:' + Math.round(fontPx * 0.4) + 'px;padding:' +
         Math.round(fontPx * 0.3) + 'px ' + Math.round(fontPx * 0.5) + 'px;backdrop-filter:blur(4px);';
     }
     box.setAttribute('style', boxCss);

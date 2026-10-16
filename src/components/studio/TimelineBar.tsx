@@ -28,7 +28,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     previewMode,
     setPreviewMode,
     waveformPeaks,
-    setWaveformPeaks
+    setWaveformPeaks,
+    setSceneDuration
   } = useMooStore();
 
   const fps = project.fps || 30;
@@ -37,10 +38,10 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     0
   );
   const totalDuration =
-    project.audioDuration && project.audioDuration > 0
-      ? project.audioDuration
-      : calculatedSceneDuration > 0
+    calculatedSceneDuration > 0
       ? calculatedSceneDuration
+      : project.audioDuration && project.audioDuration > 0
+      ? project.audioDuration
       : 10;
 
   const totalFrames = Math.max(1, Math.round(totalDuration * fps));
@@ -127,6 +128,36 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
     seekFrame(Math.round(ratio * totalFrames));
+  };
+
+  const handleTrimSceneStart = (
+    e: React.PointerEvent<HTMLDivElement>,
+    sceneId: string,
+    initialDuration: number
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (sceneId === 'default') return;
+
+    const trackEl = e.currentTarget.parentElement?.parentElement;
+    const trackWidth = trackEl ? trackEl.getBoundingClientRect().width : 300;
+    const startX = e.clientX;
+    const baseTotal = Math.max(3, totalDuration);
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const deltaSec = (dx / Math.max(100, trackWidth)) * baseTotal;
+      const nextDur = Math.min(30, Math.max(0.5, Math.round((initialDuration + deltaSec) * 10) / 10));
+      setSceneDuration(sceneId, nextDur, true);
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   // Synthetic speech cadence audio waveform bars (deterministic & responsive)
@@ -424,6 +455,17 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
                   <span className="text-[9px] font-mono text-zinc-500 hidden sm:inline">
                     {scene.durationInSeconds.toFixed(1)}s
                   </span>
+
+                  {scene.id !== 'default' && (
+                    <div
+                      onPointerDown={(e) => handleTrimSceneStart(e, scene.id, scene.durationInSeconds)}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Tarik tepi kanan untuk mengubah durasi adegan"
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-[#84cc16]/60 active:bg-[#84cc16] transition-colors z-10 flex items-center justify-center opacity-0 group-hover:opacity-100"
+                    >
+                      <span className="w-[1.5px] h-3.5 rounded-full bg-white/80" />
+                    </div>
+                  )}
                 </div>
               );
             })}

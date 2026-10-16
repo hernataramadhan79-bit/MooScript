@@ -3,7 +3,7 @@ import type { MooStoreState, AssetSlice, InsertAssetOptions } from '../types';
 import type { AssetRecord } from '../../db/mooDb';
 import { saveAssetToDb, listAssetsFromDb, deleteAssetFromDb } from '../../db/mooDb';
 import { syncComposition } from '../../engine/composition/sync';
-import { removeAssetFromHtml } from '../../engine/composition/layers';
+import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composition/layers';
 import { scheduleSave } from './projectSlice';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -99,27 +99,30 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
 
       const existingMatches = (s.html || '').match(/data-moo-layer="asset(?:-[0-9]+)?"/g);
       const layerId = existingMatches && existingMatches.length > 0 ? `asset-${existingMatches.length + 1}` : 'asset';
+      const targetSelector = `.moo-asset-container.moo-asset-${layerId}`;
 
-      const imgHtml = `\n<div class="moo-asset-container" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${asset.name}" style="${frameStyle}" /></div>`;
+      const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${asset.name}" style="${frameStyle}" /></div>`;
 
-      let animJs = 'tl.from(".moo-asset-container", { scale: 0, opacity: 0, duration: 0.7, ease: "back.out(1.7)" });';
+      let animJs = `tl.from("${targetSelector}", { scale: 0, opacity: 0, duration: 0.7, ease: "back.out(1.7)" });`;
       if (animPreset === 'slide') {
-        animJs = 'tl.from(".moo-asset-container", { y: 100, opacity: 0, duration: 0.6, ease: "power3.out" });';
+        animJs = `tl.from("${targetSelector}", { y: 100, opacity: 0, duration: 0.6, ease: "power3.out" });`;
       } else if (animPreset === 'float') {
-        animJs = 'tl.from(".moo-asset-container", { scale: 0.8, opacity: 0, duration: 0.6, ease: "power2.out" }).to(".moo-asset-container", { y: -15, repeat: -1, yoyo: true, duration: 1.5, ease: "sine.inOut" });';
+        animJs = `tl.from("${targetSelector}", { scale: 0.8, opacity: 0, duration: 0.6, ease: "power2.out" }).to("${targetSelector}", { y: -15, repeat: -1, yoyo: true, duration: 1.5, ease: "sine.inOut" });`;
       } else if (animPreset === 'zoom') {
-        animJs = 'tl.from(".moo-asset-container", { scale: 1.5, opacity: 0, duration: 0.5, ease: "power2.out" });';
+        animJs = `tl.from("${targetSelector}", { scale: 1.5, opacity: 0, duration: 0.5, ease: "power2.out" });`;
       }
 
+      const mergedHtml = s.html ? s.html + imgHtml : imgHtml;
       const mergedBuildJs = s.buildJs && s.buildJs.trim()
         ? `${s.buildJs}\n${animJs}`
         : animJs;
 
       return {
         ...s,
-        html: s.html ? s.html + imgHtml : imgHtml,
+        html: mergedHtml,
         css: s.css || '.moo-asset-container { pointer-events: auto; }',
         buildJs: mergedBuildJs,
+        editableLayers: extractLayersFromHtml(mergedHtml),
         status: 'ok' as const,
         userEdited: true,
         version: (s.version || 1) + 1

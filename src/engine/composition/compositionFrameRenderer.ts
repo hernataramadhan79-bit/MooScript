@@ -23,7 +23,7 @@ export async function createCompositionFrameRenderer(
   return new Promise((resolve) => {
     let isResolved = false;
     let iframe: HTMLIFrameElement | null = null;
-    let pendingCallback: ((dataUrl: string) => void) | null = null;
+    let pendingCallback: ((payload: { dataUrl?: string; bitmap?: ImageBitmap }) => void) | null = null;
     let pendingErrorCallback: ((err: string) => void) | null = null;
     let pendingFrameId: number | null = null;
 
@@ -59,8 +59,26 @@ export async function createCompositionFrameRenderer(
               }, 3000);
 
               pendingFrameId = frame;
-              pendingCallback = (dataUrl: string) => {
+              pendingCallback = (payload: { dataUrl?: string; bitmap?: ImageBitmap }) => {
                 clearTimeout(frameTimeout);
+                if (payload.bitmap) {
+                  try {
+                    const ctx = targetCanvas.getContext('2d');
+                    if (ctx) {
+                      ctx.fillStyle = '#09090b';
+                      ctx.fillRect(0, 0, width, height);
+                      ctx.drawImage(payload.bitmap, 0, 0, width, height);
+                    }
+                    payload.bitmap.close?.();
+                    res();
+                  } catch (err) {
+                    payload.bitmap.close?.();
+                    rej(new Error(`Bitmap render error for frame ${frame}: ${String(err)}`));
+                  }
+                  return;
+                }
+
+                const dataUrl = payload.dataUrl || '';
                 const img = new Image();
                 img.onload = () => {
                   try {
@@ -118,7 +136,7 @@ export async function createCompositionFrameRenderer(
           pendingCallback = null;
           pendingErrorCallback = null;
           pendingFrameId = null;
-          cb(data.dataUrl);
+          cb({ dataUrl: data.dataUrl, bitmap: data.bitmap });
         }
       } else if (data.type === 'frame_error') {
         if (data.id === pendingFrameId && pendingErrorCallback) {

@@ -23,7 +23,12 @@ import type {
   ScenePalette
 } from '../../types';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { CommitNumberInput } from '../ui/CommitNumberInput';
 import { AssetManagerPanel } from './AssetManagerPanel';
+import {
+  PROCEDURAL_ARCHETYPES,
+  type ProceduralArchetype
+} from '../../engine/composition/proceduralCompiler';
 
 export type InspectorTab = 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
 
@@ -156,11 +161,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     activeSceneId,
     setActiveSceneId,
     updateLayerOverride,
+    resetLayerOverride,
     removeAssetFromScene,
     updateScenePalette,
+    compileSceneProcedural,
+    compileAllScenesProcedural,
     setProject,
     isCompilingMograph,
     setIsCompilingMograph,
+    updateThemeFont,
     updateThemeCaptionPosition,
     updateThemeCaptionStyle,
     updateSubtitleCustomization,
@@ -168,6 +177,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     updateSettings,
     isGeneratingAudio,
     generateAudio,
+    uploadCustomAudio,
     cancelAudioGeneration,
     deleteAudio,
     audioProgress,
@@ -274,24 +284,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     });
   };
 
+  const [selectedArchetype, setSelectedArchetype] = useState<ProceduralArchetype>('auto');
+  const customAudioInputRef = useRef<HTMLInputElement | null>(null);
+
   const handleResetLayerOverride = () => {
     if (!activeScene || !activeLayer) return;
-    updateLayerOverride(activeScene.id, activeLayer.id, {
-      x: 0,
-      y: 0,
-      scale: 1,
-      rotation: 0,
-      opacity: 1,
-      color: undefined,
-      zIndex: undefined,
-      hidden: false,
-      flipX: false,
-      flipY: false,
-      fontSizeScale: 1,
-      textAlign: undefined,
-      borderRadius: undefined,
-      layerType: activeLayer.type
-    });
+    resetLayerOverride(activeScene.id, activeLayer.id);
     addToast(`Override layer ${activeLayer.label} direset.`, 'info');
   };
 
@@ -311,14 +309,17 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         userEdited: true
       };
     });
-    setProject({
-      ...project,
-      composition: {
-        ...project.composition,
-        scenes: updatedCompScenes,
-        updatedAt: Date.now()
-      }
-    });
+    setProject(
+      {
+        ...project,
+        composition: {
+          ...project.composition,
+          scenes: updatedCompScenes,
+          updatedAt: Date.now()
+        }
+      },
+      { keepStale: true, preserveHistory: true }
+    );
   };
 
   const handlePaletteChange = (prop: keyof ScenePalette, val: string) => {
@@ -437,22 +438,25 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       // visualIntent grow with every revision ("..., Instruksi perubahan: ...").
       const updatedProjectScenes = currentProject.scenes;
 
-      setProject({
-        ...currentProject,
-        scenes: updatedProjectScenes,
-        composition: {
-          ...(currentComp || {
-            id: `comp-${Date.now()}`,
-            width: currentProject.width || 1080,
-            height: currentProject.height || 1920,
-            fps: currentProject.fps || 30,
-            duration: currentProject.audioDuration || 10,
-            createdAt: Date.now()
-          }),
-          scenes: updatedCompScenes,
-          updatedAt: Date.now()
-        }
-      });
+      setProject(
+        {
+          ...currentProject,
+          scenes: updatedProjectScenes,
+          composition: {
+            ...(currentComp || {
+              id: `comp-${Date.now()}`,
+              width: currentProject.width || 1080,
+              height: currentProject.height || 1920,
+              fps: currentProject.fps || 30,
+              duration: currentProject.audioDuration || 10,
+              createdAt: Date.now()
+            }),
+            scenes: updatedCompScenes,
+            updatedAt: Date.now()
+          }
+        },
+        { keepStale: true, preserveHistory: true }
+      );
 
       setRevisionPrompt('');
       if (sceneModule.status === 'error') {
@@ -1289,10 +1293,20 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   </div>
 
                   {availableLayers.length === 0 ? (
-                    <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed">
-                      {activeCompScene?.html
-                        ? 'Tidak ada layer yang ditandai data-moo-layer pada adegan ini.'
-                        : 'Mograph belum di-generate. Buka tab Mograph untuk membuat visual.'}
+                    <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed flex flex-col items-center gap-2">
+                      <span>
+                        {activeCompScene?.html
+                          ? 'Tidak ada layer yang ditandai data-moo-layer pada adegan ini.'
+                          : 'Layer visual belum disusun secara permanen untuk adegan ini.'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => compileSceneProcedural(activeScene.id, 'auto')}
+                        className="px-3 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent border border-accent/40 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">bolt</span>
+                        <span>Susun Layer & Visual Instan</span>
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -1519,12 +1533,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
                                   <span>Pos X</span>
-                                  <input
-                                    type="number"
+                                  <CommitNumberInput
                                     min={-960}
                                     max={960}
+                                    step={1}
                                     value={activeLayerOverride.x || 0}
-                                    onChange={(e) => handleOverrideChange('x', parseFloat(e.target.value) || 0)}
+                                    onCommit={(val) => handleOverrideChange('x', val)}
+                                    ariaLabel="Posisi X"
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1541,12 +1556,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
                                   <span>Pos Y</span>
-                                  <input
-                                    type="number"
+                                  <CommitNumberInput
                                     min={-1080}
                                     max={1080}
+                                    step={1}
                                     value={activeLayerOverride.y || 0}
-                                    onChange={(e) => handleOverrideChange('y', parseFloat(e.target.value) || 0)}
+                                    onCommit={(val) => handleOverrideChange('y', val)}
+                                    ariaLabel="Posisi Y"
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1569,13 +1585,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
                                   <span>Skala</span>
                                   <div className="flex items-center gap-1">
-                                    <input
-                                      type="number"
+                                    <CommitNumberInput
                                       min={0.1}
                                       max={3.5}
                                       step={0.05}
                                       value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
-                                      onChange={(e) => handleOverrideChange('scale', parseFloat(e.target.value) || 1.0)}
+                                      onCommit={(val) => handleOverrideChange('scale', val)}
+                                      ariaLabel="Skala Layer"
                                       className="w-11 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                     />
                                     <button
@@ -1601,13 +1617,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
                                   <span>Rotasi</span>
-                                  <input
-                                    type="number"
+                                  <CommitNumberInput
                                     min={-180}
                                     max={180}
                                     step={5}
                                     value={activeLayerOverride.rotation || 0}
-                                    onChange={(e) => handleOverrideChange('rotation', parseFloat(e.target.value) || 0)}
+                                    onCommit={(val) => handleOverrideChange('rotation', val)}
+                                    ariaLabel="Rotasi Layer"
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1678,12 +1694,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
                                 <span>Kelengkungan Sudut</span>
                                 <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
+                                  <CommitNumberInput
                                     min={0}
                                     max={64}
+                                    step={1}
                                     value={activeLayerOverride.borderRadius || 0}
-                                    onChange={(e) => handleOverrideChange('borderRadius', parseFloat(e.target.value) || 0)}
+                                    onCommit={(val) => handleOverrideChange('borderRadius', val)}
+                                    ariaLabel="Kelengkungan Sudut"
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                   <span className="text-[9px]">px</span>
@@ -1838,6 +1855,46 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 5. Tipografi & Font Utama Proyek */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-accent">font_download</span>
+                      Tipografi & Font Proyek
+                    </span>
+                    <span className="text-[10px] font-mono text-text-muted">
+                      {mapFontDisplay(project.theme.fontFamily)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { id: 'Jakarta', label: 'Jakarta Sans', sub: 'Modern & Bersih' },
+                        { id: 'Impact', label: 'Syne Display', sub: 'Kinetik & Bold' },
+                        { id: 'Mono', label: 'JetBrains Mono', sub: 'Teknis & Kode' }
+                      ] as const
+                    ).map((f) => {
+                      const isSel = (project.theme.fontFamily || 'Jakarta') === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => updateThemeFont(f.id)}
+                          className={`p-2 rounded-xl border text-left flex flex-col gap-0.5 transition-all ${
+                            isSel
+                              ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs'
+                              : 'bg-surface-1 border-border text-text-muted hover:text-on-surface'
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold truncate">{f.label}</span>
+                          <span className="text-[9px] opacity-75 truncate">{f.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </>
             )}
 
@@ -1855,6 +1912,76 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         {/* ================= TAB MOGRAPH (AI GENERATOR & PACING) ================= */}
         {activeTab === 'mograph' && (
           <div className="flex flex-col gap-5">
+            {/* Studio Visual & Widget Instan (Zero-API Procedural Engine) */}
+            <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-accent">bolt</span>
+                  Visual & Widget Instan
+                </span>
+                <span className="text-[10px] font-mono text-accent px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25">
+                  Zero-API • Siap Edit
+                </span>
+              </div>
+
+              <p className="text-[11px] text-text-muted leading-relaxed">
+                Susun animasi tipografi kinetik & widget grafik secara instan dari naskah tanpa kuota API. Seluruh elemen langsung memiliki layer yang dapat digeser di kanvas.
+              </p>
+
+              {/* Pilihan Archetype Widget */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {PROCEDURAL_ARCHETYPES.map((arch) => {
+                  const isSel = selectedArchetype === arch.id;
+                  return (
+                    <button
+                      key={arch.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchetype(arch.id);
+                        if (activeScene) {
+                          compileSceneProcedural(activeScene.id, arch.id);
+                        }
+                      }}
+                      title={arch.description}
+                      className={`p-2 rounded-xl border text-left flex flex-col gap-1 transition-all active:scale-95 ${
+                        isSel
+                          ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs'
+                          : 'bg-surface-1 border-border text-text-muted hover:text-on-surface hover:border-border-strong'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-[15px] text-accent">{arch.icon}</span>
+                        {isSel && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                      </div>
+                      <span className="text-[10px] font-semibold leading-tight truncate">{arch.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <button
+                  type="button"
+                  disabled={!activeScene}
+                  onClick={() => activeScene && compileSceneProcedural(activeScene.id, selectedArchetype)}
+                  className="py-2 px-2.5 rounded-xl bg-surface-1 hover:bg-surface-3 border border-border text-on-surface text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[15px] text-accent">auto_fix_high</span>
+                  <span>Terapkan ke Shot #{activeSceneIndex + 1}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={scenes.length === 0}
+                  onClick={() => compileAllScenesProcedural(selectedArchetype, true)}
+                  className="py-2 px-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[15px]">bolt</span>
+                  <span>Susun Semua ({scenes.length})</span>
+                </button>
+              </div>
+            </div>
+
             {/* Action Box Utama: Generator Mograph AI */}
             <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -2646,6 +2773,33 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   Batalkan Pembuatan Suara
                 </button>
               )}
+
+              {/* Unggah File Audio / Voiceover Rekaman Sendiri */}
+              <div className="pt-1">
+                <input
+                  ref={customAudioInputRef}
+                  type="file"
+                  accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      uploadCustomAudio(file);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={isGeneratingAudio}
+                  onClick={() => customAudioInputRef.current?.click()}
+                  className="w-full py-2 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-dashed border-border hover:border-accent/50 text-on-surface text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] disabled:opacity-50"
+                  title="Unggah rekaman voiceover atau musik MP3/WAV/M4A untuk disinkronkan otomatis ke adegan"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-accent">upload_file</span>
+                  <span>Unggah Audio / Voiceover Sendiri (MP3/WAV)</span>
+                </button>
+              </div>
 
               {/* Status audio proyek */}
               <div

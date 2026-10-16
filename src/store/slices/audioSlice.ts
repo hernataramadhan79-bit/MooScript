@@ -403,12 +403,121 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
     }
   },
 
+  uploadCustomAudio: async (file: File) => {
+    const { project, audioBlobUrl, addToast } = get();
+    if (!file) return;
+    const isAudio =
+      file.type.startsWith('audio/') ||
+      /\.(mp3|wav|m4a|ogg|aac|flac|webm)$/i.test(file.name);
+    if (!isAudio) {
+      addToast('Format berkas tidak didukung. Unggah berkas audio (MP3, WAV, M4A, OGG).', 'error');
+      return;
+    }
+
+    set({
+      isGeneratingAudio: true,
+      audioProgress: {
+        currentScene: 0,
+        totalScenes: project.scenes.length,
+        sceneId: 'upload',
+        statusText: `Memproses berkas audio "${file.name}"...`
+      }
+    });
+
+    try {
+      const voiceBuffer = await decodeAudioBlob(file);
+      const totalAudioDur = Math.max(0.5, Math.round(voiceBuffer.duration * 100) / 100);
+
+      // Distribute total audio duration proportionally across scenes based on narration length
+      const rawWeights = project.scenes.map((s) =>
+        Math.max(1, (s.narrationText || s.text || '').trim().length)
+      );
+      const weightSum = rawWeights.reduce((a, b) => a + b, 0) || 1;
+
+      let accumulated = 0;
+      const updatedScenes = project.scenes.map((s, idx) => {
+        const isLast = idx === project.scenes.length - 1;
+        const dur = isLast
+          ? Math.max(0.5, Math.round((totalAudioDur - accumulated) * 100) / 100)
+          : Math.max(0.5, Math.round((totalAudioDur * (rawWeights[idx] / weightSum)) * 100) / 100);
+        accumulated += dur;
+        const text = s.narrationText || s.text || '';
+        return {
+          ...s,
+          durationInSeconds: dur,
+          wordTimestamps: computeDeterministicWordAlignment(text, dur)
+        };
+      });
+
+      let finalAudioBlob: Blob = file;
+      const bgmSettings = project.bgm;
+      if (bgmSettings?.preset && bgmSettings.preset !== 'none') {
+        const absoluteWords: Array<{ start: number; end: number }> = [];
+        let sceneOffset = 0;
+        for (const scene of updatedScenes) {
+          for (const wt of scene.wordTimestamps || []) {
+            absoluteWords.push({
+              start: sceneOffset + wt.start,
+              end: sceneOffset + wt.end
+            });
+          }
+          sceneOffset += scene.durationInSeconds;
+        }
+        finalAudioBlob = await mixVoiceAndBgm(voiceBuffer, {
+          bgmPreset: bgmSettings.preset,
+          bgmLevel: bgmSettings.level ?? 0.18,
+          voiceLevel: 1.0,
+          duckRatio: bgmSettings.duckRatio ?? 0.15,
+          duckAttackSec: 0.08,
+          duckReleaseSec: 0.35,
+          wordTimestamps: absoluteWords
+        });
+      }
+
+      if (audioBlobUrl) {
+        try {
+          URL.revokeObjectURL(audioBlobUrl);
+        } catch {
+          // ignore
+        }
+      }
+      const newBlobUrl = URL.createObjectURL(finalAudioBlob);
+      const finalProject = syncComposition({
+        ...project,
+        scenes: updatedScenes,
+        audioBlob: finalAudioBlob,
+        audioDuration: totalAudioDur
+      });
+
+      set({
+        project: finalProject,
+        isGeneratingAudio: false,
+        audioBlobUrl: newBlobUrl,
+        audioStale: false,
+        audioProgress: null,
+        rawVoiceBlob: file
+      });
+
+      extractWaveformPeaks(finalAudioBlob)
+        .then((peaks) => set({ waveformPeaks: peaks }))
+        .catch(() => {});
+
+      await saveProjectToDb(finalProject);
+      addToast(`Audio "${file.name}" (${totalAudioDur.toFixed(1)}s) berhasil diterapkan & disinkronkan!`, 'success');
+    } catch (err: unknown) {
+      set({ isGeneratingAudio: false, audioProgress: null });
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Gagal memuat berkas audio: ${msg}`, 'error');
+    }
+  },
+
   remixAudio: async () => {
     const { rawVoiceBlob, project, audioBlobUrl, addToast } = get();
-    if (!rawVoiceBlob) return;
+    const sourceVoiceBlob = rawVoiceBlob || project.audioBlob;
+    if (!sourceVoiceBlob) return;
 
     const bgmSettings = project.bgm;
-    let finalAudioBlob = rawVoiceBlob;
+    let finalAudioBlob = sourceVoiceBlob;
 
     try {
       if (bgmSettings?.preset && bgmSettings.preset !== 'none') {
@@ -424,7 +533,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           sceneOffset += scene.durationInSeconds;
         }
 
-        const voiceBuffer = await decodeAudioBlob(rawVoiceBlob);
+        const voiceBuffer = await decodeAudioBlob(sourceVoiceBlob);
         finalAudioBlob = await mixVoiceAndBgm(voiceBuffer, {
           bgmPreset: bgmSettings.preset,
           bgmLevel: bgmSettings.level ?? 0.18,
