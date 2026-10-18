@@ -71,6 +71,35 @@ describe('projectBackup serialize/parse', () => {
       'Data proyek rusak.'
     );
   });
+
+  it('rejects backups exceeding MAX_BACKUP_BYTES or containing forbidden scene code', () => {
+    const maliciousProject: MooProject = {
+      ...PROJECT,
+      schemaVersion: 2,
+      composition: {
+        id: 'comp-mal',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        duration: 2,
+        globalCss: '',
+        scenes: [
+          {
+            id: 'sc-backup-1',
+            beatId: 'sc-backup-1',
+            duration: 2,
+            html: '<div><script>alert(1)</script></div>',
+            css: '',
+            buildJs: 'eval("window.parent.postMessage(1)")',
+            status: 'ok',
+            version: 1
+          }
+        ]
+      }
+    };
+    const serializedMalicious = serializeProjectBackup(maliciousProject);
+    expect(() => parseProjectBackup(serializedMalicious)).toThrow(/validasi keamanan/i);
+  });
 });
 
 describe('Store importProject', () => {

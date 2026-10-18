@@ -17,7 +17,8 @@ export type MobileTab = 'naskah' | 'mograph' | 'style' | 'asset' | 'audio' | 'ek
 export type { InspectorTab };
 
 export const App: React.FC = () => {
-  const { initStore, setActiveSceneId } = useMooStore();
+  const initStore = useMooStore((s) => s.initStore);
+  const setActiveSceneId = useMooStore((s) => s.setActiveSceneId);
   // Tailwind lg breakpoint. Only one layout is mounted so stage/timeline/inspector exist once.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 

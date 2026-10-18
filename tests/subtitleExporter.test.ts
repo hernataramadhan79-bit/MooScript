@@ -201,6 +201,7 @@ describe('downloadSubtitleFile', () => {
   });
 
   it('creates Blob and triggers download without throwing', () => {
+    vi.useFakeTimers();
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-url');
     const mockRevokeObjectURL = vi.fn();
     globalThis.URL.createObjectURL = mockCreateObjectURL;
@@ -233,6 +234,7 @@ describe('downloadSubtitleFile', () => {
       expect(mockCreateObjectURL).toHaveBeenCalled();
       expect(clickSpy).toHaveBeenCalled();
       expect(mockAnchor.download).toBe('my_viral_video.srt');
+      vi.runAllTimers();
       expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-url');
 
       // Test VTT download
@@ -240,6 +242,7 @@ describe('downloadSubtitleFile', () => {
       expect(mockAnchor.download).toBe('my_viral_video.vtt');
       expect(mockCreateObjectURL).toHaveBeenCalledTimes(2);
     } finally {
+      vi.useRealTimers();
       delete (globalThis as any).document;
       delete (globalThis as any).window;
     }

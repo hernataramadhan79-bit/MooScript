@@ -207,4 +207,21 @@ describe('Asset Management (IndexedDB & Store Slice)', () => {
     expect(sceneMod?.html).not.toContain('data:image/png;base64,banner-data');
     expect(sceneMod?.html).not.toContain('moo-asset-container');
   });
+
+  it('escapes HTML special characters in asset name when inserting into scene HTML', () => {
+    const store = useMooStore.getState();
+    const asset = {
+      id: 'ast-xss-1',
+      projectId: 'proj-asset-test',
+      name: 'hero" onerror="alert(1)"><script>',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,xss-test',
+      createdAt: Date.now()
+    };
+
+    store.insertAssetIntoScene(asset, 'sc-asset-1');
+    const sceneMod = useMooStore.getState().project.composition?.scenes.find((s) => s.beatId === 'sc-asset-1');
+    expect(sceneMod?.html).toContain('alt="hero&quot; onerror=&quot;alert(1)&quot;&gt;&lt;script&gt;"');
+    expect(sceneMod?.html).not.toContain('onerror="alert(1)"');
+  });
 });

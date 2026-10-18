@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../../utils/textUtils';
 import type { SceneAssetAttachment } from '../../../types';
 
 /**
@@ -115,7 +116,7 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
   Aturan Integrasi:
   1. Masukkan elemen HTML:
      <div class="moo-asset-frame" data-moo-layer="asset-${asset.assetId}">
-       <img src="${asset.dataUrl}" alt="${asset.assetName}" class="moo-asset-img" />
+       <img src="${asset.dataUrl}" alt="${escapeHtml(asset.assetName || 'Asset')}" class="moo-asset-img" />
      </div>
   2. Berikan CSS styling yang kohesif pada .moo-asset-frame dan .moo-asset-img (misal: kartu berbayang, frame bercahaya, ukuran proporsional, atau potongan transparan).
   3. Animasikan dengan GSAP (tl.from / tl.to) terkoordinasi dengan teks dan grafik adegan!`

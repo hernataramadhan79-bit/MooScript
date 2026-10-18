@@ -131,6 +131,28 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@fontsource') || id.includes('?datauri')) {
+            return 'embedded-fonts';
+          }
+          if (id.includes('node_modules/gsap')) {
+            return 'gsap-vendor';
+          }
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/zustand') ||
+            id.includes('node_modules/dexie') ||
+            id.includes('node_modules/zod')
+          ) {
+            return 'core-vendor';
+          }
+        }
+      }
+    }
+  },
   server: {
     port: 3000,
     open: false

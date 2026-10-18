@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import { extractWaveformPeaks } from '../../engine/audio/waveform';
 
 interface TimelineBarProps {
@@ -30,7 +31,26 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     waveformPeaks,
     setWaveformPeaks,
     setSceneDuration
-  } = useMooStore();
+  } = useMooStore(
+    useShallow((s) => ({
+      project: s.project,
+      currentFrame: s.currentFrame,
+      isPlaying: s.isPlaying,
+      isLooping: s.isLooping,
+      toggleLoop: s.toggleLoop,
+      togglePlay: s.togglePlay,
+      seekFrame: s.seekFrame,
+      activeSceneId: s.activeSceneId,
+      setActiveSceneId: s.setActiveSceneId,
+      audioStale: s.audioStale,
+      audioBlobUrl: s.audioBlobUrl,
+      previewMode: s.previewMode,
+      setPreviewMode: s.setPreviewMode,
+      waveformPeaks: s.waveformPeaks,
+      setWaveformPeaks: s.setWaveformPeaks,
+      setSceneDuration: s.setSceneDuration
+    }))
+  );
 
   const fps = project.fps || 30;
   const calculatedSceneDuration = project.scenes.reduce(

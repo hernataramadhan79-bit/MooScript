@@ -2,7 +2,8 @@ import React from 'react';
 import { useMooStore } from '../store/useMooStore';
 
 export const ToastContainer: React.FC = () => {
-  const { toasts, removeToast } = useMooStore();
+  const toasts = useMooStore((s) => s.toasts);
+  const removeToast = useMooStore((s) => s.removeToast);
 
   if (toasts.length === 0) return null;
 

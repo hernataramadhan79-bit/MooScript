@@ -238,6 +238,14 @@ export function downloadSubtitleFile(
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    if (typeof document !== 'undefined' && document.body) {
+      try {
+        document.body.removeChild(a);
+      } catch {
+        // ignore if already removed
+      }
+    }
+    URL.revokeObjectURL(url);
+  }, 100);
 }

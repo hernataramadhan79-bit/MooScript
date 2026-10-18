@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import { exportSkillToJson, importSkillFromJson, addCustomSkill, deleteSkill, resolveSkillIcon } from '../engine/skills/skillManager';
 import { checkStoragePersistence, requestPersistentStorage } from '../db/mooDb';
 import { testProviderApiKey, fetchAvailableModels, DEFAULT_PROVIDER_MODELS, type ProviderModelInfo } from '../engine/ai/llm';
@@ -188,7 +189,22 @@ export const SettingsDrawer: React.FC = () => {
     cacheSizeBytes,
     clearCache,
     addToast
-  } = useMooStore();
+  } = useMooStore(
+    useShallow((s) => ({
+      isSettingsOpen: s.isSettingsOpen,
+      setSettingsOpen: s.setSettingsOpen,
+      settings: s.settings,
+      updateSettings: s.updateSettings,
+      updateApiKey: s.updateApiKey,
+      skills: s.skills,
+      activeSkillId: s.activeSkillId,
+      setActiveSkillId: s.setActiveSkillId,
+      refreshSkills: s.refreshSkills,
+      cacheSizeBytes: s.cacheSizeBytes,
+      clearCache: s.clearCache,
+      addToast: s.addToast
+    }))
+  );
 
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [testingKey, setTestingKey] = useState<Record<string, boolean>>({});

@@ -14,25 +14,28 @@ export async function extractWaveformPeaks(blob: Blob, count = 64): Promise<numb
   try {
     const arrayBuffer = await blob.arrayBuffer();
     const ctx = new AudioCtx();
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    const channelData = audioBuffer.getChannelData(0);
+    try {
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const channelData = audioBuffer.getChannelData(0);
 
-    const step = Math.max(1, Math.floor(channelData.length / count));
-    const peaks: number[] = [];
+      const step = Math.max(1, Math.floor(channelData.length / count));
+      const peaks: number[] = [];
 
-    for (let i = 0; i < count; i++) {
-      const start = i * step;
-      const end = Math.min(start + step, channelData.length);
-      let max = 0;
-      for (let j = start; j < end; j++) {
-        const val = Math.abs(channelData[j]);
-        if (val > max) max = val;
+      for (let i = 0; i < count; i++) {
+        const start = i * step;
+        const end = Math.min(start + step, channelData.length);
+        let max = 0;
+        for (let j = start; j < end; j++) {
+          const val = Math.abs(channelData[j]);
+          if (val > max) max = val;
+        }
+        peaks.push(Math.min(1, Math.max(0, max)));
       }
-      peaks.push(Math.min(1, Math.max(0, max)));
-    }
 
-    await ctx.close().catch(() => {});
-    return peaks;
+      return peaks;
+    } finally {
+      await ctx.close().catch(() => {});
+    }
   } catch (err) {
     console.warn('extractWaveformPeaks error:', err);
     return [];

@@ -10,6 +10,37 @@ describe('Audio Waveform Peak Extraction & Store', () => {
     expect(Array.isArray(peaks)).toBe(true);
   });
 
+  it('closes AudioContext in finally block even if decodeAudioData rejects', async () => {
+    let closeCalled = false;
+    const globalRecord = globalThis as unknown as Record<string, unknown>;
+    const prevWindow = globalRecord.window;
+    globalRecord.window = {
+      AudioContext: class {
+        async decodeAudioData() {
+          throw new Error('corrupted audio');
+        }
+        async close() {
+          closeCalled = true;
+        }
+      }
+    };
+
+    try {
+      const dummyBlob = {
+        arrayBuffer: async () => new ArrayBuffer(8)
+      } as unknown as Blob;
+      const peaks = await extractWaveformPeaks(dummyBlob, 16);
+      expect(peaks).toEqual([]);
+      expect(closeCalled).toBe(true);
+    } finally {
+      if (prevWindow === undefined) {
+        delete globalRecord.window;
+      } else {
+        globalRecord.window = prevWindow;
+      }
+    }
+  });
+
   it('stores and updates waveform peaks in audioSlice', () => {
     const store = useMooStore.getState();
     expect(store.waveformPeaks).toBeNull();

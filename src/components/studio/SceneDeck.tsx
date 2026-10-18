@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { SceneTransition } from '../../types';
 import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { Button } from '../ui/Button';
@@ -143,7 +144,38 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     activeSkillId,
     setSettingsOpen,
     compileSceneProcedural
-  } = useMooStore();
+  } = useMooStore(
+    useShallow((s) => ({
+      project: s.project,
+      addScene: s.addScene,
+      removeScene: s.removeScene,
+      duplicateScene: s.duplicateScene,
+      updateSceneText: s.updateSceneText,
+      updateSceneVisualIntent: s.updateSceneVisualIntent,
+      updateSceneVisualConcept: s.updateSceneVisualConcept,
+      toggleWordFocus: s.toggleWordFocus,
+      setSceneDuration: s.setSceneDuration,
+      setSceneTransition: s.setSceneTransition,
+      reorderScenes: s.reorderScenes,
+      scriptPrompt: s.scriptPrompt,
+      setScriptPrompt: s.setScriptPrompt,
+      generateScript: s.generateScript,
+      isGeneratingScript: s.isGeneratingScript,
+      undoGenerateScript: s.undoGenerateScript,
+      previousScenesSnapshot: s.previousScenesSnapshot,
+      activeSceneId: s.activeSceneId,
+      setActiveSceneId: s.setActiveSceneId,
+      seekFrame: s.seekFrame,
+      assets: s.assets,
+      assignAssetToScene: s.assignAssetToScene,
+      removeAssetFromSceneBeat: s.removeAssetFromSceneBeat,
+      updateSceneAssetRole: s.updateSceneAssetRole,
+      skills: s.skills,
+      activeSkillId: s.activeSkillId,
+      setSettingsOpen: s.setSettingsOpen,
+      compileSceneProcedural: s.compileSceneProcedural
+    }))
+  );
 
   const scenes = project.scenes || [];
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});

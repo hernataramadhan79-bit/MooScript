@@ -9,3 +9,12 @@ export function cleanWord(word: string): string {
     .toLocaleLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, '');
 }
+
+export function escapeHtml(raw: string): string {
+  return (raw || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}

@@ -13,7 +13,8 @@ interface CodeInspectorModalProps {
 }
 
 export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, isOpen, onClose }) => {
-  const { project, addToast } = useMooStore();
+  const project = useMooStore((s) => s.project);
+  const addToast = useMooStore((s) => s.addToast);
 
   const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
   const [htmlCode, setHtmlCode] = useState('');

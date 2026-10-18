@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { MooProject } from '../types';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { flushPendingSave } from '../store/slices/projectSlice';
@@ -23,7 +24,19 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     renameProject,
     importProject,
     addToast
-  } = useMooStore();
+  } = useMooStore(
+    useShallow((s) => ({
+      project: s.project,
+      projectsList: s.projectsList,
+      createNewProject: s.createNewProject,
+      switchProject: s.switchProject,
+      duplicateProject: s.duplicateProject,
+      deleteProject: s.deleteProject,
+      renameProject: s.renameProject,
+      importProject: s.importProject,
+      addToast: s.addToast
+    }))
+  );
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

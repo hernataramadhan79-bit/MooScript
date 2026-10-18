@@ -1,5 +1,6 @@
 import type { MooProject } from '../types';
 import { normalizeProject } from './mooDb';
+import { validateSceneCode } from '../engine/composition/validator';
 
 export const BACKUP_FORMAT = 'mooscript-project';
 export const BACKUP_VERSION = 1;
@@ -20,6 +21,9 @@ export function serializeProjectBackup(project: MooProject): string {
 }
 
 export function parseProjectBackup(text: string): MooProject {
+  if (typeof text !== 'string' || text.length > MAX_BACKUP_BYTES) {
+    throw new Error('Berkas terlalu besar (maks 20 MB).');
+  }
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -40,5 +44,18 @@ export function parseProjectBackup(text: string): MooProject {
     throw new Error('Data proyek rusak.');
   }
 
-  return normalizeProject(project);
+  const normalized = normalizeProject(project);
+  if (normalized.composition?.scenes) {
+    for (const scene of normalized.composition.scenes) {
+      const check = validateSceneCode({
+        html: scene.html,
+        css: scene.css,
+        buildJs: scene.buildJs
+      });
+      if (!check.valid) {
+        throw new Error(`Kode adegan pada cadangan tidak lolos validasi keamanan: ${check.errors[0]}`);
+      }
+    }
+  }
+  return normalized;
 }

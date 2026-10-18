@@ -5,6 +5,7 @@ import { saveAssetToDb, listAssetsFromDb, deleteAssetFromDb } from '../../db/moo
 import { syncComposition } from '../../engine/composition/sync';
 import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composition/layers';
 import { scheduleSave } from './projectSlice';
+import { escapeHtml } from '../../utils/textUtils';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> = (set, get) => ({
@@ -101,7 +102,8 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       const layerId = existingMatches && existingMatches.length > 0 ? `asset-${existingMatches.length + 1}` : 'asset';
       const targetSelector = `.moo-asset-container.moo-asset-${layerId}`;
 
-      const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${asset.name}" style="${frameStyle}" /></div>`;
+      const safeAlt = escapeHtml(asset.name || 'Asset');
+      const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${safeAlt}" style="${frameStyle}" /></div>`;
 
       let animJs = `tl.from("${targetSelector}", { scale: 0, opacity: 0, duration: 0.7, ease: "back.out(1.7)" });`;
       if (animPreset === 'slide') {

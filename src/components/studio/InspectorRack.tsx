@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
@@ -195,7 +196,49 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     audioStale,
     setSettingsOpen,
     addToast
-  } = useMooStore();
+  } = useMooStore(
+    useShallow((s) => ({
+      project: s.project,
+      settings: s.settings,
+      activeSceneId: s.activeSceneId,
+      setActiveSceneId: s.setActiveSceneId,
+      updateLayerOverride: s.updateLayerOverride,
+      resetLayerOverride: s.resetLayerOverride,
+      removeAssetFromScene: s.removeAssetFromScene,
+      updateScenePalette: s.updateScenePalette,
+      compileSceneProcedural: s.compileSceneProcedural,
+      compileAllScenesProcedural: s.compileAllScenesProcedural,
+      setProject: s.setProject,
+      isCompilingMograph: s.isCompilingMograph,
+      setIsCompilingMograph: s.setIsCompilingMograph,
+      updateThemeFont: s.updateThemeFont,
+      updateThemeCaptionPosition: s.updateThemeCaptionPosition,
+      updateThemeCaptionStyle: s.updateThemeCaptionStyle,
+      updateSubtitleCustomization: s.updateSubtitleCustomization,
+      toggleGlobalSubtitles: s.toggleGlobalSubtitles,
+      updateSettings: s.updateSettings,
+      isGeneratingAudio: s.isGeneratingAudio,
+      generateAudio: s.generateAudio,
+      uploadCustomAudio: s.uploadCustomAudio,
+      cancelAudioGeneration: s.cancelAudioGeneration,
+      deleteAudio: s.deleteAudio,
+      audioProgress: s.audioProgress,
+      auditionVoice: s.auditionVoice,
+      updateBgmPreset: s.updateBgmPreset,
+      updateBgmLevel: s.updateBgmLevel,
+      updateBgmDuckRatio: s.updateBgmDuckRatio,
+      updateResolution: s.updateResolution,
+      isExporting: s.isExporting,
+      exportProgress: s.exportProgress,
+      exportResult: s.exportResult,
+      startExport: s.startExport,
+      cancelExport: s.cancelExport,
+      revokeExportResult: s.revokeExportResult,
+      audioStale: s.audioStale,
+      setSettingsOpen: s.setSettingsOpen,
+      addToast: s.addToast
+    }))
+  );
 
   const currentLlmProvider = settings.selectedLLMProvider;
   const currentLlmApiKey = settings.apiKeys[currentLlmProvider] || '';

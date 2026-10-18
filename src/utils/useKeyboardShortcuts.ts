@@ -14,30 +14,32 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function useKeyboardShortcuts(): void {
-  const isPlaying = useMooStore((s) => s.isPlaying);
-  const play = useMooStore((s) => s.play);
-  const pause = useMooStore((s) => s.pause);
-  const togglePlay = useMooStore((s) => s.togglePlay);
-  const seekFrame = useMooStore((s) => s.seekFrame);
-  const currentFrame = useMooStore((s) => s.currentFrame);
-  const project = useMooStore((s) => s.project);
-  const fps = project.fps || 30;
-  const scenes = project.scenes;
-  const totalDuration =
-    project.audioDuration ||
-    scenes.reduce((acc, sc) => acc + (sc.durationInSeconds || 3), 0);
-  const totalFrames = Math.max(1, Math.round(totalDuration * fps));
-  const activeSceneId = useMooStore((s) => s.activeSceneId);
-  const setActiveSceneId = useMooStore((s) => s.setActiveSceneId);
-  const duplicateScene = useMooStore((s) => s.duplicateScene);
-  const removeScene = useMooStore((s) => s.removeScene);
-  const undo = useMooStore((s) => s.undo);
-  const redo = useMooStore((s) => s.redo);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing into input, textarea, slider, or inside an active modal dialog
       if (isEditableTarget(e.target)) return;
+
+      const {
+        isPlaying,
+        play,
+        pause,
+        togglePlay,
+        seekFrame,
+        currentFrame,
+        project,
+        activeSceneId,
+        setActiveSceneId,
+        duplicateScene,
+        removeScene,
+        undo,
+        redo
+      } = useMooStore.getState();
+      const fps = project.fps || 30;
+      const scenes = project.scenes;
+      const totalDuration =
+        project.audioDuration ||
+        scenes.reduce((acc, sc) => acc + (sc.durationInSeconds || 3), 0);
+      const totalFrames = Math.max(1, Math.round(totalDuration * fps));
 
       const hasMetaOrCtrl = e.ctrlKey || e.metaKey;
 
@@ -150,21 +152,5 @@ export function useKeyboardShortcuts(): void {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    isPlaying,
-    play,
-    pause,
-    togglePlay,
-    seekFrame,
-    currentFrame,
-    totalFrames,
-    fps,
-    scenes,
-    activeSceneId,
-    setActiveSceneId,
-    duplicateScene,
-    removeScene,
-    undo,
-    redo
-  ]);
+  }, []);
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ProjectManagerModal } from './ProjectManagerModal';
 import { IconButton } from './ui/IconButton';
 import { Button } from './ui/Button';
@@ -9,11 +10,28 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
-  const { project, settings, setSettingsOpen, updateTitle, canUndo, canRedo, undo, redo } = useMooStore();
+  const { project, settings, setSettingsOpen, updateTitle, canUndo, canRedo, undo, redo } = useMooStore(
+    useShallow((s) => ({
+      project: s.project,
+      settings: s.settings,
+      setSettingsOpen: s.setSettingsOpen,
+      updateTitle: s.updateTitle,
+      canUndo: s.canUndo,
+      canRedo: s.canRedo,
+      undo: s.undo,
+      redo: s.redo
+    }))
+  );
 
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(project.title);
+
+  React.useEffect(() => {
+    if (!editingTitle) {
+      setTitleInput(project.title);
+    }
+  }, [project.id, project.title, editingTitle]);
 
   const hasApiKey = Boolean(
     settings.apiKeys.gemini ||
@@ -33,9 +51,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
   return (
     <>
       <header className="fixed top-0 inset-x-0 z-40 h-14 bg-surface-1/95 backdrop-blur-xl border-b border-border select-none">
-        <div className="h-full px-4 max-w-[1920px] mx-auto flex items-center justify-between gap-3">
+        <div className="h-full px-2.5 sm:px-4 max-w-[1920px] mx-auto flex items-center justify-between gap-2 sm:gap-3">
           {/* Sisi Kiri: Logo + Judul Proyek */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div className="flex items-center gap-2.5 shrink-0">
               <svg
                 aria-label="MooScript Logo"
@@ -63,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
             <div className="h-4 w-[1px] bg-border hidden sm:block shrink-0" />
 
             {/* Title Renamer & Switcher */}
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 sm:flex-initial">
               {editingTitle ? (
                 <input
                   type="text"
@@ -78,37 +96,45 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                       setEditingTitle(false);
                     }
                   }}
-                  className="bg-surface-2 border border-accent rounded-lg px-2.5 h-8 text-[13px] font-semibold text-on-surface focus:outline-none w-[160px] sm:w-[220px]"
+                  className="bg-surface-2 border border-accent rounded-lg px-2.5 h-8 text-[13px] font-semibold text-on-surface focus:outline-none w-full min-w-[120px] sm:w-[220px]"
                 />
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTitleInput(project.title);
-                    setEditingTitle(true);
-                  }}
-                  title="Klik untuk mengubah nama proyek"
-                  className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg hover:bg-surface-2 text-[13px] font-semibold text-on-surface transition-colors truncate max-w-[140px] sm:max-w-[220px]"
-                >
-                  <span className="truncate">{project.title}</span>
-                  <span className="material-symbols-outlined text-[14px] text-text-faint shrink-0">edit</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitleInput(project.title);
+                      setEditingTitle(true);
+                    }}
+                    title="Klik untuk mengubah nama proyek"
+                    className="flex items-center justify-between gap-1.5 px-2.5 h-8 rounded-lg bg-surface-2/60 sm:bg-transparent hover:bg-surface-2 border border-border/60 sm:border-transparent text-[13px] font-semibold text-on-surface transition-colors min-w-0 flex-1 sm:flex-initial sm:max-w-[240px]"
+                  >
+                    <span className="truncate">{project.title}</span>
+                    <span className="material-symbols-outlined text-[14px] text-text-faint shrink-0">edit</span>
+                  </button>
+
+                  <IconButton
+                    icon="folder_open"
+                    aria-label="Kelola Proyek"
+                    size="sm"
+                    onClick={() => setShowProjectModal(true)}
+                  />
+                </>
               )}
+            </div>
+          </div>
 
-              <IconButton
-                icon="folder_open"
-                aria-label="Kelola Proyek"
-                size="sm"
-                onClick={() => setShowProjectModal(true)}
-              />
-
-              <div className="flex items-center gap-0.5 shrink-0 ml-1">
+          {/* Sisi Kanan: Riwayat, Status & Aksi Utama */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {!editingTitle && (
+              <div className="flex items-center gap-0.5 bg-surface-2/60 sm:bg-transparent border border-border/60 sm:border-0 rounded-lg p-0.5 sm:p-0">
                 <IconButton
                   icon="undo"
                   aria-label="Batalkan (Ctrl+Z)"
                   size="sm"
                   disabled={!canUndo}
                   onClick={undo}
+                  className="!w-8 !h-8 !min-w-[32px] !min-h-[32px] sm:!w-9 sm:!h-9 sm:!min-w-[36px] sm:!min-h-[36px]"
                 />
                 <IconButton
                   icon="redo"
@@ -116,13 +142,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                   size="sm"
                   disabled={!canRedo}
                   onClick={redo}
+                  className="!w-8 !h-8 !min-w-[32px] !min-h-[32px] sm:!w-9 sm:!h-9 sm:!min-w-[36px] sm:!min-h-[36px]"
                 />
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Sisi Kanan: Status & Aksi Utama */}
-          <div className="flex items-center gap-2 shrink-0">
             {/* Status Kunci API / Mode Lokal */}
             <button
               type="button"
@@ -134,8 +158,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
             </button>
 
             {onOpenExport && (
-              <Button variant="primary" size="sm" icon="file_download" onClick={onOpenExport}>
-                Ekspor
+              <Button
+                variant="primary"
+                size="sm"
+                icon="file_download"
+                aria-label="Ekspor Video"
+                title="Ekspor Video"
+                onClick={onOpenExport}
+                className="!px-2.5 sm:!px-3"
+              >
+                <span className="hidden sm:inline">Ekspor</span>
               </Button>
             )}
 
@@ -143,6 +175,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
               icon="tune"
               aria-label="Pengaturan API & Studio"
               size="sm"
+              badge={!hasApiKey}
               onClick={() => setSettingsOpen(true)}
             />
           </div>
