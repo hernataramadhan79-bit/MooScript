@@ -31,6 +31,23 @@ const EMBEDDED_FONT_CSS = `
 export interface BuildDocumentOptions {
   standalone?: boolean;
   audioDataUrl?: string;
+  /**
+   * Leave layer overrides out of the scene CSS. The editor stage pushes them to the runtime
+   * after load (set_override_css), so dragging a layer never changes the document and reloads the iframe.
+   */
+  omitOverrides?: boolean;
+}
+
+/** Layer-override CSS for every scene of a composition, scoped to each scene's DOM id. */
+export function compileCompositionOverridesCss(
+  comp: Composition | undefined | null,
+  options?: { important?: boolean }
+): string {
+  if (!comp) return '';
+  return comp.scenes
+    .map((mod) => compileOverridesCss(toDomId(mod.beatId), mod.overrides, options))
+    .filter(Boolean)
+    .join('\n');
 }
 
 const FONT_BY_THEME: Record<string, string> = {
@@ -151,7 +168,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
     .map(({ mod, css }, idx) => {
       const domId = toDomId(mod.beatId);
       const paletteRule = compileScenePaletteCss(domId, mod.palette);
-      const overrides = compileOverridesCss(domId, mod.overrides);
+      const overrides = options?.omitOverrides ? '' : compileOverridesCss(domId, mod.overrides);
       return `/* Scene ${idx + 1} (${mod.beatId}) */\n${css || ''}\n${paletteRule}\n${overrides}`;
     })
     .join('\n\n');

@@ -104,21 +104,22 @@ MooScript Studio is a full-fledged Progressive Web App powered by `vite-plugin-p
 │   │   │   └── mp4Exporter.ts   # WebCodecs VideoEncoder + Mediabunny hardware export pipeline
 │   │   └── renderer/
 │   │       └── canvasRenderer.ts # 2D Canvas fallback engine
-│   ├── features/                # 4-Step Production Wizard
-│   │   ├── idea/                # Step 0: Prompt, AI director & persona skills
-│   │   ├── style/               # Step 1: Visual identity, palette & typography
-│   │   ├── editor/              # Step 2: Interactive composition stage, timeline & audio controls
-│   │   └── export/              # Step 3: Aspect ratio, bitrate & MP4/subtitle export
+│   ├── features/
+│   │   └── scene/               # CodeInspectorModal: per-scene HTML/CSS/GSAP code editor
 │   ├── store/
 │   │   ├── slices/              # Modular Zustand store slices (project, audio, bgm, playback, settings)
 │   │   ├── types.ts             # Central store slice interfaces
 │   │   └── useMooStore.ts       # Unified backwards-compatible Zustand hook
 │   ├── components/
-│   │   ├── studio/
-│   │   │   ├── CompositionStage.tsx # Responsive sandboxed iframe stage host
-│   │   │   └── CanvasStage.tsx      # Legacy 2D canvas stage fallback
-│   │   └── timeline/
-│   │       └── TimelineBar.tsx      # Interactive audio scrubber & scene playhead
+│   │   ├── studio/              # 3-zone workstation
+│   │   │   ├── SceneDeck.tsx        # Zone 1: storyboard / scene cards
+│   │   │   ├── CompositionStage.tsx # Zone 2: sandboxed iframe stage + on-canvas layer drag/scale/rotate
+│   │   │   ├── TimelineBar.tsx      # Zone 2: scrubber & scene playhead
+│   │   │   ├── InspectorRack.tsx    # Zone 3: Mograph, Style, Assets, Audio, Export tabs
+│   │   │   └── AssetManagerPanel.tsx
+│   │   ├── ui/                  # Shared primitives (Button, Sheet, ConfirmModal, ...)
+│   │   ├── SettingsDrawer.tsx   # BYOK keys, voices, storage (lazy-loaded)
+│   │   └── ProjectManagerModal.tsx
 │   ├── types/
 │   │   └── index.ts             # TypeScript data contracts
 │   ├── App.tsx                  # Wizard stage orchestrator

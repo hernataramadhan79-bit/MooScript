@@ -3,6 +3,7 @@ import type { EngineSettings } from '../../types';
 import { db, getCacheSize, clearAllCache, loadProjectFromDb, listProjectsFromDb, saveProjectToDb } from '../../db/mooDb';
 import { BUILTIN_SKILLS, getAllSkills, initializeSkills } from '../../engine/skills/skillManager';
 import { syncComposition } from '../../engine/composition/sync';
+import { syncCustomBgmForProject } from '../../db/customBgm';
 import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
 import type { MooStoreState, SettingsSlice } from '../types';
 
@@ -196,6 +197,7 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
     }
 
     const cacheSize = await getCacheSize();
+    await syncCustomBgmForProject(project.id);
 
     set({
       skills,

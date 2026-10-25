@@ -234,9 +234,19 @@ function num(n: unknown): number | undefined {
  * transform properties (`translate`, `scale`, `rotate`) are separate and compose with it, and
  * `filter: opacity()` multiplies with GSAP's inline `opacity`. That lets user tweaks coexist with
  * the generated animation instead of fighting it.
+ *
+ * Caveat: when GSAP first parses an element's transform it folds any CSS translate/scale/rotate
+ * into its inline `transform` and writes those properties as `none` inline. Overrides present
+ * at load are therefore baked in correctly, but later changes need `important` to beat the
+ * inline `none` (used by the editor's live override stylesheet, applied after GSAP has parsed).
  */
-export function compileOverridesCss(sceneDomId: string, overrides?: Record<string, LayerOverride>): string {
+export function compileOverridesCss(
+  sceneDomId: string,
+  overrides?: Record<string, LayerOverride>,
+  options?: { important?: boolean }
+): string {
   if (!overrides) return '';
+  const imp = options?.important ? ' !important' : '';
   const safeDomId = String(sceneDomId).trim().replace(/[^a-zA-Z0-9_-]/g, '-');
   const rules: string[] = [];
   for (const [rawId, o] of Object.entries(overrides)) {
@@ -255,7 +265,7 @@ export function compileOverridesCss(sceneDomId: string, overrides?: Record<strin
     const x = num(o.x);
     const y = num(o.y);
     if ((x !== undefined && x !== 0) || (y !== undefined && y !== 0)) {
-      decls.push(`translate: ${x ?? 0}px ${y ?? 0}px`);
+      decls.push(`translate: ${x ?? 0}px ${y ?? 0}px${imp}`);
     }
 
     const sc = num(o.scale);
@@ -263,24 +273,24 @@ export function compileOverridesCss(sceneDomId: string, overrides?: Record<strin
       const sx = o.flipX ? -sc : sc;
       const sy = o.flipY ? -sc : sc;
       if (sx === sy) {
-        decls.push(`scale: ${sx}`);
+        decls.push(`scale: ${sx}${imp}`);
       } else {
-        decls.push(`scale: ${sx} ${sy}`);
+        decls.push(`scale: ${sx} ${sy}${imp}`);
       }
     } else if (o.flipX || o.flipY) {
       const base = sc ?? 1;
       const sx = o.flipX ? -base : base;
       const sy = o.flipY ? -base : base;
       if (sx === sy) {
-        decls.push(`scale: ${sx}`);
+        decls.push(`scale: ${sx}${imp}`);
       } else {
-        decls.push(`scale: ${sx} ${sy}`);
+        decls.push(`scale: ${sx} ${sy}${imp}`);
       }
     }
 
     const rot = num(o.rotation);
     if (rot !== undefined && rot !== 0) {
-      decls.push(`rotate: ${rot}deg`);
+      decls.push(`rotate: ${rot}deg${imp}`);
     }
 
     const op = num(o.opacity);

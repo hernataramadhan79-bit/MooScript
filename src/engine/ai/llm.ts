@@ -659,10 +659,9 @@ export interface ProviderModelInfo {
 export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> = {
   gemini: [
     { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Recommended • Fast & Smart (GA)', isRecommended: true },
-    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Stable & Universally Available' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Preview / Restricted API Tier' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Newer & Smarter' },
     { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', description: 'Cost Efficient' },
-    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', description: 'Deep Reasoning' }
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Deep Reasoning' }
   ],
   openai: [
     { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Recommended • Fast & Affordable', isRecommended: true },
@@ -673,13 +672,14 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
   ],
   groq: [
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', description: 'Recommended • 131k ctx', isRecommended: true },
-    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', description: 'Blazing Fast' },
-    { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B', description: 'Reasoning Engine' },
-    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', description: 'MoE Fast' }
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', description: 'Blazing Fast' }
   ],
   anthropic: [
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
-    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Ultra Fast' }
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Ultra Fast' },
+    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', description: 'Latest Generation' },
+    { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', description: 'Latest • Ultra Fast' },
+    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', description: 'Latest • Deepest Reasoning' }
   ],
   openrouter: [
     { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Router)', description: 'Recommended', isRecommended: true },
@@ -1085,7 +1085,7 @@ async function generateWithGemini(
     if (fallbackRes.ok) {
       res = fallbackRes;
     } else if (isFallbackCandidate(fallbackRes.status)) {
-      activeModel = 'gemini-1.5-flash';
+      activeModel = 'gemini-2.5-flash';
       const legacyRes = await fetchGemini(activeModel);
       if (legacyRes.ok) {
         res = legacyRes;
@@ -1406,7 +1406,7 @@ export async function callRawLLM(opts: {
       if (fallbackRes.ok) {
         res = fallbackRes;
       } else if (isFallbackCandidate(fallbackRes.status)) {
-        activeModel = 'gemini-1.5-flash';
+        activeModel = 'gemini-2.5-flash';
         const legacyRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
         if (legacyRes.ok) {
           res = legacyRes;

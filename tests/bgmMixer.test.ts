@@ -12,8 +12,14 @@
  *  7–10. renderBgmBuffer — returns AudioBuffer for ambient/hiphop/cinematic/lofi
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildDuckingCurve, renderBgmBuffer } from '../src/engine/audio/bgmMixer';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  buildDuckingCurve,
+  decodeCustomBgm,
+  hasCustomBgm,
+  renderBgmBuffer,
+  setCustomBgmBuffer
+} from '../src/engine/audio/bgmMixer';
 
 // ── Shared Audio mocks (same pattern as localTts.test.ts) ──────────────────
 
@@ -216,5 +222,25 @@ describe('renderBgmBuffer', () => {
     const buf = await renderBgmBuffer('lofi', 2.0);
     expect(buf).not.toBeNull();
     expect(buf!.numberOfChannels).toBe(2);
+  });
+});
+
+describe('custom BGM preset', () => {
+  afterEach(() => setCustomBgmBuffer(null));
+
+  it('renders nothing until a track has been uploaded', async () => {
+    expect(hasCustomBgm()).toBe(false);
+    expect(await renderBgmBuffer('custom', 4.0)).toBeNull();
+  });
+
+  it('decodes an uploaded file and loops it to the requested duration', async () => {
+    const decoded = await decodeCustomBgm(new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' }));
+    setCustomBgmBuffer(decoded);
+    expect(hasCustomBgm()).toBe(true);
+
+    // The decoded fixture is 2s long; asking for 7s must still produce a 7s buffer.
+    const buf = await renderBgmBuffer('custom', 7.0);
+    expect(buf).not.toBeNull();
+    expect(buf!.duration).toBeCloseTo(7.0, 1);
   });
 });

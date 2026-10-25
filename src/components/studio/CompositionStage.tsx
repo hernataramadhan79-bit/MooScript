@@ -1,8 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { AspectRatio } from '../../types';
+import type { AspectRatio, Composition, LayerOverride } from '../../types';
 import { useMooStore } from '../../store/useMooStore';
-import { buildCompositionDocument } from '../../engine/composition/buildDocument';
+import {
+  buildCompositionDocument,
+  compileCompositionOverridesCss
+} from '../../engine/composition/buildDocument';
+
+type LayerRect = { id: string; tagName: string; x: number; y: number; width: number; height: number };
+
+/** Composition with one layer's override replaced by an in-progress drag value. */
+function withDraftOverride(
+  comp: Composition,
+  sceneId: string,
+  layerId: string,
+  draft: Partial<LayerOverride>
+): Composition {
+  return {
+    ...comp,
+    scenes: comp.scenes.map((mod) =>
+      mod.beatId !== sceneId && mod.id !== sceneId
+        ? mod
+        : { ...mod, overrides: { ...mod.overrides, [layerId]: { ...mod.overrides?.[layerId], ...draft } } }
+    )
+  };
+}
 import { useDebouncedValue } from '../../utils/hooks';
 
 interface CompositionStageProps {
@@ -39,10 +61,11 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const [showSafeZone, setShowSafeZone] = useState(false);
   const [isInteractiveEdit, setIsInteractiveEdit] = useState(true);
   const [isFit, setIsFit] = useState(true);
-  const [layerRects, setLayerRects] = useState<
-    Array<{ id: string; tagName: string; x: number; y: number; width: number; height: number }>
-  >([]);
+  const [layerRects, setLayerRects] = useState<LayerRect[]>([]);
   const [snapGuide, setSnapGuide] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  // A drag that ends outside the layer box fires a click on the canvas; don't let it deselect.
+  const suppressCanvasClickRef = useRef(false);
 
   const currentAspect: AspectRatio =
     projectAspectRatio ||
@@ -81,7 +104,9 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
   const theme = useMooStore((s) => s.project.theme);
 
-  // Build srcdoc when minimal composition or scenes properties change
+  // Layer overrides are kept out of the document and pushed live to the runtime, so moving,
+  // scaling or recoloring a layer restyles the stage in place instead of reloading the iframe.
+  // The string stays identical when only overrides change, so React leaves srcDoc alone.
   const srcDoc = React.useMemo(() => {
     const minimalProject = {
       id: projectId,
@@ -92,8 +117,16 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       composition,
       theme
     } as any;
-    return buildCompositionDocument(minimalProject);
+    return buildCompositionDocument(minimalProject, { omitOverrides: true });
   }, [composition, scenes, width, height, fps, projectId, theme]);
+
+  // !important: GSAP writes translate/scale/rotate as inline `none` once it has parsed a layer.
+  const overridesCss = React.useMemo(
+    () => compileCompositionOverridesCss(composition, { important: true }),
+    [composition]
+  );
+  const latestOverridesCssRef = useRef(overridesCss);
+  latestOverridesCssRef.current = overridesCss;
 
   // Reloading an iframe on every keystroke makes the preview flash while typing a script.
   // Debounce the document, but switch instantly when the project or canvas size changes.
@@ -160,6 +193,20 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     );
   }, []);
 
+  const postOverridesCss = React.useCallback((css: string) => {
+    for (const frame of [iframeRef.current, theaterIframeRef.current]) {
+      frame?.contentWindow?.postMessage({ type: 'set_override_css', css }, '*');
+    }
+  }, []);
+
+  useEffect(() => {
+    postOverridesCss(overridesCss);
+    requestLayerRects();
+  }, [overridesCss, postOverridesCss, requestLayerRects]);
+
+  // Abort an in-flight drag if the stage unmounts mid-gesture.
+  useEffect(() => () => dragCleanupRef.current?.(), []);
+
   // Handle postMessage communication from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
@@ -169,6 +216,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       if (e.source === iframeRef.current?.contentWindow) {
         if (data.type === 'ready') {
           setIsReady(true);
+          // The runtime has parsed every tween by now, so overrides can be applied safely.
+          postOverridesCss(latestOverridesCssRef.current);
           iframeRef.current?.contentWindow?.postMessage(
             {
               type: 'seek',
@@ -185,6 +234,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         }
       } else if (e.source === theaterIframeRef.current?.contentWindow) {
         if (data.type === 'ready') {
+          postOverridesCss(latestOverridesCssRef.current);
           theaterIframeRef.current?.contentWindow?.postMessage(
             {
               type: 'seek',
@@ -199,7 +249,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [requestLayerRects]);
+  }, [requestLayerRects, postOverridesCss]);
 
   // Seek iframe runtime when currentFrame / currentTime changes
   useEffect(() => {
@@ -249,15 +299,20 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     setIsFit((prev) => !prev);
   };
 
+  // While dragging, the layer is restyled live inside the iframe and the store is written
+  // once on release: one undo step, one save, and no document reload mid-gesture.
   const startLayerDrag = (
     e: React.PointerEvent,
-    layerId: string,
+    rect: LayerRect,
     mode: 'move' | 'scale' | 'rotate'
   ) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!currentSceneId) return;
+    if (!currentSceneId || e.button !== 0) return;
+    const sceneId = currentSceneId;
+    const layerId = rect.id;
     setSelectedLayerId(layerId);
+    dragCleanupRef.current?.();
 
     const existing = currentCompScene?.overrides?.[layerId] || {};
     const startX = e.clientX;
@@ -267,39 +322,76 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     const initScale = existing.scale ?? 1;
     const initRot = existing.rotation ?? 0;
     const safeScale = Math.max(0.05, scale);
+    // Snap distance stays ~8 screen px regardless of stage zoom.
+    const snapThreshold = 8 / safeScale;
+    const startCenterX = rect.x + rect.width / 2;
+    const startCenterY = rect.y + rect.height / 2;
+
+    let draft: Partial<LayerOverride> | null = null;
+    let frameRequest = 0;
+
+    const flushDraft = () => {
+      frameRequest = 0;
+      const comp = useMooStore.getState().project.composition;
+      if (!comp || !draft) return;
+      postOverridesCss(
+        compileCompositionOverridesCss(withDraftOverride(comp, sceneId, layerId, draft), { important: true })
+      );
+      requestLayerRects();
+    };
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       const dx = (moveEv.clientX - startX) / safeScale;
       const dy = (moveEv.clientY - startY) / safeScale;
 
       if (mode === 'move') {
-        let nextX = Math.round(initX + dx);
-        let nextY = Math.round(initY + dy);
-        const snapX = Math.abs(nextX) <= 10;
-        const snapY = Math.abs(nextY) <= 10;
-        if (snapX) nextX = 0;
-        if (snapY) nextY = 0;
-        setSnapGuide({ x: snapX, y: snapY });
-        updateLayerOverride(currentSceneId, layerId, { x: nextX, y: nextY });
+        let nextX = initX + dx;
+        let nextY = initY + dy;
+        // Snap the layer's center onto the canvas center lines (what the guides draw).
+        const offCenterX = startCenterX + (nextX - initX) - width / 2;
+        const offCenterY = startCenterY + (nextY - initY) - height / 2;
+        const snapX = Math.abs(offCenterX) <= snapThreshold;
+        const snapY = Math.abs(offCenterY) <= snapThreshold;
+        if (snapX) nextX -= offCenterX;
+        if (snapY) nextY -= offCenterY;
+        setSnapGuide((prev) => (prev.x === snapX && prev.y === snapY ? prev : { x: snapX, y: snapY }));
+        draft = { x: Math.round(nextX), y: Math.round(nextY) };
       } else if (mode === 'scale') {
         const deltaScale = (dx + dy) / 300;
-        const nextScale = Math.max(0.2, Math.min(3.0, Math.round((initScale + deltaScale) * 100) / 100));
-        updateLayerOverride(currentSceneId, layerId, { scale: nextScale });
-      } else if (mode === 'rotate') {
-        const nextRot = Math.max(-180, Math.min(180, Math.round(initRot + dx * 0.4)));
-        updateLayerOverride(currentSceneId, layerId, { rotation: nextRot });
+        draft = { scale: Math.max(0.2, Math.min(3.0, Math.round((initScale + deltaScale) * 100) / 100)) };
+      } else {
+        draft = { rotation: Math.max(-180, Math.min(180, Math.round(initRot + dx * 0.4))) };
       }
+
+      if (!frameRequest) frameRequest = requestAnimationFrame(flushDraft);
     };
 
-    const handlePointerUp = () => {
-      setSnapGuide({ x: false, y: false });
+    const cleanup = () => {
+      if (frameRequest) cancelAnimationFrame(frameRequest);
+      frameRequest = 0;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      setTimeout(requestLayerRects, 50);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      dragCleanupRef.current = null;
     };
 
+    function handlePointerUp() {
+      cleanup();
+      setSnapGuide({ x: false, y: false });
+      if (draft) {
+        suppressCanvasClickRef.current = true;
+        setTimeout(() => {
+          suppressCanvasClickRef.current = false;
+        }, 0);
+        updateLayerOverride(sceneId, layerId, draft);
+      }
+      setTimeout(requestLayerRects, 50);
+    }
+
+    dragCleanupRef.current = cleanup;
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
   };
 
   return (
@@ -392,6 +484,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       <div
         ref={containerRef}
         onClick={() => {
+          if (suppressCanvasClickRef.current) return;
           if (selectedLayerId) setSelectedLayerId(null);
         }}
         className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden p-1"
@@ -453,9 +546,10 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                     left: `${rect.x}px`,
                     top: `${rect.y}px`,
                     width: `${rect.width}px`,
-                    height: `${rect.height}px`
+                    height: `${rect.height}px`,
+                    touchAction: 'none'
                   }}
-                  onPointerDown={(e) => startLayerDrag(e, rect.id, 'move')}
+                  onPointerDown={(e) => startLayerDrag(e, rect, 'move')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedLayerId(rect.id);
@@ -492,14 +586,16 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
                       {/* Rotation Handle (Top Center) */}
                       <div
-                        onPointerDown={(e) => startLayerDrag(e, rect.id, 'rotate')}
+                        onPointerDown={(e) => startLayerDrag(e, rect, 'rotate')}
+                        style={{ touchAction: 'none' }}
                         title="Tahan & geser untuk memutar (Rotate)"
                         className="absolute -top-9 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-[#84cc16] border-2 border-black shadow-lg cursor-ew-resize flex items-center justify-center"
                       />
 
                       {/* Scale Handle (Bottom Right) */}
                       <div
-                        onPointerDown={(e) => startLayerDrag(e, rect.id, 'scale')}
+                        onPointerDown={(e) => startLayerDrag(e, rect, 'scale')}
+                        style={{ touchAction: 'none' }}
                         title="Tahan & tarik sudut untuk mengubah ukuran (Scale)"
                         className="absolute -bottom-3.5 -right-3.5 w-7 h-7 rounded-md bg-[#84cc16] border-2 border-black shadow-lg cursor-nwse-resize"
                       />

@@ -212,6 +212,7 @@ export const SettingsDrawer: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showAddSkillModal, setShowAddSkillModal] = useState(false);
   const [persistenceStatus, setPersistenceStatus] = useState<{ persisted: boolean; supported: boolean } | null>(null);
+  const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [deviceCaps, setDeviceCaps] = useState<DeviceCapabilities | null>(null);
   const [localModelsSizeBytes, setLocalModelsSizeBytes] = useState<number>(0);
   const [confirmPurgeModels, setConfirmPurgeModels] = useState(false);
@@ -286,6 +287,10 @@ export const SettingsDrawer: React.FC = () => {
   useEffect(() => {
     if (isSettingsOpen) {
       checkStoragePersistence().then(setPersistenceStatus);
+      navigator.storage?.estimate?.().then(
+        (e) => setStorageEstimate({ usage: e.usage ?? 0, quota: e.quota ?? 0 }),
+        () => setStorageEstimate(null)
+      );
       checkDeviceCapabilities().then(setDeviceCaps);
       getCachedLocalModelsSizeBytes().then(setLocalModelsSizeBytes);
       refreshModelStatuses();
@@ -1089,6 +1094,16 @@ export const SettingsDrawer: React.FC = () => {
                 <span className="text-zinc-400">Ukuran Cache Audio TTS:</span>
                 <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
               </div>
+
+              {storageEstimate && storageEstimate.quota > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-400">Penyimpanan Browser Terpakai:</span>
+                  <span className="font-mono text-zinc-200 font-semibold">
+                    {(storageEstimate.usage / (1024 * 1024)).toFixed(0)} MB dari{' '}
+                    {(storageEstimate.quota / (1024 * 1024 * 1024)).toFixed(1)} GB
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-400">Ukuran Model Suara Lokal:</span>

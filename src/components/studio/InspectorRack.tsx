@@ -186,6 +186,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     updateBgmPreset,
     updateBgmLevel,
     updateBgmDuckRatio,
+    uploadCustomBgm,
+    removeCustomBgm,
     updateResolution,
     isExporting,
     exportProgress,
@@ -227,6 +229,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       updateBgmPreset: s.updateBgmPreset,
       updateBgmLevel: s.updateBgmLevel,
       updateBgmDuckRatio: s.updateBgmDuckRatio,
+      uploadCustomBgm: s.uploadCustomBgm,
+      removeCustomBgm: s.removeCustomBgm,
       updateResolution: s.updateResolution,
       isExporting: s.isExporting,
       exportProgress: s.exportProgress,
@@ -329,6 +333,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
   const [selectedArchetype, setSelectedArchetype] = useState<ProceduralArchetype>('auto');
   const customAudioInputRef = useRef<HTMLInputElement | null>(null);
+  const customBgmInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleResetLayerOverride = () => {
     if (!activeScene || !activeLayer) return;
@@ -676,7 +681,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     { value: 'ambient', label: 'Ambient' },
     { value: 'lofi', label: 'Lofi' },
     { value: 'cinematic', label: 'Cinematic' },
-    { value: 'hiphop', label: 'Hiphop' }
+    { value: 'hiphop', label: 'Hiphop' },
+    ...(project.bgm?.customName ? [{ value: 'custom' as BgmPreset, label: 'Kustom' }] : [])
   ];
 
   const bgmLevel = project.bgm?.level ?? 0.18;
@@ -737,16 +743,20 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // MP4 Export trigger
   const handleExportMedia = async () => {
     if (isExporting) return;
+    // The exporter may switch to WebM when the browser has no H.264 encoder, so name the file by its real type.
+    const extOf = (blob: Blob) => (blob.type === 'video/webm' ? 'webm' : 'mp4');
     if (exportResult?.objectUrl) {
-      triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.${exportFormat}`);
-      addToast(`Mengunduh video ${exportFormat.toUpperCase()}...`, 'success');
+      const ext = extOf(exportResult.blob);
+      triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.${ext}`);
+      addToast(`Mengunduh video ${ext.toUpperCase()}...`, 'success');
       return;
     }
     await startExport({ format: exportFormat, watermark: exportWatermark, hud: exportHud });
     const result = useMooStore.getState().exportResult;
     if (result?.objectUrl) {
-      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.${exportFormat}`);
-      addToast(`Video ${exportFormat.toUpperCase()} berhasil diunduh.`, 'success');
+      const ext = extOf(result.blob);
+      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.${ext}`);
+      addToast(`Video ${ext.toUpperCase()} berhasil diunduh.`, 'success');
     }
   };
 
@@ -2891,7 +2901,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </span>
 
               {/* Preset Musik */}
-              <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
+              <div
+                className={`grid gap-1 p-1 rounded-xl bg-surface-2 border border-border ${
+                  bgmPresets.length > 5 ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-5'
+                }`}
+              >
                 {bgmPresets.map((bp) => {
                   const isSelected = currentBgmPreset === bp.value;
                   return (
@@ -2909,6 +2923,47 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Unggah musik sendiri */}
+              <div className="flex flex-col gap-1.5">
+                <input
+                  ref={customBgmInputRef}
+                  type="file"
+                  accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      uploadCustomBgm(file);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={isGeneratingAudio}
+                  onClick={() => customBgmInputRef.current?.click()}
+                  className="w-full py-2 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-dashed border-border hover:border-accent/50 text-on-surface text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] disabled:opacity-50"
+                  title="Unggah musik latar sendiri (maks 25 MB). Musik diulang otomatis sampai video selesai."
+                >
+                  <span className="material-symbols-outlined text-[16px] text-accent">library_music</span>
+                  <span>{project.bgm?.customName ? 'Ganti Musik Sendiri' : 'Unggah Musik Sendiri'}</span>
+                </button>
+                {project.bgm?.customName && (
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                    <span className="truncate" title={project.bgm.customName}>
+                      {project.bgm.customName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomBgm()}
+                      className="shrink-0 text-rose-400 hover:text-rose-300 font-semibold"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Slider Volume */}

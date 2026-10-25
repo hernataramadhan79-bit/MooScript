@@ -13,7 +13,55 @@ import { audioBufferToWavBlob } from '../ai/tts';
 
 // ── Preset BGM generators (all procedural, no external files) ─────────────────
 
-export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi';
+export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi' | 'custom';
+
+// ── User-supplied BGM ─────────────────────────────────────────────────────────
+
+/** Decoded track for the 'custom' preset; set for the active project by the BGM slice. */
+let customBgmBuffer: AudioBuffer | null = null;
+
+export function setCustomBgmBuffer(buffer: AudioBuffer | null): void {
+  customBgmBuffer = buffer;
+}
+
+export function hasCustomBgm(): boolean {
+  return customBgmBuffer !== null;
+}
+
+/** Decode an uploaded audio file. Throws if the browser cannot decode it. */
+export async function decodeCustomBgm(blob: Blob): Promise<AudioBuffer> {
+  const scope = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+  const AudioCtx = scope.AudioContext || scope.webkitAudioContext;
+  if (!AudioCtx) throw new Error('AudioContext tidak tersedia di browser ini.');
+  const ctx = new AudioCtx();
+  try {
+    return await ctx.decodeAudioData(await blob.arrayBuffer());
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}
+
+/**
+ * Loop the custom track to `durationSeconds`, resampled to `sampleRate`, with a short fade-out
+ * at the end so a cut-off track does not stop abruptly.
+ */
+async function renderCustomBgm(durationSeconds: number, sampleRate: number): Promise<AudioBuffer | null> {
+  if (!customBgmBuffer) return null;
+  const length = Math.max(1, Math.ceil(durationSeconds * sampleRate));
+  const ctx = new OfflineAudioContext(2, length, sampleRate);
+  const src = ctx.createBufferSource();
+  src.buffer = customBgmBuffer;
+  src.loop = true;
+  const fade = ctx.createGain();
+  const fadeSec = Math.min(1.5, durationSeconds / 4);
+  fade.gain.setValueAtTime(1, 0);
+  fade.gain.setValueAtTime(1, Math.max(0, durationSeconds - fadeSec));
+  fade.gain.linearRampToValueAtTime(0, durationSeconds);
+  src.connect(fade);
+  fade.connect(ctx.destination);
+  src.start(0);
+  return ctx.startRendering();
+}
 
 /**
  * Shape for a single kick/hit event used by rhythm-based presets.
@@ -194,6 +242,7 @@ export async function renderBgmBuffer(
   sampleRate = 48000
 ): Promise<AudioBuffer | null> {
   if (preset === 'none') return null;
+  if (preset === 'custom') return renderCustomBgm(durationSeconds, sampleRate);
 
   const length = Math.max(1, Math.ceil(durationSeconds * sampleRate));
   const ctx = new OfflineAudioContext(2, length, sampleRate);

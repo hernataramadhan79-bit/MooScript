@@ -168,6 +168,8 @@ export interface SettingsSlice {
 
 export interface BgmSlice {
   updateBgmPreset: (preset: BgmPreset) => Promise<void> | void;
+  uploadCustomBgm: (file: File) => Promise<void>;
+  removeCustomBgm: () => Promise<void>;
   updateBgmLevel: (level: number) => Promise<void> | void;
   updateBgmDuckRatio: (duckRatio: number) => Promise<void> | void;
 }

@@ -1,17 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useMooStore } from './store/useMooStore';
 import { Header } from './components/Header';
 import { CompositionStage } from './components/studio/CompositionStage';
 import { TimelineBar } from './components/studio/TimelineBar';
 import { SceneDeck } from './components/studio/SceneDeck';
 import { InspectorRack, type InspectorTab } from './components/studio/InspectorRack';
-import { CodeInspectorModal } from './features/scene/CodeInspectorModal';
-import { SettingsDrawer } from './components/SettingsDrawer';
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 import { WelcomeModal } from './components/WelcomeModal';
 import { useMediaQuery } from './utils/hooks';
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts';
+
+// Opened on demand, so keep them out of the initial bundle.
+const CodeInspectorModal = lazy(() =>
+  import('./features/scene/CodeInspectorModal').then((m) => ({ default: m.CodeInspectorModal }))
+);
+const SettingsDrawer = lazy(() =>
+  import('./components/SettingsDrawer').then((m) => ({ default: m.SettingsDrawer }))
+);
 
 export type MobileTab = 'naskah' | 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
 export type { InspectorTab };
@@ -19,6 +25,7 @@ export type { InspectorTab };
 export const App: React.FC = () => {
   const initStore = useMooStore((s) => s.initStore);
   const setActiveSceneId = useMooStore((s) => s.setActiveSceneId);
+  const isSettingsOpen = useMooStore((s) => s.isSettingsOpen);
   // Tailwind lg breakpoint. Only one layout is mounted so stage/timeline/inspector exist once.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -156,14 +163,18 @@ export const App: React.FC = () => {
       </main>
 
       {/* 3. Code Inspector Modal */}
-      <CodeInspectorModal
-        beatId={inspectingBeatId}
-        isOpen={Boolean(inspectingBeatId)}
-        onClose={() => setInspectingBeatId(null)}
-      />
+      <Suspense fallback={null}>
+        {inspectingBeatId && (
+          <CodeInspectorModal
+            beatId={inspectingBeatId}
+            isOpen
+            onClose={() => setInspectingBeatId(null)}
+          />
+        )}
 
-      {/* 4. Settings Drawer */}
-      <SettingsDrawer />
+        {/* 4. Settings Drawer */}
+        {isSettingsOpen && <SettingsDrawer />}
+      </Suspense>
 
       {/* 5. Toast Notifications */}
       <ToastContainer />

@@ -17,6 +17,13 @@ export interface CachedSceneAudio {
   updatedAt: number;
 }
 
+export interface StoredBgm {
+  projectId: string;
+  blob: Blob;
+  name: string;
+  updatedAt: number;
+}
+
 export interface AssetRecord {
   id: string;
   projectId: string;
@@ -34,6 +41,7 @@ export class MooDatabase extends Dexie {
   settings!: Table<{ id: string; data: EngineSettings }, string>;
   sceneAudioCache!: Table<CachedSceneAudio, string>;
   assets!: Table<AssetRecord, string>;
+  bgmBlobs!: Table<StoredBgm, string>;
 
   constructor() {
     super('MooScriptDB');
@@ -90,6 +98,17 @@ export class MooDatabase extends Dexie {
       settings: 'id',
       sceneAudioCache: 'cacheKey, updatedAt',
       assets: 'id, projectId, name, mimeType, createdAt'
+    });
+
+    // Version 5: one user-uploaded BGM track per project
+    this.version(5).stores({
+      projects: 'id, title, renderMode, updatedAt',
+      audioBlobs: 'projectId, updatedAt',
+      skills: 'id, name, isBuiltin',
+      settings: 'id',
+      sceneAudioCache: 'cacheKey, updatedAt',
+      assets: 'id, projectId, name, mimeType, createdAt',
+      bgmBlobs: 'projectId, updatedAt'
     });
   }
 }
@@ -211,6 +230,7 @@ export async function deleteProjectFromDb(id: string): Promise<void> {
   try {
     await db.projects.delete(id);
     await db.audioBlobs.delete(id);
+    await db.bgmBlobs.delete(id);
     lastSavedAudioBlobByProject.delete(id);
   } catch (err) {
     console.warn('Failed to delete project from IndexedDB', err);
@@ -226,9 +246,25 @@ export async function getCachedSceneAudio(cacheKey: string): Promise<CachedScene
   }
 }
 
+export const SCENE_AUDIO_CACHE_MAX_BYTES = 200 * 1024 * 1024;
+
+/** Drops the least recently written entries until the cache fits `maxBytes`; the newest entry is always kept. */
+export async function evictSceneAudioCache(maxBytes: number = SCENE_AUDIO_CACHE_MAX_BYTES): Promise<number> {
+  const entries = await db.sceneAudioCache.orderBy('updatedAt').toArray();
+  let total = entries.reduce((sum, e) => sum + (e.blob?.size ?? 0), 0);
+  const stale: string[] = [];
+  for (let i = 0; i < entries.length - 1 && total > maxBytes; i++) {
+    stale.push(entries[i].cacheKey);
+    total -= entries[i].blob?.size ?? 0;
+  }
+  if (stale.length > 0) await db.sceneAudioCache.bulkDelete(stale);
+  return stale.length;
+}
+
 export async function putCachedSceneAudio(item: CachedSceneAudio): Promise<void> {
   try {
     await db.sceneAudioCache.put(item);
+    await evictSceneAudioCache();
   } catch (err) {
     console.warn('Failed to write sceneAudioCache:', err);
   }
@@ -281,9 +317,46 @@ export async function requestPersistentStorage(): Promise<{ persisted: boolean; 
   return { persisted: false, supported: false };
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function saveBgmToDb(projectId: string, blob: Blob, name: string): Promise<void> {
+  try {
+    await db.bgmBlobs.put({ projectId, blob, name, updatedAt: Date.now() });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Gagal menyimpan BGM ke IndexedDB (${msg})`);
+  }
+}
+
+export async function loadBgmFromDb(projectId: string): Promise<StoredBgm | undefined> {
+  try {
+    return await db.bgmBlobs.get(projectId);
+  } catch (err) {
+    console.warn('Failed to load custom BGM', err);
+    return undefined;
+  }
+}
+
+export async function deleteBgmFromDb(projectId: string): Promise<void> {
+  try {
+    await db.bgmBlobs.delete(projectId);
+  } catch (err) {
+    console.warn('Failed to delete custom BGM', err);
+  }
+}
+
 export async function saveAssetToDb(asset: AssetRecord): Promise<void> {
   try {
-    await db.assets.put(asset);
+    // A base64 copy next to the blob would cost ~2.3x the file size; the data URL is rebuilt on load.
+    const record = asset.blob ? { ...asset, dataUrl: undefined } : asset;
+    await db.assets.put(record);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('saveAssetToDb error:', err);
@@ -293,7 +366,17 @@ export async function saveAssetToDb(asset: AssetRecord): Promise<void> {
 
 export async function listAssetsFromDb(projectId: string): Promise<AssetRecord[]> {
   try {
-    return await db.assets.where('projectId').equals(projectId).sortBy('createdAt');
+    const records = await db.assets.where('projectId').equals(projectId).sortBy('createdAt');
+    return await Promise.all(
+      records.map(async (r) => {
+        if (r.dataUrl || !r.blob) return r;
+        try {
+          return { ...r, dataUrl: await blobToDataUrl(r.blob) };
+        } catch {
+          return r;
+        }
+      })
+    );
   } catch (err: unknown) {
     console.error('listAssetsFromDb error:', err);
     return [];

@@ -291,8 +291,11 @@ export function getRuntimeScript(): string {
       } catch(e) {}
     }
 
-    // Initial render at frame 0
+    // Initial render at frame 0. Rendering to the end first initializes every tween now, so GSAP
+    // reads each layer's CSS translate/scale/rotate exactly once, before the editor can push
+    // live overrides (set_override_css) that must not be folded into GSAP's transform.
     if (masterTl) {
+      masterTl.progress(1, true);
       masterTl.seek(0, false);
     }
 
@@ -392,6 +395,15 @@ export function getRuntimeScript(): string {
     } else if (data.type === 'query_layer_rects') {
       const rects = computeLayerRects(data.sceneId);
       window.parent.postMessage({ type: 'layer_rects', sceneId: data.sceneId, rects: rects }, '*');
+    } else if (data.type === 'set_override_css') {
+      // Live layer overrides from the editor: restyle in place instead of reloading the document.
+      let liveTag = document.getElementById('moo-live-overrides');
+      if (!liveTag) {
+        liveTag = document.createElement('style');
+        liveTag.id = 'moo-live-overrides';
+        document.head.appendChild(liveTag);
+      }
+      liveTag.textContent = String(data.css || '');
     } else if (data.type === 'highlight_layer') {
       const layerId = data.layerId;
       let styleTag = document.getElementById('moo-layer-highlight-style');

@@ -172,13 +172,26 @@ export async function exportMooProjectToMP4(
   const warnings: string[] = [];
   let hasAudio = false;
 
-  // 1. Verify WebCodecs VideoEncoder availability via mediabunny
-  const isVideoSupported = await canEncodeVideo('avc');
-  if (!isVideoSupported || typeof VideoEncoder === 'undefined') {
+  // 1. Verify WebCodecs VideoEncoder availability via mediabunny for the requested container.
+  // Browsers without an H.264 encoder (e.g. Firefox, some Linux builds) fall back to WebM/VP9.
+  let isWebm = opts?.format === 'webm';
+  if (typeof VideoEncoder === 'undefined') {
     throw new Error(
       'WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.'
     );
   }
+  if (!isWebm && !(await canEncodeVideo('avc'))) {
+    if (await canEncodeVideo('vp9')) {
+      isWebm = true;
+      warnings.push('Browser tidak mendukung encoder H.264, jadi video diekspor sebagai WebM (VP9).');
+    }
+  }
+  if (!(await canEncodeVideo(isWebm ? 'vp9' : 'avc'))) {
+    throw new Error(
+      `WebCodecs tidak dapat meng-encode ${isWebm ? 'VP9 (WebM)' : 'H.264 (MP4)'} pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.`
+    );
+  }
+  const audioCodec = isWebm ? 'opus' : 'aac';
 
   // Calculate adaptive bitrate based on resolution and fps
   const basePixels = 1080 * 1920 * 30;
@@ -261,7 +274,7 @@ export async function exportMooProjectToMP4(
   let targetAudioBuffer = audioBuffer;
 
   if (audioBuffer) {
-    const isAudioSupported = await canEncodeAudio('aac');
+    const isAudioSupported = await canEncodeAudio(audioCodec);
     if (!isAudioSupported || typeof AudioEncoder === 'undefined') {
       warnings.push('AudioEncoder tidak didukung oleh browser Anda. Video diekspor tanpa audio.');
     } else {
@@ -279,7 +292,6 @@ export async function exportMooProjectToMP4(
   }
 
   // 4. Initialize Mediabunny Output with in-memory fastStart
-  const isWebm = opts?.format === 'webm';
   const target = new BufferTarget();
   const output = new Output({
     target,
@@ -305,8 +317,10 @@ export async function exportMooProjectToMP4(
     meta?: any;
   }> | null = null;
 
+  // The worker only emits H.264 packets, so WebM always renders on the main thread.
   const canAttemptWorker =
     opts?.useWorker !== false &&
+    !isWebm &&
     !isCompositionMode &&
     typeof Worker !== 'undefined';
 
@@ -362,7 +376,7 @@ export async function exportMooProjectToMP4(
     let audioSource: AudioBufferSource | null = null;
     if (hasAudioTrack && targetAudioBuffer) {
       audioSource = new AudioBufferSource({
-        codec: 'aac',
+        codec: audioCodec,
         bitrate: 128_000
       });
       output.addAudioTrack(audioSource);

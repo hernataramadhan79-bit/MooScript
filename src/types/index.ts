@@ -20,7 +20,8 @@ export interface SubtitleCustomization {
   /** Vertical position offset percentage (-20% s/d +20%). Default 0. */
   yOffsetPercent?: number;
 }
-export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi';
+/** 'custom' plays the track the user uploaded for this project (stored in the bgmBlobs table). */
+export type BgmPreset = 'none' | 'ambient' | 'hiphop' | 'cinematic' | 'lofi' | 'custom';
 
 // Legacy (pre-generative) vocabulary. Kept ONLY so old projects can be read & migrated.
 export type MotionPreset = 'punch_zoom' | 'slide_split' | 'fade_float' | 'kinetic_shake';
@@ -697,6 +698,8 @@ export interface MooProject {
     preset: BgmPreset;
     level: number;
     duckRatio: number;
+    /** File name of the uploaded track, shown in the UI while preset is 'custom'. */
+    customName?: string;
   };
   createdAt?: number;
   updatedAt?: number;

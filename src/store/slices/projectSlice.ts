@@ -9,8 +9,11 @@ import {
   deleteProjectFromDb,
   saveAssetToDb,
   listAssetsFromDb,
+  loadBgmFromDb,
+  saveBgmToDb,
   db
 } from '../../db/mooDb';
+import { syncCustomBgmForProject } from '../../db/customBgm';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
@@ -539,6 +542,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         // ignore localStorage errors in private browsing
       }
 
+      await syncCustomBgmForProject(newId);
       await get().refreshProjectsList();
       get().addToast(`Created "${syncedProject.title}"`, 'success');
       return newId;
@@ -601,6 +605,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
       await get().refreshProjectsList();
       await get().loadAssets(target.id);
+      await syncCustomBgmForProject(target.id);
       get().addToast(`Switched to "${target.title}"`, 'info');
     },
     duplicateProject: async (id: string) => {
@@ -638,6 +643,10 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         }
       } catch (err) {
         console.error('Failed to duplicate project assets:', err);
+      }
+      const sourceBgm = await loadBgmFromDb(source.id);
+      if (sourceBgm) {
+        await saveBgmToDb(dupId, sourceBgm.blob, sourceBgm.name);
       }
       await get().refreshProjectsList();
       get().addToast(`Duplicated as "${duplicated.title}"`, 'success');
