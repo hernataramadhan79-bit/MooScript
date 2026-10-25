@@ -3,6 +3,7 @@ import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
+import { EXPORT_FPS_CHOICES, type ExportQuality } from '../../engine/export/exportOptions';
 import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
@@ -535,6 +536,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
+  const [exportFps, setExportFps] = useState<number>(30);
+  const [exportQuality, setExportQuality] = useState<ExportQuality>('standard');
 
   // Text position options
   const currentPosition = project.theme?.captionPosition || 'bottom';
@@ -751,7 +754,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       addToast(`Mengunduh video ${ext.toUpperCase()}...`, 'success');
       return;
     }
-    await startExport({ format: exportFormat, watermark: exportWatermark, hud: exportHud });
+    await startExport({
+      format: exportFormat,
+      fps: exportFps,
+      quality: exportQuality,
+      watermark: exportWatermark,
+      hud: exportHud
+    });
     const result = useMooStore.getState().exportResult;
     if (result?.objectUrl) {
       const ext = extOf(result.blob);
@@ -3071,6 +3080,63 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 >
                   WebM (VP9)
                 </button>
+              </div>
+            </div>
+
+            {/* Frame Rate */}
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                Frame Rate
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {EXPORT_FPS_CHOICES.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setExportFps(value)}
+                    className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
+                      exportFps === value
+                        ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
+                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                    }`}
+                  >
+                    {value} fps
+                  </button>
+                ))}
+              </div>
+              {exportFps === 60 && (
+                <span className="text-[10px] text-text-muted">
+                  60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.
+                </span>
+              )}
+            </div>
+
+            {/* Kualitas */}
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                Kualitas
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    ['compact', 'Hemat'],
+                    ['standard', 'Standar'],
+                    ['high', 'Tinggi']
+                  ] as [ExportQuality, string][]
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setExportQuality(value)}
+                    className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
+                      exportQuality === value
+                        ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
+                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 

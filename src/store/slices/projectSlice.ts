@@ -14,6 +14,7 @@ import {
   db
 } from '../../db/mooDb';
 import { syncCustomBgmForProject } from '../../db/customBgm';
+import { getProjectTemplate } from '../../engine/templates/projectTemplates';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
@@ -548,6 +549,45 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       return newId;
     },
 
+    createProjectFromTemplate: async (templateId: string) => {
+      const template = getProjectTemplate(templateId);
+      if (!template) {
+        get().addToast('Template tidak ditemukan.', 'error');
+        return '';
+      }
+      const newId = await get().createNewProject(template.title);
+      const base = get().project;
+      const now = Date.now();
+      const scenes: Scene[] = template.scenes.map((t, i) => {
+        const dur = calculateFallbackSceneDuration(t.narration);
+        return {
+          id: `sc-${now}-${i}`,
+          narrationText: t.narration,
+          text: t.narration,
+          visualIntent: t.visualIntent,
+          visualConcept: t.visualIntent,
+          visualElements: ['headline', 'supporting-detail'],
+          focusWords: t.focusWords,
+          motionPreset: 'punch_zoom',
+          camera: 'push_in',
+          icon: 'sparkles',
+          durationInSeconds: dur,
+          wordTimestamps: computeDeterministicWordAlignment(t.narration, dur),
+          showSubtitles: false
+        };
+      });
+      const totalDur = scenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
+      const sized = applySize({ ...base, scenes, audioDuration: totalDur }, template.aspectRatio, '1080p');
+      const updated = syncComposition(sized);
+      clearHistory();
+      set({ project: updated, activeSceneId: null });
+      await saveProjectToDb(updated);
+      await get().refreshProjectsList();
+      // Give every scene a ready-made visual right away; no API key needed.
+      get().compileAllScenesProcedural();
+      return newId;
+    },
+
     switchProject: async (id: string) => {
       get().pause();
       stopPlaybackAudio();
@@ -658,9 +698,18 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const now = Date.now();
       const id = `proj-${now}-${Math.random().toString(36).slice(2, 7)}`;
       const imported: MooProject = { ...project, id, createdAt: now, updatedAt: now, audioBlob: undefined };
+      // Backups never carry audio, so an uploaded BGM track does not survive the trip.
+      const lostCustomBgm = imported.bgm?.preset === 'custom';
+      if (lostCustomBgm) {
+        const { customName: _lost, ...restBgm } = imported.bgm;
+        imported.bgm = { ...restBgm, preset: 'none' };
+      }
       await saveProjectToDb(imported);
       await get().refreshProjectsList();
       get().addToast(`Diimpor sebagai "${imported.title}"`, 'success');
+      if (lostCustomBgm) {
+        get().addToast('Musik sendiri tidak ikut dalam cadangan. Unggah ulang di tab Audio.', 'info', 6000);
+      }
       return id;
     },
 

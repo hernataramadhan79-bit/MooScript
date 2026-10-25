@@ -10,6 +10,7 @@ import {
 } from '../../engine/ai/tts';
 import { mixVoiceAndBgm, renderStandaloneBgm } from '../../engine/audio/bgmMixer';
 import { synthesizeLocalTTS, isLocalModelCached } from '../../engine/ai/localTts';
+import { WHISPER_MAX_BYTES, alignScenesToTranscript, transcribeWords } from '../../engine/ai/voiceAlign';
 import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb } from '../../db/mooDb';
 import { extractWaveformPeaks } from '../../engine/audio/waveform';
@@ -428,24 +429,41 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       const voiceBuffer = await decodeAudioBlob(file);
       const totalAudioDur = Math.max(0.5, Math.round(voiceBuffer.duration * 100) / 100);
 
-      // Distribute total audio duration proportionally across scenes based on narration length
-      const rawWeights = project.scenes.map((s) =>
-        Math.max(1, (s.narrationText || s.text || '').trim().length)
-      );
+      // With an OpenAI key, use the recording's real timing (Whisper); otherwise, or if that fails,
+      // distribute the total duration proportionally across scenes based on narration length.
+      const sceneTexts = project.scenes.map((s) => s.narrationText || s.text || '');
+      let whisperAligned: ReturnType<typeof alignScenesToTranscript> = null;
+      const openaiKey = get().settings.apiKeys.openai?.trim();
+      if (openaiKey && file.size <= WHISPER_MAX_BYTES) {
+        set({
+          audioProgress: {
+            currentScene: 0,
+            totalScenes: project.scenes.length,
+            sceneId: 'upload',
+            statusText: 'Menyelaraskan naskah dengan suara (Whisper)...'
+          }
+        });
+        const transcript = await transcribeWords({ apiKey: openaiKey, audio: file, fileName: file.name });
+        whisperAligned = alignScenesToTranscript(sceneTexts, transcript, totalAudioDur);
+      }
+
+      const rawWeights = sceneTexts.map((t) => Math.max(1, t.trim().length));
       const weightSum = rawWeights.reduce((a, b) => a + b, 0) || 1;
 
       let accumulated = 0;
       const updatedScenes = project.scenes.map((s, idx) => {
+        if (whisperAligned) {
+          return { ...s, ...whisperAligned[idx] };
+        }
         const isLast = idx === project.scenes.length - 1;
         const dur = isLast
           ? Math.max(0.5, Math.round((totalAudioDur - accumulated) * 100) / 100)
           : Math.max(0.5, Math.round((totalAudioDur * (rawWeights[idx] / weightSum)) * 100) / 100);
         accumulated += dur;
-        const text = s.narrationText || s.text || '';
         return {
           ...s,
           durationInSeconds: dur,
-          wordTimestamps: computeDeterministicWordAlignment(text, dur)
+          wordTimestamps: computeDeterministicWordAlignment(sceneTexts[idx], dur)
         };
       });
 

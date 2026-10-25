@@ -122,4 +122,18 @@ describe('Store importProject', () => {
     expect(list.some((p) => p.id === PROJECT.id)).toBe(true);
     expect(useMooStore.getState().project.id).toBe(PROJECT.id);
   });
+
+  it('resets a custom BGM preset on import because the track is not in the backup', async () => {
+    const withCustom: MooProject = {
+      ...PROJECT,
+      bgm: { preset: 'custom', level: 0.3, duckRatio: 0.2, customName: 'lagu.mp3' }
+    };
+    const parsed = parseProjectBackup(serializeProjectBackup(withCustom));
+    const newId = await useMooStore.getState().importProject(parsed);
+
+    const imported = (await listProjectsFromDb()).find((p) => p.id === newId);
+    expect(imported?.bgm.preset).toBe('none');
+    expect(imported?.bgm.customName).toBeUndefined();
+    expect(imported?.bgm.level).toBe(0.3);
+  });
 });

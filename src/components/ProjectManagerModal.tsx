@@ -7,6 +7,7 @@ import { flushPendingSave } from '../store/slices/projectSlice';
 import { loadProjectFromDb } from '../db/mooDb';
 import { MAX_BACKUP_BYTES, parseProjectBackup, serializeProjectBackup } from '../db/projectBackup';
 import { safeFileName, triggerFileDownload } from '../utils/fileUtils';
+import { PROJECT_TEMPLATES } from '../engine/templates/projectTemplates';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     project: activeProject,
     projectsList,
     createNewProject,
+    createProjectFromTemplate,
     switchProject,
     duplicateProject,
     deleteProject,
@@ -29,6 +31,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
       project: s.project,
       projectsList: s.projectsList,
       createNewProject: s.createNewProject,
+      createProjectFromTemplate: s.createProjectFromTemplate,
       switchProject: s.switchProject,
       duplicateProject: s.duplicateProject,
       deleteProject: s.deleteProject,
@@ -73,6 +76,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     try {
       setIsCreating(true);
       await createNewProject();
+      onClose();
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCreateFromTemplate = async (templateId: string) => {
+    try {
+      setIsCreating(true);
+      await createProjectFromTemplate(templateId);
       onClose();
     } finally {
       setIsCreating(false);
@@ -192,6 +205,29 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
+          </div>
+        </div>
+
+        {/* Template starters */}
+        <div className="px-4 pt-3 pb-1">
+          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Mulai dari template</span>
+          <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {PROJECT_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.id}
+                type="button"
+                disabled={isCreating}
+                onClick={() => handleCreateFromTemplate(tpl.id)}
+                title={tpl.description}
+                className="p-2.5 rounded-xl border border-zinc-800 bg-[#18181b]/70 hover:border-primary/60 hover:bg-[#18181b] text-left transition-all active:scale-[0.98] disabled:opacity-50 flex flex-col gap-1"
+              >
+                <span className="material-symbols-outlined text-[18px] text-primary">{tpl.icon}</span>
+                <span className="text-[12px] font-semibold text-zinc-100 leading-tight">{tpl.title}</span>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {tpl.aspectRatio} · {tpl.scenes.length} adegan
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 

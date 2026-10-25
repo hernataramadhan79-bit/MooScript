@@ -14,6 +14,7 @@ import type { MooProject, ThemeTokens } from '../../types';
 import { resolveTheme } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
+import { EXPORT_QUALITY_FACTOR, type ExportQuality } from './exportOptions';
 
 export interface ExportProgress {
   percent: number;
@@ -34,6 +35,9 @@ export interface ExportResult {
 export type ExportContainerFormat = 'mp4' | 'webm';
 
 export interface ExportOptions {
+  /** Output frame rate; defaults to the project's own fps. */
+  fps?: number;
+  quality?: ExportQuality;
   format?: ExportContainerFormat;
   hud?: boolean;
   watermark?: boolean;
@@ -161,11 +165,14 @@ async function resampleAudioBuffer(audioBuffer: AudioBuffer, targetSampleRate = 
 }
 
 export async function exportMooProjectToMP4(
-  project: MooProject,
+  sourceProject: MooProject,
   onProgress: (progress: ExportProgress) => void,
   abortSignal?: AbortSignal,
   opts?: ExportOptions
 ): Promise<ExportResult> {
+  // Frame rate is an export choice; every renderer reads project.fps, so hand them a copy that carries it.
+  const project =
+    opts?.fps && opts.fps !== sourceProject.fps ? { ...sourceProject, fps: opts.fps } : sourceProject;
   const fps = project.fps || 30;
   const width = project.width || 1080;
   const height = project.height || 1920;
@@ -197,7 +204,10 @@ export async function exportMooProjectToMP4(
   const basePixels = 1080 * 1920 * 30;
   const currentPixels = width * height * fps;
   const calculatedBitrate = Math.round((currentPixels / basePixels) * 6_000_000);
-  const bitrate = Math.max(2_000_000, Math.min(12_000_000, calculatedBitrate));
+  const qualityFactor = EXPORT_QUALITY_FACTOR[opts?.quality ?? 'standard'] ?? 1;
+  const bitrate = Math.round(
+    Math.max(2_000_000, Math.min(12_000_000, calculatedBitrate)) * qualityFactor
+  );
 
   // Pre-load fonts and check availability
   if (typeof document !== 'undefined' && document.fonts) {

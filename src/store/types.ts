@@ -54,6 +54,7 @@ export interface ProjectSlice {
   setProject: (project: MooProject, options?: { keepStale?: boolean; preserveHistory?: boolean }) => void;
   refreshProjectsList: () => Promise<void>;
   createNewProject: (title?: string) => Promise<string>;
+  createProjectFromTemplate: (templateId: string) => Promise<string>;
   switchProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<string>;
