@@ -57,11 +57,11 @@ describe('golden comparator', () => {
     expect(compareRecords(folded, record({ translate: '40px -60px', scale: '1.2', rotate: '9deg' })).mismatches.length).toBeGreaterThan(0);
   });
 
-  // Known GSAP bug: overrides baked into the document (MP4 export, standalone HTML) are folded into
-  // GSAP's transform and then overwritten by absolute tweens, while the editor pushes them later with
-  // !important and they compose. MooTween never writes translate/scale/rotate, so both paths agree;
-  // flip this test when the runtime switches engines.
-  it('GSAP: baked overrides on animated layers differ from the editor', async () => {
+  // Why api-overrides-export is checked against the live snapshot: under GSAP, overrides baked into the
+  // document (MP4 export, standalone HTML) were folded into its transform and overwritten by absolute
+  // tweens, while the editor pushed them later with !important. The GSAP reference keeps that bug; the
+  // golden suite proves MooTween renders the export like the editor.
+  it('GSAP reference: baked overrides on animated layers differed from the editor', async () => {
     const baked = await load('api-overrides-export');
     const live = await load('api-overrides-live');
     const diverging = new Set(compareRecords(baked, live).mismatches.map((m) => m.element));

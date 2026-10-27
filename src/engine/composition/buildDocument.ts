@@ -1,12 +1,12 @@
 import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
+import { installMooTween } from './runtime/mooTween';
 import { compileOverridesCss, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
 import { scopeCss } from './scopeCss';
 import type { Scene } from '../../types';
-import gsapScript from 'gsap/dist/gsap.min.js?raw';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
 // and SVG foreignObject export frames render correct typography with zero network access.
 import jakarta400 from '@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-400-normal.woff2?datauri';
@@ -360,12 +360,9 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
-  <!-- GSAP Inlined Core -->
+  <!-- MooTween animation engine (also exposed as window.gsap for scene code) -->
   <script>
-    ${gsapScript}
-    if (window.gsap && typeof window.gsap.config === 'function') {
-      window.gsap.config({ nullTargetWarn: false });
-    }
+    (${installMooTween.toString()})(window);
   </script>
   <style>
     /* Self-contained WOFF2 fonts (local @fontsource, data-URI) — primary type source */

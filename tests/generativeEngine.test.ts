@@ -458,7 +458,7 @@ while(true) { eval("bad"); }
     // Notice: NO audioBlob, NO audioDuration
     const standaloneHtml = buildCompositionDocument(testProject, { standalone: true });
     expect(standaloneHtml).toContain('<!DOCTYPE html>');
-    expect(standaloneHtml).toContain('GSAP');
+    expect(standaloneHtml).toContain('MooTween');
     expect(standaloneHtml).toContain("MOO.scene('sc-a'");
     expect(standaloneHtml).toContain('MooScript');
     expect(standaloneHtml).not.toContain('<audio id="moo-audio" src="undefined"');

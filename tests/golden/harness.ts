@@ -2,20 +2,12 @@
  * Golden-frame harness: renders a composition in a real stage iframe, seeks a fixed list of times
  * (forward, then backward) and records the computed state of every element inside each scene.
  *
- * The record is engine-agnostic, so the same corpus can be replayed against GSAP (reference) and
- * MooTween and compared with the tolerances in compare.ts.
+ * Snapshots were recorded with GSAP before the stage moved to MooTween (the transition cases were
+ * re-recorded after the slide, zoom and wipe fix); the stage document now runs MooTween and is
+ * compared with them using the tolerances in compare.ts.
  */
 import { buildCompositionDocument, compileCompositionOverridesCss } from '../../src/engine/composition/buildDocument';
-import { installMooTween } from '../../src/engine/composition/runtime/mooTween';
 import type { MooProject } from '../../src/types';
-
-const GSAP_BLOCK = /<!-- GSAP Inlined Core -->\s*<script>[\s\S]*?<\/script>/;
-
-/** Swaps the inlined GSAP build for MooTween, embedded the same way the runtime embeds its kit. */
-export function withMooTween(html: string): string {
-  if (!GSAP_BLOCK.test(html)) throw new Error('Inlined GSAP block not found in the stage document');
-  return html.replace(GSAP_BLOCK, () => `<script>(${installMooTween.toString()})(window);</script>`);
-}
 
 /** A documented place where MooTween is meant to differ from the GSAP reference. */
 export interface Divergence {

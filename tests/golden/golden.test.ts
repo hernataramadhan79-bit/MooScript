@@ -1,16 +1,19 @@
 /**
- * Golden frames: every corpus case is rendered in a real stage iframe and compared with the JSON
- * snapshot recorded from GSAP. MooTween runs the same corpus against the same snapshots, minus the
- * divergences each case documents. Record or refresh snapshots with `npm run test:golden -- -u`.
+ * Golden frames: every corpus case is rendered in a real stage iframe (now running MooTween) and
+ * compared with its JSON snapshot, minus the divergences the case documents.
+ *
+ * The snapshots are the GSAP reference recorded before the migration; GSAP is no longer installed, so
+ * `-u` records with MooTween. Only refresh a case on purpose, e.g.
+ * `npm run test:golden -- -u -t transition-` after changing the transitions.
  */
 import { describe, expect, inject, it } from 'vitest';
 import { commands } from '@vitest/browser/context';
 import { buildCorpus } from './corpus';
-import { recordCase, serializeRecord, withMooTween, type GoldenCase, type GoldenRecord, type RecordOptions } from './harness';
+import { recordCase, serializeRecord, type GoldenCase, type GoldenRecord } from './harness';
 import { compareRecords, formatMismatches, type Mismatch } from './compare';
 
 const update = inject('goldenUpdate');
-// GOLDEN_REPORT=1 writes every remaining mismatch to tests/golden/.report/<engine>/<case>.txt.
+// GOLDEN_REPORT=1 writes every remaining mismatch to tests/golden/.report/<case>.txt.
 const report = inject('goldenReport');
 const corpus = buildCorpus();
 
@@ -30,42 +33,33 @@ async function loadSnapshot(name: string): Promise<GoldenRecord> {
   try {
     return JSON.parse(await commands.readFile(file));
   } catch {
-    throw new Error(`Missing golden snapshot ${file}. Record it with: npm run test:golden -- -u`);
+    throw new Error(`Missing golden snapshot ${file}. Record it with: npm run test:golden -- -u -t ${name}`);
   }
 }
 
-const ENGINES: Array<{ name: string; options: RecordOptions }> = [
-  { name: 'gsap', options: {} },
-  { name: 'mootween', options: { prepareDocument: withMooTween } }
-];
+describe('golden frames', () => {
+  for (const c of corpus) {
+    it(c.name, async () => {
+      const actual = await recordCase(c);
 
-for (const engine of ENGINES) {
-  describe(`golden frames (${engine.name})`, () => {
-    for (const c of corpus) {
-      it(c.name, async () => {
-        if (update && engine.name !== 'gsap') return;
-        const actual = await recordCase(c, engine.options);
+      if (update) {
+        await commands.writeFile(`snapshots/${c.name}.json`, serializeRecord(actual));
+        return;
+      }
 
-        if (update) {
-          await commands.writeFile(`snapshots/${c.name}.json`, serializeRecord(actual));
-          return;
-        }
-
-        const mooTween = engine.name === 'mootween';
-        const expected = await loadSnapshot(mooTween && c.mooTweenReference ? c.mooTweenReference : c.name);
-        const result = compareRecords(expected, actual);
-        if (result.crossPlatform) {
-          console.info(`[golden] ${c.name}: recorded on ${expected.env.platform}, running on ${actual.env.platform}; layout-dependent values skipped`);
-        }
-        const mismatches = mooTween ? result.mismatches.filter((m) => !allowed(c, actual, m)) : result.mismatches;
-        if (report) {
-          const lines = [...result.structural, ...formatMismatches(actual, mismatches, Infinity)];
-          await commands.writeFile(`.report/${engine.name}/${c.name}.txt`, lines.join('\n') + '\n');
-        }
-        expect(actual.logs.filter((l) => !mooTween || !l.startsWith('warn: [MooTween]'))).toEqual(expected.logs);
-        expect(result.structural).toEqual([]);
-        expect(formatMismatches(actual, mismatches)).toEqual([]);
-      });
-    }
-  });
-}
+      const expected = await loadSnapshot(c.mooTweenReference || c.name);
+      const result = compareRecords(expected, actual);
+      if (result.crossPlatform) {
+        console.info(`[golden] ${c.name}: recorded on ${expected.env.platform}, running on ${actual.env.platform}; layout-dependent values skipped`);
+      }
+      const mismatches = result.mismatches.filter((m) => !allowed(c, actual, m));
+      if (report) {
+        const lines = [...result.structural, ...formatMismatches(actual, mismatches, Infinity)];
+        await commands.writeFile(`.report/${c.name}.txt`, lines.join('\n') + '\n');
+      }
+      expect(actual.logs.filter((l) => !l.startsWith('warn: [MooTween]'))).toEqual(expected.logs);
+      expect(result.structural).toEqual([]);
+      expect(formatMismatches(actual, mismatches)).toEqual([]);
+    });
+  }
+});

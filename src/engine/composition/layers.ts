@@ -230,15 +230,13 @@ function num(n: unknown): number | undefined {
 /**
  * Compile non-destructive layer overrides into CSS.
  *
- * GSAP writes the shorthand `transform` inline while the timeline plays; the CSS *individual*
+ * MooTween writes the shorthand `transform` inline while the timeline plays; the CSS *individual*
  * transform properties (`translate`, `scale`, `rotate`) are separate and compose with it, and
- * `filter: opacity()` multiplies with GSAP's inline `opacity`. That lets user tweaks coexist with
- * the generated animation instead of fighting it.
+ * `filter: opacity()` multiplies with the inline `opacity`. That lets user tweaks coexist with
+ * the generated animation instead of fighting it, in the editor and in the export alike.
  *
- * Caveat: when GSAP first parses an element's transform it folds any CSS translate/scale/rotate
- * into its inline `transform` and writes those properties as `none` inline. Overrides present
- * at load are therefore baked in correctly, but later changes need `important` to beat the
- * inline `none` (used by the editor's live override stylesheet, applied after GSAP has parsed).
+ * MooTween never writes translate/scale/rotate. `important` is still used by the editor's live
+ * override stylesheet so it wins over inline values a scene's own code may set.
  */
 export function compileOverridesCss(
   sceneDomId: string,

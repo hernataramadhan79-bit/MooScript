@@ -17,7 +17,7 @@ export function resetSharedCanvas(): void {
 
 /**
  * MooRuntime client-side script injected into the isolated iframe sandbox.
- * Enforces determinism, wraps GSAP timeline, and provides postMessage communication with host.
+ * Enforces determinism, drives the MooTween master timeline, and provides postMessage communication with host.
  */
 export function getRuntimeScript(): string {
   return `
@@ -61,17 +61,14 @@ export function getRuntimeScript(): string {
   let stageElem = null;
 
   async function initMasterTimeline(compositionMeta) {
-    if (!window.gsap) {
-      console.error('GSAP is not loaded inside iframe runtime');
+    const engine = window.MooTween;
+    if (!engine) {
+      console.error('MooTween is not loaded inside iframe runtime');
       return;
     }
 
-    // Disable real-time auto-ticker: playback is purely driven by host seek()
-    window.gsap.ticker.lagSmoothing(0);
-    if (typeof window.gsap.config === 'function') {
-      window.gsap.config({ nullTargetWarn: false });
-    }
-    masterTl = window.gsap.timeline({ paused: true });
+    // MooTween never ticks in real time: playback is purely driven by host seek()
+    masterTl = engine.timeline({ paused: true });
 
     function isEmptyTarget(targets) {
       if (!targets) return true;
@@ -222,9 +219,12 @@ export function getRuntimeScript(): string {
         index: i
       };
 
-      const rawSceneTl = window.gsap.timeline();
+      // Selectors resolve inside this shot only, repeat: -1 covers this shot, and standalone
+      // gsap.to()/from() calls made while it builds join its timeline.
+      const rawSceneTl = engine.timeline({ scope: sceneWrapper, repeatSpan: duration });
       const safeSceneTl = makeSafeTimeline(rawSceneTl);
-      const safeGsap = makeSafeGsap(window.gsap);
+      const safeGsap = makeSafeGsap(engine);
+      engine.activeTimeline = rawSceneTl;
       try {
         installMographKit(safeSceneTl, sceneWrapper, ctx);
       } catch (kitErr) {
@@ -240,6 +240,7 @@ export function getRuntimeScript(): string {
       } catch (err) {
         console.error('Error in scene build(): ' + current.item.id, err);
       }
+      engine.activeTimeline = null;
 
       // Add child scene timeline at accumulatedTime
       masterTl.add(rawSceneTl, accumulatedTime);
@@ -271,9 +272,11 @@ export function getRuntimeScript(): string {
           masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
           masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'slide') {
-          // Push slide: Next scene enters from right, current scene slides left (immediateRender: false avoids premature offscreen state)
+          // Push slide: Next scene enters from right, current scene slides left. The next scene is made visible
+          // with its own set: a fromTo() with immediateRender: false never applies values only its from-vars name.
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' }, transStart);
           masterTl.fromTo(next.wrapper,
-            { x: '100%', visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' },
+            { x: '100%' },
             { x: '0%', duration: transDur, ease: 'power2.inOut', immediateRender: false },
             transStart
           );
@@ -281,9 +284,10 @@ export function getRuntimeScript(): string {
           masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
           masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
-          // Zoom transition: Next scene zooms from 0.92 to 1.0, current scene zooms to 1.15 and fades
+          // Zoom transition: Next scene zooms from 0.92 to 1.0 and fades in on top, current scene zooms to 1.15 and fades
+          masterTl.set(next.wrapper, { visibility: 'visible', zIndex: 2, x: '0%', clipPath: 'none' }, transStart);
           masterTl.fromTo(next.wrapper,
-            { scale: 0.92, visibility: 'visible', opacity: 0, zIndex: 1, x: '0%', clipPath: 'none' },
+            { scale: 0.92, opacity: 0 },
             { scale: 1, opacity: 1, duration: transDur, ease: 'power2.out', immediateRender: false },
             transStart
           );
@@ -293,8 +297,9 @@ export function getRuntimeScript(): string {
         } else if (transitionType === 'wipe') {
           // Vertical wipe: Next scene visible underneath, current scene wipes away
           masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
           masterTl.fromTo(sceneWrapper,
-            { clipPath: 'inset(0% 0% 0% 0%)', zIndex: 2 },
+            { clipPath: 'inset(0% 0% 0% 0%)' },
             { clipPath: 'inset(0% 0% 100% 0%)', duration: transDur, ease: 'power2.inOut', immediateRender: false },
             transStart
           );

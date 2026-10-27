@@ -7,7 +7,7 @@ import { getRuntimeScript } from '../src/engine/composition/runtime/mooRuntime';
 import type { MooProject } from '../src/types';
 
 describe('Composition Document Builder', () => {
-  it('correctly injects GSAP, MooRuntime, and scene definitions into srcdoc', () => {
+  it('correctly injects MooTween, MooRuntime, and scene definitions into srcdoc', () => {
     const mockProject: MooProject = {
       id: 'test-proj',
       title: 'Test Mograph',
@@ -59,7 +59,8 @@ describe('Composition Document Builder', () => {
     };
 
     const doc = buildCompositionDocument(mockProject);
-    expect(doc).toContain('gsap');
+    expect(doc).toContain('MooTween');
+    expect(doc).not.toContain('GreenSock');
     expect(doc).toContain('MOO.scene');
     expect(doc).toContain('Hello');
     expect(doc).toContain('.test { color: #84cc16; }');
@@ -186,7 +187,7 @@ describe('Composition Document Builder', () => {
     // The full document (export path) still bakes the override in.
     expect(buildCompositionDocument(moved)).toContain('translate: 120px -40px');
 
-    // Live editor CSS must beat the inline `translate: none` GSAP writes after parsing a layer.
+    // Live editor CSS is !important so it beats any inline translate/scale/rotate a scene's own code writes.
     const css = compileCompositionOverridesCss(moved.composition, { important: true });
     expect(css).toContain('#scene-sc-1 [data-moo-layer="title"]');
     expect(css).toContain('translate: 120px -40px !important');
@@ -194,7 +195,7 @@ describe('Composition Document Builder', () => {
 
     const runtime = getRuntimeScript();
     expect(runtime).toContain("data.type === 'set_override_css'");
-    // All tweens are initialized before 'ready', so later overrides are never folded into GSAP transforms.
+    // All tweens are initialized before 'ready', so start values are read before live overrides arrive.
     expect(runtime.indexOf('masterTl.progress(1, true)')).toBeLessThan(runtime.indexOf("type: 'ready'"));
   });
 });

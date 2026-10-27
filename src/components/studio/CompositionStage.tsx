@@ -126,7 +126,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     return buildCompositionDocument(minimalProject, { omitOverrides: true });
   }, [composition, scenes, width, height, fps, projectId, theme, styleBrief]);
 
-  // !important: GSAP writes translate/scale/rotate as inline `none` once it has parsed a layer.
+  // !important: must win over inline translate/scale/rotate a scene's own code may write.
   const overridesCss = React.useMemo(
     () => compileCompositionOverridesCss(composition, { important: true }),
     [composition]
