@@ -1,10 +1,13 @@
-import type { StoryBeat, StyleBrief, GeneratedScene, LLMProvider, AspectRatio } from '../../../types';
+import type { StoryBeat, StyleBrief, GeneratedScene, LLMProvider, AspectRatio, WordTimestamp } from '../../../types';
 import { validateGeneratedScene } from '../../composition/validator';
+import { lintMographQuality } from '../../composition/mographLint';
 import { extractLayersFromHtml } from '../../composition/layers';
 import {
   MOTION_DIRECTOR_SYSTEM_PROMPT,
   buildSceneCodegenPrompt,
-  buildSceneRepairPrompt
+  buildSceneRepairPrompt,
+  buildSceneQualityRepairPrompt,
+  stageSizeFor
 } from './motionLaws';
 
 export function cleanGeneratedHtml(rawHtml: string): { html: string; embeddedCss: string; embeddedJs: string } {
@@ -260,25 +263,20 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   // 5. Fail-Safe Guarantee: If buildJs is completely empty, but html exists,
   // synthesize a smooth default GSAP animation so the scene never fails validation or stays static.
   if (!buildJs.trim() && html.trim()) {
-    buildJs = `// Auto-synthesized entrance animation for scene layers
-const targets = root.children && root.children.length > 0 ? root.children : [root];
+    buildJs = `// Auto-synthesized motion for scene layers (visible frame 0, camera drift, overshoot pops, hand-off)
+const D = ctx.dur || 3.5;
+const stage = root.firstElementChild || root;
+const targets = stage.children && stage.children.length > 0 ? stage.children : [stage];
+tl.fromTo(stage, { scale: 1.1 }, { scale: 1, duration: Math.max(0.5, D - 0.4), ease: 'sine.inOut' }, 0);
 tl.from(targets, {
-  opacity: 0,
-  y: 35,
-  duration: Math.min(1.0, (ctx.dur || 3.5) * 0.4),
-  stagger: 0.15,
-  ease: 'power3.out'
-});
-const layers = root.querySelectorAll('[data-moo-layer]');
-if (layers && layers.length > 0) {
-  tl.to(layers, {
-    scale: 1.03,
-    duration: Math.max(0.5, (ctx.dur || 3.5) * 0.6),
-    ease: 'sine.inOut',
-    yoyo: true,
-    repeat: 1
-  }, '-=0.5');
-}`;
+  scale: 0.8,
+  rotation: -6,
+  transformOrigin: '50% 50%',
+  duration: Math.min(0.8, D * 0.3),
+  stagger: 0.12,
+  ease: 'back.out(1.8)'
+}, 0);
+tl.to(stage, { scale: 1.6, opacity: 0, duration: 0.35, ease: 'power4.in' }, Math.max(0, D - 0.35));`;
   }
 
   return { html, css, buildJs };
@@ -298,6 +296,7 @@ export function synthesizeFallbackScene(params: {
   index: number;
   styleBrief: StyleBrief;
   durationSec: number;
+  aspectRatio?: AspectRatio;
 }): { html: string; css: string; buildJs: string } {
   const { beat, index, styleBrief, durationSec } = params;
   const palette = styleBrief?.palette || {
@@ -308,18 +307,35 @@ export function synthesizeFallbackScene(params: {
     text: '#f8fafc',
     muted: '#94a3b8'
   };
+  const { w, h } = stageSizeFor(params.aspectRatio || '9:16');
+  const cx = Math.round(w / 2);
+  const cy = Math.round(h * 0.56);
+  const unit = Math.min(w, h);
+  const fontSize = Math.round(unit * 0.1);
 
-  const title = (beat.visualIntent || `Scene ${index + 1}`).trim();
-  const narration = (beat.narration || '').trim();
+  // Only a short kinetic title goes on screen; the narration is spoken and captioned separately.
+  const titleWords = (beat.visualIntent || `Scene ${index + 1}`).trim().split(/\s+/).slice(0, 6);
   const sceneClass = `scene-s${index + 1}`;
+  const r1 = Math.round(unit * 0.22);
+  const r2 = Math.round(unit * 0.34);
+  const r3 = Math.round(unit * 0.46);
 
   const html = `<div class="scene-root ${sceneClass}">
-  <div class="synth-bg-glow" data-moo-layer="Ambient Glow"></div>
-  <div class="synth-card" data-moo-layer="Main Card">
-    <div class="synth-badge" data-moo-layer="Scene Tag">${escapeHtml(beat.visualConcept || `ACT ${index + 1}`)}</div>
-    <h2 class="synth-headline" data-moo-layer="Headline">${escapeHtml(title)}</h2>
-    ${narration ? `<p class="synth-narration" data-moo-layer="Narration">${escapeHtml(narration)}</p>` : ''}
-    <div class="synth-accent-bar" data-moo-layer="Accent Line"></div>
+  <div class="moo-camera" data-moo-layer="camera">
+    <div class="synth-bg-glow" data-moo-layer="Ambient Glow"></div>
+    <svg class="synth-stage" data-moo-layer="Orbit" viewBox="0 0 ${w} ${h}">
+      <g class="synth-rings" fill="none" stroke="var(--moo-primary, ${palette.primary})" stroke-width="4">
+        <circle cx="${cx}" cy="${cy}" r="${r1}" />
+        <circle cx="${cx}" cy="${cy}" r="${r2}" stroke-dasharray="18 22" />
+        <circle cx="${cx}" cy="${cy}" r="${r3}" opacity="0.4" />
+      </g>
+      <circle class="synth-core" cx="${cx}" cy="${cy}" r="${Math.round(unit * 0.07)}" fill="var(--moo-accent, ${palette.accent})" />
+      <circle class="synth-satellite" cx="${cx + r2}" cy="${cy}" r="${Math.round(unit * 0.025)}" fill="var(--moo-text, ${palette.text})" />
+    </svg>
+    <svg class="synth-line-wrap" data-moo-layer="Accent Line" viewBox="0 0 ${w} ${h}">
+      <path class="synth-accent-line" d="M ${Math.round(w * 0.2)} ${Math.round(h * 0.3)} L ${Math.round(w * 0.8)} ${Math.round(h * 0.3)}" fill="none" stroke="var(--moo-accent, ${palette.accent})" stroke-width="8" stroke-linecap="round" />
+    </svg>
+    <div class="synth-headline" data-moo-layer="Headline">${titleWords.map((word) => `<span>${escapeHtml(word)}</span>`).join(' ')}</div>
   </div>
 </div>`;
 
@@ -327,158 +343,86 @@ export function synthesizeFallbackScene(params: {
   width: 100%;
   height: 100%;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  box-sizing: border-box;
+  overflow: hidden;
   background: var(--moo-bg, ${palette.bg});
   color: var(--moo-text, ${palette.text});
   font-family: var(--moo-font-display, '${styleBrief?.fontDisplay || 'system-ui, -apple-system, sans-serif'}');
-  overflow: hidden;
+}
+
+.${sceneClass} .moo-camera {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 56%;
 }
 
 .${sceneClass} .synth-bg-glow {
   position: absolute;
-  width: 140%;
-  height: 140%;
-  background: radial-gradient(circle at 50% 50%, var(--moo-primary, ${palette.primary}) 0%, transparent 60%);
+  left: ${cx - r3 * 1.5}px;
+  top: ${cy - r3 * 1.5}px;
+  width: ${r3 * 3}px;
+  height: ${r3 * 3}px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--moo-primary, ${palette.primary}) 0%, transparent 60%);
   opacity: 0.25;
-  pointer-events: none;
 }
 
-.${sceneClass} .synth-card {
-  position: relative;
-  z-index: 2;
+.${sceneClass} .synth-stage,
+.${sceneClass} .synth-line-wrap {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
-  max-width: 85%;
-  background: rgba(19, 27, 46, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 36px 30px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.${sceneClass} .synth-badge {
-  align-self: flex-start;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  border-radius: 9999px;
-  background: var(--moo-primary, ${palette.primary});
-  color: var(--moo-text, ${palette.text});
-  opacity: 0.9;
+  height: 100%;
+  overflow: visible;
 }
 
 .${sceneClass} .synth-headline {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 800;
-  line-height: 1.25;
+  position: absolute;
+  left: ${Math.round(w * 0.08)}px;
+  top: ${Math.round(h * 0.1)}px;
+  width: ${Math.round(w * 0.84)}px;
+  text-align: center;
+  font-size: ${fontSize}px;
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   color: var(--moo-text, ${palette.text});
 }
 
-.${sceneClass} .synth-narration {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.5;
-  color: var(--moo-text, ${palette.text});
-  opacity: 0.8;
-  font-weight: 400;
-}
-
-.${sceneClass} .synth-accent-bar {
-  height: 4px;
-  width: 60px;
-  background: linear-gradient(90deg, var(--moo-primary, ${palette.primary}), var(--moo-accent, ${palette.accent}));
-  border-radius: 2px;
-  margin-top: 8px;
+.${sceneClass} .synth-headline span {
+  display: inline-block;
 }`;
 
   const buildJs = `// Bespoke synthesis timeline for Scene #${index + 1}
-const card = root.querySelector('.synth-card');
-const badge = root.querySelector('.synth-badge');
-const headline = root.querySelector('.synth-headline');
-const narration = root.querySelector('.synth-narration');
+const D = ctx.dur || ${durationSec.toFixed(1)};
+const cam = root.querySelector('.moo-camera');
 const glow = root.querySelector('.synth-bg-glow');
-const bar = root.querySelector('.synth-accent-bar');
+const rings = root.querySelectorAll('.synth-rings circle');
+const core = root.querySelector('.synth-core');
+const satellite = root.querySelector('.synth-satellite');
+const line = root.querySelector('.synth-accent-line');
+const words = root.querySelectorAll('.synth-headline span');
 
-const targets = [card, badge, headline, narration, bar].filter(Boolean);
-tl.set(targets, { transformOrigin: 'center center' });
+// Camera drifts for the whole shot
+tl.fromTo(cam, { scale: 1.15, rotation: -3 }, { scale: 1, rotation: 0, duration: Math.max(0.5, D - 0.4), ease: 'sine.inOut' }, 0);
+if (glow) tl.fromTo(glow, { scale: 0.7 }, { scale: 1.2, duration: D, ease: 'sine.inOut' }, 0);
 
-// Entrance
-if (glow) {
-  tl.from(glow, {
-    scale: 0.6,
-    opacity: 0,
-    duration: Math.min(1.2, (ctx.dur || ${durationSec.toFixed(1)}) * 0.4),
-    ease: 'power2.out'
-  }, 0);
+// Core and rings are visible on frame 0 (the editor's still), then expand with overshoot
+if (core) tl.fromTo(core, { scale: 0.55, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.5, ease: 'back.out(2.5)' }, 0);
+tl.fromTo(rings, { scale: 0.6, rotation: -90, transformOrigin: '50% 50%' }, { scale: 1, rotation: 0, duration: 0.8, stagger: 0.12, ease: 'expo.out' }, 0);
+if (rings[1]) tl.to(rings[1], { rotation: 120, transformOrigin: '50% 50%', duration: D, ease: 'none' }, 0);
+if (satellite) tl.to(satellite, { rotation: 300, svgOrigin: '${cx} ${cy}', duration: D, ease: 'none' }, 0);
+
+// Accent line draws, title snaps in word by word
+if (line) {
+  const len = line.getTotalLength ? line.getTotalLength() : ${Math.round(w * 0.6)};
+  tl.set(line, { strokeDasharray: len, strokeDashoffset: len }, 0);
+  tl.to(line, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.inOut' }, 0.3);
 }
+tl.from(words, { yPercent: 110, rotation: 8, scale: 0.8, opacity: 0, duration: 0.45, stagger: 0.07, ease: 'expo.out' }, 0.35);
 
-if (card) {
-  tl.from(card, {
-    scale: 0.92,
-    y: 40,
-    opacity: 0,
-    duration: Math.min(0.9, (ctx.dur || ${durationSec.toFixed(1)}) * 0.35),
-    ease: 'back.out(1.4)'
-  }, 0.1);
-}
-
-if (badge) {
-  tl.from(badge, {
-    scale: 0.8,
-    opacity: 0,
-    duration: 0.4,
-    ease: 'power3.out'
-  }, 0.3);
-}
-
-if (headline) {
-  tl.from(headline, {
-    y: 20,
-    opacity: 0,
-    duration: 0.5,
-    ease: 'power3.out'
-  }, 0.4);
-}
-
-if (narration) {
-  tl.from(narration, {
-    y: 15,
-    opacity: 0,
-    duration: 0.5,
-    ease: 'power3.out'
-  }, 0.5);
-}
-
-if (bar) {
-  tl.from(bar, {
-    scaleX: 0,
-    opacity: 0,
-    duration: 0.6,
-    ease: 'power2.out'
-  }, 0.6);
-}
-
-// Subtle cinematic breathing motion
-if (card) {
-  tl.to(card, {
-    y: '-=8',
-    duration: Math.max(1.0, (ctx.dur || ${durationSec.toFixed(1)}) * 0.5),
-    ease: 'sine.inOut',
-    yoyo: true,
-    repeat: 1
-  }, 0.8);
-}`;
+// Hand-off into the next shot
+tl.to(cam, { scale: 2.4, opacity: 0, duration: 0.4, ease: 'power4.in' }, Math.max(0, D - 0.4));`;
 
   return { html, css, buildJs };
 }
@@ -496,7 +440,57 @@ export interface GenerateCustomSceneParams {
   model?: string;
   executeLlm: (opts: { systemPrompt: string; userPrompt: string }) => Promise<string>;
   styleAdvice?: string;
+  /** Scene-relative voice-over word timings, used to sync accents via ctx.at(). */
+  wordTimestamps?: WordTimestamp[];
   onProgress?: (status: string) => void;
+}
+
+/**
+ * Asks the LLM to rewrite a valid-but-slide-like scene. Returns the rewrite only when it
+ * still validates and scores better on the anti-PPT lint; otherwise the original is kept.
+ */
+export async function improveSceneMographQuality(params: {
+  code: { html: string; css: string; buildJs: string };
+  issues: string[];
+  score: number;
+  beatIndex: number;
+  visualIntent: string;
+  narration?: string;
+  durationSec: number;
+  aspectRatio: AspectRatio;
+  wordTimestamps?: WordTimestamp[];
+  executeLlm: (opts: { systemPrompt: string; userPrompt: string }) => Promise<string>;
+}): Promise<{ html: string; css: string; buildJs: string; improved: boolean }> {
+  try {
+    const rawResponse = await params.executeLlm({
+      systemPrompt: MOTION_DIRECTOR_SYSTEM_PROMPT,
+      userPrompt: buildSceneQualityRepairPrompt({
+        originalCode: params.code,
+        issues: params.issues,
+        beatIndex: params.beatIndex,
+        visualIntent: params.visualIntent,
+        narration: params.narration,
+        durationSec: params.durationSec,
+        aspectRatio: params.aspectRatio,
+        wordTimestamps: params.wordTimestamps
+      })
+    });
+    const rewritten = parseCodeBlocks(rawResponse);
+    if (!validateGeneratedScene(rewritten).valid) {
+      return { ...params.code, improved: false };
+    }
+    const lint = lintMographQuality(rewritten, {
+      narration: params.narration,
+      hasWordTimestamps: Boolean(params.wordTimestamps?.length)
+    });
+    if (lint.score >= params.score) {
+      return { ...params.code, improved: false };
+    }
+    return { ...rewritten, improved: true };
+  } catch (err: unknown) {
+    console.warn('[MooScript] Mograph quality rewrite failed, keeping original scene:', err);
+    return { ...params.code, improved: false };
+  }
 }
 
 /**
@@ -561,6 +555,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     nextSceneSummary,
     executeLlm,
     styleAdvice,
+    wordTimestamps,
     onProgress
   } = params;
 
@@ -583,6 +578,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     nextSceneSummary,
     focusWords: beat.focusWords,
     assignedAssets: beat.assignedAssets,
+    wordTimestamps,
     styleBrief: {
       palette: styleBrief.palette,
       fontDisplay: styleBrief.fontDisplay,
@@ -605,6 +601,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     onProgress?.('Mem-parsing blok kode HTML, CSS, dan GSAP...');
     let parsed = parseCodeBlocks(rawResponse);
     let validation = validateGeneratedScene(parsed);
+    let synthesized = false;
 
     // If validation fails, attempt 1-time automatic repair with validation errors
     if (!validation.valid) {
@@ -635,10 +632,37 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
             beat,
             index,
             styleBrief,
-            durationSec: duration
+            durationSec: duration,
+            aspectRatio
           });
           validation = validateGeneratedScene(parsed);
+          synthesized = true;
         }
+      }
+    }
+
+    // Valid code can still read as a slide / web page: lint it and ask for one rewrite.
+    if (validation.valid && !synthesized) {
+      const lint = lintMographQuality(parsed, {
+        narration: beat.narration,
+        hasWordTimestamps: Boolean(wordTimestamps?.length)
+      });
+      if (lint.needsRepair) {
+        console.warn(`[MooScript] Scene #${index + 1} reads like a slide (score ${lint.score}), requesting mograph rewrite:`, lint.issues.map((i) => i.id).join(', '));
+        onProgress?.('Hasil masih terasa seperti slide: AI sedang menulis ulang jadi mograph...');
+        const improved = await improveSceneMographQuality({
+          code: parsed,
+          issues: lint.issues.map((i) => i.message),
+          score: lint.score,
+          beatIndex: index,
+          visualIntent: beat.visualIntent,
+          narration: beat.narration,
+          durationSec: duration,
+          aspectRatio,
+          wordTimestamps,
+          executeLlm
+        });
+        parsed = { html: improved.html, css: improved.css, buildJs: improved.buildJs };
       }
     }
 

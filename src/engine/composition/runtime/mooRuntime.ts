@@ -1,3 +1,5 @@
+import { installMographKit } from './mographKit';
+
 /**
  * Shared canvas instance and context for canvas pooling in export rendering.
  */
@@ -21,6 +23,7 @@ export function getRuntimeScript(): string {
   return `
 (function() {
   window.__MOO_SCENES__ = [];
+  const installMographKit = ${installMographKit.toString()};
   window.__MOO_READY__ = false;
 
   // 1. Seeded PRNG for deterministic rendering
@@ -204,8 +207,13 @@ export function getRuntimeScript(): string {
         words: meta.wordTimestamps || [],
         at: function(word, occurrence) {
           if (!meta.wordTimestamps) return 0;
-          const clean = String(word).toLowerCase().trim();
-          const matches = meta.wordTimestamps.filter(w => String(w.word).toLowerCase().includes(clean));
+          // Exact word first, then prefix, then substring: 'ide' must not land on 'inside'.
+          const norm = function(s) { return String(s).toLowerCase().replace(/[^\\p{L}\\p{N}%]/gu, ''); };
+          const clean = norm(word);
+          if (!clean) return 0;
+          let matches = meta.wordTimestamps.filter(w => norm(w.word) === clean);
+          if (matches.length === 0) matches = meta.wordTimestamps.filter(w => norm(w.word).startsWith(clean));
+          if (matches.length === 0) matches = meta.wordTimestamps.filter(w => norm(w.word).includes(clean));
           const idx = typeof occurrence === 'number' && occurrence > 0 ? Math.min(occurrence, matches.length - 1) : 0;
           const match = matches[idx];
           return match ? Math.max(0, match.start) : 0;
@@ -217,6 +225,11 @@ export function getRuntimeScript(): string {
       const rawSceneTl = window.gsap.timeline();
       const safeSceneTl = makeSafeTimeline(rawSceneTl);
       const safeGsap = makeSafeGsap(window.gsap);
+      try {
+        installMographKit(safeSceneTl, sceneWrapper, ctx);
+      } catch (kitErr) {
+        console.warn('Mograph kit unavailable for scene ' + current.item.id, kitErr);
+      }
       try {
         if (typeof def.build === 'function') {
           def.build(safeSceneTl, sceneWrapper, ctx);

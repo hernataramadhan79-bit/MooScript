@@ -433,6 +433,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         index: activeSceneIndex >= 0 ? activeSceneIndex : 0,
         total: scenes.length,
         aspectRatio: project.aspectRatio || '9:16',
+        wordTimestamps: activeScene.wordTimestamps,
         styleBrief: {
           adjectives: ['cinematic', 'expressive', 'bespoke'],
           palette: {
@@ -957,6 +958,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               index: i,
               total,
               aspectRatio: projectNow.aspectRatio || '9:16',
+              wordTimestamps: beat.wordTimestamps,
               styleBrief: {
                 adjectives: ['cinematic', 'expressive', 'bespoke'],
                 palette: {

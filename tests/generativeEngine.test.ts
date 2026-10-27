@@ -246,8 +246,11 @@ while(true) { eval("bad"); }
     });
 
     expect(result.status).toBe('ok');
-    expect(result.html).toContain('Prinsip Bernoulli');
+    expect(result.html).toContain('<span>Prinsip</span> <span>Bernoulli</span>');
     expect(result.html).toContain('data-moo-layer="Headline"');
+    expect(result.html).toContain('moo-camera');
+    // Narration is spoken + captioned, never pasted into the frame
+    expect(result.html).not.toContain('aliran fluida');
     expect(result.buildJs).toContain('tl.');
     expect(result.editableLayers).toBeDefined();
     expect(result.editableLayers!.length).toBeGreaterThan(0);

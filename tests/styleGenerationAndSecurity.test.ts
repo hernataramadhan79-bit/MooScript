@@ -52,9 +52,12 @@ tl.from(root.querySelector("h1"), { opacity: 0, duration: 0.5 });
       styleAdvice: advice
     });
 
-    expect(executeLlm).toHaveBeenCalledTimes(1);
-    expect(capturedUserPrompt).toContain('=== STYLE ADVICE ===');
-    expect(capturedUserPrompt).toContain(advice);
+    // The slide-like mock triggers one extra mograph-quality rewrite call
+    expect(executeLlm).toHaveBeenCalledTimes(2);
+    const firstUserPrompt = executeLlm.mock.calls[0][0].userPrompt as string;
+    expect(firstUserPrompt).toContain('=== STYLE ADVICE ===');
+    expect(firstUserPrompt).toContain(advice);
+    expect(capturedUserPrompt).toContain('SLIDE / HALAMAN WEB');
     expect(result.status).toBe('ok');
     expect(result.userEdited).toBe(false);
   });
