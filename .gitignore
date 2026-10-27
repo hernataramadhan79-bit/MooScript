@@ -36,3 +36,13 @@ coverage/
 
 # ONNX runtime wasm binaries (generated from node_modules)
 public/onnx/
+
+# Local AI-agent configs and working notes (kept on disk, not published)
+.claude/
+GEMINI.md
+CLAUDE.local.md
+PROJECT.md
+SPECIFICATION.md
+
+# One-off local scripts
+scripts/

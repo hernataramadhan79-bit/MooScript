@@ -1,183 +1,138 @@
-# MooScript Studio — Zero-Server Motion Graphics Generator
+# MooScript Studio
 
-> **Pure Client-Side, Hardware-Accelerated MP4 Video Generator** compiling text, audio, and kinetic motion graphics directly inside your browser tabs using **WebCodecs** (`VideoEncoder`), **HTML/CSS/GSAP Layered Composition Engine**, and **Mediabunny**.
-
----
-
-## 🌟 Architectural Principles
-
-1. **100% Client-Side & Zero-Server**:
-   - Runs completely on the user's device in modern web browsers.
-   - **4-Step Production Wizard**: Structured flow guiding creators from Concept (`Idea`), Theme (`Style`), Directing (`Visual Editor`), to Delivery (`Export`).
-   - Bring-Your-Own-Key (BYOK) for Gemini, OpenAI, Groq, and ElevenLabs. API keys are stored only locally in IndexedDB or sessionStorage (memory-safe mode).
-   - **Local Offline TTS Engine**: Synthesizes speech locally in the browser via Piper ONNX Web Worker without external network requests.
-   - **Decoupled Procedural BGM Engine**: Standalone or sidechained BGM generation using Web Audio API with automatic dynamic speech ducking. Modifying BGM presets re-mixes audio instantly without re-calling TTS APIs.
-   - **SubRip (.srt) & WebVTT (.vtt) Export**: Instant subtitle track generation directly from word timestamps.
-   - **Multi-Project Management**: Create, switch, duplicate, and delete multiple video projects stored locally in IndexedDB.
-   - **Installable Progressive Web App (PWA)**: Precaches assets, self-hosted typography (`Plus Jakarta Sans`, `JetBrains Mono`), and local TTS models for instant offline startup.
-
-2. **Dual-Engine Architecture (GSAP Layers + Canvas Fallback)**:
-   - **Primary Engine (v2)**: Sandboxed HTML/CSS/GSAP Layer Composition (`mooRuntime.ts`). Provides fluid kinetic typography, SVG graphics, responsive aspect ratios (9:16, 16:9, 1:1), and non-destructive layer overrides.
-   - **Legacy Engine**: 2D HTML5 Canvas renderer (`canvasRenderer.ts`) retained as a lightweight fallback.
-   - Evaluated deterministically during video compilation via GSAP timeline scrubbing (`tl.seek(t)`).
-   - 100% reproducible video renders with zero dropped frames or audio desynchronization.
-
-3. **Hardware Acceleration via WebCodecs & Canvas Pooling**:
-   - Uses browser-native `VideoEncoder` with dynamic fallback (`avc1.4d002a`, `avc1.640028`, `avc1.42001f`).
-   - **Canvas Pooling & Zero-Copy Rasterization**: Reuses a single shared canvas buffer during export to prevent memory leaks and browser tab termination on mobile and Safari iOS devices.
-   - Adaptive bitrates derived automatically from resolution, fps, and screen aspect ratio.
-   - Avoids heavy WASM FFmpeg binaries to guarantee lightweight, instant renders without crashing browser tabs.
-
-4. **Memory Safety & Backpressure Control**:
-   - Explicitly calls `videoFrame.close()` and `audioData.close()` immediately after each frame/chunk is submitted to the encoder.
-   - Enforces backpressure queue monitoring (`encodeQueueSize <= MAX_QUEUE`) and yields the event loop with `scheduler.yield()` / micro-yields to prevent memory bloat and thermal throttling.
-   - IndexedDB caching for scene audio blobs via Dexie prevents duplicate synthesis calls and RAM spikes.
+> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + GSAP, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
 
 ---
 
-## 📱 Progressive Web App (PWA) & Offline Capabilities
+## What it does
 
-MooScript Studio is a full-fledged Progressive Web App powered by `vite-plugin-pwa`:
+1. **Write an idea or a script.** The AI turns it into a **shot list** (5–10 shots of 2–4.5 s), each with one hero object and a match cut into the next shot, plus a **world bible** for the whole film: palette, a recurring motif, illustration style and camera style.
+2. **Generate the visuals.** Each shot is written as real motion graphics code (SVG-first stage, a moving camera, kinetic type) and checked by an anti-slide linter before it lands on the timeline.
+3. **Add a voice-over and music.** Cloud or fully offline TTS, Whisper word alignment, procedural background music with speech ducking.
+4. **Edit and export.** Drag layers on the canvas, tweak colors, edit the code of any shot, then export MP4 (plus SRT/VTT subtitles) locally.
 
-- **Installation**:
-  - **Android (Chrome)**: Tap the browser menu `⋮` → **Install app** or tap the prompt banner.
-  - **iOS / iPadOS (Safari)**: Tap the Share button `⎋` → **Add to Home Screen**.
-  - **Desktop (Chrome / Edge)**: Click the Install icon in the browser address bar.
-- **Offline Reliability**:
-  - All web application assets, self-hosted fonts (`Plus Jakarta Sans`, `JetBrains Mono`, `Material Symbols`), and ONNX inference runtimes are precached by the Service Worker.
-  - Local TTS Piper voice models are cached via Workbox `CacheFirst` runtime caching.
-  - Zero server dependencies. Even without an internet connection, you can compose storyboards, synthesize procedural or local voiceovers, and compile hardware-accelerated MP4 videos.
-- **Version Updates**:
-  - When an updated release is deployed, the app displays a non-intrusive notification toast offering a 1-click reload to update without losing active IndexedDB project data.
+Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ---
 
-## 🌐 Browser Compatibility Matrix
+## Features
 
-| Browser                      | OS / Platform                  |  Video Export   | Audio Encoding  | PWA Install | Status & Notes                                                                                                                            |
-| :--------------------------- | :----------------------------- | :-------------: | :-------------: | :---------: | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Google Chrome / Chromium** | Windows, macOS, Linux, Android |     ✅ Full     |     ✅ Full     |   ✅ Full   | **Recommended**. Hardware-accelerated H.264/AAC.                                                                                          |
-| **Microsoft Edge**           | Windows, macOS, Linux          |     ✅ Full     |     ✅ Full     |   ✅ Full   | **Recommended**. Hardware-accelerated H.264/AAC.                                                                                          |
-| **Brave / Opera / Vivaldi**  | Desktop & Android              |     ✅ Full     |     ✅ Full     |   ✅ Full   | Fully supported on Chromium 94+.                                                                                                          |
-| **Apple Safari**             | macOS 14.4+, iOS 17.4+         |   ⚠️ Partial    |   ⚠️ Partial    |   ✅ Full   | Supported with hardware AVC baseline. If `AudioEncoder` is unavailable in older builds, automatically exports video-only with UI warning. |
-| **Mozilla Firefox**          | Desktop & Android              | ⚠️ Experimental | ⚠️ Experimental |   ✅ Full   | WebCodecs is partially behind flags (`dom.media.webcodecs.enabled`). If unavailable, UI presents explicit guidance.                       |
+### AI motion director
 
----
+- **Shot-list storyboard + world bible** (`src/engine/ai/llm.ts`): structured output for Gemini, OpenAI, Groq, Anthropic and OpenRouter. The world bible palette becomes the project theme.
+- **Stage contract & motion grammar** (`src/engine/ai/director/motionLaws.ts`): each shot is a fixed film frame (1080×1920, 1920×1080 or 1080×1080) composed in absolute coordinates inside a `.moo-camera` layer. Frame 0 must already show the subject, nothing holds still for long, accents land on spoken words, and every shot ends with a hand-off.
+- **Shot continuity**: every shot prompt carries the world bible, its neighbouring shots and the incoming/outgoing match cut.
+- **Anti-PPT linter** (`src/engine/composition/mographLint.ts`): scores generated code for slide/web-page patterns (no camera, card layouts, pasted narration, fade-up-only motion, empty first frame, …) and requests one rewrite when needed. The rewrite is kept only if it is valid and scores better.
+- **Mograph kit** (`src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
+- **Instant visuals without AI** (`src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs.
 
-## ⚠️ Known Limitations
+### Composition runtime
 
-- **Browser WebCodecs Support**: Browsers without WebCodecs cannot export MP4 files client-side. Use modern Chrome, Edge, or updated Safari.
-- **Mobile Memory Constraints**: Very long videos (> 3 minutes at 1080p60) may encounter browser tab memory limits on low-memory mobile devices. We recommend 15–60 second formats (3–10 scenes), which is ideal for TikTok, Shorts, and Reels.
-- **Safari Storage Eviction**: Safari may evict IndexedDB storage if unused for 7 days. You can click **"Enable Persistent Mode"** in Settings to request eviction protection via `navigator.storage.persist()`.
-- **iOS Safari Backgrounding**: While encoding video on iOS Safari, keep the tab in the foreground. iOS may freeze Web Workers or canvas rasterization if the user switches apps during an active export run.
+- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single GSAP master timeline scrubbed by frame, so preview and export are identical.
+- **Flow transition** (default): the next shot is already underneath and lands with a short push while the current one hands off. Cut, fade, slide, zoom and wipe are also available.
+- Per-scene CSS is scoped to its wrapper (`scopeCss.ts`), so shots never leak styles into each other.
+- Poster frames: while the editor is paused at the start of a shot whose first frame is empty, the preview shows its first frame with content. Playback and export always render the real timeline.
+- Non-destructive layer overrides (move, scale, rotate, opacity, color) and per-scene palettes.
 
----
+### Audio
 
-## 📁 Repository Structure
+- TTS: OpenAI, ElevenLabs, or **offline Piper** voices running in a Web Worker (ONNX Runtime Web).
+- Word timestamps from Whisper alignment or a deterministic estimate; generated shots sync accents to them.
+- Procedural BGM presets or your own track, mixed with speech ducking via the Web Audio API.
 
-```
-├── .github/workflows/
-│   └── ci.yml                   # CI pipeline: TypeScript, ESLint, Vitest, and Vite build
-├── docs/design/                 # Design assets and mockups from Stitch
-├── tests/                       # Automated Vitest test suites
-│   ├── exporter.test.ts         # WebCodecs mock tests, backpressure, error capture, cancellation
-│   ├── renderer.test.ts         # Golden-frame deterministic pixel and command hash tests
-│   ├── skillManager.test.ts     # Skills CRUD, protection, JSON import/export validation
-│   ├── spring.test.ts           # Analytical harmonic oscillator spring physics & monotonic checks
-│   └── tts.test.ts              # Deterministic word alignment & fallback duration calculations
-├── src/
-│   ├── db/
-│   │   └── mooDb.ts             # Dexie IndexedDB persistence layer (projects, audio cache, settings, assets)
-│   ├── engine/
-│   │   ├── ai/
-│   │   │   ├── llm.ts           # BYOK LLM wrapper (Gemini, OpenAI, Groq) with structured outputs
-│   │   │   ├── tts.ts           # BYOK TTS wrapper (OpenAI, ElevenLabs, offline synthesizer)
-│   │   │   └── localTts.ts      # Client-side Piper ONNX speech synthesizer (100% offline)
-│   │   ├── audio/
-│   │   │   └── bgmMixer.ts      # Standalone & ducking procedural BGM synthesis (Web Audio API)
-│   │   ├── composition/         # GSAP Layered Composition Engine (v2)
-│   │   │   ├── buildDocument.ts # Self-contained HTML/CSS sandboxed stage assembler
-│   │   │   ├── layers.ts        # Layer metadata discovery, CSS overrides, palette tokens
-│   │   │   └── runtime/
-│   │   │       └── mooRuntime.ts # Iframe GSAP runtime, timeline scrubber, canvas pooling
-│   │   ├── export/
-│   │   │   └── mp4Exporter.ts   # WebCodecs VideoEncoder + Mediabunny hardware export pipeline
-│   │   └── renderer/
-│   │       └── canvasRenderer.ts # 2D Canvas fallback engine
-│   ├── features/
-│   │   └── scene/               # CodeInspectorModal: per-scene HTML/CSS/GSAP code editor
-│   ├── store/
-│   │   ├── slices/              # Modular Zustand store slices (project, audio, bgm, playback, settings)
-│   │   ├── types.ts             # Central store slice interfaces
-│   │   └── useMooStore.ts       # Unified backwards-compatible Zustand hook
-│   ├── components/
-│   │   ├── studio/              # 3-zone workstation
-│   │   │   ├── SceneDeck.tsx        # Zone 1: storyboard / scene cards
-│   │   │   ├── CompositionStage.tsx # Zone 2: sandboxed iframe stage + on-canvas layer drag/scale/rotate
-│   │   │   ├── TimelineBar.tsx      # Zone 2: scrubber & scene playhead
-│   │   │   ├── InspectorRack.tsx    # Zone 3: Mograph, Style, Assets, Audio, Export tabs
-│   │   │   └── AssetManagerPanel.tsx
-│   │   ├── ui/                  # Shared primitives (Button, Sheet, ConfirmModal, ...)
-│   │   ├── SettingsDrawer.tsx   # BYOK keys, voices, storage (lazy-loaded)
-│   │   └── ProjectManagerModal.tsx
-│   ├── types/
-│   │   └── index.ts             # TypeScript data contracts
-│   ├── App.tsx                  # Wizard stage orchestrator
-│   └── main.tsx                 # Entrypoint with self-hosted fonts
-├── LICENSE                      # MIT License
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── vitest.config.ts
-```
+### Export
+
+- WebCodecs `VideoEncoder` + [Mediabunny](https://mediabunny.dev) MP4 muxing, with codec fallbacks, backpressure control and frame cleanup.
+- Quality presets (compact / standard / high) at 24, 30 or 60 fps; captions burned in or exported as SRT / WebVTT.
+- Standalone HTML export of the composition.
+
+### App
+
+- Multi-project management, project templates, undo/redo, keyboard shortcuts.
+- Installable PWA with self-hosted fonts and offline caching of app assets, the ONNX runtime and downloaded voices.
+- API keys stay on the device (IndexedDB, or session-only mode) and are sent only to the provider you choose.
 
 ---
 
-## 🛠️ Development & Quality Assurance
+## Browser support
 
-### 1. Install Dependencies
+| Browser | Video export | Audio encoding | PWA | Notes |
+| :-- | :-: | :-: | :-: | :-- |
+| Chrome / Chromium, Edge | ✅ | ✅ | ✅ | Recommended. Hardware-accelerated H.264/AAC. |
+| Brave / Opera / Vivaldi | ✅ | ✅ | ✅ | Chromium 94+. |
+| Safari (macOS 14.4+, iOS 17.4+) | ⚠️ | ⚠️ | ✅ | Falls back to video-only export when `AudioEncoder` is missing. |
+| Firefox | ⚠️ | ⚠️ | ✅ | WebCodecs support is still partial. |
+
+### Known limitations
+
+- Exporting needs WebCodecs. Use a recent Chrome, Edge or Safari.
+- Long 1080p60 videos can hit memory limits on low-end phones. 15–60 s formats work best.
+- Safari may evict IndexedDB after 7 days of inactivity. Enable **persistent storage** in Settings.
+- Keep the tab in the foreground while exporting on iOS.
+- Generation quality depends on the model you pick. Each shot is one AI call (sometimes two when the linter asks for a rewrite).
+
+---
+
+## Getting started
+
+Requires Node.js 20 or newer.
 
 ```bash
 npm install
-```
-
-### 2. Development Server
-
-```bash
 npm run dev
 ```
 
-### 3. Run Automated Tests
+Open the app, add an API key under **Settings** (or use offline voices and instant visuals without one), type an idea and press **Susun Adegan**.
+
+### Quality gates
+
+CI runs all of these on every push and pull request to `main`:
 
 ```bash
-# Run unit & engine integration tests
-npm test
-
-# Run tests with v8 code coverage
-npm run test:coverage
+npx tsc -b        # type check
+npm run lint      # ESLint, zero warnings
+npm test          # Vitest
+npm run build     # production build
 ```
 
-### 4. Code Quality & Formatting
+`npm run test:coverage` writes a v8 coverage report; `npm run format` runs Prettier.
 
-```bash
-# Type check with strict TypeScript
-npx tsc -b
+---
 
-# Lint codebase (zero warnings enforced)
-npm run lint
+## Repository structure
 
-# Format code with Prettier
-npm run format
 ```
-
-### 5. Production Build
-
-```bash
-npm run build
+src/
+├── components/            # Workstation UI: SceneDeck, CompositionStage, TimelineBar, InspectorRack, settings, modals
+├── db/                    # Dexie (IndexedDB) persistence, asset and BGM storage, legacy demo cleanup
+├── engine/
+│   ├── ai/
+│   │   ├── llm.ts         # BYOK LLM providers, shot-list storyboard + world bible schemas
+│   │   ├── director/      # Motion director prompts, scene generation, lint-driven rewrites
+│   │   ├── tts.ts         # Cloud TTS and word alignment
+│   │   ├── localTts.ts    # Offline Piper TTS (Web Worker)
+│   │   └── voiceAlign.ts  # Whisper word-level alignment
+│   ├── audio/             # BGM mixer and waveform peaks
+│   ├── composition/       # Document builder, runtime, mograph kit, linter, CSS scoping, procedural archetypes
+│   ├── export/            # MP4 exporter, export options, subtitle export
+│   └── renderer/          # Legacy canvas renderer (old projects only)
+├── features/scene/        # Per-shot code editor
+├── store/                 # Zustand slices (project, script, audio, bgm, playback, export, settings, ui)
+└── types/                 # Shared data contracts
+tests/                     # Vitest suites and fixtures
+docs/design/               # Early design mockups
+public/                    # PWA icons, icon font, privacy page
 ```
 
 ---
 
-## 📄 License
+## License
 
-This project is open-source software licensed under the [MIT License](LICENSE).
+The MooScript Studio source code is released under the [MIT License](LICENSE).
+
+Third-party components keep their own licenses, including:
+
+- **GSAP** — [GSAP Standard "No Charge" License](https://gsap.com/standard-license) (not open source). It is bundled into the stage and into exported HTML.
+- **Mediabunny** — MPL-2.0. **ONNX Runtime Web**, React, Zustand, Zod — MIT. **Dexie**, Phonemizer — Apache-2.0.
+- **Fonts** (Plus Jakarta Sans, JetBrains Mono, Syne, Material Symbols) — SIL Open Font License 1.1.
+- **Piper voices** are downloaded at runtime from Hugging Face; each voice has its own model card and license.
