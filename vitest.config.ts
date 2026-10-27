@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import { fontDataUri } from './fontDataUriPlugin';
 
 export default defineConfig({
@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts'],
+    // Browser-only suite, run by the "golden" project in vitest.workspace.ts.
+    exclude: [...configDefaults.exclude, 'tests/golden/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

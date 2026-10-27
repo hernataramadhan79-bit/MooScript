@@ -37,7 +37,11 @@ jobs:
       - name: Lint check (ESLint)
         run: npm run lint
 
-      - name: Unit & Integration tests (Vitest)
+      # The golden-frame suite runs in Vitest browser mode on Playwright's Chromium.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Unit, integration & golden-frame tests (Vitest)
         run: npm test
 
       - name: Production build (Vite)
