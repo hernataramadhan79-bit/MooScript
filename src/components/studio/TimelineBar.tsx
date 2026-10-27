@@ -62,7 +62,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
       ? calculatedSceneDuration
       : project.audioDuration && project.audioDuration > 0
       ? project.audioDuration
-      : 10;
+      : 0;
 
   const totalFrames = Math.max(1, Math.round(totalDuration * fps));
   const currentTimeSec = currentFrame / fps;
@@ -71,19 +71,9 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
 
   // Compute scene time boundaries with Shot numbers
   const sceneBoundaries = useMemo(() => {
+    // An empty project has no shots yet: show an empty timeline, not a placeholder shot.
     if (!project.scenes || project.scenes.length === 0) {
-      return [
-        {
-          id: 'default',
-          shotNumber: 1,
-          durationInSeconds: totalDuration,
-          startSec: 0,
-          endSec: totalDuration,
-          startFrame: 0,
-          endFrame: totalFrames,
-          widthPct: 100
-        }
-      ];
+      return [];
     }
 
     let accumulated = 0;
@@ -103,7 +93,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         widthPct: totalDuration > 0 ? (dur / totalDuration) * 100 : 0
       };
     });
-  }, [project.scenes, totalDuration, fps, totalFrames]);
+  }, [project.scenes, totalDuration, fps]);
 
   // Current active scene based on playhead position (discrete frame comparison eliminates rounding jitter)
   const currentSceneIndex = sceneBoundaries.findIndex(

@@ -70,8 +70,8 @@ export const WelcomeModal: React.FC = () => {
               <span className="material-symbols-outlined text-primary text-[18px] shrink-0">key</span>
               <span>
                 API key Anda disimpan di perangkat ini dan hanya dikirim langsung ke provider yang Anda
-                pilih. Tanpa key pun Anda bisa menyunting proyek contoh, memakai suara lokal, dan
-                mengekspor.
+                pilih. Tanpa key pun Anda bisa menulis adegan sendiri, membangun visual instan, memakai
+                suara lokal, dan mengekspor.
               </span>
             </li>
             <li className="flex gap-2.5">

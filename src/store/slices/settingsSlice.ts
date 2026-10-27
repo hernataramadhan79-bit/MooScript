@@ -4,6 +4,7 @@ import { db, getCacheSize, clearAllCache, loadProjectFromDb, listProjectsFromDb,
 import { BUILTIN_SKILLS, getAllSkills, initializeSkills } from '../../engine/skills/skillManager';
 import { syncComposition } from '../../engine/composition/sync';
 import { syncCustomBgmForProject } from '../../db/customBgm';
+import { removePristineLegacyDemo } from '../../db/legacyDemo';
 import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
 import type { MooStoreState, SettingsSlice } from '../types';
 
@@ -144,6 +145,11 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
 
     // Load all projects from DB
     let allProjects = await listProjectsFromDb();
+    // Older builds seeded a demo project; drop it while it is still untouched.
+    const legacyDemo = allProjects.find((p) => p.id === DEFAULT_PROJECT_ID);
+    if (await removePristineLegacyDemo(legacyDemo)) {
+      allProjects = allProjects.filter((p) => p.id !== DEFAULT_PROJECT_ID);
+    }
     if (allProjects.length === 0) {
       await saveProjectToDb(INITIAL_PROJECT);
       allProjects = [INITIAL_PROJECT];

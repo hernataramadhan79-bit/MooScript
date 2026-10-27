@@ -1983,7 +1983,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   className="py-2 px-2.5 rounded-xl bg-surface-1 hover:bg-surface-3 border border-border text-on-surface text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[15px] text-accent">auto_fix_high</span>
-                  <span>Terapkan ke Shot #{activeSceneIndex + 1}</span>
+                  <span>{activeScene ? `Terapkan ke Shot #${activeSceneIndex + 1}` : 'Terapkan ke Shot'}</span>
                 </button>
 
                 <button

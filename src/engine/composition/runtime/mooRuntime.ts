@@ -322,6 +322,7 @@ export function getRuntimeScript(): string {
     // live overrides (set_override_css) that must not be folded into GSAP's transform.
     if (masterTl) {
       masterTl.progress(1, true);
+      measurePosterOffsets(sceneElements);
       masterTl.seek(0, false);
     }
 
@@ -375,11 +376,79 @@ export function getRuntimeScript(): string {
     return rects;
   }
 
-  function seekTo(t) {
+  // Poster frames: a scene whose first frame shows no content (everything still animating in)
+  // would make a paused editor look black at that scene's start. For such scenes we remember the
+  // first moment real content is visible and show that while the editor is paused there.
+  // Playback and export always render the true timeline.
+  const POSTER_SHAPES = { path: 1, circle: 1, rect: 1, line: 1, polyline: 1, polygon: 1, ellipse: 1, text: 1, tspan: 1, image: 1, use: 1 };
+  let posterRanges = [];
+
+  function hasVisibleContent(wrapper, stageArea) {
+    const nodes = wrapper.querySelectorAll('*');
+    const limit = Math.min(nodes.length, 600);
+    for (let i = 0; i < limit; i++) {
+      const el = nodes[i];
+      const tag = String(el.tagName || '').toLowerCase();
+      let paints = POSTER_SHAPES[tag] === 1 || tag === 'img' || tag === 'canvas' || tag === 'video';
+      if (!paints) {
+        for (let c = el.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3 && String(c.nodeValue || '').trim()) { paints = true; break; }
+        }
+      }
+      if (!paints) continue;
+      const r = el.getBoundingClientRect();
+      const ratio = (r.width * r.height) / stageArea;
+      if (ratio < 0.00002 || ratio > 0.9) continue;
+      let alpha = 1;
+      let hidden = false;
+      for (let n = el; n && n !== wrapper.parentNode; n = n.parentElement) {
+        const cs = window.getComputedStyle(n);
+        if (cs.visibility === 'hidden' || cs.display === 'none') { hidden = true; break; }
+        alpha *= parseFloat(cs.opacity || '1');
+        if (alpha < 0.3) break;
+      }
+      if (!hidden && alpha >= 0.3) return true;
+    }
+    return false;
+  }
+
+  function measurePosterOffsets(sceneElements) {
+    posterRanges = [];
+    const stageRect = stageElem.getBoundingClientRect();
+    const stageArea = Math.max(1, stageRect.width * stageRect.height);
+    const samples = [0.1, 0.2, 0.35, 0.5, 0.7, 0.9, 1.2, 1.5];
+    let start = 0;
+    for (let i = 0; i < sceneElements.length; i++) {
+      const wrapper = sceneElements[i].wrapper;
+      const dur = sceneElements[i].duration;
+      try {
+        masterTl.seek(start + 0.001, true);
+        if (!hasVisibleContent(wrapper, stageArea)) {
+          for (let k = 0; k < samples.length && samples[k] <= dur * 0.5; k++) {
+            masterTl.seek(start + samples[k], true);
+            if (hasVisibleContent(wrapper, stageArea)) {
+              posterRanges.push({ start: start, end: start + samples[k] });
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+      start += dur;
+    }
+    window.__MOO_POSTERS__ = posterRanges;
+  }
+
+  function seekTo(t, still) {
     t = Number(t) || 0;
     virtualTimeSeconds = t;
+    let renderT = t;
+    if (still) {
+      for (let i = 0; i < posterRanges.length; i++) {
+        if (t >= posterRanges[i].start && t < posterRanges[i].end) { renderT = posterRanges[i].end; break; }
+      }
+    }
     if (masterTl) {
-      masterTl.seek(t, false);
+      masterTl.seek(renderT, false);
     }
     // Overlay hook (subtitles). Must never break seeking.
     if (typeof window.__MOO_AFTER_SEEK__ === 'function') {
@@ -416,7 +485,7 @@ export function getRuntimeScript(): string {
       await initMasterTimeline(data.meta);
     } else if (data.type === 'seek') {
       const t = Number(data.time) || 0;
-      seekTo(t);
+      seekTo(t, data.still === true);
       window.parent.postMessage({ type: 'seeked', id: data.id, time: t }, '*');
     } else if (data.type === 'query_layer_rects') {
       const rects = computeLayerRects(data.sceneId);

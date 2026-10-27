@@ -47,7 +47,7 @@ export function applyWorldBible(project: MooProject, world: WorldBible | undefin
 
 export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice> = (set, get) => ({
   isGeneratingScript: false,
-  scriptPrompt: 'Tips meningkatkan produktivitas dan fokus kerja harian',
+  scriptPrompt: '',
   setScriptPrompt: (scriptPrompt) => set({ scriptPrompt }),
 
   cancelGenerateScript: () => {

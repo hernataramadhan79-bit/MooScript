@@ -105,6 +105,14 @@ describe('Composition document: scoping, flow transition, world palette', () => 
     expect(getRuntimeScript()).toContain("transitionType === 'flow'");
   });
 
+  it('shows a poster frame only while the editor is paused, never during playback or export', () => {
+    const script = getRuntimeScript();
+    expect(script).toContain('measurePosterOffsets(sceneElements)');
+    expect(script).toContain("seekTo(t, data.still === true)");
+    // Frame capture for export keeps rendering the true timeline
+    expect(script).toMatch(/data\.type === 'capture'\) \{\s*const t = Number\(data\.time\) \|\| 0;\s*seekTo\(t\);/);
+  });
+
   it('uses the world bible primary for --moo-primary', () => {
     const project = makeProject();
     expect(getProjectPalette(project).primary).toBe('#38bdf8');

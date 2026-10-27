@@ -15,7 +15,7 @@ import {
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
 import { migrateLegacyProject } from '../src/engine/composition/migrate';
 import { useMooStore } from '../src/store/useMooStore';
-import { INITIAL_PROJECT } from '../src/store/slices/projectSlice';
+import { DEMO_PROJECT } from './fixtures/demoProject';
 import type { MooProject, StoryBeat, StyleBrief, GeneratedScene } from '../src/types';
 
 describe('Generative Mograph Engine Suite', () => {
@@ -34,7 +34,7 @@ describe('Generative Mograph Engine Suite', () => {
   };
 
   beforeEach(() => {
-    useMooStore.setState({ project: INITIAL_PROJECT });
+    useMooStore.setState({ project: DEMO_PROJECT });
   });
 
   /* ------------------------------------------------------------------ *

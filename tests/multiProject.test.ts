@@ -135,7 +135,9 @@ describe('Store Multi-Project Actions', () => {
     const current = useMooStore.getState().project;
     expect(current.id).toBe(newId);
     expect(current.title).toBe('My Cool Short');
-    expect(current.scenes.length).toBe(1);
+    // New projects start empty: no script, no scenes, no generated code
+    expect(current.scenes.length).toBe(0);
+    expect(current.composition?.scenes || []).toEqual([]);
 
     // Verify it is in projectsList
     const list = useMooStore.getState().projectsList;

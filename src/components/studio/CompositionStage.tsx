@@ -41,6 +41,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const fps = useMooStore((s) => s.project.fps || 30);
   const projectId = useMooStore((s) => s.project.id);
   const currentFrame = useMooStore((s) => s.currentFrame);
+  const isPlaying = useMooStore((s) => s.isPlaying);
   const projectAspectRatio = useMooStore((s) => s.project.aspectRatio);
   const updateProjectAspectRatio = useMooStore((s) => s.updateProjectAspectRatio);
   const previewMode = useMooStore((s) => s.previewMode);
@@ -77,6 +78,9 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   latestTimeRef.current = currentTime;
   const latestFrameRef = useRef(currentFrame);
   latestFrameRef.current = currentFrame;
+  // While paused the runtime may show a scene's poster frame instead of an empty first frame.
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
 
   // Determine active scene at current playhead or from activeSceneId
   const currentSceneId = React.useMemo(() => {
@@ -223,6 +227,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           iframeRef.current?.contentWindow?.postMessage(
             {
               type: 'seek',
+              still: !isPlayingRef.current,
               time: latestTimeRef.current,
               id: latestFrameRef.current
             },
@@ -240,6 +245,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           theaterIframeRef.current?.contentWindow?.postMessage(
             {
               type: 'seek',
+              still: !isPlayingRef.current,
               time: latestTimeRef.current,
               id: latestFrameRef.current
             },
@@ -259,6 +265,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       iframeRef.current.contentWindow.postMessage(
         {
           type: 'seek',
+          still: !isPlayingRef.current,
           time: currentTime,
           id: currentFrame
         },
@@ -269,13 +276,14 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       theaterIframeRef.current.contentWindow.postMessage(
         {
           type: 'seek',
+          still: !isPlayingRef.current,
           time: currentTime,
           id: currentFrame
         },
         '*'
       );
     }
-  }, [currentFrame, currentTime, isReady, previewMode]);
+  }, [currentFrame, currentTime, isReady, previewMode, isPlaying]);
 
   // Highlight selected layer inside iframe runtime & refresh rects
   useEffect(() => {
@@ -513,6 +521,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               iframeRef.current.contentWindow.postMessage(
                 {
                   type: 'seek',
+                  still: !isPlayingRef.current,
                   time: latestTimeRef.current,
                   id: latestFrameRef.current
                 },
@@ -698,6 +707,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                     theaterIframeRef.current.contentWindow.postMessage(
                       {
                         type: 'seek',
+                        still: !isPlayingRef.current,
                         time: latestTimeRef.current,
                         id: latestFrameRef.current
                       },

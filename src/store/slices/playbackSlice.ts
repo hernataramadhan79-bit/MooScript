@@ -19,7 +19,7 @@ function getPlaybackTotalDuration(project: any): number {
   if (project?.composition?.duration && project.composition.duration > 0) {
     return project.composition.duration;
   }
-  return 10;
+  return 0;
 }
 
 function cancelPlaybackRaf() {
@@ -88,6 +88,8 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
     const state = get();
     const fps = state.project.fps || 30;
     const totalDuration = getPlaybackTotalDuration(state.project);
+    // Nothing to play in an empty project.
+    if (totalDuration <= 0) return;
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
 
     let startFrame = state.currentFrame;
