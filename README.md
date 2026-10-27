@@ -128,7 +128,21 @@ public/                    # PWA icons, icon font, privacy page
 
 ## License
 
-The MooScript Studio source code is released under the [MIT License](LICENSE).
+Copyright (C) 2026 hernataramadhan79-bit and MooScript Studio contributors.
+
+Starting with this version, MooScript Studio is free software released under the [GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later). You may use, study, modify and share it, but if you distribute a modified version **or run it for other people over a network** (for example as a hosted website), you must make the complete source code of your version available to them under the same license.
+
+Versions published before this change remain available under the MIT License they were released with.
+
+### Additional permission for GSAP (AGPL section 7)
+
+The stage runtime currently relies on GSAP, which is distributed under its own non-free [GSAP Standard "No Charge" License](https://gsap.com/standard-license). As the copyright holders, we grant this additional permission:
+
+> If you modify this Program, or any covered work, by linking or combining it with GSAP (or a modified version of that library), containing parts covered by the terms of the GSAP Standard "No Charge" License, the licensors of this Program grant you additional permission to convey the resulting work. Corresponding Source for a non-source form of such a combination shall include the source code for the parts of GSAP used as well as that of the covered work.
+
+This permission covers GSAP only. Your use of GSAP itself stays subject to its own license. The permission will no longer be needed once the stage moves to its own animation engine.
+
+### Third-party components
 
 Third-party components keep their own licenses, including:
 
