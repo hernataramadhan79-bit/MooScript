@@ -195,6 +195,12 @@ export function lintMographQuality(
   if (!kitHandoff && !/ctx\.dur\s*-|\b(D|dur|DUR)\s*-\s*\d/.test(js)) {
     add('no-handoff', 1, 'Tidak ada aksi keluar/hand-off di akhir shot: pakai ctx.camera({ handoff }) atau animasikan keluar pada posisi ctx.dur - 0.4.');
   }
+  // --- Scope ----------------------------------------------------------------------
+  // Selector strings in tl calls resolve inside this shot; document-wide lookups do not and can grab
+  // another shot's elements that share a class name.
+  if (/\bdocument\s*\.\s*(?:querySelector(?:All)?|getElementById|getElementsBy(?:ClassName|TagName|Name))\s*\(/.test(js)) {
+    add('global-selector', 1, 'Pencarian elemen lewat document.* bisa mengenai elemen shot lain: pakai root.querySelector(...) atau selector string langsung di tl.to(...).');
+  }
   if (options.hasWordTimestamps && !/ctx\.(at|beat)\s*\(/.test(js)) {
     add('unsynced', 1, 'Timestamp kata tersedia tapi tidak dipakai: jatuhkan aksen tepat di ctx.beat(\'kata\', detikCadangan).');
   }

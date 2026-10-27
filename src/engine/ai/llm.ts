@@ -1278,7 +1278,7 @@ async function generateWithOpenRouter(
 
 /**
  * Freeform LLM text/code generation without JSON-schema constraint.
- * Used for AI Director code generation (HTML/CSS/GSAP) and custom scripting.
+ * Used for AI Director code generation (HTML/CSS/MooTween timeline) and custom scripting.
  */
 export async function callRawLLM(opts: {
   provider: LLMProvider;

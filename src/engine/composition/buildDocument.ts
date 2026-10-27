@@ -360,7 +360,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
-  <!-- MooTween animation engine (also exposed as window.gsap for scene code) -->
+  <!-- MooTween: MooScript's animation engine (window.gsap stays as an alias for older scenes) -->
   <script>
     (${installMooTween.toString()})(window);
   </script>

@@ -121,7 +121,7 @@ tl.from(root.children, { opacity: 0, duration: 0.5 });
 .card { width: 100%; }
 \`\`\`
 \`\`\`javascript
-// missing gsap animation
+// missing timeline animation
 \`\`\``;
     });
 

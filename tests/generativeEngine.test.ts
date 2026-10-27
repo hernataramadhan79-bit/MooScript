@@ -113,9 +113,9 @@ describe('Generative Mograph Engine Suite', () => {
   });
 
   /* ------------------------------------------------------------------ *
-   * Criterion 3: Custom generation produces valid HTML/CSS/GSAP       *
+   * Criterion 3: Custom generation produces valid HTML/CSS/MooTween      *
    * ------------------------------------------------------------------ */
-  it('3. Generates custom bespoke HTML/CSS/GSAP and extracts editable layers', async () => {
+  it('3. Generates custom bespoke HTML/CSS/MooTween and extracts editable layers', async () => {
     const beat: StoryBeat = {
       id: 'beat-custom-1',
       narration: 'Pesawat terangkat karena perbedaan tekanan udara.',
@@ -290,7 +290,7 @@ while(true) { eval("bad"); }
   /* ------------------------------------------------------------------ *
    * Criterion 6: Non-destructive overrides compile into CSS rules      *
    * ------------------------------------------------------------------ */
-  it('6. Non-destructive overrides compile into CSS individual transform properties without fighting GSAP', () => {
+  it('6. Non-destructive overrides compile into CSS individual transform properties that compose with the animation', () => {
     const overrides = {
       headline: {
         x: 45,

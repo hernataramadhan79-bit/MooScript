@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validateSceneCode } from '../src/engine/composition/validator';
 
 describe('Composition Code Validator', () => {
-  it('allows safe GSAP timeline manipulation and scoped CSS', () => {
+  it('allows safe MooTween timeline manipulation and scoped CSS', () => {
     const validCode = {
       html: '<div class="banner"><h1>Hello World</h1></div>',
       css: '.banner { width: 100%; height: 100%; display: flex; }',

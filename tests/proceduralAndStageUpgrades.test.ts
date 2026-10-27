@@ -79,7 +79,7 @@ describe('Procedural Mograph Compiler & Semantic Widgets', () => {
     ).toBe('chart-data');
   });
 
-  it('compiles valid, deterministic HTML/CSS/GSAP and editable layers for all archetypes', () => {
+  it('compiles valid, deterministic HTML/CSS/MooTween and editable layers for all archetypes', () => {
     for (const arch of PROCEDURAL_ARCHETYPES) {
       const mod = compileProceduralScene(sampleScene, 0, 3, undefined, arch.id);
       expect(mod.status).toBe('ok');
@@ -200,7 +200,7 @@ describe('Store Upgrades: Undo/Redo Integrity, Procedural Compilation, Multi-Ass
     expect(useMooStore.getState().audioStale).toBe(true);
   });
 
-  it('prevents multi-asset GSAP selector collision and extracts editableLayers when inserting multiple assets', () => {
+  it('prevents multi-asset selector collision and extracts editableLayers when inserting multiple assets', () => {
     const store = useMooStore.getState();
     const sceneId = store.project.scenes[0].id;
     store.compileSceneProcedural(sceneId, 'kinetic-impact');

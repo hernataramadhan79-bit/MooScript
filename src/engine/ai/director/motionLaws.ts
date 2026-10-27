@@ -5,9 +5,38 @@ import type { SceneAssetAttachment } from '../../../types';
  * Core Motion Graphics Director Laws & Prompts
  * 
  * Grounded in generative cinematic motion design principles.
- * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and GSAP animation code
+ * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and MooTween timeline code
  * based on the concept and narrative — NEVER constrained by fixed slide or text templates.
  */
+
+/**
+ * MooTween is MooScript's own seek-only animation engine. This is the part of its timeline API the
+ * model may use; anything outside it is rejected by the validator with a repair message.
+ */
+export const MOOTWEEN_RUNTIME_RULES = `=== MOOTWEEN TIMELINE (MooScript animation engine) ===
+- Animate through the provided 'tl' (a MooTween timeline). Signature: (tl, root, ctx, MooTween).
+- DO NOT redeclare 'tl', 'root', 'ctx', or 'MooTween'. No import/export, no function wrapper, no DOMContentLoaded.
+- Target elements with root.querySelector() / root.querySelectorAll(), or selector strings in tl calls
+  (they only match inside this shot). Never use document.querySelector / getElementById.
+- Total shot duration is ctx.dur seconds; every tween must finish within [0, ctx.dur].
+- Supported:
+  tl.to / tl.from / tl.fromTo / tl.set / tl.add / tl.addLabel / tl.call, chained or with a position:
+    seconds (1.2), '+=0.3' / '-=0.3', '<' / '>' (start / end of the previous tween), '<0.2', a label ('hit+=0.1').
+  vars: duration, delay, ease, stagger (number or { each | amount, from: 'start'|'center'|'end'|'edges'|index }),
+    repeat (-1 loops for the whole shot), yoyo, repeatDelay, keyframes: [{...}, {...}], immediateRender,
+    onStart / onUpdate / onComplete.
+  eases: 'none', power1-4 / quad / cubic / quart / quint / sine / expo / circ with .in .out .inOut,
+    'back.out(1.7)', 'elastic.out(1, 0.3)', 'bounce.out', 'steps(5)'.
+  properties: x, y (px or '%'), xPercent, yPercent, scale, scaleX, scaleY, rotation, rotationX, rotationY,
+    skewX, skewY, transformOrigin, svgOrigin (SVG, viewBox units), transformPerspective, opacity, autoAlpha,
+    numeric CSS (width, height, left, top, fontSize, letterSpacing, borderRadius ...), colors (hex, rgb, hsl,
+    var(--moo-*)), clipPath, filter, boxShadow (same shape at start and end), strokeDasharray,
+    strokeDashoffset, fill, stroke, attr: { cx, cy, r, d (same point count) }, relative '+=' / '-=' values,
+    plain objects for counters ({ v: 0 }).
+  helpers: MooTween.utils.clamp / interpolate / mapRange / wrap / toArray.
+- Not available (use the ctx helpers instead): plugins and registerPlugin (ScrollTrigger, MotionPath,
+  MorphSVG, SplitText, DrawSVG, Draggable, Text), ticker, context, matchMedia, quickTo, quickSetter.
+  Split text with ctx.kinetic / ctx.split, draw strokes with ctx.draw, move along a circle with ctx.orbit.`;
 
 /**
  * Reference scene shown to the model. It demonstrates the motion grammar (poster-ready frame 0,
@@ -75,7 +104,7 @@ ctx.punch('.ex-core', { at: hit, scale: 1.35 });
 
 export const MOTION_DIRECTOR_SYSTEM_PROMPT = `
 You are the MooScript Elite Motion Graphics Director & Code Architect.
-You write one SHOT of a motion graphics film as HTML (mostly SVG), scoped CSS, and a GSAP timeline.
+You write one SHOT of a motion graphics film as HTML (mostly SVG), scoped CSS, and a MooTween timeline.
 It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landing-page section.
 
 === STAGE CONTRACT (WAJIB) ===
@@ -145,11 +174,7 @@ ${REFERENCE_SCENE_EXAMPLE}
   var(--moo-bg, <bg>), var(--moo-text, <text>), var(--moo-accent, <accent>), var(--moo-primary, <primary>).
 - Tag major editable elements with data-moo-layer="layer-id" (e.g. "camera", "airplane", "airflow", "headline").
 
-=== GSAP RUNTIME ===
-- Animate through the provided 'tl' (GSAP Timeline). Signature: (tl, root, ctx, gsap).
-- DO NOT redeclare 'tl', 'root', 'ctx', or 'gsap'. No import/export, no function wrapper, no DOMContentLoaded.
-- Target elements with root.querySelector() / root.querySelectorAll().
-- Total shot duration is ctx.dur seconds; every tween must finish within [0, ctx.dur].
+${MOOTWEEN_RUNTIME_RULES}
 
 === DETERMINISM & CODE SECURITY LAWS ===
 - NEVER use Math.random(). Use ctx.rand() for deterministic pseudo-random values.
@@ -248,7 +273,7 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
        <img src="${asset.dataUrl}" alt="${escapeHtml(asset.assetName || 'Asset')}" class="moo-asset-img" />
      </div>
   2. Berikan CSS styling yang kohesif pada .moo-asset-frame dan .moo-asset-img (misal: potongan transparan, mask bentuk, frame bercahaya, ukuran proporsional; posisikan absolut di panggung, bukan kartu).
-  3. Animasikan dengan GSAP (tl.from / tl.to) terkoordinasi dengan teks dan grafik adegan!`
+  3. Animasikan dengan timeline MooTween (tl.from / tl.to) terkoordinasi dengan teks dan grafik adegan!`
       ).join('\n') + '\n';
   }
 
@@ -314,7 +339,7 @@ ${worldSnippet ? `=== DUNIA FILM (sama di semua shot) ===\n${worldSnippet}\n` : 
 3. Root .scene-s${beatIndex + 1} berukuran 100% x 100%; semua isi berada di dalam <div class="moo-camera" data-moo-layer="camera">.
 4. Minimal 3 lapisan kedalaman bertanda data-moo-layer (latar, objek tengah, depan).
 5. Frame 0 = poster: latar, kamera, dan subjek utama SUDAH terlihat di t=0 (jangan mulai dari opacity 0 / scale 0). Kamera bergerak sepanjang ctx.dur, tidak ada jeda diam > 0.8s, dan ada aksi keluar di ctx.dur - 0.4.
-6. Kode GSAP dieksekusi langsung dengan parameter (tl, root, ctx, gsap). JANGAN deklarasikan ulang 'tl' atau 'root'. Hasilkan HANYA 3 blok kode tanpa kata pembuka atau penutup.
+6. Kode timeline MooTween dieksekusi langsung dengan parameter (tl, root, ctx, MooTween). JANGAN deklarasikan ulang 'tl' atau 'root'. Hasilkan HANYA 3 blok kode tanpa kata pembuka atau penutup.
 
 === FORMAT OUTPUT WAJIB ===
 Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tambahan di luar blok):
@@ -341,7 +366,7 @@ Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tamba
 \`\`\`
 
 \`\`\`javascript
-// Function signature: (tl, root, ctx, gsap)
+// Function signature: (tl, root, ctx, MooTween)
 // root adalah elemen wadah scene. ctx.dur adalah durasi (${durationSec.toFixed(1)}s).
 ctx.camera({ move: 'push', handoff: 'zoom' });   // kamera + hand-off
 ctx.hero('.subjek-utama');                        // terlihat di frame 0
@@ -369,7 +394,7 @@ TUGAS ANDA:
 Segera tuliskan 3 blok kode lengkap (html, css, javascript) yang valid:
 1. Blok html: wadah <div class="scene-s1"> dengan elemen data-moo-layer="..."
 2. Blok css: styling ter-scope untuk scene
-3. Blok javascript: timeline GSAP (tl.from / tl.to) mengontrol animasi visual
+3. Blok javascript: timeline MooTween (tl.from / tl.to) mengontrol animasi visual
 
 PENTING:
 - Keluarkan HANYA 3 blok kode (\`\`\`html, \`\`\`css, \`\`\`javascript).

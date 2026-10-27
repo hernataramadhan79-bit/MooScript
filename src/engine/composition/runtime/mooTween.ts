@@ -1,10 +1,11 @@
 /**
- * MooTween: the stage iframe's own animation engine.
+ * MooTween: MooScript's own animation engine, running inside the stage iframe.
  *
- * A seek-only engine that implements the GSAP-style subset MooScript scenes use: timelines with
- * to / from / fromTo / set, position parameters, staggers, eases, repeat/yoyo, keyframes, CSS,
- * transform, color, complex-string, SVG and attr properties, and callbacks. Nothing ticks in real
- * time; every frame is produced by seek(t).
+ * A seek-only engine with the timeline API MooScript scenes use: timelines with to / from / fromTo /
+ * set, position parameters, staggers, eases, repeat/yoyo, keyframes, CSS, transform, color,
+ * complex-string, SVG and attr properties, and callbacks. Nothing ticks in real time; every frame is
+ * produced by seek(t). The API keeps the GSAP-style shape, so scenes written before MooTween run
+ * unchanged.
  *
  * Rendering follows the order the existing scenes were authored against: moving forward, children
  * render in start order; moving backward, in reverse; a child whose clamped time did not change is
@@ -952,7 +953,7 @@ export function installMooTween(win: any): any {
       const fromSpec = mode === 'to' ? undefined : resolveSpec(fromVars[key], i, t, targets);
       const toSpec = mode === 'from' ? undefined : resolveSpec(toVars[key], i, t, targets);
       if (PLUGINS.indexOf(key) >= 0) {
-        warnOnce('plugin:' + key, '"' + key + '" needs a GSAP plugin MooTween does not have; ignored.');
+        warnOnce('plugin:' + key, '"' + key + '" needs a plugin MooTween does not have; ignored.');
         return;
       }
       if (key === 'attr') {
@@ -1804,7 +1805,7 @@ export function installMooTween(win: any): any {
       lagSmoothing: noop,
       fps: noop,
       add(): void {
-        warnOnce('ticker.add', 'gsap.ticker.add is not supported: the stage renders by seek, never in real time.');
+        warnOnce('ticker.add', 'ticker.add() is not supported: MooTween renders by seek, never in real time.');
       },
       remove: noop,
       time: 0,
@@ -1863,23 +1864,23 @@ export function installMooTween(win: any): any {
       easeMap[String(name).toLowerCase()] = fn;
     },
     registerPlugin(): void {
-      warnOnce('registerPlugin', 'GSAP plugins are not available in MooTween; registerPlugin() is ignored.');
+      warnOnce('registerPlugin', 'MooTween has no plugins; registerPlugin() is ignored.');
     },
     context(fn?: any): any {
-      warnOnce('context', 'gsap.context() is not supported; running its function directly.');
+      warnOnce('context', 'context() is not supported; running its function directly.');
       if (isFn(fn)) fn();
       return { add: noop, revert: noop, kill: noop };
     },
     matchMedia(): any {
-      warnOnce('matchMedia', 'gsap.matchMedia() is not supported.');
+      warnOnce('matchMedia', 'matchMedia() is not supported.');
       return { add: noop, revert: noop, kill: noop };
     },
     quickTo(): any {
-      warnOnce('quickTo', 'gsap.quickTo() is not supported.');
+      warnOnce('quickTo', 'quickTo() is not supported.');
       return noop;
     },
     quickSetter(): any {
-      warnOnce('quickSetter', 'gsap.quickSetter() is not supported.');
+      warnOnce('quickSetter', 'quickSetter() is not supported.');
       return noop;
     },
     killTweensOf: noop,
@@ -1892,6 +1893,7 @@ export function installMooTween(win: any): any {
   };
 
   win.MooTween = api;
+  // Alias for scenes written before MooTween.
   win.gsap = api;
   return api;
 }

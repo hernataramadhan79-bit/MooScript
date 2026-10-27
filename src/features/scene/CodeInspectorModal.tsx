@@ -3,7 +3,11 @@ import { useMooStore } from '../../store/useMooStore';
 import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
-import { validateSceneCode } from '../../engine/composition/validator';
+import {
+  findUnsupportedTimelineApis,
+  unsupportedTimelineApiMessage,
+  validateSceneCode
+} from '../../engine/composition/validator';
 import type { SceneModule, Composition } from '../../types';
 
 interface CodeInspectorModalProps {
@@ -47,6 +51,12 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
     if (!validation.valid) {
       setErrors(validation.errors);
       addToast('Perubahan memiliki error validasi determinisme/keamanan', 'error');
+      return;
+    }
+    const unsupported = findUnsupportedTimelineApis(jsCode);
+    if (unsupported.length > 0) {
+      setErrors(unsupported.map(unsupportedTimelineApiMessage));
+      addToast('Kode memakai API yang tidak tersedia di MooTween', 'error');
       return;
     }
 
@@ -106,7 +116,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
   const tabs = [
     { value: 'html' as const, label: 'HTML Markup', icon: 'code' },
     { value: 'css' as const, label: 'CSS Styling', icon: 'css' },
-    { value: 'js' as const, label: 'GSAP Animation', icon: 'javascript' }
+    { value: 'js' as const, label: 'MooTween Animation', icon: 'javascript' }
   ];
 
   return (
@@ -114,7 +124,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       isOpen={isOpen}
       onClose={onClose}
       title="Code Inspector: Mograph Editor"
-      description="Edit langsung struktur DOM, style CSS, dan kurva animasi GSAP untuk scene ini."
+      description="Edit langsung struktur DOM, style CSS, dan timeline animasi MooTween untuk scene ini."
       maxWidth="max-w-3xl"
     >
       <div className="flex flex-col gap-4">
@@ -159,7 +169,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
               value={jsCode}
               onChange={(e) => setJsCode(e.target.value)}
               className="w-full h-72 bg-transparent p-3 text-amber-300 focus:outline-none resize-none font-mono text-[13px] leading-relaxed"
-              placeholder="// Manipulasi tl GSAP timeline..."
+              placeholder="// Animasikan lewat timeline MooTween: tl.to / tl.from / ctx.*"
             />
           )}
         </div>

@@ -99,9 +99,9 @@ export function getRuntimeScript(): string {
       });
     }
 
-    function makeSafeGsap(realGsap) {
-      if (typeof Proxy === 'undefined') return realGsap;
-      return new Proxy(realGsap, {
+    function makeSafeEngine(realEngine) {
+      if (typeof Proxy === 'undefined') return realEngine;
+      return new Proxy(realEngine, {
         get: function(target, prop, receiver) {
           const val = Reflect.get(target, prop, receiver);
           if (typeof val === 'function' && (prop === 'to' || prop === 'from' || prop === 'fromTo' || prop === 'set')) {
@@ -220,10 +220,10 @@ export function getRuntimeScript(): string {
       };
 
       // Selectors resolve inside this shot only, repeat: -1 covers this shot, and standalone
-      // gsap.to()/from() calls made while it builds join its timeline.
+      // MooTween.to()/from() calls made while it builds join its timeline.
       const rawSceneTl = engine.timeline({ scope: sceneWrapper, repeatSpan: duration });
       const safeSceneTl = makeSafeTimeline(rawSceneTl);
-      const safeGsap = makeSafeGsap(engine);
+      const safeEngine = makeSafeEngine(engine);
       engine.activeTimeline = rawSceneTl;
       try {
         installMographKit(safeSceneTl, sceneWrapper, ctx);
@@ -234,8 +234,9 @@ export function getRuntimeScript(): string {
         if (typeof def.build === 'function') {
           def.build(safeSceneTl, sceneWrapper, ctx);
         } else if (typeof def.buildSrc === 'string' && def.buildSrc.trim()) {
-          const fn = new Function('tl', 'root', 'ctx', 'gsap', def.buildSrc);
-          fn(safeSceneTl, sceneWrapper, ctx, safeGsap);
+          // 'gsap' stays as an alias so scenes saved before MooTween keep running.
+          const fn = new Function('tl', 'root', 'ctx', 'MooTween', 'gsap', def.buildSrc);
+          fn(safeSceneTl, sceneWrapper, ctx, safeEngine, safeEngine);
         }
       } catch (err) {
         console.error('Error in scene build(): ' + current.item.id, err);
@@ -322,9 +323,9 @@ export function getRuntimeScript(): string {
       } catch(e) {}
     }
 
-    // Initial render at frame 0. Rendering to the end first initializes every tween now, so GSAP
-    // reads each layer's CSS translate/scale/rotate exactly once, before the editor can push
-    // live overrides (set_override_css) that must not be folded into GSAP's transform.
+    // Initial render at frame 0. Rendering to the end first initializes every tween now, in time
+    // order, so each tween reads its start values once, before the editor pushes live overrides
+    // (set_override_css).
     if (masterTl) {
       masterTl.progress(1, true);
       measurePosterOffsets(sceneElements);

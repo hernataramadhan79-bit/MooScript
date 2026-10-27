@@ -63,7 +63,7 @@ export function cleanGeneratedJs(rawJs: string): string {
   // Strip any wrapping <script> tags
   js = js.replace(/<\/?script\b[^>]*>/gi, '');
 
-  // Strip ES import statements (e.g. `import gsap from 'gsap';` or multiline import { ... } from '...')
+  // Strip ES import statements (e.g. `import gsap from 'gsap';` from GSAP-trained models, or multiline import { ... } from '...')
   js = js.replace(/(?:^|\n)\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '\n');
   js = js.replace(/(?:^|\n)\s*import\s+['"][^'"]+['"]\s*;?/g, '\n');
   js = js.replace(/^\s*import\b[^\n;]+;?\s*$/gm, '').trim();
@@ -78,10 +78,10 @@ export function cleanGeneratedJs(rawJs: string): string {
   }
 
   // Unwrap outer function wrapper even with preceding comments or whitespace:
-  // e.g.: function(tl, root, ctx, gsap) { ... }
-  // or: function buildScene(tl, root, ctx, gsap) { ... }
-  // or: (tl, root, ctx, gsap) => { ... }
-  // or: const build = (tl, root, ctx, gsap) => { ... }
+  // e.g.: function(tl, root, ctx, MooTween) { ... }
+  // or: function buildScene(tl, root, ctx, gsap) { ... }   (older GSAP-style signature)
+  // or: (tl, root, ctx) => { ... }
+  // or: const build = (tl, root, ctx) => { ... }
   const withoutComments = js
     .replace(/^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/g, '')
     .replace(/(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/|\s)*$/g, '');
@@ -90,7 +90,7 @@ export function cleanGeneratedJs(rawJs: string): string {
   );
   if (fnWrapperMatch && fnWrapperMatch[1]) {
     const body = fnWrapperMatch[1].trim();
-    if (body.includes('tl') || body.includes('gsap') || body.includes('root') || body.includes('ctx')) {
+    if (body.includes('tl') || body.includes('MooTween') || body.includes('gsap') || body.includes('root') || body.includes('ctx')) {
       js = body;
     }
   }
@@ -101,14 +101,14 @@ export function cleanGeneratedJs(rawJs: string): string {
   );
   if (domLoadedMatch && (domLoadedMatch[1] || domLoadedMatch[2])) {
     const inner = (domLoadedMatch[1] || domLoadedMatch[2]).trim();
-    if (inner.includes('tl') || inner.includes('gsap')) {
+    if (inner.includes('tl') || inner.includes('MooTween') || inner.includes('gsap')) {
       js = inner;
     }
   }
 
-  // Strip duplicate declarations of parameters provided in runtime scope (tl, root, ctx, gsap)
-  // Find any custom timeline variable names assigned to gsap.timeline(...) and normalize to tl
-  const customTlVarMatches = js.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:window\.)?gsap\.timeline\b/g);
+  // Strip duplicate declarations of parameters provided in runtime scope (tl, root, ctx, MooTween, gsap)
+  // Find any custom timeline variable names assigned to MooTween.timeline(...) / gsap.timeline(...) and normalize to tl
+  const customTlVarMatches = js.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\b/g);
   for (const match of customTlVarMatches) {
     const varName = match[1];
     if (varName && varName !== 'tl') {
@@ -116,15 +116,15 @@ export function cleanGeneratedJs(rawJs: string): string {
     }
   }
 
-  // Strip chained or standalone gsap.timeline(...) declarations
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)(?=\s*\.)/g, '\ntl');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?gsap\.timeline\s*\([\s\S]*?\)\s*;?/g, '\n');
+  // Strip chained or standalone MooTween.timeline(...) / gsap.timeline(...) declarations
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\s*\([\s\S]*?\)(?=\s*\.)/g, '\ntl');
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\s*\([\s\S]*?\)\s*;?/g, '\n');
 
-  // Any other declaration of tl, root, ctx, gsap
+  // Any other declaration of tl, root, ctx, MooTween, gsap
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\b[^\n;]*;?/g, '\n');
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+root\b[^\n;]*;?/g, '\n');
   js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+ctx\b[^\n;]*;?/g, '\n');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+gsap\b[^\n;]*;?/g, '\n');
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+(?:MooTween|gsap)\b[^\n;]*;?/g, '\n');
 
   // Auto-fix determinism violations: replace Math.random() with ctx.rand()
   js = js.replace(/\bMath\.random\s*\([^)]*\)/g, 'ctx.rand()');
@@ -139,7 +139,7 @@ export function cleanGeneratedJs(rawJs: string): string {
 /**
  * Resilient multi-tier code block parser.
  * Handles JSON responses, markdown backticks (``` or ````), language variations,
- * untagged blocks, embedded styles/scripts, and guarantees valid GSAP code.
+ * untagged blocks, embedded styles/scripts, and guarantees valid MooTween timeline code.
  */
 export function parseCodeBlocks(rawText: string): { html: string; css: string; buildJs: string } {
   if (!rawText || !rawText.trim()) {
@@ -200,7 +200,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
     } else if (!css && (b.tag.includes('css') || b.tag.includes('style') || b.tag.includes('scss') || b.tag.includes('postcss'))) {
       css = b.content;
       used.add(i);
-    } else if (!buildJs && (b.tag.includes('javascript') || b.tag.includes('js') || b.tag.includes('typescript') || b.tag.includes('ts') || b.tag.includes('gsap') || b.tag.includes('script') || b.tag.includes('anim'))) {
+    } else if (!buildJs && (b.tag.includes('javascript') || b.tag.includes('js') || b.tag.includes('typescript') || b.tag.includes('ts') || b.tag.includes('gsap') || b.tag.includes('moo') || b.tag.includes('script') || b.tag.includes('anim'))) {
       buildJs = b.content;
       used.add(i);
     }
@@ -220,7 +220,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
         html = b.content;
       } else if (!css && (/\{[\s\S]*?:[\s\S]*?\}/.test(b.content) || b.content.includes('.scene-') || b.content.includes('width:'))) {
         css = b.content;
-      } else if (!buildJs && !/^\s*</.test(b.content) && (/\b(tl|gsap|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
+      } else if (!buildJs && !/^\s*</.test(b.content) && (/\b(tl|MooTween|gsap|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
         buildJs = b.content;
       }
     }
@@ -267,7 +267,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   buildJs = cleanGeneratedJs(buildJs);
 
   // 5. Fail-Safe Guarantee: If buildJs is completely empty, but html exists,
-  // synthesize a smooth default GSAP animation so the scene never fails validation or stays static.
+  // synthesize a smooth default MooTween animation so the scene never fails validation or stays static.
   if (!buildJs.trim() && html.trim()) {
     buildJs = `// Auto-synthesized motion for scene layers (visible frame 0, camera drift, overshoot pops, hand-off)
 const D = ctx.dur || 3.5;
@@ -575,7 +575,7 @@ export async function repairGeneratedScene(params: {
   onProgress?: (status: string) => void;
 }): Promise<{ html: string; css: string; buildJs: string; valid: boolean; errors: string[] }> {
   try {
-    params.onProgress?.('AI sedang menganalisis error dan mereparasi GSAP timeline...');
+    params.onProgress?.('AI sedang menganalisis error dan mereparasi timeline MooTween...');
     const repairPrompt = buildSceneRepairPrompt({
       originalCode: params.originalCode,
       errors: params.errors,
@@ -672,7 +672,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
       userPrompt: prompt
     });
 
-    onProgress?.('Mem-parsing blok kode HTML, CSS, dan GSAP...');
+    onProgress?.('Mem-parsing blok kode HTML, CSS, dan MooTween...');
     let parsed = parseCodeBlocks(rawResponse);
     let validation = validateGeneratedScene(parsed);
     let synthesized = false;
@@ -680,7 +680,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     // If validation fails, attempt 1-time automatic repair with validation errors
     if (!validation.valid) {
       console.warn(`[MooScript] Validation failed for scene #${index + 1}, attempting auto-repair:`, validation.errors.join(' | '));
-      onProgress?.('Validasi layer GSAP: AI sedang mereparasi animasi...');
+      onProgress?.('Validasi timeline MooTween: AI sedang mereparasi animasi...');
       const repaired = await repairGeneratedScene({
         originalCode: parsed,
         errors: validation.errors,
