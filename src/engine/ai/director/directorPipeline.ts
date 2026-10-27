@@ -1,4 +1,4 @@
-import type { StoryBeat, StyleBrief, GeneratedScene, LLMProvider, AspectRatio, WordTimestamp } from '../../../types';
+import type { StoryBeat, StyleBrief, GeneratedScene, LLMProvider, AspectRatio, WordTimestamp, MooProject, Scene } from '../../../types';
 import { validateGeneratedScene } from '../../composition/validator';
 import { lintMographQuality } from '../../composition/mographLint';
 import { extractLayersFromHtml } from '../../composition/layers';
@@ -427,6 +427,67 @@ tl.to(cam, { scale: 2.4, opacity: 0, duration: 0.4, ease: 'power4.in' }, Math.ma
   return { html, css, buildJs };
 }
 
+/** Storyboard beat for a timeline scene, reading the current intent fields before legacy ones. */
+export function sceneToStoryBeat(scene: Scene): StoryBeat {
+  return {
+    id: scene.id,
+    narration: scene.narrationText || scene.text || '',
+    visualIntent: scene.visualIntent || scene.narrationText || 'Adegan mograph dinamis',
+    visualConcept: scene.visualConcept,
+    visualElements: scene.visualElements,
+    motionIntent: scene.motionIntent,
+    cameraIntent: scene.cameraIntent || scene.camera,
+    heroObject: scene.heroObject,
+    matchCut: scene.matchCut,
+    durationHint: scene.durationInSeconds || 3.5,
+    focusWords: scene.focusWords || scene.emphasis,
+    assignedAssets: scene.assignedAssets
+  };
+}
+
+function shotSummary(scene: Scene | undefined): string | undefined {
+  if (!scene) return undefined;
+  const intent = scene.visualIntent || scene.narrationText || '';
+  return scene.heroObject ? `${intent} (subjek: ${scene.heroObject})` : intent || undefined;
+}
+
+/**
+ * Everything a shot needs from the rest of the film: the world bible as a style brief, the
+ * neighbouring shots, and the match cut it opens on. Shots are generated in parallel, so
+ * continuity comes from the storyboard rather than from previously generated code.
+ */
+export function buildSceneGenerationContext(
+  project: MooProject,
+  index: number,
+  fontDisplay: string
+): Pick<GenerateCustomSceneParams, 'styleBrief' | 'previousSceneSummary' | 'nextSceneSummary' | 'incomingMatchCut'> {
+  const scenes = project.scenes || [];
+  const prev = index > 0 ? scenes[index - 1] : undefined;
+  const next = scenes[index + 1];
+  const theme = project.theme;
+  const world = project.styleBrief;
+  return {
+    styleBrief: {
+      adjectives: world?.adjectives?.length ? world.adjectives : ['cinematic', 'expressive', 'bespoke'],
+      palette: {
+        bg: theme.bg || '#09090b',
+        primary: world?.palette?.primary || theme.textPrimary || '#f4f4f6',
+        // Lime is the app's UI default, not a topic choice; let the model pick a thematic accent.
+        accent: theme.textHighlight && theme.textHighlight !== '#84cc16' ? theme.textHighlight : '',
+        text: theme.textPrimary || '#ffffff'
+      },
+      fontDisplay,
+      fontBody: 'Plus Jakarta Sans',
+      backgroundLanguage: world?.backgroundLanguage || 'Visual atmosfer tematik yang secara organik mengekspresikan ide adegan',
+      motionSignature: world?.motionSignature || 'Animasi kinetik dinamis yang secara akurat memvisualisasikan narasi & konsep',
+      motif: world?.motif
+    },
+    previousSceneSummary: shotSummary(prev),
+    nextSceneSummary: shotSummary(next),
+    incomingMatchCut: prev?.matchCut
+  };
+}
+
 export interface GenerateCustomSceneParams {
   beat: StoryBeat;
   index: number;
@@ -435,6 +496,8 @@ export interface GenerateCustomSceneParams {
   aspectRatio?: AspectRatio;
   previousSceneSummary?: string;
   nextSceneSummary?: string;
+  /** The previous shot's match cut, which this shot must open on. */
+  incomingMatchCut?: string;
   provider: LLMProvider;
   apiKey: string;
   model?: string;
@@ -553,6 +616,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     aspectRatio = '9:16',
     previousSceneSummary,
     nextSceneSummary,
+    incomingMatchCut,
     executeLlm,
     styleAdvice,
     wordTimestamps,
@@ -577,13 +641,17 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     previousSceneSummary,
     nextSceneSummary,
     focusWords: beat.focusWords,
+    heroObject: beat.heroObject,
+    matchCut: beat.matchCut,
+    incomingMatchCut,
     assignedAssets: beat.assignedAssets,
     wordTimestamps,
     styleBrief: {
       palette: styleBrief.palette,
       fontDisplay: styleBrief.fontDisplay,
       motionSignature: styleBrief.motionSignature,
-      backgroundLanguage: styleBrief.backgroundLanguage
+      backgroundLanguage: styleBrief.backgroundLanguage,
+      motif: styleBrief.motif
     }
   });
 

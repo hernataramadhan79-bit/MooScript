@@ -103,6 +103,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   );
 
   const theme = useMooStore((s) => s.project.theme);
+  const styleBrief = useMooStore((s) => s.project.styleBrief);
 
   // Layer overrides are kept out of the document and pushed live to the runtime, so moving,
   // scaling or recoloring a layer restyles the stage in place instead of reloading the iframe.
@@ -115,10 +116,11 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       fps,
       scenes,
       composition,
-      theme
+      theme,
+      styleBrief
     } as any;
     return buildCompositionDocument(minimalProject, { omitOverrides: true });
-  }, [composition, scenes, width, height, fps, projectId, theme]);
+  }, [composition, scenes, width, height, fps, projectId, theme, styleBrief]);
 
   // !important: GSAP writes translate/scale/rotate as inline `none` once it has parsed a layer.
   const overridesCss = React.useMemo(

@@ -4,6 +4,7 @@ import { compileOverridesCss, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
+import { scopeCss } from './scopeCss';
 import type { Scene } from '../../types';
 import gsapScript from 'gsap/dist/gsap.min.js?raw';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
@@ -57,11 +58,12 @@ const FONT_BY_THEME: Record<string, string> = {
 };
 
 /** Palette exposed to generated scenes as --moo-* CSS variables. */
-export function getProjectPalette(project: Pick<MooProject, 'theme'>): ScenePalette {
+export function getProjectPalette(project: Pick<MooProject, 'theme'> & Partial<Pick<MooProject, 'styleBrief'>>): ScenePalette {
   const theme = project.theme;
   return {
     bg: theme?.bg || '#09090b',
-    primary: theme?.textPrimary || '#f4f4f5',
+    // The world bible's primary drives shapes and lines; the theme has no separate primary color.
+    primary: project.styleBrief?.palette?.primary || theme?.textPrimary || '#f4f4f5',
     accent: theme?.textHighlight || '#84cc16',
     text: theme?.textPrimary || '#f4f4f5'
   };
@@ -74,6 +76,11 @@ function safeJson(value: unknown): string {
 
 function toDomId(sceneId: string): string {
   return `scene-${sceneId}`;
+}
+
+/** CSS selector for a scene wrapper's DOM id. */
+function domIdSelector(domId: string): string {
+  return /^[A-Za-z][\w-]*$/.test(domId) ? `#${domId}` : `[id="${domId.replace(/["\\]/g, '\\$&')}"]`;
 }
 
 /** Live fallback surface for scenes that have not been custom-compiled by AI yet, or status surface for error/generating. */
@@ -169,7 +176,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
       const domId = toDomId(mod.beatId);
       const paletteRule = compileScenePaletteCss(domId, mod.palette);
       const overrides = options?.omitOverrides ? '' : compileOverridesCss(domId, mod.overrides);
-      return `/* Scene ${idx + 1} (${mod.beatId}) */\n${css || ''}\n${paletteRule}\n${overrides}`;
+      return `/* Scene ${idx + 1} (${mod.beatId}) */\n${scopeCss(css || '', domIdSelector(domId))}\n${paletteRule}\n${overrides}`;
     })
     .join('\n\n');
 
@@ -183,7 +190,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
 MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   html: ${safeJson(html || '')},
   buildSrc: ${safeJson(buildJs || '')},
-  transition: ${safeJson(ts?.transition || 'cut')}
+  transition: ${safeJson(ts?.transition || 'flow')}
 });
 `;
     })
@@ -319,7 +326,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
       return {
         id: mod.beatId,
         duration: durationOf(mod),
-        transition: ts?.transition || 'cut',
+        transition: ts?.transition || 'flow',
         wordTimestamps: ts?.wordTimestamps || []
       };
     })

@@ -173,11 +173,18 @@ export interface SceneCodegenParams {
   previousSceneSummary?: string;
   nextSceneSummary?: string;
   focusWords?: string[];
+  /** The one subject of this shot; it must be visible on frame 0 (ctx.hero). */
+  heroObject?: string;
+  /** How this shot hands off into the next one. */
+  matchCut?: string;
+  /** How the previous shot handed off, i.e. what this shot must open on. */
+  incomingMatchCut?: string;
   styleBrief: {
     palette: { bg: string; primary: string; accent: string; text: string };
     fontDisplay: string;
     motionSignature: string;
     backgroundLanguage: string;
+    motif?: string;
   };
   wordTimestamps?: Array<{ word: string; start: number; end: number }>;
   assignedAssets?: SceneAssetAttachment[];
@@ -221,6 +228,9 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
     previousSceneSummary,
     nextSceneSummary,
     focusWords,
+    heroObject,
+    matchCut,
+    incomingMatchCut,
     styleBrief
   } = params;
   const stage = stageSizeFor(aspectRatio);
@@ -254,13 +264,26 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
 
   const focusList = focusWords && focusWords.length > 0 ? focusWords.join(', ') : '';
 
+  let worldSnippet = '';
+  if (styleBrief.motif) worldSnippet += `- Motif berulang (benang merah film): "${styleBrief.motif}" — munculkan di shot ini bila menyambung cerita.\n`;
+  if (styleBrief.backgroundLanguage) worldSnippet += `- Bahasa visual: "${styleBrief.backgroundLanguage}"\n`;
+  if (styleBrief.motionSignature) worldSnippet += `- Gaya kamera: "${styleBrief.motionSignature}"\n`;
+
+  let cutSnippet = '';
+  if (incomingMatchCut) {
+    cutSnippet += `- Shot ini DIBUKA dari hand-off shot sebelumnya: "${incomingMatchCut}". Frame 0 menampilkan elemen itu (bentuk/warna/posisi menyambung), lalu berkembang menjadi subjek shot ini.\n`;
+  }
+  if (matchCut) {
+    cutSnippet += `- Shot ini DITUTUP dengan: "${matchCut}". Hand-off di ctx.dur - 0.4 mengarah ke elemen itu; pilih ctx.camera({ handoff }) yang cocok (zoom masuk ke bentuk, whip searah gerak, dsb).\n`;
+  }
+
   return `
 Desain dan kodekan SCENE #${beatIndex + 1} dari ${totalBeats} untuk video motion graphics ini.
 
 === ARAHAN UTAMA: 100% PATUH PADA IDE & INTENT PENGGUNA ===
 - Narasi (Voiceover — DIUCAPKAN & di-caption terpisah, JANGAN ditulis ulang di layar): "${narration || '(Scene visual murni tanpa teks narasi)'}"
 - Visual Intent (Apa yang digambar/dimunculkan): "${visualIntent}"
-${visualConcept ? `- Konsep / Metafora Visual: "${visualConcept}"\n` : ''}
+${heroObject ? `- Subjek utama shot (wajib terlihat di frame 0, pakai ctx.hero): "${heroObject}"\n` : ''}${visualConcept ? `- Konsep / Metafora Visual: "${visualConcept}"\n` : ''}
 ${focusList ? `- Kata Kunci Sorotan (Focus Words): "${focusList}" (Wajib berikan highlight aksen/punch kinetik saat kata ini muncul)\n` : ''}
 - Elemen Visual: ${elementsList}
 ${motionIntent ? `- Arahan Gerak: "${motionIntent}"\n` : ''}
@@ -274,7 +297,7 @@ ${timingLine}
 - Gerakan utama mengikuti ritme kata, bukan menumpuk di awal.
 ` : ''}${assetsSnippet}
 
-${contextSnippet ? `=== KONTINUITAS DENGAN SCENE LAIN ===\n${contextSnippet}\n` : ''}
+${worldSnippet ? `=== DUNIA FILM (sama di semua shot) ===\n${worldSnippet}\n` : ''}${contextSnippet || cutSnippet ? `=== KONTINUITAS & MATCH CUT ===\n${contextSnippet}${cutSnippet}\n` : ''}
 === PALET WARNA & ATMOSFER (BEBAS SESUAI TOPIK — JANGAN DEFAULT HIJAU) ===
 - Rancang atmosfer latar belakang, gradien, pencahayaan, dan warna yang SEPENUHNYA COCOK dan ORGANIK dengan topik cerita di atas.
 - DILARANG memaksakan warna hijau limau (#84cc16) kecuali topik cerita Anda memang tentang botani/lingkungan hidup!

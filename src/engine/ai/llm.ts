@@ -82,6 +82,8 @@ export const StoryboardBeatSchema = z.object({
   motionIntent: z.string().optional().default(''),
   cameraIntent: z.string().optional().default(''),
   transitionIntent: z.string().optional().default(''),
+  heroObject: z.string().optional().default(''),
+  matchCut: z.string().optional().default(''),
   emphasis: z.array(z.string()).default([]),
   mood: z.string().optional().default(''),
   durationHint: z.number().positive().default(4),
@@ -123,9 +125,29 @@ export const StoryboardBeatSchema = z.object({
 
 export const StoryboardSceneSchema = StoryboardBeatSchema;
 
+const HexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .optional()
+  .catch(undefined);
+
+/** Visual world shared by every shot: palette, recurring motif, illustration and camera language. */
+export const WorldBibleSchema = z.object({
+  palette: z
+    .object({ bg: HexColor, primary: HexColor, accent: HexColor, text: HexColor })
+    .optional()
+    .catch(undefined),
+  motif: z.string().optional().default(''),
+  visualLanguage: z.string().optional().default(''),
+  cameraStyle: z.string().optional().default('')
+});
+
+export type WorldBible = z.infer<typeof WorldBibleSchema>;
+
 export const StoryboardSchema = z.object({
   title: z.string().min(1, 'Title cannot be empty').default('Untitled MooScript'),
   targetDuration: z.number().positive().optional().default(30),
+  worldBible: WorldBibleSchema.optional().catch(undefined),
   scenes: z.array(StoryboardBeatSchema).min(1, 'Storyboard must contain at least 1 scene')
 });
 
@@ -137,9 +159,31 @@ export const OPENAI_STORYBOARD_SCHEMA = {
   properties: {
     title: { type: 'string', description: 'Short catchy video title' },
     targetDuration: { type: 'number', description: 'Target total duration in seconds' },
+    worldBible: {
+      type: 'object',
+      description: 'Visual world shared by every shot so the film reads as one piece',
+      properties: {
+        palette: {
+          type: 'object',
+          properties: {
+            bg: { type: 'string', description: 'Background hex color, e.g. #0b1020' },
+            primary: { type: 'string', description: 'Primary hex color for main shapes and lines' },
+            accent: { type: 'string', description: 'Accent hex color for focus hits' },
+            text: { type: 'string', description: 'Text hex color' }
+          },
+          required: ['bg', 'primary', 'accent', 'text'],
+          additionalProperties: false
+        },
+        motif: { type: 'string', description: 'Recurring object or character that threads through every shot' },
+        visualLanguage: { type: 'string', description: 'Illustration style: line weight, shapes, textures, lighting' },
+        cameraStyle: { type: 'string', description: 'How the camera behaves across the film' }
+      },
+      required: ['palette', 'motif', 'visualLanguage', 'cameraStyle'],
+      additionalProperties: false
+    },
     scenes: {
       type: 'array',
-      description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
+      description: 'Shot list: 5 to 10 short shots (2-4.5s each) that play as one continuous motion graphics film',
       items: {
         type: 'object',
         properties: {
@@ -159,89 +203,11 @@ export const OPENAI_STORYBOARD_SCHEMA = {
             items: { type: 'string' },
             description: '1-3 key terms or focus concepts'
           },
-          durationHint: { type: 'number', description: 'Duration in seconds (2 to 8s)' },
-          background: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                description: 'Procedural background visual type (e.g. solid, mesh_gradient, dot_grid, ambient, gradient, dark, vibrant)'
-              },
-              fillToken: {
-                type: 'string',
-                description: 'Semantic token for background tone (primary, accent, surface, text, muted, bg)'
-              }
-            },
-            required: ['type', 'fillToken'],
-            additionalProperties: false
-          },
-          nodes: {
-            type: 'array',
-            description: 'Atomic Scene Graph nodes with semantic tokens and kinetic animation primitives',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                type: {
-                  type: 'string',
-                  description: 'Node visual type (e.g. container, text, shape, metric, code, badge, diagram, vector, illustration)'
-                },
-                content: { type: 'string' },
-                transform: {
-                  type: 'object',
-                  properties: {
-                    x: { type: 'number', description: '0-100% canvas width' },
-                    y: { type: 'number', description: '0-100% canvas height' },
-                    scale: { type: 'number' },
-                    rotation: { type: 'number' },
-                    opacity: { type: 'number' }
-                  },
-                  required: ['x', 'y', 'scale', 'rotation', 'opacity'],
-                  additionalProperties: false
-                },
-                style: {
-                  type: 'object',
-                  properties: {
-                    fillToken: {
-                      type: 'string',
-                      description: 'Semantic color token (e.g. primary, accent, surface, text, muted)'
-                    },
-                    fontSize: { type: 'number' }
-                  },
-                  required: ['fillToken', 'fontSize'],
-                  additionalProperties: false
-                },
-                animation: {
-                  type: 'object',
-                  properties: {
-                    enterType: {
-                      type: 'string',
-                      description: 'Kinetic entrance animation type (e.g. spring_pop, wipe_up, blur_in, typewriter, scale_drift, none)'
-                    }
-                  },
-                  required: ['enterType'],
-                  additionalProperties: false
-                },
-                children: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string' },
-                      type: {
-                        type: 'string',
-                        description: 'Child node type (e.g. container, text, shape, metric, code, badge)'
-                      },
-                      content: { type: 'string' }
-                    },
-                    required: ['id', 'type', 'content'],
-                    additionalProperties: false
-                  }
-                }
-              },
-              required: ['id', 'type', 'content', 'transform', 'style', 'animation', 'children'],
-              additionalProperties: false
-            }
+          durationHint: { type: 'number', description: 'Shot duration in seconds (2 to 4.5s)' },
+          heroObject: { type: 'string', description: 'The ONE subject this shot is about (object, mechanism, character); visible on frame 0' },
+          matchCut: {
+            type: 'string',
+            description: 'How this shot hands off into the next shot: a shared shape, color or motion that becomes the next opening'
           }
         },
         required: [
@@ -254,26 +220,44 @@ export const OPENAI_STORYBOARD_SCHEMA = {
           'transitionIntent',
           'emphasis',
           'durationHint',
-          'background',
-          'nodes'
+          'heroObject',
+          'matchCut'
         ],
         additionalProperties: false
       }
     }
   },
-  required: ['title', 'targetDuration', 'scenes'],
+  required: ['title', 'targetDuration', 'worldBible', 'scenes'],
   additionalProperties: false
 };
 
-// Gemini Structured Output Schema (Atomic Scene Graph Storyboard)
+// Gemini Structured Output Schema (shot-list storyboard + world bible)
 const GEMINI_ENGINE_SCHEMA = {
   type: 'OBJECT',
   properties: {
     title: { type: 'STRING', description: 'Short catchy video title' },
     targetDuration: { type: 'NUMBER', description: 'Target total duration in seconds' },
+    worldBible: {
+      type: 'OBJECT',
+      description: 'Visual world shared by every shot',
+      properties: {
+        palette: {
+          type: 'OBJECT',
+          properties: {
+            bg: { type: 'STRING', description: 'Background hex color' },
+            primary: { type: 'STRING', description: 'Primary hex color' },
+            accent: { type: 'STRING', description: 'Accent hex color' },
+            text: { type: 'STRING', description: 'Text hex color' }
+          }
+        },
+        motif: { type: 'STRING', description: 'Recurring object or character across shots' },
+        visualLanguage: { type: 'STRING', description: 'Illustration style' },
+        cameraStyle: { type: 'STRING', description: 'Camera behaviour across the film' }
+      }
+    },
     scenes: {
       type: 'ARRAY',
-      description: 'List of 3 to 6 concise storyboard scenes for motion graphics video',
+      description: 'Shot list: 5 to 10 short shots (2-4.5s each) that play as one continuous motion graphics film',
       items: {
         type: 'OBJECT',
         properties: {
@@ -285,72 +269,15 @@ const GEMINI_ENGINE_SCHEMA = {
           cameraIntent: { type: 'STRING', description: 'Camera direction (e.g. push_in, pull_out, tracking)' },
           transitionIntent: { type: 'STRING', description: 'Transition to next beat' },
           emphasis: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Key terms or focus concepts for timing' },
-          durationHint: { type: 'NUMBER', description: 'Duration in seconds' },
-          background: {
-            type: 'OBJECT',
-            properties: {
-              type: { type: 'STRING', description: 'solid | mesh_gradient | dot_grid | bento_card' },
-              fillToken: { type: 'STRING', description: 'primary | accent | surface | text | muted | bg' }
-            }
-          },
-          nodes: {
-            type: 'ARRAY',
-            description: 'Atomic Scene Graph nodes with semantic tokens and kinetic animation primitives',
-            items: {
-              type: 'OBJECT',
-              properties: {
-                id: { type: 'STRING' },
-                type: { type: 'STRING', description: 'container | text | shape | metric | code | badge' },
-                content: { type: 'STRING' },
-                transform: {
-                  type: 'OBJECT',
-                  properties: {
-                    x: { type: 'NUMBER', description: '0-100% canvas width' },
-                    y: { type: 'NUMBER', description: '0-100% canvas height' },
-                    scale: { type: 'NUMBER' },
-                    rotation: { type: 'NUMBER' },
-                    opacity: { type: 'NUMBER' }
-                  }
-                },
-                style: {
-                  type: 'OBJECT',
-                  properties: {
-                    fillToken: { type: 'STRING', description: 'primary | accent | surface | text | muted' },
-                    fontSize: { type: 'NUMBER' }
-                  }
-                },
-                animation: {
-                  type: 'OBJECT',
-                  properties: {
-                    enter: {
-                      type: 'OBJECT',
-                      properties: {
-                        type: { type: 'STRING', description: 'spring_pop | wipe_up | blur_in | typewriter' },
-                        duration: { type: 'NUMBER' }
-                      }
-                    }
-                  }
-                },
-                children: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      id: { type: 'STRING' },
-                      type: { type: 'STRING' },
-                      content: { type: 'STRING' }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          durationHint: { type: 'NUMBER', description: 'Shot duration in seconds (2 to 4.5s)' },
+          heroObject: { type: 'STRING', description: 'The ONE subject of this shot; visible on frame 0' },
+          matchCut: { type: 'STRING', description: 'Shared shape, color or motion that hands off into the next shot' }
         },
-        required: ['narration', 'visualIntent', 'visualElements', 'motionIntent', 'durationHint']
+        required: ['narration', 'visualIntent', 'visualElements', 'motionIntent', 'durationHint', 'heroObject', 'matchCut']
       }
     }
   },
-  required: ['title', 'scenes']
+  required: ['title', 'worldBible', 'scenes']
 };
 
 /**
@@ -462,22 +389,34 @@ function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' =
 Your task is to conceptualize and direct an original, high-impact motion graphics video storyboard tailored strictly to the user's intent.
 
 === CORE MOTION GRAPHICS DIRECTOR INSTRUCTIONS ===
-1. NARRATIVE & SCENE STRUCTURE:
-   - Determine the pacing, narrative arc, and scene division (3 to 6 high-impact scenes for 15-45s total duration).
-   - Each beat must have a distinct visual focus, emotional momentum, and clear storytelling role.
+You are writing a SHOT LIST for one continuous motion graphics film, not a slide deck.
 
-2. BESPOKE VISUAL COMPOSITION (ANTI-TEMPLATE & VISUAL-FIRST):
-   - Invent custom, organic visual concepts tailored strictly to the subject matter.
-   - NEVER constrain scenes to generic slide decks, repetitive cards, or predictable boxes.
-   - Freely conceptualize diagrams, physical mechanisms, directional vectors, charts, kinetic typography, process flows, or atmospheric illustrations that genuinely explain the idea.
-   - Text is merely one supportive layer; focus on what the scene visibly depicts (visualIntent and visualConcept).
+1. SHOT LIST & PACING:
+   - 5 to 10 short shots for 15-45s total. Each shot is 2 to 4.5 seconds and carries ONE idea.
+   - Narration per shot is short (about 4-12 spoken words) so the visuals keep cutting with the voice.
+   - Every shot changes something on screen: a new object, a transformation, a new camera angle.
 
-3. KINETIC TIMING & KEYWORD FOCUS:
-   - Identify 1-3 core focus keywords per scene in 'emphasis' for kinetic punch and animation synchrony.
-   - Define camera movements and spatial transitions (push_in, pull_out, tracking, drift) that reinforce clarity.
+2. WORLD BIBLE (one visual world for the whole film):
+   - worldBible.palette: 4 hex colors chosen from the topic (ocean: deep navy/cyan; fire: vermilion/amber;
+     finance: charcoal/gold). Never default to lime green unless the topic is about plants or nature.
+   - worldBible.motif: one recurring object or character that threads through the shots (a ball of light,
+     a paper plane, a coin, a cell) and carries the story from shot to shot.
+   - worldBible.visualLanguage: the illustration style (line weight, flat or textured shapes, lighting).
+   - worldBible.cameraStyle: how the camera behaves across the film.
 
-4. SEMANTIC THEMING:
-   - Use semantic color tokens ("primary", "accent", "surface", "text", "muted", "bg") for instant post-generation theming.
+3. SHOW, DON'T TELL (ANTI-TEMPLATE & VISUAL-FIRST):
+   - heroObject: the ONE subject of the shot (an object, mechanism, character or data shape), never a text card.
+   - Invent diagrams, physical mechanisms, directional vectors, charts, metaphors that genuinely explain the idea.
+   - NEVER describe slides, cards, bullet lists, or title + paragraph layouts. Text is at most 1-3 keywords.
+
+4. CONTINUITY (MATCH CUTS):
+   - matchCut: how this shot hands off into the NEXT shot, using a shared shape, color, motif or motion
+     (e.g. "the coin spins and becomes the wheel of the next shot", "zoom into the dot, which is the next planet").
+   - The next shot must open on that same element, so the film flows without visible slide changes.
+
+5. KINETIC TIMING & KEYWORD FOCUS:
+   - Identify 1-3 focus keywords per shot in 'emphasis'; they get a kinetic punch exactly when spoken.
+   - cameraIntent per shot (push_in, pull_out, pan, orbit, tracking, roll) that reinforces the idea.
 
 - ${langInstruction}
 
@@ -576,7 +515,7 @@ export async function generateStoryboard(params: {
   // Attempt 2: 1-time retry with correction feedback
   const retryFeedbackPrompt = `Your previous response had validation issues: ${parseResult1.error}.
 Please provide strictly valid JSON without preamble matching the required schema:
-{"title": "...", "targetDuration": 30, "scenes": [{"narration": "...", "visualIntent": "...", "visualElements": ["..."], "motionIntent": "...", "durationHint": 4}]}
+{"title": "...", "targetDuration": 30, "worldBible": {"palette": {"bg": "#0b1020", "primary": "#38bdf8", "accent": "#f59e0b", "text": "#f8fafc"}, "motif": "...", "visualLanguage": "...", "cameraStyle": "..."}, "scenes": [{"narration": "...", "visualIntent": "...", "heroObject": "...", "matchCut": "...", "visualElements": ["..."], "motionIntent": "...", "durationHint": 3}]}
 
 Original Request:
 ${prompt}`;

@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
 import { EXPORT_FPS_CHOICES, type ExportQuality } from '../../engine/export/exportOptions';
-import { generateCustomScene } from '../../engine/ai/director/directorPipeline';
+import { generateCustomScene, sceneToStoryBeat, buildSceneGenerationContext } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
@@ -130,6 +130,9 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     reader.readAsDataURL(blob);
   });
 }
+
+/** Scene code (SVG + CSS + timeline) runs long; a 2048-token cap truncates it mid-block. */
+const SCENE_CODEGEN_MIN_TOKENS = 4096;
 
 const mapFontDisplay = (fontFamily?: string): string => {
   switch (fontFamily) {
@@ -417,39 +420,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         ? `${activeScene.visualIntent || activeScene.narrationText || ''}. Instruksi perubahan: ${revisionPrompt.trim()}`
         : activeScene.visualIntent || activeScene.narrationText || 'Adegan mograph dinamis';
 
+      const sceneIndex = activeSceneIndex >= 0 ? activeSceneIndex : 0;
       const sceneModule = await generateCustomScene({
-        beat: {
-          id: activeScene.id,
-          narration: activeScene.narrationText || activeScene.text || '',
-          visualIntent: revisedVisualIntent,
-          visualConcept: activeScene.visualConcept,
-          visualElements: activeScene.visualElements,
-          motionIntent: activeScene.motionIntent,
-          cameraIntent: activeScene.camera,
-          durationHint: activeScene.durationInSeconds || 3.5,
-          focusWords: activeScene.focusWords,
-          assignedAssets: activeScene.assignedAssets,
-        },
-        index: activeSceneIndex >= 0 ? activeSceneIndex : 0,
+        beat: { ...sceneToStoryBeat(activeScene), visualIntent: revisedVisualIntent },
+        index: sceneIndex,
         total: scenes.length,
         aspectRatio: project.aspectRatio || '9:16',
         wordTimestamps: activeScene.wordTimestamps,
-        styleBrief: {
-          adjectives: ['cinematic', 'expressive', 'bespoke'],
-          palette: {
-            bg: project.theme.bg || '#09090b',
-            primary: project.theme.textPrimary || '#f4f4f6',
-            accent:
-              project.theme.textHighlight && project.theme.textHighlight !== '#84cc16'
-                ? project.theme.textHighlight
-                : '',
-            text: project.theme.textPrimary || '#ffffff'
-          },
-          fontDisplay: mapFontDisplay(project.theme.fontFamily),
-          fontBody: 'Plus Jakarta Sans',
-          backgroundLanguage: 'Visual atmosfer tematik yang secara organik mengekspresikan ide adegan',
-          motionSignature: 'Animasi kinetik dinamis yang secara akurat memvisualisasikan narasi & konsep'
-        },
+        ...buildSceneGenerationContext(project, sceneIndex, mapFontDisplay(project.theme.fontFamily)),
         provider,
         apiKey,
         model: modelToUse,
@@ -462,7 +440,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             systemPrompt,
             userPrompt,
             signal: controller.signal,
-            maxTokens: settings.maxOutputTokens || 2048,
+            maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
             onActivity: (status) => setRevisionProgress(status)
           });
         }
@@ -943,38 +921,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
           try {
             const sceneModule = await generateCustomScene({
-              beat: {
-                id: beat.id,
-                narration: beat.narrationText || beat.text || '',
-                visualIntent: beat.visualIntent || beat.narrationText || `Adegan ${i + 1}`,
-                visualConcept: beat.visualConcept,
-                visualElements: beat.visualElements,
-                motionIntent: beat.motionIntent,
-                cameraIntent: beat.camera,
-                durationHint: beat.durationInSeconds || 3.5,
-                focusWords: beat.focusWords,
-                assignedAssets: beat.assignedAssets,
-              },
+              beat: sceneToStoryBeat(beat),
               index: i,
               total,
               aspectRatio: projectNow.aspectRatio || '9:16',
               wordTimestamps: beat.wordTimestamps,
-              styleBrief: {
-                adjectives: ['cinematic', 'expressive', 'bespoke'],
-                palette: {
-                  bg: projectNow.theme.bg || '#09090b',
-                  primary: projectNow.theme.textPrimary || '#f4f4f6',
-                  accent:
-                    projectNow.theme.textHighlight && projectNow.theme.textHighlight !== '#84cc16'
-                      ? projectNow.theme.textHighlight
-                      : '',
-                  text: projectNow.theme.textPrimary || '#ffffff'
-                },
-                fontDisplay: mapFontDisplay(projectNow.theme.fontFamily),
-                fontBody: 'Plus Jakarta Sans',
-                backgroundLanguage: 'Visual atmosfer tematik yang secara organik mengekspresikan ide adegan',
-                motionSignature: 'Animasi kinetik dinamis yang secara akurat memvisualisasikan narasi & konsep'
-              },
+              ...buildSceneGenerationContext({ ...projectNow, scenes: beats }, i, mapFontDisplay(projectNow.theme.fontFamily)),
               provider,
               apiKey,
               model: modelToUse,
@@ -989,7 +941,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   systemPrompt,
                   userPrompt,
                   signal: sceneAbortController.signal,
-                  maxTokens: settings.maxOutputTokens || 2048,
+                  maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
                   onActivity: (status) => {
                     recordActivity(status);
                   }

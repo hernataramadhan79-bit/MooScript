@@ -63,9 +63,22 @@ describe('OpenAI Strict JSON Schema (Phase 1a)', () => {
       'transitionIntent',
       'emphasis',
       'durationHint',
-      'background',
-      'nodes'
+      'heroObject',
+      'matchCut'
     ]);
+  });
+
+  it('requires a world bible (palette, motif, visual and camera language) for the whole film', () => {
+    expect(OPENAI_STORYBOARD_SCHEMA.required).toContain('worldBible');
+    const world = OPENAI_STORYBOARD_SCHEMA.properties.worldBible as any;
+    expect(world.required).toEqual(['palette', 'motif', 'visualLanguage', 'cameraStyle']);
+    expect(world.properties.palette.required).toEqual(['bg', 'primary', 'accent', 'text']);
+  });
+
+  it('no longer asks the model for the legacy atomic scene graph', () => {
+    const sceneProps = OPENAI_STORYBOARD_SCHEMA.properties.scenes.items.properties as any;
+    expect(sceneProps.nodes).toBeUndefined();
+    expect(sceneProps.background).toBeUndefined();
   });
 
   it('ensures generative storyboard schema forbids legacy layout templates', () => {

@@ -95,6 +95,36 @@ function escapeHtml(raw: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Layers that carry each archetype's frame 0: they start visible so the editor's still is never empty.
+const POSTER_LAYERS: Record<Exclude<ProceduralArchetype, 'auto'>, string[]> = {
+  'stat-counter': ['card'],
+  'code-terminal': ['term'],
+  'split-versus': ['title', 'leftCard', 'rightCard'],
+  'bento-list': ['title'],
+  'chart-data': ['title', 'card'],
+  'social-quote': ['card'],
+  'glass-spotlight': ['card'],
+  'kinetic-impact': ['title']
+};
+
+const CAMERA_MOVES = ['push', 'pan-left', 'roll', 'pull', 'pan-up'];
+
+/** Puts everything inside the stage into a .moo-camera layer that ctx.camera can move. */
+function wrapInCamera(html: string, sid: string): string {
+  const open = `<div class="${sid}-stage">`;
+  const close = html.lastIndexOf('</div>');
+  if (!html.startsWith(open) || close < open.length) return html;
+  return `${open}\n  <div class="moo-camera" data-moo-layer="camera">${html.slice(open.length, close)}  </div>\n</div>`;
+}
+
+/** Starts the poster layers visible (opacity 1) instead of fading them in from nothing. */
+function keepPosterLayersVisible(buildJs: string, layers: string[]): string {
+  return layers.reduce(
+    (js, name) => js.replace(new RegExp(`(\\.fromTo\\(${name}, \\{[^}]*?)opacity: 0(?=[ ,}])`), '$1opacity: 1'),
+    buildJs
+  );
+}
+
 const STOP_WORDS = new Set([
   'yang', 'dan', 'di', 'ke', 'dari', 'ini', 'itu', 'dengan', 'untuk', 'pada', 'adalah',
   'dalam', 'tidak', 'bisa', 'akan', 'atau', 'juga', 'karena', 'oleh', 'saat', 'lebih',
@@ -210,11 +240,15 @@ export function compileProceduralScene(
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: radial-gradient(circle at 20% 15%, rgba(132, 204, 22, 0.14), transparent 50%),
-              radial-gradient(circle at 85% 80%, rgba(56, 189, 248, 0.12), transparent 55%),
+  background: radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--moo-accent, #84cc16) 14%, transparent), transparent 50%),
+              radial-gradient(circle at 85% 80%, color-mix(in srgb, var(--moo-primary, #38bdf8) 12%, transparent), transparent 55%),
               var(--moo-bg, #09090b);
   color: var(--moo-text, #f4f4f5);
   font-family: var(--moo-font-display, 'Plus Jakarta Sans', sans-serif);
+}
+.${sid}-stage > .moo-camera {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -499,7 +533,7 @@ tl.fromTo(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease
 }
 .${sid}-vs-right {
   border-color: var(--moo-accent, #84cc16);
-  box-shadow: 0 0 40px rgba(132, 204, 22, 0.18);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--moo-accent, #84cc16) 18%, transparent);
 }
 .${sid}-vs-tag {
   font-family: 'JetBrains Mono', monospace;
@@ -827,8 +861,8 @@ tl.fromTo(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1
 .${sid}-chip {
   padding: 10px 20px;
   border-radius: 14px;
-  background: rgba(132, 204, 22, 0.14);
-  border: 1px solid rgba(132, 204, 22, 0.35);
+  background: color-mix(in srgb, var(--moo-accent, #84cc16) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--moo-accent, #84cc16) 35%, transparent);
   color: var(--moo-accent, #84cc16);
   font-size: 20px;
   font-weight: 700;
@@ -909,6 +943,15 @@ tl.fromTo(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease
   .to(orb, { scale: 1.2, x: -30, y: 30, duration: ${Math.max(1.5, duration - 0.2).toFixed(2)}, ease: 'sine.inOut' }, 0);
 `.trim();
   }
+
+  // Instant visuals still move like a shot: camera life, ambient particles, a hand-off, and a
+  // composed frame 0 instead of a slide that fades in from black.
+  html = wrapInCamera(html, sid);
+  buildJs = `if (ctx.camera) {
+  ctx.camera({ move: '${CAMERA_MOVES[index % CAMERA_MOVES.length]}', handoff: 'zoom' });
+  ctx.particles({ count: 14, size: [3, 6] });
+}
+${keepPosterLayersVisible(buildJs, POSTER_LAYERS[chosen] || [])}`;
 
   const editableLayers = extractLayersFromHtml(html);
 

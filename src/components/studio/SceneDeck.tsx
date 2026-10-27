@@ -732,11 +732,12 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <span className="material-symbols-outlined text-[12px] text-text-faint">swap_horiz</span>
                   <span className="text-[10px] text-text-muted">Transisi:</span>
                   <select
-                    value={scene.transition || 'cut'}
+                    value={scene.transition || 'flow'}
                     onChange={(e) => setSceneTransition(scene.id, e.target.value as SceneTransition)}
                     className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer pr-1"
                     aria-label={`Transisi dari adegan ${index + 1}`}
                   >
+                    <option value="flow" className="bg-surface-1 text-text">Flow (Menyambung)</option>
                     <option value="cut" className="bg-surface-1 text-text">Cut (Langsung)</option>
                     <option value="fade" className="bg-surface-1 text-text">Fade (Pudar)</option>
                     <option value="slide" className="bg-surface-1 text-text">Slide (Geser)</option>

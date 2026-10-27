@@ -1,4 +1,5 @@
-export type SceneTransition = 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom';
+/** 'flow' overlaps shots: the next shot is already underneath while the current one hands off. */
+export type SceneTransition = 'flow' | 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom';
 export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal' | 'outline';
 export type CaptionPosition = 'top' | 'center' | 'bottom';
 
@@ -58,6 +59,10 @@ export interface StoryBeat {
   motionIntent?: string;
   cameraIntent?: string;
   transitionIntent?: string;
+  /** The one subject this shot is about; it must be visible on frame 0. */
+  heroObject?: string;
+  /** How this shot hands off into the next one (shared shape, color or motion). */
+  matchCut?: string;
   emphasis?: string[];
   focusWords?: string[];
   mood?: string;
@@ -263,6 +268,8 @@ export interface Scene {
   motionIntent?: string;
   cameraIntent?: string;
   transitionIntent?: string;
+  heroObject?: string;
+  matchCut?: string;
   emphasis?: string[];
   mood?: string;
   locked?: boolean;
@@ -571,6 +578,8 @@ export interface StyleBrief {
   density?: string;
   transitionPlan?: string;
   heroMoment?: string;
+  /** Recurring object/character that threads through every shot of the film. */
+  motif?: string;
 }
 
 /* ------------------------------------------------------------------ *

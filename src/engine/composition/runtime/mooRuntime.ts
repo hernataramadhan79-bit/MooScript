@@ -51,7 +51,7 @@ export function getRuntimeScript(): string {
       window.__MOO_SCENES__.push({
         id: id,
         definition: definition,
-        transition: (definition && definition.transition) || 'cut'
+        transition: (definition && definition.transition) || 'flow'
       });
     }
   };
@@ -187,7 +187,7 @@ export function getRuntimeScript(): string {
       const def = current.def;
       const meta = current.meta;
       const duration = current.duration;
-      const transitionType = current.item.transition || current.def.transition || meta.transition || 'cut';
+      const transitionType = current.item.transition || current.def.transition || meta.transition || 'flow';
       const next = sceneElements[i + 1];
 
       // Ensure current scene wrapper is unconditionally visible and reset at accumulatedTime
@@ -250,7 +250,20 @@ export function getRuntimeScript(): string {
         const transStart = accumulatedTime + duration - transDur;
         const transEnd = accumulatedTime + duration;
 
-        if (transitionType === 'fade') {
+        if (transitionType === 'flow') {
+          // Overlap: the next shot is already on screen underneath (its frame 0 is a composed poster) and
+          // lands with a short push, while the current shot plays its in-scene hand-off on top and dissolves.
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', clipPath: 'none' }, transStart);
+          masterTl.fromTo(next.wrapper,
+            { scale: 1.12 },
+            { scale: 1, duration: transDur, ease: 'power3.out', immediateRender: false },
+            transStart
+          );
+          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
+          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.in' }, transStart);
+          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
+          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
+        } else if (transitionType === 'fade') {
           // Crossfade: Next scene appears underneath at transStart, current scene fades out
           masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);

@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
-import type { Scene, MooProject } from '../../types';
+import type { Scene, MooProject, StyleBrief } from '../../types';
+import type { WorldBible } from '../../engine/ai/llm';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { syncComposition } from '../../engine/composition/sync';
@@ -7,6 +8,42 @@ import { saveProjectToDb } from '../../db/mooDb';
 import type { MooStoreState, ScriptSlice } from '../types';
 
 let scriptAbortController: AbortController | null = null;
+
+/** A shot list with a world bible needs more room than the old 3-6 scene storyboard. */
+const STORYBOARD_MIN_TOKENS = 4096;
+
+/**
+ * Applies the storyboard's world bible: it becomes the project's style brief (motif, visual and
+ * camera language, palette) and its palette drives the theme colors exposed as --moo-* variables.
+ */
+export function applyWorldBible(project: MooProject, world: WorldBible | undefined): MooProject {
+  if (!world) return project;
+  const palette = world.palette || {};
+  const theme = { ...project.theme };
+  if (palette.bg) theme.bg = palette.bg;
+  if (palette.accent) theme.textHighlight = palette.accent;
+  if (palette.text) theme.textPrimary = palette.text;
+  const styleBrief: StyleBrief = {
+    ...(project.styleBrief || {
+      adjectives: [],
+      fontDisplay: '',
+      fontBody: '',
+      backgroundLanguage: '',
+      motionSignature: ''
+    }),
+    palette: {
+      bg: palette.bg || theme.bg,
+      primary: palette.primary || palette.accent || theme.textHighlight,
+      accent: palette.accent || theme.textHighlight,
+      text: palette.text || theme.textPrimary,
+      source: 'world-bible'
+    },
+    motif: world.motif || undefined,
+    backgroundLanguage: world.visualLanguage || project.styleBrief?.backgroundLanguage || '',
+    motionSignature: world.cameraStyle || project.styleBrief?.motionSignature || ''
+  };
+  return { ...project, theme, styleBrief };
+}
 
 export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice> = (set, get) => ({
   isGeneratingScript: false,
@@ -82,7 +119,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         skill: activeSkill,
         language: settings.outputLanguage || 'id',
         signal: scriptAbortController.signal,
-        maxTokens: settings.maxOutputTokens || 2048
+        maxTokens: Math.max(settings.maxOutputTokens || 2048, STORYBOARD_MIN_TOKENS)
       });
 
       const newScenes: Scene[] = storyboard.scenes.map((s, idx) => {
@@ -100,13 +137,13 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
           motionIntent: s.motionIntent,
           cameraIntent: s.cameraIntent,
           transitionIntent: s.transitionIntent,
+          heroObject: s.heroObject || undefined,
+          matchCut: s.matchCut || undefined,
           emphasis: focusWords,
           focusWords,
           durationInSeconds: dur,
           wordTimestamps: computeDeterministicWordAlignment(text, dur),
-          showSubtitles: false,
-          nodes: s.nodes || [],
-          background: s.background || { type: 'dot_grid' }
+          showSubtitles: false
         };
       });
 
@@ -119,13 +156,16 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
           // ignore
         }
       }
-      const updatedProject: MooProject = {
-        ...get().project,
-        title: storyboard.title || get().project.title,
-        scenes: newScenes,
-        audioBlob: undefined,
-        audioDuration: totalDur
-      };
+      const updatedProject: MooProject = applyWorldBible(
+        {
+          ...get().project,
+          title: storyboard.title || get().project.title,
+          scenes: newScenes,
+          audioBlob: undefined,
+          audioDuration: totalDur
+        },
+        storyboard.worldBible
+      );
       const syncedProject = syncComposition(updatedProject);
 
       set({
