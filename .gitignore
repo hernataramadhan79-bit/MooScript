@@ -46,3 +46,6 @@ SPECIFICATION.md
 
 # One-off local scripts
 scripts/
+
+# Local planning prompts
+docs/mootween-migration-prompt.md
