@@ -676,6 +676,26 @@ sceneTimeline.from(root.querySelector('.title'), { opacity: 0, duration: 1 });
     expect(validation.valid).toBe(true);
     expect(validation.errors).toEqual([]);
   });
+
+  it('16. parseCodeBlocks never takes markup as buildJs when the reply has no JavaScript block', () => {
+    // "scene-root" and "ctx-tl" used to match the \b(tl|gsap|root|ctx)\b heuristic for JavaScript.
+    const rawLlmResponse = `
+\`\`\`html
+<div class="scene-root"><div class="moo-camera" data-moo-layer="camera"><div class="ctx-tl">A</div></div></div>
+\`\`\`
+
+\`\`\`css
+.scene-root { width: 100%; height: 100%; }
+\`\`\`
+`;
+
+    const parsed = parseCodeBlocks(rawLlmResponse);
+    expect(parsed.html).toContain('class="scene-root"');
+    expect(parsed.css).toContain('.scene-root');
+    expect(parsed.buildJs.startsWith('// Auto-synthesized motion')).toBe(true);
+    expect(parsed.buildJs).not.toContain('<div');
+    expect(validateGeneratedScene(parsed).valid).toBe(true);
+  });
 });
 
 

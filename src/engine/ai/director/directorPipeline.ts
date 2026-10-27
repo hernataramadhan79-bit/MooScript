@@ -192,13 +192,17 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
   }
 
   // Assign from tagged blocks first
-  for (const b of blocks) {
+  const used = new Set<number>();
+  for (const [i, b] of blocks.entries()) {
     if (!html && (b.tag.includes('html') || b.tag.includes('svg') || b.tag.includes('xml'))) {
       html = b.content;
+      used.add(i);
     } else if (!css && (b.tag.includes('css') || b.tag.includes('style') || b.tag.includes('scss') || b.tag.includes('postcss'))) {
       css = b.content;
+      used.add(i);
     } else if (!buildJs && (b.tag.includes('javascript') || b.tag.includes('js') || b.tag.includes('typescript') || b.tag.includes('ts') || b.tag.includes('gsap') || b.tag.includes('script') || b.tag.includes('anim'))) {
       buildJs = b.content;
+      used.add(i);
     }
   }
 
@@ -208,13 +212,15 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
     if (!css) css = blocks[1].content;
     if (!buildJs) buildJs = blocks[2].content;
   } else if (blocks.length > 0 && (!html || !css || !buildJs)) {
-    // Content-based heuristic assignment
-    for (const b of blocks) {
+    // Content-based heuristic assignment for blocks the tags did not claim. Markup is never
+    // JavaScript: class names like "scene-root" would otherwise match the \broot\b test.
+    for (const [i, b] of blocks.entries()) {
+      if (used.has(i)) continue;
       if (!html && (/<[a-z][\s\S]*>/i.test(b.content) || b.content.includes('<div') || b.content.includes('<svg'))) {
         html = b.content;
       } else if (!css && (/\{[\s\S]*?:[\s\S]*?\}/.test(b.content) || b.content.includes('.scene-') || b.content.includes('width:'))) {
         css = b.content;
-      } else if (!buildJs && (/\b(tl|gsap|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
+      } else if (!buildJs && !/^\s*</.test(b.content) && (/\b(tl|gsap|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
         buildJs = b.content;
       }
     }
