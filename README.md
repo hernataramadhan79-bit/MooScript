@@ -1,6 +1,6 @@
 # MooScript Studio
 
-> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + GSAP, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
+> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + a MooTween timeline, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
 
 ---
 
@@ -28,11 +28,23 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ### Composition runtime
 
-- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single GSAP master timeline scrubbed by frame, so preview and export are identical.
+- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master timeline scrubbed by frame, so preview and export are identical.
+- Each shot's selectors only match inside that shot, and `repeat: -1` loops for the length of the shot.
 - **Flow transition** (default): the next shot is already underneath and lands with a short push while the current one hands off. Cut, fade, slide, zoom and wipe are also available.
 - Per-scene CSS is scoped to its wrapper (`scopeCss.ts`), so shots never leak styles into each other.
 - Poster frames: while the editor is paused at the start of a shot whose first frame is empty, the preview shows its first frame with content. Playback and export always render the real timeline.
 - Non-destructive layer overrides (move, scale, rotate, opacity, color) and per-scene palettes.
+
+### MooTween, the animation engine
+
+MooTween (`src/engine/composition/runtime/mooTween.ts`) is MooScript's own animation engine. It is seek-only: nothing runs on a real-time ticker, and every frame is produced by `seek(t)`, so the same time always renders the same picture in the editor, the MP4 and the HTML export.
+
+- **Timeline API**: `tl.to / from / fromTo / set / add / addLabel / call`, position parameters (`1.2`, `'+=0.3'`, `'<'`, `'>'`, `'<0.2'`, labels), `stagger`, `repeat` / `yoyo`, `keyframes`, callbacks and `MooTween.utils`.
+- **Properties**: HTML and SVG transforms (including `svgOrigin`), opacity / `autoAlpha`, numeric CSS with unit conversion, colors (hex, rgb, hsl, named, `var(--moo-*)`), `clipPath` / `filter` / `boxShadow`, SVG strokes and `attr`.
+- **Eases**: the `power`, `sine`, `expo`, `circ`, `back`, `elastic`, `bounce` and `steps` families.
+- Scene code receives it as `(tl, root, ctx, MooTween)`. The API keeps the familiar GSAP-style shape, and `gsap` remains as an alias, so scenes written before MooTween still run.
+- APIs outside this set (plugins, ticker, `context`, `quickTo`, …) are rejected for new code with a repair hint. Saved scenes that use them are marked **perlu perbaikan** and can be fixed with **Perbaiki dengan AI** in the scene inspector; their code is never rewritten without asking.
+- A golden-frame suite (`tests/golden/`) renders 46 reference shots in Chromium and compares every frame with snapshots recorded from the previous engine.
 
 ### Audio
 
@@ -91,9 +103,11 @@ CI runs all of these on every push and pull request to `main`:
 ```bash
 npx tsc -b        # type check
 npm run lint      # ESLint, zero warnings
-npm test          # Vitest
+npm test          # Vitest: unit suites in Node, MooTween and golden frames in Chromium
 npm run build     # production build
 ```
+
+The browser suites run in Vitest browser mode on Playwright's Chromium. Install it once with `npx playwright install chromium`. `npm run test:unit` and `npm run test:browser` run each half; `npm run test:golden` runs only the golden frames, and `GOLDEN_REPORT=1` writes every mismatch to `tests/golden/.report/`.
 
 `npm run test:coverage` writes a v8 coverage report; `npm run format` runs Prettier.
 
@@ -113,13 +127,15 @@ src/
 │   │   ├── localTts.ts    # Offline Piper TTS (Web Worker)
 │   │   └── voiceAlign.ts  # Whisper word-level alignment
 │   ├── audio/             # BGM mixer and waveform peaks
-│   ├── composition/       # Document builder, runtime, mograph kit, linter, CSS scoping, procedural archetypes
+│   ├── composition/       # Document builder, MooTween + runtime, mograph kit, linter, CSS scoping, procedural archetypes
 │   ├── export/            # MP4 exporter, export options, subtitle export
 │   └── renderer/          # Legacy canvas renderer (old projects only)
 ├── features/scene/        # Per-shot code editor
 ├── store/                 # Zustand slices (project, script, audio, bgm, playback, export, settings, ui)
 └── types/                 # Shared data contracts
-tests/                     # Vitest suites and fixtures
+tests/                     # Vitest suites (Node) and fixtures
+├── browser/               # MooTween feature tests (Chromium)
+└── golden/                # Golden-frame corpus, harness, comparator and snapshots (Chromium)
 docs/design/               # Early design mockups
 public/                    # PWA icons, icon font, privacy page
 ```
@@ -134,19 +150,12 @@ Starting with this version, MooScript Studio is free software released under the
 
 Versions published before this change remain available under the MIT License they were released with.
 
-### Additional permission for GSAP (AGPL section 7)
-
-The stage runtime currently relies on GSAP, which is distributed under its own non-free [GSAP Standard "No Charge" License](https://gsap.com/standard-license). As the copyright holders, we grant this additional permission:
-
-> If you modify this Program, or any covered work, by linking or combining it with GSAP (or a modified version of that library), containing parts covered by the terms of the GSAP Standard "No Charge" License, the licensors of this Program grant you additional permission to convey the resulting work. Corresponding Source for a non-source form of such a combination shall include the source code for the parts of GSAP used as well as that of the covered work.
-
-This permission covers GSAP only. Your use of GSAP itself stays subject to its own license. The permission will no longer be needed once the stage moves to its own animation engine.
+Earlier AGPL versions included an additional permission (AGPL section 7) for combining the program with GSAP. The stage now runs on MooTween and no longer contains GSAP, so that permission is not part of the license of this version.
 
 ### Third-party components
 
 Third-party components keep their own licenses, including:
 
-- **GSAP** — [GSAP Standard "No Charge" License](https://gsap.com/standard-license) (not open source). It is bundled into the stage and into exported HTML.
 - **Mediabunny** — MPL-2.0. **ONNX Runtime Web**, React, Zustand, Zod — MIT. **Dexie**, Phonemizer — Apache-2.0.
 - **Fonts** (Plus Jakarta Sans, JetBrains Mono, Syne, Material Symbols) — SIL Open Font License 1.1.
 - **Piper voices** are downloaded at runtime from Hugging Face; each voice has its own model card and license.
