@@ -2,6 +2,7 @@ import type { MooProject, GeneratedScene, Composition } from '../../types';
 import { CURRENT_SCHEMA_VERSION } from '../../types';
 import { buildLegacySceneModule } from '../legacy/legacyTemplates';
 import { createPendingSceneModule } from './sync';
+import { sceneHasRenderableCode } from './legacyScenes';
 
 /**
  * Migrates legacy (v1 template-based) projects to the v2 generative mograph format.
@@ -36,7 +37,7 @@ export function migrateLegacyProject(project: MooProject): MooProject {
 
   const migratedScenes: GeneratedScene[] = (project.scenes || []).map((scene) => {
     const existing = existingModulesByBeatId.get(scene.id);
-    if (existing && existing.status === 'ok' && existing.html) {
+    if (existing && sceneHasRenderableCode(existing)) {
       return {
         ...existing,
         id: scene.id,

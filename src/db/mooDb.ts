@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp } from '../types';
 import { CURRENT_SCHEMA_VERSION, migrateLegacyScene, resolveTheme } from '../types';
 import { migrateLegacyProject } from '../engine/composition/migrate';
+import { flagScenesNeedingRepair } from '../engine/composition/legacyScenes';
 
 export interface StoredAudio {
   projectId: string;
@@ -192,9 +193,10 @@ export function normalizeProject(project: MooProject): MooProject {
   }
   // One-time migration for legacy projects
   if (project.schemaVersion !== CURRENT_SCHEMA_VERSION || !project.composition) {
-    return migrateLegacyProject(project);
+    return flagScenesNeedingRepair(migrateLegacyProject(project));
   }
-  return project;
+  // Scenes whose saved code uses APIs MooTween does not have are flagged, never rewritten.
+  return flagScenesNeedingRepair(project);
 }
 
 export async function loadProjectFromDb(id: string): Promise<MooProject | null> {

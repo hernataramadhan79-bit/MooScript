@@ -627,7 +627,8 @@ export interface ScenePalette {
   text: string;
 }
 
-export type GeneratedSceneStatus = 'pending' | 'generating' | 'ok' | 'error';
+/** 'needs-repair': saved code uses APIs MooTween does not have; it still renders, awaiting an AI repair. */
+export type GeneratedSceneStatus = 'pending' | 'generating' | 'ok' | 'error' | 'needs-repair';
 
 export interface GeneratedScene {
   /** Immutable scene identity (equals the owning Scene.id). */

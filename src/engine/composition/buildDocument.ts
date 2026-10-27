@@ -6,6 +6,7 @@ import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
 import { scopeCss } from './scopeCss';
+import { sceneHasRenderableCode } from './legacyScenes';
 import type { Scene } from '../../types';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
 // and SVG foreignObject export frames render correct typography with zero network access.
@@ -160,7 +161,8 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
 
   const resolved = orderedModules.map((mod, idx) => {
     const ts = timelineScenes.find((s) => s.id === mod.beatId);
-    const needsPlaceholder = mod.status !== 'ok' || !(mod.html || '').trim();
+    // Scenes awaiting repair keep rendering their own code; MooTween skips what it cannot run.
+    const needsPlaceholder = !sceneHasRenderableCode(mod);
     const src = needsPlaceholder
       ? statusPlaceholder(mod, ts, idx, orderedModules.length)
       : { html: mod.html, css: mod.css, buildJs: mod.buildJs };

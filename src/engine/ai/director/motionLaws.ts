@@ -418,6 +418,7 @@ Perbaiki kode di bawah ini sehingga mematuhi seluruh aturan:
 6. JANGAN gunakan import atau export default
 7. Keluarkan HANYA 3 blok kode (html, css, javascript) yang valid dan bersih tanpa penjelasan tambahan di luarnya.
 8. Pastikan sintaks JavaScript valid dan tidak ada kurung atau tanda petik yang terpotong. Langsung gunakan tl.to() atau tl.from().
+9. Untuk setiap "API di luar MooTween", ganti hanya pemanggilan itu sesuai petunjuknya; pertahankan desain, layout, warna, dan timing aslinya.
 
 Kode Asli yang Bermasalah:
 \`\`\`html

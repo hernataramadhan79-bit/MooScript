@@ -497,6 +497,21 @@ describe('MooTween API surface', () => {
     expect(() => mt.config({ nullTargetWarn: false })).not.toThrow();
   });
 
+  it('lets older scenes that reference plugins keep building', () => {
+    win.console.warn = () => undefined;
+    const target = el();
+    const build = new win.Function('tl', 'MooTween', 'gsap', `
+      gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+      const split = new SplitText('.missing', { type: 'chars' });
+      tl.from(split.chars, { y: 20 }, 0);
+      Draggable.create('.missing');
+      tl.to(arguments[3], { x: 80, duration: 1, ease: 'none' }, 0);`);
+    const tl = mt.timeline();
+    build(tl, mt, mt, target);
+    tl.seek(0.5);
+    expect(translateX(target)).toBeCloseTo(40, 3);
+  });
+
   it('runs from its own source text, the way the stage embeds it', () => {
     const fresh = document.createElement('iframe');
     document.body.appendChild(fresh);

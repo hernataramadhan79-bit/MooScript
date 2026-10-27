@@ -4,15 +4,22 @@ import { useShallow } from 'zustand/react/shallow';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
 import { EXPORT_FPS_CHOICES, type ExportQuality } from '../../engine/export/exportOptions';
-import { generateCustomScene, sceneToStoryBeat, buildSceneGenerationContext } from '../../engine/ai/director/directorPipeline';
+import {
+  generateCustomScene,
+  repairGeneratedScene,
+  sceneToStoryBeat,
+  buildSceneGenerationContext
+} from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
 import {
+  extractLayersFromHtml,
   mergeEditableLayers,
   getLayerText,
   setLayerText
 } from '../../engine/composition/layers';
+import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { isLocalModelCached, downloadLocalModel, getLocalVoice, purgeLocalModel } from '../../engine/ai/localTts';
 import type {
   CaptionPosition,
@@ -506,6 +513,110 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     }
   };
 
+  /**
+   * Repairs a scene saved before MooTween whose code uses APIs MooTween does not have. The repair
+   * prompt names each API and its replacement; the scene keeps its old code unless the fix validates.
+   */
+  const handleRepairLegacyScene = async () => {
+    if (!activeScene || !activeCompScene || activeCompScene.status !== 'needs-repair') return;
+    const provider = settings.selectedLLMProvider;
+    const apiKey = settings.apiKeys[provider] || '';
+    if (!apiKey) {
+      addToast(`Masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan.`, 'warning');
+      return;
+    }
+
+    const controller = new AbortController();
+    singleSceneAbortRef.current = controller;
+    setIsRevisingScene(true);
+    setRevisionProgress('Menghubungi AI...');
+
+    const modelToUse =
+      provider === 'gemini'
+        ? settings.geminiModel
+        : provider === 'openai'
+          ? settings.openaiModel
+          : provider === 'groq'
+            ? settings.groqModel
+            : provider === 'anthropic'
+              ? settings.anthropicModel
+              : settings.openrouterModel;
+
+    try {
+      const target = activeCompScene;
+      const result = await repairGeneratedScene({
+        originalCode: { html: target.html, css: target.css, buildJs: target.buildJs },
+        errors: target.errors || [],
+        visualIntent: activeScene.visualIntent || activeScene.narrationText || 'Adegan mograph dinamis',
+        narration: activeScene.narrationText,
+        durationSec: activeScene.durationInSeconds,
+        onProgress: (status) => setRevisionProgress(status),
+        executeLlm: async ({ systemPrompt, userPrompt }) => {
+          return await callRawLLM({
+            provider,
+            apiKey,
+            model: modelToUse,
+            systemPrompt,
+            userPrompt,
+            signal: controller.signal,
+            maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
+            onActivity: (status) => setRevisionProgress(status)
+          });
+        }
+      });
+
+      if (controller.signal.aborted) {
+        addToast('Perbaikan adegan dibatalkan.', 'info');
+        return;
+      }
+      if (!result.valid) {
+        addToast(`Perbaikan AI belum lolos validasi, kode lama dipertahankan: ${result.errors[0] || 'tidak diketahui'}`, 'error');
+        return;
+      }
+
+      const currentProject = useMooStore.getState().project;
+      const currentComp = currentProject.composition;
+      if (!currentComp) return;
+      setProject(
+        {
+          ...currentProject,
+          composition: {
+            ...currentComp,
+            scenes: currentComp.scenes.map((mod) =>
+              mod.id !== target.id
+                ? mod
+                : {
+                    ...mod,
+                    html: result.html,
+                    css: result.css,
+                    buildJs: result.buildJs,
+                    editableLayers: extractLayersFromHtml(result.html),
+                    status: 'ok' as const,
+                    errors: undefined,
+                    version: (mod.version || 1) + 1,
+                    userEdited: true
+                  }
+            ),
+            updatedAt: Date.now()
+          }
+        },
+        { keepStale: true, preserveHistory: true }
+      );
+      addToast(`Adegan #${activeSceneIndex + 1} diperbaiki untuk MooTween.`, 'success');
+    } catch (err: unknown) {
+      if (controller.signal.aborted) {
+        addToast('Perbaikan adegan dibatalkan.', 'info');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Error memperbaiki adegan: ${msg}`, 'error');
+    } finally {
+      setIsRevisingScene(false);
+      setRevisionProgress('');
+      singleSceneAbortRef.current = null;
+    }
+  };
+
   // Mograph Compilation States
   const [compilationProgress, setCompilationProgress] = useState<string>('');
   const [generationStats, setGenerationStats] = useState<{
@@ -685,11 +796,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // Mirrors exporter logic: watermark/HUD only apply to the legacy canvas renderer.
   const isCompositionExport =
     (project.renderMode || 'composition') === 'composition' &&
-    Boolean(
-      project.composition?.scenes?.some(
-        (s) => s.status === 'ok' && Boolean(s.html && s.html.trim().length > 0)
-      )
-    );
+    Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
 
   // A finished MP4 is only valid for the exact project it was rendered from.
   // Drop it as soon as anything that affects the output changes.
@@ -1178,10 +1285,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               ? 'bg-emerald-500/15 text-emerald-400'
                               : activeCompScene.status === 'error'
                                 ? 'bg-rose-500/15 text-rose-400'
-                                : 'bg-zinc-500/15 text-zinc-400'
+                                : activeCompScene.status === 'needs-repair'
+                                  ? 'bg-amber-500/15 text-amber-300'
+                                  : 'bg-zinc-500/15 text-zinc-400'
                           }`}
                         >
-                          {activeCompScene.status}
+                          {activeCompScene.status === 'needs-repair' ? 'perlu perbaikan' : activeCompScene.status}
                         </span>
                       )}
                     </div>
@@ -1231,6 +1340,45 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     >
                       <span className="material-symbols-outlined text-[14px]">refresh</span>
                       Generate Ulang Adegan Ini
+                    </button>
+                  </div>
+                )}
+
+                {/* Scene saved before MooTween that calls APIs it does not have */}
+                {activeCompScene?.status === 'needs-repair' && (
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-amber-300 font-semibold text-[12px]">
+                      <span className="material-symbols-outlined text-[17px]">build</span>
+                      <span>Adegan ini memakai API yang tidak tersedia di MooTween</span>
+                    </div>
+                    <p className="text-[11px] text-amber-100/70 leading-relaxed">
+                      Adegan tetap diputar, tapi bagian yang memakai API ini dilewati. Kode belum diubah; AI akan mengganti
+                      hanya bagian berikut dan mempertahankan desainnya.
+                    </p>
+                    {activeCompScene.errors && activeCompScene.errors.length > 0 && (
+                      <ul className="flex flex-col gap-1">
+                        {activeCompScene.errors.map((err) => (
+                          <li key={err} className="text-[11px] text-amber-200/90 font-mono leading-snug">
+                            {err.replace(/^API di luar MooTween: /, '')}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleRepairLegacyScene}
+                      disabled={isRevisingScene || !hasLlmApiKey}
+                      title={
+                        !hasLlmApiKey
+                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          : undefined
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-[11px] font-semibold hover:bg-amber-400 transition-colors self-start flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      <span className={`material-symbols-outlined text-[14px] ${isRevisingScene ? 'animate-spin' : ''}`}>
+                        {isRevisingScene ? 'progress_activity' : 'auto_fix_high'}
+                      </span>
+                      {isRevisingScene ? revisionProgress || 'Memperbaiki...' : 'Perbaiki dengan AI'}
                     </button>
                   </div>
                 )}

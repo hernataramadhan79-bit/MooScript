@@ -1892,6 +1892,25 @@ export function installMooTween(win: any): any {
     }
   };
 
+  // Inert stand-ins for plugin globals that older scenes reference, so a line such as
+  // registerPlugin(ScrollTrigger) is skipped instead of aborting the rest of the scene's build.
+  const inertPlugin = { create: () => ({ kill: noop, revert: noop }), refresh: noop, register: noop, getAll: () => [] };
+  const PLUGIN_STUBS: Record<string, any> = {
+    ScrollTrigger: inertPlugin,
+    ScrollToPlugin: inertPlugin,
+    MotionPathPlugin: inertPlugin,
+    MorphSVGPlugin: inertPlugin,
+    DrawSVGPlugin: inertPlugin,
+    TextPlugin: inertPlugin,
+    CustomEase: { create: () => linear, register: noop },
+    Draggable: { create: () => [], get: () => undefined },
+    SplitText: function SplitText() {
+      warnOnce('SplitText', 'SplitText is not available in MooTween; use ctx.kinetic or ctx.split.');
+      return { chars: [], words: [], lines: [], revert: noop };
+    }
+  };
+  for (const name in PLUGIN_STUBS) if (win[name] === undefined) win[name] = PLUGIN_STUBS[name];
+
   win.MooTween = api;
   // Alias for scenes written before MooTween.
   win.gsap = api;

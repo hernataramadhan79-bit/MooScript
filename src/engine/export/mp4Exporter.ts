@@ -14,6 +14,7 @@ import type { MooProject, ThemeTokens } from '../../types';
 import { resolveTheme } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
+import { sceneHasRenderableCode } from '../composition/legacyScenes';
 import { EXPORT_QUALITY_FACTOR, type ExportQuality } from './exportOptions';
 
 export interface ExportProgress {
@@ -308,11 +309,7 @@ export async function exportMooProjectToMP4(
     format: isWebm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' })
   });
 
-  const hasGeneratedCompositionScenes = Boolean(
-    project.composition?.scenes?.some(
-      (s) => s.status === 'ok' && Boolean(s.html && s.html.trim().length > 0)
-    )
-  );
+  const hasGeneratedCompositionScenes = Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
 
   const isCompositionMode =
     (project.renderMode || 'composition') === 'composition' &&
