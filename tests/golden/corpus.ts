@@ -515,6 +515,18 @@ function apiCss(): GoldenCase {
 .acs .ac-filter { left: 600px; top: 940px; filter: blur(0px) brightness(1); }
 .acs .ac-shadow { left: 600px; top: 1080px; } .acs .ac-mismatch { left: 600px; top: 1220px; clip-path: inset(10% 10% 10% 10%); }`
   );
+  const divergences = [
+    {
+      element: 'ac-mismatch',
+      prop: 'clipPath',
+      reason: 'inset() -> circle() cannot be interpolated; MooTween switches at the end (spec 4.5), GSAP morphs number by number'
+    },
+    {
+      element: 'ac-type',
+      prop: 'letterSpacing',
+      reason: "GSAP leaves letter-spacing at 'normal'; MooTween animates it from 0px as the scene asks (spec 4.5)"
+    }
+  ];
   return single('api-css', {
     ...s,
     duration: 3,
@@ -533,7 +545,7 @@ tl.fromTo('.ac-clip3', { clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'
 tl.to('.ac-filter', { filter: 'blur(12px) brightness(1.5)', duration: 1 }, 0.4);
 tl.fromTo('.ac-shadow', { boxShadow: '0px 0px 0px rgba(0,0,0,0)' }, { boxShadow: '0px 20px 40px rgba(132,204,22,0.8)', duration: 1 }, 0.6);
 tl.to('.ac-mismatch', { clipPath: 'circle(30% at 50% 50%)', duration: 0.8 }, 1.4);`
-  });
+  }, undefined, { divergences });
 }
 
 function apiSvg(): GoldenCase {
@@ -739,7 +751,12 @@ function apiOverrides(): GoldenCase[] {
 tl.to(root.querySelector('.ao-box'), { rotation: 45, scale: 1.3, duration: 1.2 }, 0.4);
 tl.fromTo(root.querySelector('.ao-icon'), { scale: 0.5 }, { scale: 1, x: 120, duration: 1, ease: 'back.out(1.7)' }, 0.6);`
   };
-  return [single('api-overrides-export', shot), single('api-overrides-live', shot, undefined, { liveOverrides: true })];
+  // GSAP folds overrides baked into the document into its own transform and then loses them; MooTween
+  // leaves CSS translate/scale/rotate alone, so the export must look exactly like the editor preview.
+  return [
+    single('api-overrides-export', shot, undefined, { mooTweenReference: 'api-overrides-live' }),
+    single('api-overrides-live', shot, undefined, { liveOverrides: true })
+  ];
 }
 
 /* ------------------------------------------------------------------ *

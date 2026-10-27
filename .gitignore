@@ -49,3 +49,6 @@ scripts/
 
 # Local planning prompts
 docs/mootween-migration-prompt.md
+
+# Golden-frame mismatch reports (GOLDEN_REPORT=1)
+tests/golden/.report/

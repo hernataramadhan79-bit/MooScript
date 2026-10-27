@@ -6,13 +6,36 @@
  * MooTween and compared with the tolerances in compare.ts.
  */
 import { buildCompositionDocument, compileCompositionOverridesCss } from '../../src/engine/composition/buildDocument';
+import { installMooTween } from '../../src/engine/composition/runtime/mooTween';
 import type { MooProject } from '../../src/types';
+
+const GSAP_BLOCK = /<!-- GSAP Inlined Core -->\s*<script>[\s\S]*?<\/script>/;
+
+/** Swaps the inlined GSAP build for MooTween, embedded the same way the runtime embeds its kit. */
+export function withMooTween(html: string): string {
+  if (!GSAP_BLOCK.test(html)) throw new Error('Inlined GSAP block not found in the stage document');
+  return html.replace(GSAP_BLOCK, () => `<script>(${installMooTween.toString()})(window);</script>`);
+}
+
+/** A documented place where MooTween is meant to differ from the GSAP reference. */
+export interface Divergence {
+  /** Element id, data-moo-layer or class name; any element when omitted. */
+  element?: string;
+  prop?: string;
+  /** Time window (seconds) the divergence covers, inclusive. */
+  from?: number;
+  to?: number;
+  reason: string;
+}
 
 export interface GoldenCase {
   name: string;
   project: MooProject;
   /** Editor flow: overrides are pushed after load with !important instead of baked into the document. */
   liveOverrides?: boolean;
+  /** MooTween is compared with this case's snapshot instead of its own. */
+  mooTweenReference?: string;
+  divergences?: Divergence[];
 }
 
 export interface GoldenElement {

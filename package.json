@@ -11,7 +11,8 @@
     "generate-pwa-assets": "pwa-assets-generator",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:golden": "vitest run --project golden",
+    "test:browser": "vitest run --project browser",
+    "test:golden": "vitest run --project browser tests/golden",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write ."

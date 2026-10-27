@@ -9,13 +9,13 @@ export default defineWorkspace([
     test: { name: 'unit' }
   },
   {
-    // Golden frames need a real layout engine: computed transforms, SVG geometry, getBBox.
+    // Golden frames and MooTween need a real layout engine: computed transforms, SVG geometry, getBBox.
     plugins: [fontDataUri()],
     test: {
-      name: 'golden',
-      include: ['tests/golden/**/*.test.ts'],
+      name: 'browser',
+      include: ['tests/golden/**/*.test.ts', 'tests/browser/**/*.test.ts'],
       testTimeout: 60000,
-      provide: { goldenUpdate: updateGolden },
+      provide: { goldenUpdate: updateGolden, goldenReport: process.env.GOLDEN_REPORT === '1' },
       browser: {
         enabled: true,
         provider: 'playwright',

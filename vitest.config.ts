@@ -8,8 +8,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts'],
-    // Browser-only suite, run by the "golden" project in vitest.workspace.ts.
-    exclude: [...configDefaults.exclude, 'tests/golden/**'],
+    // Browser-only suites, run by the "browser" project in vitest.workspace.ts.
+    exclude: [...configDefaults.exclude, 'tests/golden/**', 'tests/browser/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
