@@ -59,12 +59,19 @@ const formatSeconds = (sec: number) => (Math.round(sec * 10) / 10).toFixed(1);
 
 const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCommit }) => {
   const [localVal, setLocalVal] = useState(formatSeconds(duration));
+  // Escape blurs the field; the blur must then discard the typed value instead of saving it.
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     setLocalVal(formatSeconds(duration));
   }, [duration]);
 
   const commit = () => {
+    if (cancelledRef.current) {
+      cancelledRef.current = false;
+      setLocalVal(formatSeconds(duration));
+      return;
+    }
     const parsed = parseFloat(localVal.replace(',', '.'));
     if (!isNaN(parsed) && parsed > 0) {
       const clamped = Math.min(MAX_SCENE_SECONDS, Math.max(0.5, Math.round(parsed * 10) / 10));
@@ -91,7 +98,7 @@ const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCom
           if (e.key === 'Enter') {
             e.currentTarget.blur();
           } else if (e.key === 'Escape') {
-            setLocalVal(duration.toString());
+            cancelledRef.current = true;
             e.currentTarget.blur();
           }
         }}
@@ -126,12 +133,14 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     updateSceneVisualIntent,
     updateSceneVisualConcept,
     toggleWordFocus,
+    toggleSceneSubtitles,
     setSceneDuration,
     setSceneTransition,
     reorderScenes,
     scriptPrompt,
     setScriptPrompt,
     generateScript,
+    cancelGenerateScript,
     isGeneratingScript,
     undoGenerateScript,
     previousScenesSnapshot,
@@ -158,12 +167,14 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
       updateSceneVisualIntent: s.updateSceneVisualIntent,
       updateSceneVisualConcept: s.updateSceneVisualConcept,
       toggleWordFocus: s.toggleWordFocus,
+      toggleSceneSubtitles: s.toggleSceneSubtitles,
       setSceneDuration: s.setSceneDuration,
       setSceneTransition: s.setSceneTransition,
       reorderScenes: s.reorderScenes,
       scriptPrompt: s.scriptPrompt,
       setScriptPrompt: s.setScriptPrompt,
       generateScript: s.generateScript,
+      cancelGenerateScript: s.cancelGenerateScript,
       isGeneratingScript: s.isGeneratingScript,
       undoGenerateScript: s.undoGenerateScript,
       previousScenesSnapshot: s.previousScenesSnapshot,
@@ -191,6 +202,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
   const hasLlmKey = useMooStore((s) => Boolean((s.settings.apiKeys[s.settings.selectedLLMProvider] || '').trim()));
 
   const scenes = project.scenes || [];
+  const subtitlesOn = Boolean(project.theme?.showSubtitles);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [openAssetPickerForScene, setOpenAssetPickerForScene] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -330,17 +342,33 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               );
             })()}
 
-            <Button
-              variant="primary"
-              size="sm"
-              icon="movie_creation"
-              isLoading={isGeneratingScript}
-              disabled={!scriptPrompt.trim() || isGeneratingScript}
-              onClick={() => generateScript()}
-              className="!px-3 !text-[12px] !min-h-[36px] lg:!min-h-[32px] whitespace-nowrap shrink-0"
-            >
-              Susun Adegan
-            </Button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isGeneratingScript && (
+                <button
+                  type="button"
+                  onClick={cancelGenerateScript}
+                  className="min-h-[36px] lg:min-h-[32px] px-2.5 rounded-lg bg-surface-2 border border-border text-[12px] font-medium text-text-muted hover:text-rose-300 hover:border-rose-500/40 transition-colors"
+                >
+                  Batal
+                </button>
+              )}
+              <Button
+                variant="primary"
+                size="sm"
+                icon="movie_creation"
+                isLoading={isGeneratingScript}
+                disabled={!scriptPrompt.trim() || isGeneratingScript}
+                onClick={() => generateScript()}
+                title={
+                  scenes.length > 0
+                    ? 'Menyusun storyboard baru menggantikan adegan saat ini (bisa diurungkan)'
+                    : 'Susun shot list dari ide atau naskah'
+                }
+                className="!px-3 !text-[12px] !min-h-[36px] lg:!min-h-[32px] whitespace-nowrap"
+              >
+                {isGeneratingScript ? 'Menyusun…' : 'Susun Adegan'}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -884,6 +912,35 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     <span className="w-8 text-right font-medium text-text-muted select-none">
                       {duration.toFixed(1)}s
                     </span>
+                  </div>
+
+                  {/* 5. Subtitel per adegan (mengikuti pengaturan subtitel proyek) */}
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/30">
+                    <span className="flex flex-col">
+                      <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+                        Subtitel adegan ini
+                      </span>
+                      {!subtitlesOn && (
+                        <span className="text-[10px] text-text-faint">Aktifkan subtitel proyek di tab Mograph.</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={subtitlesOn && !scene.hideSubtitles}
+                      aria-label={`Subtitel adegan #${index + 1}`}
+                      disabled={!subtitlesOn}
+                      onClick={() => toggleSceneSubtitles(scene.id)}
+                      className={`w-9 h-5 rounded-full transition-colors relative shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                        subtitlesOn && !scene.hideSubtitles ? 'bg-accent' : 'bg-surface-3 border border-border'
+                      }`}
+                    >
+                      <span
+                        className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all ${
+                          subtitlesOn && !scene.hideSubtitles ? 'right-1' : 'left-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
               )}

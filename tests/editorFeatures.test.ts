@@ -129,4 +129,47 @@ describe('AI scene generation in the store', () => {
     await useMooStore.getState().regenerateSceneAi('a');
     expect(generateCustomScene).not.toHaveBeenCalled();
   });
+
+  const failedModule = (id: string): GeneratedScene => ({
+    id,
+    beatId: id,
+    duration: 3,
+    html: '',
+    css: '',
+    buildJs: '',
+    status: 'error',
+    errors: ['429 rate limit'],
+    version: 1,
+    userEdited: false
+  });
+
+  it('keeps the visual a scene already had when regenerating it fails', async () => {
+    await useMooStore.getState().regenerateSceneAi('b');
+    const before = compScene('b');
+    expect(before?.status).toBe('ok');
+
+    vi.mocked(generateCustomScene).mockResolvedValueOnce(failedModule('b'));
+    await useMooStore.getState().regenerateSceneAi('b', 'lebih ramai');
+
+    expect(compScene('b')).toEqual(before);
+    expect(useMooStore.getState().toasts.some((t) => t.message.includes('visual sebelumnya dipertahankan'))).toBe(true);
+  });
+
+  it('shows the failure when the scene had no visual of its own yet', async () => {
+    vi.mocked(generateCustomScene).mockResolvedValueOnce(failedModule('c'));
+    await useMooStore.getState().regenerateSceneAi('c');
+    expect(compScene('c')?.status).toBe('error');
+  });
+
+  it('does not bring back a scene deleted while its visual was being made', async () => {
+    vi.mocked(generateCustomScene).mockImplementationOnce(async ({ beat }) => {
+      useMooStore.getState().removeScene('b');
+      return { ...failedModule(beat.id), status: 'ok', html: '<div>late</div>' };
+    });
+    await useMooStore.getState().regenerateSceneAi('b');
+
+    const state = useMooStore.getState();
+    expect(state.project.scenes.map((s) => s.id)).toEqual(['a', 'c']);
+    expect(state.project.composition?.scenes.map((m) => m.beatId)).toEqual(['a', 'c']);
+  });
 });

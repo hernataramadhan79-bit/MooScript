@@ -5,8 +5,19 @@ import { BUILTIN_SKILLS, getAllSkills, initializeSkills } from '../../engine/ski
 import { syncComposition } from '../../engine/composition/sync';
 import { syncCustomBgmForProject } from '../../db/customBgm';
 import { removePristineLegacyDemo } from '../../db/legacyDemo';
+import { loadProjectVoice } from '../../db/voiceTrack';
 import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
 import type { MooStoreState, SettingsSlice } from '../types';
+
+const ACTIVE_SKILL_KEY = 'mooscript_active_skill_id';
+
+function readStoredSkillId(): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_SKILL_KEY) : null;
+  } catch {
+    return null;
+  }
+}
 
 export const DEFAULT_SETTINGS: EngineSettings = {
   apiKeys: {
@@ -81,10 +92,21 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
 
   skills: BUILTIN_SKILLS,
   activeSkillId: BUILTIN_SKILLS[0].id,
-  setActiveSkillId: (activeSkillId) => set({ activeSkillId }),
+  setActiveSkillId: (activeSkillId) => {
+    set({ activeSkillId });
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(ACTIVE_SKILL_KEY, activeSkillId);
+    } catch {
+      // ignore localStorage errors in private browsing
+    }
+  },
   refreshSkills: async () => {
     const all = await getAllSkills();
     set({ skills: all });
+    // A deleted persona falls back to the default one.
+    if (!all.some((s) => s.id === get().activeSkillId) && all.length > 0) {
+      get().setActiveSkillId(all[0].id);
+    }
   },
 
   cacheSizeBytes: 0,
@@ -204,6 +226,8 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
 
     const cacheSize = await getCacheSize();
     await syncCustomBgmForProject(project.id);
+    const voice = await loadProjectVoice(project);
+    const storedSkillId = readStoredSkillId();
 
     set({
       skills,
@@ -212,7 +236,11 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
       projectsList: allProjects,
       audioBlobUrl: blobUrl,
       cacheSizeBytes: cacheSize,
-      audioStale: false
+      audioStale: false,
+      ...voice,
+      ...(storedSkillId && skills.some((s) => s.id === storedSkillId) ? { activeSkillId: storedSkillId } : {})
     });
+    // The scene cards offer the project's images before the asset tab is ever opened.
+    await get().loadAssets(project.id);
   }
 });

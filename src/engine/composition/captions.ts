@@ -14,7 +14,8 @@ export interface CaptionSceneMeta {
   duration: number;
   text: string;
   wordTimestamps: { word: string; start: number; end: number }[];
-  showSubtitles?: boolean;
+  /** This scene opted out of captions. */
+  hideSubtitles?: boolean;
 }
 
 /**
@@ -146,7 +147,7 @@ export function buildCaptionScript(config: CaptionConfig, scenes: CaptionSceneMe
     var chunk = null;
     if (sceneIdx >= 0) {
       var sc = SCENES[sceneIdx];
-      if (sc.showSubtitles !== false) {
+      if (!sc.hideSubtitles) {
         var words = sc.wordTimestamps && sc.wordTimestamps.length
           ? sc.wordTimestamps
           : mooEvenWords(sc.text, durations[sceneIdx] || sc.duration);

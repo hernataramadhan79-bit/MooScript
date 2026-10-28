@@ -133,7 +133,10 @@ export interface AudioSlice {
   audioBlobUrl: string | null;
   audioStale: boolean;
   audioProgress: AudioProgressInfo | null;
+  /** The narration before BGM mixing; null when the project has no voice-over. */
   rawVoiceBlob?: Blob | null;
+  /** The project audio is background music only, so changing the music may replace it freely. */
+  bgmOnlyAudio: boolean;
   generateAudio: () => Promise<void>;
   uploadCustomAudio: (file: File) => Promise<void>;
   cancelAudioGeneration: () => void;

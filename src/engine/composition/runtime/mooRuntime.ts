@@ -301,7 +301,7 @@ export function getRuntimeScript(): string {
       container = document.getElementById('scene-' + targetSceneId);
     }
     if (!container) {
-      const allWrappers = stageEl.querySelectorAll('[data-scene-id]');
+      const allWrappers = stageEl.querySelectorAll('.moo-scene-wrapper');
       for (let i = 0; i < allWrappers.length; i++) {
         const st = window.getComputedStyle(allWrappers[i]);
         if (st.visibility !== 'hidden' && parseFloat(st.opacity || '1') > 0.05) {

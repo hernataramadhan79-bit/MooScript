@@ -35,6 +35,17 @@ export interface AssetRecord {
   createdAt: number;
 }
 
+/**
+ * What the project audio is made of. 'voice' keeps the narration from before BGM mixing, so the
+ * music can be changed later without losing the voice-over; 'bgm' means the audio is music only.
+ */
+export interface StoredVoiceTrack {
+  projectId: string;
+  kind: 'voice' | 'bgm';
+  blob?: Blob;
+  updatedAt: number;
+}
+
 export class MooDatabase extends Dexie {
   projects!: Table<MooProject, string>;
   audioBlobs!: Table<StoredAudio, string>;
@@ -43,6 +54,7 @@ export class MooDatabase extends Dexie {
   sceneAudioCache!: Table<CachedSceneAudio, string>;
   assets!: Table<AssetRecord, string>;
   bgmBlobs!: Table<StoredBgm, string>;
+  voiceTracks!: Table<StoredVoiceTrack, string>;
 
   constructor() {
     super('MooScriptDB');
@@ -110,6 +122,18 @@ export class MooDatabase extends Dexie {
       sceneAudioCache: 'cacheKey, updatedAt',
       assets: 'id, projectId, name, mimeType, createdAt',
       bgmBlobs: 'projectId, updatedAt'
+    });
+
+    // Version 6: the raw voice-over per project, kept apart from the BGM mix
+    this.version(6).stores({
+      projects: 'id, title, renderMode, updatedAt',
+      audioBlobs: 'projectId, updatedAt',
+      skills: 'id, name, isBuiltin',
+      settings: 'id',
+      sceneAudioCache: 'cacheKey, updatedAt',
+      assets: 'id, projectId, name, mimeType, createdAt',
+      bgmBlobs: 'projectId, updatedAt',
+      voiceTracks: 'projectId, updatedAt'
     });
   }
 }
@@ -233,6 +257,7 @@ export async function deleteProjectFromDb(id: string): Promise<void> {
     await db.projects.delete(id);
     await db.audioBlobs.delete(id);
     await db.bgmBlobs.delete(id);
+    await db.voiceTracks.delete(id);
     lastSavedAudioBlobByProject.delete(id);
   } catch (err) {
     console.warn('Failed to delete project from IndexedDB', err);
@@ -351,6 +376,31 @@ export async function deleteBgmFromDb(projectId: string): Promise<void> {
     await db.bgmBlobs.delete(projectId);
   } catch (err) {
     console.warn('Failed to delete custom BGM', err);
+  }
+}
+
+/** Stores (or with `null`, forgets) what the project audio is made of. Never throws. */
+export async function saveVoiceTrackToDb(
+  projectId: string,
+  track: { kind: 'voice'; blob: Blob } | { kind: 'bgm' } | null
+): Promise<void> {
+  try {
+    if (!track) {
+      await db.voiceTracks.delete(projectId);
+    } else {
+      await db.voiceTracks.put({ projectId, ...track, updatedAt: Date.now() });
+    }
+  } catch (err) {
+    console.warn('Failed to store the voice track', err);
+  }
+}
+
+export async function loadVoiceTrackFromDb(projectId: string): Promise<StoredVoiceTrack | undefined> {
+  try {
+    return await db.voiceTracks.get(projectId);
+  } catch (err) {
+    console.warn('Failed to load the voice track', err);
+    return undefined;
   }
 }
 

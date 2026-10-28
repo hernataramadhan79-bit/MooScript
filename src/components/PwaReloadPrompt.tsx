@@ -30,19 +30,22 @@ export const PwaReloadPrompt: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-24 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-full z-40 sm:max-w-sm p-4 rounded-xl bg-zinc-900 border border-primary/40 shadow-2xl animate-fadeIn text-white space-y-2.5">
+    <div
+      role="status"
+      className="fixed bottom-24 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-full z-40 sm:max-w-sm p-4 rounded-xl bg-zinc-900 border border-primary/40 shadow-2xl animate-fadeIn text-white space-y-2.5"
+    >
       <div className="flex items-start gap-2.5">
-        <span className="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5">
+        <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5">
           {needRefresh ? 'system_update' : 'cloud_done'}
         </span>
         <div className="flex-1 text-xs">
           <h4 className="font-bold text-white mb-0.5">
-            {needRefresh ? 'Update Available' : 'Offline Ready'}
+            {needRefresh ? 'Versi baru tersedia' : 'Siap dipakai offline'}
           </h4>
           <p className="text-zinc-400 leading-relaxed text-[11px]">
             {needRefresh
-              ? 'A new version of MooScript Studio is available. Reload to update.'
-              : 'App content has been cached for offline use.'}
+              ? 'MooScript Studio punya versi baru. Muat ulang untuk memperbarui; proyek Anda tetap tersimpan.'
+              : 'Aplikasi sudah tersimpan di perangkat dan bisa dibuka tanpa internet.'}
           </p>
         </div>
       </div>
@@ -54,7 +57,7 @@ export const PwaReloadPrompt: React.FC = () => {
             onClick={() => updateServiceWorker(true)}
             className="px-3 py-1.5 rounded-lg bg-primary hover:bg-lime-300 text-black text-xs font-bold transition-all active:scale-95 shadow-sm"
           >
-            Reload
+            Muat Ulang
           </button>
         )}
         <button
@@ -62,7 +65,7 @@ export const PwaReloadPrompt: React.FC = () => {
           onClick={close}
           className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
         >
-          Dismiss
+          Tutup
         </button>
       </div>
     </div>

@@ -250,6 +250,7 @@ export const App: React.FC = () => {
       <Suspense fallback={null}>
         {inspectingBeatId && (
           <CodeInspectorModal
+            key={inspectingBeatId}
             beatId={inspectingBeatId}
             isOpen
             onClose={() => setInspectingBeatId(null)}

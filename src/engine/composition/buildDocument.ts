@@ -75,6 +75,19 @@ function safeJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 }
 
+/** A single-quoted JS string literal that is safe inside an inline <script> element. */
+function jsString(value: string): string {
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/</g, '\\x3c')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+  return `'${escaped}'`;
+}
+
 function toDomId(sceneId: string): string {
   return `scene-${sceneId}`;
 }
@@ -189,7 +202,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
       const ts = timelineScenes.find((s) => s.id === mod.beatId);
       return `
 // Register Scene ${idx + 1}
-MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
+MOO.scene(${jsString(mod.beatId)}, {
   html: ${safeJson(html || '')},
   buildSrc: ${safeJson(buildJs || '')},
   transition: ${safeJson(ts?.transition || 'flow')}
@@ -350,7 +363,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
         duration: durationOf(mod),
         text: ts?.narrationText || ts?.text || '',
         wordTimestamps: ts?.wordTimestamps || [],
-        showSubtitles: ts?.showSubtitles
+        hideSubtitles: ts?.hideSubtitles
       };
     })
   );

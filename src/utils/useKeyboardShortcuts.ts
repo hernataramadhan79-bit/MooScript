@@ -150,10 +150,18 @@ export function useKeyboardShortcuts(): void {
           break;
         }
 
-        // Escape: deselect scene
-        case 'Escape':
-          setActiveSceneId(null);
+        // Escape: drop the layer selection first, then the scene selection. Theater mode closes
+        // itself on Escape and keeps both.
+        case 'Escape': {
+          const { previewMode, selectedLayerId, setSelectedLayerId } = useMooStore.getState();
+          if (previewMode === 'theater') break;
+          if (selectedLayerId) {
+            setSelectedLayerId(null);
+          } else {
+            setActiveSceneId(null);
+          }
           break;
+        }
 
         default:
           break;

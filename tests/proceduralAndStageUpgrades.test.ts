@@ -236,7 +236,7 @@ describe('Store Upgrades: Undo/Redo Integrity, Procedural Compilation, Multi-Ass
     expect(compScene?.buildJs).toContain('.moo-asset-container.moo-asset-asset-2');
   });
 
-  it('respects custom bgColor and per-scene showSubtitles in buildCompositionDocument', () => {
+  it('respects custom bgColor and the per-scene caption opt-out in buildCompositionDocument', () => {
     const proj = structuredClone(INITIAL_PROJECT);
     proj.theme.showSubtitles = true;
     proj.theme.captionStyle = 'boxed';
@@ -244,12 +244,23 @@ describe('Store Upgrades: Undo/Redo Integrity, Procedural Compilation, Multi-Ass
       bgColor: '#1e293b',
       bgOpacity: 0.8
     };
-    proj.scenes[0].showSubtitles = false;
+    proj.scenes[0].hideSubtitles = true;
 
     const doc = buildCompositionDocument(proj);
     expect(doc).toContain('"bgColor":"#1e293b"');
-    expect(doc).toContain('"showSubtitles":false');
+    expect(doc).toContain('"hideSubtitles":true');
     expect(doc).toContain('hexToRgba(CUST.bgColor, bgOp)');
-    expect(doc).toContain('if (sc.showSubtitles !== false)');
+    expect(doc).toContain('if (!sc.hideSubtitles)');
+  });
+
+  it('shows captions for scenes saved with the old per-scene showSubtitles: false default', () => {
+    const proj = structuredClone(INITIAL_PROJECT);
+    proj.theme.showSubtitles = true;
+    // Every scene used to be created with showSubtitles: false; it no longer hides captions.
+    proj.scenes[0].showSubtitles = false;
+
+    const doc = buildCompositionDocument(proj);
+    expect(doc).not.toContain('"hideSubtitles":true');
+    expect(doc).toContain('if (!sc.hideSubtitles)');
   });
 });

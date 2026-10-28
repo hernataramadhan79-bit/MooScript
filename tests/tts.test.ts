@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../src/engine/ai/tts';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  computeDeterministicWordAlignment,
+  calculateFallbackSceneDuration,
+  generateSceneAudio
+} from '../src/engine/ai/tts';
+import * as mooDb from '../src/db/mooDb';
+import * as localTts from '../src/engine/ai/localTts';
 
 describe('TTS Alignment & Duration Algorithms', () => {
   describe('computeDeterministicWordAlignment', () => {
@@ -66,5 +72,60 @@ describe('TTS Alignment & Duration Algorithms', () => {
       // 4 words at 200 WPM => (4 / 200) * 60 + 1.2 = 1.2 + 1.2 = 2.4s
       expect(calculateFallbackSceneDuration(text, 200)).toBe(2.4);
     });
+  });
+});
+
+describe('generateSceneAudio', () => {
+  class MockAudioBuffer {
+    sampleRate = 22050;
+    numberOfChannels = 1;
+    duration = 2.5;
+    length = 22050 * 2.5;
+    getChannelData() {
+      return new Float32Array(this.length);
+    }
+  }
+
+  beforeEach(() => {
+    (globalThis as any).AudioContext = class {
+      decodeAudioData() {
+        return Promise.resolve(new MockAudioBuffer());
+      }
+      close() {
+        return Promise.resolve();
+      }
+    };
+  });
+
+  it('keeps a scene without narration silent for its own length, without calling a TTS provider', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const segment = await generateSceneAudio({
+      scene: { id: 'quiet', narrationText: '   ', durationInSeconds: 2.5, wordTimestamps: [] },
+      provider: 'openai',
+      apiKeys: {},
+      voiceId: 'alloy'
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(segment.paddedDuration).toBe(2.5);
+    expect(segment.wordTimestamps).toEqual([]);
+    fetchSpy.mockRestore();
+  });
+
+  it('caches Piper audio per expressiveness setting', async () => {
+    const getSpy = vi.spyOn(mooDb, 'getCachedSceneAudio').mockResolvedValue(undefined);
+    vi.spyOn(localTts, 'synthesizeLocalTTS').mockResolvedValue({
+      audioBlob: new Blob(['wav']),
+      wordTimestamps: []
+    } as Awaited<ReturnType<typeof localTts.synthesizeLocalTTS>>);
+    vi.spyOn(mooDb, 'putCachedSceneAudio').mockResolvedValue();
+
+    const scene = { id: 'pip', narrationText: 'Halo dunia', durationInSeconds: 2, wordTimestamps: [] };
+    await generateSceneAudio({ scene, provider: 'local', apiKeys: {}, voiceId: 'id_ID-news_tts', noiseScale: 0.3 });
+    await generateSceneAudio({ scene, provider: 'local', apiKeys: {}, voiceId: 'id_ID-news_tts', noiseScale: 0.9 });
+
+    const keys = getSpy.mock.calls.map((c) => c[0]);
+    expect(keys[0]).not.toBe(keys[1]);
+    vi.restoreAllMocks();
   });
 });

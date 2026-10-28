@@ -11,11 +11,15 @@ import {
   listAssetsFromDb,
   loadBgmFromDb,
   saveBgmToDb,
+  loadVoiceTrackFromDb,
+  saveVoiceTrackToDb,
   db
 } from '../../db/mooDb';
 import { syncCustomBgmForProject } from '../../db/customBgm';
+import { loadProjectVoice, NO_VOICE } from '../../db/voiceTrack';
 import { getProjectTemplate } from '../../engine/templates/projectTemplates';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
+import { DEFAULT_SCENE_SECONDS } from '../../utils/projectDuration';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
 import {
@@ -151,6 +155,18 @@ function snapshotProject(project: MooProject): MooProject {
   return JSON.parse(JSON.stringify(rest));
 }
 
+/** Editor state that only makes sense for the project it was created in. */
+const PROJECT_SCOPED_RESET = {
+  currentFrame: 0,
+  isPlaying: false,
+  audioStale: false,
+  audioProgress: null,
+  previousScenesSnapshot: null,
+  activeSceneId: null,
+  selectedLayerId: null,
+  waveformPeaks: null
+};
+
 export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlice> = (set, get) => {
   const triggerSave = (project: MooProject) => {
     scheduleSave(project, (msg) => get().addToast(msg, 'error'));
@@ -188,6 +204,19 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     historyPast = [];
     historyFuture = [];
     set({ canUndo: false, canRedo: false });
+  };
+
+  /**
+   * Stops work that belongs to the project being left. Its results would be thrown away (or
+   * worse, land in the next project), so there is no point spending API quota or CPU on them.
+   */
+  const cancelProjectJobs = () => {
+    const s = get();
+    if (s.isExporting) s.cancelExport();
+    if (s.isGeneratingScript) s.cancelGenerateScript();
+    if (s.isGeneratingAudio) s.cancelAudioGeneration();
+    if (s.isCompilingMograph || s.revisingSceneId) s.cancelMographGeneration();
+    if (s.exportResult) s.revokeExportResult();
   };
 
 
@@ -261,6 +290,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     createNewProject: async (title?: string) => {
       get().pause();
       stopPlaybackAudio();
+      cancelProjectJobs();
       await flushPendingSave();
       clearHistory();
       const now = Date.now();
@@ -308,11 +338,8 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       set({
         project: syncedProject,
         audioBlobUrl: null,
-        audioStale: false,
-        currentFrame: 0,
-        isPlaying: false,
-        previousScenesSnapshot: null,
-        activeSceneId: null,
+        ...PROJECT_SCOPED_RESET,
+        ...NO_VOICE,
         assets: []
       });
       try {
@@ -325,7 +352,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
       await syncCustomBgmForProject(newId);
       await get().refreshProjectsList();
-      get().addToast(`Created "${syncedProject.title}"`, 'success');
+      get().addToast(`Proyek "${syncedProject.title}" dibuat.`, 'success');
       return newId;
     },
 
@@ -352,8 +379,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
           camera: 'push_in',
           icon: 'sparkles',
           durationInSeconds: dur,
-          wordTimestamps: computeDeterministicWordAlignment(t.narration, dur),
-          showSubtitles: false
+          wordTimestamps: computeDeterministicWordAlignment(t.narration, dur)
         };
       });
       const totalDur = scenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
@@ -373,12 +399,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       stopPlaybackAudio();
       await flushPendingSave();
 
-      clearHistory();
       let target = await loadProjectFromDb(id);
       if (!target) {
-        get().addToast('Project not found in storage', 'error');
+        get().addToast('Proyek tidak ditemukan di penyimpanan.', 'error');
         return;
       }
+      cancelProjectJobs();
+      clearHistory();
 
       if (!target.composition) {
         target = syncComposition(target);
@@ -404,15 +431,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (target.audioBlob) {
         newBlobUrl = URL.createObjectURL(target.audioBlob);
       }
+      const voice = await loadProjectVoice(target);
 
       set({
         project: target,
         audioBlobUrl: newBlobUrl,
-        audioStale: false,
-        currentFrame: 0,
-        isPlaying: false,
-        previousScenesSnapshot: null,
-        activeSceneId: null
+        ...PROJECT_SCOPED_RESET,
+        ...voice
       });
 
       try {
@@ -426,13 +451,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       await get().refreshProjectsList();
       await get().loadAssets(target.id);
       await syncCustomBgmForProject(target.id);
-      get().addToast(`Switched to "${target.title}"`, 'info');
+      get().addToast(`Membuka "${target.title}"`, 'info');
     },
     duplicateProject: async (id: string) => {
       await flushPendingSave();
       const source = id === get().project.id ? get().project : await loadProjectFromDb(id);
       if (!source) {
-        get().addToast('Project to duplicate not found', 'error');
+        get().addToast('Proyek yang akan diduplikat tidak ditemukan.', 'error');
         return '';
       }
 
@@ -468,8 +493,15 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (sourceBgm) {
         await saveBgmToDb(dupId, sourceBgm.blob, sourceBgm.name);
       }
+      const sourceVoice = await loadVoiceTrackFromDb(source.id);
+      if (sourceVoice && duplicated.audioBlob) {
+        await saveVoiceTrackToDb(
+          dupId,
+          sourceVoice.kind === 'voice' && sourceVoice.blob ? { kind: 'voice', blob: sourceVoice.blob } : { kind: 'bgm' }
+        );
+      }
       await get().refreshProjectsList();
-      get().addToast(`Duplicated as "${duplicated.title}"`, 'success');
+      get().addToast(`Diduplikat sebagai "${duplicated.title}"`, 'success');
       return dupId;
     },
 
@@ -499,7 +531,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       await flushPendingSave();
       const list = get().projectsList;
       if (list.length <= 1) {
-        get().addToast('Cannot delete the last remaining project.', 'warning');
+        get().addToast('Proyek terakhir tidak bisa dihapus.', 'warning');
         return;
       }
       await deleteProjectFromDb(id);
@@ -517,7 +549,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         await get().refreshProjectsList();
       }
 
-      get().addToast('Project deleted', 'info');
+      get().addToast('Proyek dihapus.', 'info');
     },
 
     updateTitle: (title) => {
@@ -662,7 +694,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       );
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
-      get().addToast(`Resolution set to ${res} (${updated.width}×${updated.height})`, 'info');
+      get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
     },
 
     updateExportSettings: (settings) => {
@@ -684,7 +716,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       };
       set({ project: updated });
       triggerSave(updated);
-      get().addToast(`Subtitles ${!currentVal ? 'enabled' : 'disabled'}`, 'info');
+      get().addToast(`Subtitel ${!currentVal ? 'diaktifkan' : 'dinonaktifkan'}`, 'info');
     },
 
     updateSceneText: (id, text) => {
@@ -726,6 +758,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateSceneVisualIntent: (sceneId: string, visualIntent: string) => {
+      pushSnapshot(get().project, `intent:${sceneId}`);
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, visualIntent } : s));
       const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
@@ -733,6 +766,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateSceneVisualConcept: (sceneId: string, visualConcept: string) => {
+      pushSnapshot(get().project, `concept:${sceneId}`);
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, visualConcept } : s));
       const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
@@ -810,14 +844,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       pushSnapshot(currentProj, `palette:${sceneId}:${Object.keys(palette).sort().join(',')}`);
       const updatedScenes = comp.scenes.map((mod) => {
         if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
-        return {
-          ...mod,
-          userEdited: true,
-          palette: {
-            ...(mod.palette || {}),
-            ...palette
-          }
-        };
+        // An undefined color resets that slot to the project palette.
+        const merged = Object.fromEntries(
+          Object.entries({ ...(mod.palette || {}), ...palette }).filter(([, v]) => v !== undefined && v !== '')
+        ) as Partial<ScenePalette>;
+        const { palette: _old, ...rest } = mod;
+        return Object.keys(merged).length > 0 ? { ...rest, userEdited: true, palette: merged } : rest;
       });
       const updatedComp: Composition = {
         ...comp,
@@ -880,10 +912,23 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const current = get().project;
       if (current.scenes.length === 0) return;
       pushSnapshot(current);
+      const replacedCustomWork =
+        overwriteExisting &&
+        (current.composition?.scenes || []).some(
+          (m) => m.userEdited || m.generatorVersion?.startsWith('generative')
+        );
       const updatedProject = compileProceduralProject(current, archetype, overwriteExisting);
       set({ project: updatedProject });
       triggerSave(updatedProject);
-      get().addToast(`Seluruh ${current.scenes.length} adegan berhasil dibangun secara instan!`, 'success');
+      if (replacedCustomWork) {
+        get().addToast(
+          `Seluruh ${current.scenes.length} adegan diganti visual instan, termasuk visual AI/editan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`,
+          'warning',
+          6000
+        );
+      } else {
+        get().addToast(`Seluruh ${current.scenes.length} adegan berhasil dibangun secara instan!`, 'success');
+      }
     },
 
     updateSceneCamera: (sceneId: string, camera: CameraMovement) => {
@@ -894,8 +939,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     toggleSceneSubtitles: (sceneId: string) => {
+      pushSnapshot(get().project);
       const updatedScenes = get().project.scenes.map((s) =>
-        s.id === sceneId ? { ...s, showSubtitles: !s.showSubtitles } : s
+        s.id === sceneId ? { ...s, hideSubtitles: !s.hideSubtitles } : s
       );
       const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
@@ -903,6 +949,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     toggleWordFocus: (sceneId, word) => {
+      pushSnapshot(get().project);
       const cleanTarget = cleanWord(word);
       const updatedScenes = get().project.scenes.map((s) => {
         if (s.id !== sceneId) return s;
@@ -924,6 +971,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     setSceneTransition: (sceneId, transition) => {
+      pushSnapshot(get().project);
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, transition } : s));
       const updated = { ...get().project, scenes: updatedScenes };
       set({ project: updated });
@@ -971,23 +1019,21 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const current = get().project;
       pushSnapshot(current);
       const hasAudio = !!current.audioBlob;
-      const newId = `sc-${Date.now()}`;
-      const defaultText = 'New kinetic motion scene';
-      const dur = calculateFallbackSceneDuration(defaultText);
+      const newId = `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      // Starts without narration: the card shows the writing prompt, and the scene holds its
+      // default length until text (or a voice-over) times it.
       const newScene: Scene = {
         id: newId,
-        narrationText: defaultText,
-        text: defaultText,
-        visualIntent: 'Kinetic motion scene with bold visual emphasis',
-        visualConcept: 'Dynamic layout with fluid text animation',
+        narrationText: '',
+        text: '',
+        visualIntent: '',
         visualElements: ['headline', 'supporting-detail'],
-        focusWords: ['kinetic', 'scene'],
+        focusWords: [],
         motionPreset: 'punch_zoom',
         camera: 'push_in',
         icon: 'sparkles',
-        durationInSeconds: dur,
-        wordTimestamps: computeDeterministicWordAlignment(defaultText, dur),
-        showSubtitles: false
+        durationInSeconds: DEFAULT_SCENE_SECONDS,
+        wordTimestamps: []
       };
       const updatedScenes = [...current.scenes, newScene];
       const totalDur = updatedScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
@@ -1018,11 +1064,16 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
       const updated = syncComposition(updatedProject);
+      const { activeSceneId, selectedLayerId } = get();
       set({
         project: updated,
-        audioStale: hasAudio ? true : get().audioStale
+        audioStale: hasAudio ? true : get().audioStale,
+        activeSceneId: activeSceneId === id ? null : activeSceneId,
+        selectedLayerId: activeSceneId === id ? null : selectedLayerId
       });
       triggerSave(updated);
+      // The film got shorter: keep the playhead inside it.
+      get().seekFrame(get().currentFrame);
     },
 
     duplicateScene: (id: string) => {
@@ -1222,6 +1273,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     setSelectedNodeId: (id: string | null) => set({ selectedNodeId: id }),
     assignAssetToScene: (sceneId: string, attachment: SceneAssetAttachment) => {
       const current = get().project;
+      pushSnapshot(current);
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         const existing = s.assignedAssets || [];
@@ -1238,6 +1290,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     removeAssetFromSceneBeat: (sceneId: string, assetId: string) => {
       const current = get().project;
+      pushSnapshot(current);
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         return {
@@ -1252,6 +1305,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     updateSceneAssetRole: (sceneId: string, assetId: string, role: SceneAssetAttachment['role'], guidance?: string) => {
       const current = get().project;
+      pushSnapshot(current, `asset-role:${sceneId}:${assetId}`);
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         const updatedAssets = (s.assignedAssets || []).map((a) => {

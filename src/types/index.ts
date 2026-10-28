@@ -254,6 +254,9 @@ export interface Scene {
   /** When true, narration edits never recompute the duration (set by AI pacing or manual edit). */
   durationLocked?: boolean;
   wordTimestamps: WordTimestamp[];
+  /** Leaves this scene without captions while project subtitles are on. */
+  hideSubtitles?: boolean;
+  /** @deprecated legacy canvas renderer only; captions follow the project setting and `hideSubtitles`. */
   showSubtitles?: boolean;
 
   // Atomic Scene Graph

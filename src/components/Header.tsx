@@ -27,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(project.title);
+  // Escape leaves the field; the blur that may follow must not save the typed title.
+  const titleCancelledRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!editingTitle) {
@@ -44,8 +46,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
 
   const handleTitleSubmit = () => {
     setEditingTitle(false);
-    if (titleInput.trim() && titleInput !== project.title) {
-      updateTitle(titleInput.trim());
+    if (titleCancelledRef.current) {
+      titleCancelledRef.current = false;
+      return;
+    }
+    const trimmed = titleInput.trim();
+    if (trimmed && trimmed !== project.title) {
+      updateTitle(trimmed);
     }
   };
 
@@ -91,8 +98,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                   onChange={(e) => setTitleInput(e.target.value)}
                   onBlur={handleTitleSubmit}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleTitleSubmit();
+                    if (e.key === 'Enter') e.currentTarget.blur();
                     if (e.key === 'Escape') {
+                      titleCancelledRef.current = true;
                       setTitleInput(project.title);
                       setEditingTitle(false);
                     }
@@ -104,6 +112,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                   <button
                     type="button"
                     onClick={() => {
+                      titleCancelledRef.current = false;
                       setTitleInput(project.title);
                       setEditingTitle(true);
                     }}

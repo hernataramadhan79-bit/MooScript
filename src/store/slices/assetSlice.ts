@@ -4,7 +4,6 @@ import type { AssetRecord } from '../../db/mooDb';
 import { saveAssetToDb, listAssetsFromDb, deleteAssetFromDb } from '../../db/mooDb';
 import { syncComposition } from '../../engine/composition/sync';
 import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composition/layers';
-import { scheduleSave } from './projectSlice';
 import { escapeHtml } from '../../utils/textUtils';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -58,8 +57,10 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     };
 
     await saveAssetToDb(record);
-    const updated = [...get().assets, record];
-    set({ assets: updated });
+    // The list on screen belongs to the open project; another one may have been opened meanwhile.
+    if (get().project.id === currentProject.id) {
+      set({ assets: [...get().assets, record] });
+    }
     get().addToast(`Aset "${file.name}" berhasil diunggah!`, 'success');
     return record;
   },
@@ -136,8 +137,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       composition: { ...activeComp, scenes: compScenes }
     });
 
-    set({ project: updatedProject });
-    scheduleSave(updatedProject, (msg) => get().addToast(msg, 'error'));
+    get().setProject(updatedProject, { preserveHistory: true, keepStale: true });
     get().addToast(`Aset "${asset.name}" disisipkan ke adegan!`, 'success');
   },
 
@@ -170,8 +170,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       composition: { ...current.composition, scenes: compScenes }
     });
 
-    set({ project: updatedProject });
-    scheduleSave(updatedProject, (msg) => get().addToast(msg, 'error'));
+    get().setProject(updatedProject, { preserveHistory: true, keepStale: true });
     get().addToast('Aset berhasil dihapus dari adegan.', 'info');
   }
 });

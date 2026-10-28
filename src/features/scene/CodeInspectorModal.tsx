@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +8,7 @@ import {
   foreignApiMessage,
   validateSceneCode
 } from '../../engine/composition/validator';
+import { extractLayersFromHtml } from '../../engine/composition/layers';
 import type { SceneModule, Composition } from '../../types';
 import { MooApiGuidePanel } from './MooApiGuidePanel';
 
@@ -17,35 +18,34 @@ interface CodeInspectorModalProps {
   onClose: () => void;
 }
 
+/** Starting point for a scene that has no code of its own yet. */
+const STARTER_CODE = {
+  html: '<div class="scene-box">\n  <h1 class="headline" data-moo-layer="headline">Judul Adegan</h1>\n</div>',
+  css: '.scene-box {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.headline {\n  font-size: 72px;\n  color: var(--moo-accent, #38bdf8);\n}',
+  buildJs: 'shot.arrive(".headline", {\n  scale: 0.5,\n  opacity: 0,\n  dur: 0.8,\n  curve: "overshoot-out(1.7)"\n}, 0);'
+};
+
+function initialCode(scene: SceneModule | undefined): { html: string; css: string; buildJs: string } {
+  if (!scene || (!scene.html?.trim() && !scene.buildJs?.trim())) return STARTER_CODE;
+  return { html: scene.html || '', css: scene.css || '', buildJs: scene.buildJs || '' };
+}
+
 export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, isOpen, onClose }) => {
   const project = useMooStore((s) => s.project);
   const addToast = useMooStore((s) => s.addToast);
-
-  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js' | 'guide'>('html');
-  const [htmlCode, setHtmlCode] = useState('');
-  const [cssCode, setCssCode] = useState('');
-  const [jsCode, setJsCode] = useState('');
-  const [errors, setErrors] = useState<string[]>([]);
 
   // Find target scene module in composition
   const currentScene: SceneModule | undefined = project.composition?.scenes?.find(
     (s) => s.beatId === beatId
   );
 
-  useEffect(() => {
-    if (currentScene) {
-      setHtmlCode(currentScene.html || '');
-      setCssCode(currentScene.css || '');
-      setJsCode(currentScene.buildJs || '');
-      setErrors([]);
-    } else {
-      // Default template if not yet generated
-      setHtmlCode('<div class="scene-box">\n  <h1 class="headline">Custom Title</h1>\n</div>');
-      setCssCode('.scene-box {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.headline {\n  font-size: 72px;\n  color: var(--moo-accent, #38bdf8);\n}');
-      setJsCode('shot.arrive(".headline", {\n  scale: 0.5,\n  opacity: 0,\n  dur: 0.8,\n  curve: "overshoot-out(1.7)"\n}, 0);');
-      setErrors([]);
-    }
-  }, [currentScene, beatId, isOpen]);
+  // The editor is mounted per scene and seeded once: background saves (audio finishing, AI work on
+  // other shots) re-create composition objects and must never wipe code that is being typed.
+  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js' | 'guide'>('html');
+  const [htmlCode, setHtmlCode] = useState(() => initialCode(currentScene).html);
+  const [cssCode, setCssCode] = useState(() => initialCode(currentScene).css);
+  const [jsCode, setJsCode] = useState(() => initialCode(currentScene).buildJs);
+  const [errors, setErrors] = useState<string[]>([]);
 
   const handleApplyChanges = async () => {
     const validation = validateSceneCode({ html: htmlCode, css: cssCode, buildJs: jsCode });
@@ -76,15 +76,24 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
     };
 
     const targetBeatId = beatId || 'default-beat';
+    if (!project.scenes.some((s) => s.id === targetBeatId)) {
+      addToast('Adegan ini sudah dihapus, perubahan kode tidak diterapkan.', 'warning');
+      onClose();
+      return;
+    }
     const sceneDuration = project.scenes.find((s) => s.id === targetBeatId)?.durationInSeconds || 3;
+    // Layer overrides and the scene palette are kept: they apply on top of whatever code runs.
     const updatedScene: SceneModule = {
+      ...currentScene,
       id: currentScene?.id || targetBeatId,
       beatId: targetBeatId,
       duration: sceneDuration,
       html: htmlCode,
       css: cssCode,
       buildJs: jsCode,
+      editableLayers: extractLayersFromHtml(htmlCode),
       status: 'ok',
+      errors: undefined,
       version: (currentScene?.version || 1) + 1,
       userEdited: true
     };

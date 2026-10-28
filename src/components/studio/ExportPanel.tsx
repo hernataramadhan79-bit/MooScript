@@ -76,8 +76,10 @@ export const ExportPanel: React.FC = () => {
     project.resolution || (project.width === 1080 || project.height === 1080 ? '1080p' : '720p');
   // Mirrors exporter logic: watermark/HUD only apply to the legacy canvas renderer.
   const isCompositionExport =
-    (project.renderMode || 'composition') === 'composition' &&
-    Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
+    (project.renderMode || 'composition') === 'composition' && scenes.length > 0 && Boolean(project.composition);
+  const unbuiltModules = (project.composition?.scenes || []).filter((m) => !sceneHasRenderableCode(m));
+  const failedVisualCount = unbuiltModules.filter((m) => m.status === 'error').length;
+  const pendingVisualCount = unbuiltModules.length - failedVisualCount;
 
   // A finished video is only valid for the exact project and options it was rendered with.
   // Drop it as soon as anything that affects the output changes.
@@ -356,6 +358,18 @@ export const ExportPanel: React.FC = () => {
       {hasProjectAudio && audioStale && (
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
           Naskah berubah sejak suara dibuat. Buat ulang suara di tab Audio agar video sesuai naskah.
+        </div>
+      )}
+      {scenes.length > 0 && failedVisualCount > 0 && (
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] leading-relaxed">
+          {failedVisualCount} adegan gagal dibuat dan akan tampil sebagai kartu error. Buat ulang visualnya dari kartu
+          adegan atau tab Gaya sebelum mengekspor.
+        </div>
+      )}
+      {scenes.length > 0 && pendingVisualCount > 0 && (
+        <div className="p-3 rounded-xl bg-surface-2 border border-border text-text-muted text-[11px] leading-relaxed">
+          {pendingVisualCount} adegan belum punya visual sendiri dan akan dirender dengan visual instan seperti di
+          pratinjau.
         </div>
       )}
 

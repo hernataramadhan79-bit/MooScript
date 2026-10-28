@@ -571,7 +571,26 @@ export async function generateSceneAudio(params: {
   } = params;
 
   const rawText = (scene.narrationText || scene.text || '').trim();
-  const cacheKey = `${provider}:${voiceId}:${elevenLabsModel || ''}:${speed}:${stability}:${rawText}`;
+
+  // Narration is optional: a scene without it keeps its own length as silence, with no TTS call.
+  if (!rawText) {
+    const silentDuration = Math.round(Math.max(0.5, scene.durationInSeconds || 3) * 100) / 100;
+    const sampleRate = 22050;
+    const silentBlob = pcmFloat32ToWavBlob(new Float32Array(Math.max(1, Math.round(silentDuration * sampleRate))), sampleRate);
+    return {
+      sceneId: scene.id,
+      audioBlob: silentBlob,
+      audioBuffer: await decodeAudioBlob(silentBlob),
+      audioDuration: silentDuration,
+      paddedDuration: silentDuration,
+      wordTimestamps: [],
+      fromCache: false
+    };
+  }
+
+  // Piper's expressiveness settings change the voice, so they are part of a local voice's cache key.
+  const localVoiceParams = provider === 'local' ? `:${params.noiseScale ?? ''}:${params.noiseW ?? ''}` : '';
+  const cacheKey = `${provider}:${voiceId}:${elevenLabsModel || ''}:${speed}:${stability}${localVoiceParams}:${rawText}`;
 
   // 1. Check IndexedDB cache first
   const cached = await getCachedSceneAudio(cacheKey);

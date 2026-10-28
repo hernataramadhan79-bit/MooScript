@@ -9,6 +9,7 @@ import {
 } from '../../engine/ai/director/directorPipeline';
 import { callRawLLM } from '../../engine/ai/llm';
 import { extractLayersFromHtml } from '../../engine/composition/layers';
+import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { syncComposition } from '../../engine/composition/sync';
 
 /** Scene code (SVG + CSS + timeline) runs long; a 2048-token cap truncates it mid-block. */
@@ -51,6 +52,13 @@ let sceneController: AbortController | null = null;
 
 const matchesScene = (mod: SceneModule, sceneId: string) => mod.beatId === sceneId || mod.id === sceneId;
 
+type WriteOutcome = 'written' | 'project-changed' | 'scene-removed';
+
+/** The scene's current module in the latest composition, if any. */
+function currentModule(get: () => MooStoreState, sceneId: string): SceneModule | undefined {
+  return get().project.composition?.scenes.find((m) => matchesScene(m, sceneId));
+}
+
 /** Writes one finished scene module into the latest composition of the project it was made for. */
 function writeSceneModule(
   get: () => MooStoreState,
@@ -59,11 +67,13 @@ function writeSceneModule(
   module: SceneModule,
   fallbackComp?: Composition,
   history: 'push' | 'skip' = 'push'
-): boolean {
+): WriteOutcome {
   const latest = get().project;
-  if (latest.id !== projectId) return false;
+  if (latest.id !== projectId) return 'project-changed';
+  // A scene deleted while its visual was made must not come back as an extra shot.
+  if (!latest.scenes.some((s) => s.id === sceneId)) return 'scene-removed';
   const comp = latest.composition || fallbackComp;
-  if (!comp) return false;
+  if (!comp) return 'project-changed';
   const exists = comp.scenes.some((m) => matchesScene(m, sceneId));
   const nextScenes = exists ? comp.scenes.map((m) => (matchesScene(m, sceneId) ? module : m)) : [...comp.scenes, module];
   get().setProject(
@@ -74,7 +84,7 @@ function writeSceneModule(
     },
     history === 'push' ? { keepStale: true, preserveHistory: true } : { keepStale: true, skipHistory: true }
   );
-  return true;
+  return 'written';
 }
 
 function llmExecutor(settings: EngineSettings, signal: AbortSignal, onActivity: (status: string) => void) {
@@ -145,6 +155,8 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
 
       let failureCount = 0;
       let completedCount = 0;
+      /** Failed shots that kept the visual they had before this run. */
+      const keptShots: number[] = [];
       // The whole run is one undo step: only the first scene to land records it.
       let historyRecorded = false;
       let nextIndex = 0;
@@ -230,9 +242,21 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           if (module.status !== 'ok') failureCount++;
           completedCount++;
           setStatus(beat.id, module.status === 'ok' ? 'ok' : 'error', completedCount);
-          // Land each shot as soon as it is ready, so the stage fills in while the rest render.
-          writeSceneModule(get, startProject.id, beat.id, module, fallbackComp, historyRecorded ? 'skip' : 'push');
-          historyRecorded = true;
+          // A failed shot never replaces a visual the scene already had.
+          if (module.status !== 'ok' && sceneHasRenderableCode(currentModule(get, beat.id))) {
+            keptShots.push(i + 1);
+          } else {
+            // Land each shot as soon as it is ready, so the stage fills in while the rest render.
+            const outcome = writeSceneModule(
+              get,
+              startProject.id,
+              beat.id,
+              module,
+              fallbackComp,
+              historyRecorded ? 'skip' : 'push'
+            );
+            if (outcome === 'written') historyRecorded = true;
+          }
           await new Promise((r) => setTimeout(r, 50));
         }
       };
@@ -244,9 +268,13 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
         } else if (get().project.id !== startProject.id) {
           get().addToast('Proyek berganti, hasil visual yang tersisa dibuang.', 'warning');
         } else if (failureCount > 0) {
+          const kept = keptShots.sort((a, b) => a - b);
           get().addToast(
-            `${failureCount} dari ${total} adegan mengalami kendala rendering. Buat ulang adegan itu dari kartunya.`,
-            'warning'
+            kept.length > 0
+              ? `${failureCount} dari ${total} adegan gagal dibuat. Adegan #${kept.join(', #')} memakai visual sebelumnya; coba lagi dari kartunya.`
+              : `${failureCount} dari ${total} adegan mengalami kendala rendering. Buat ulang adegan itu dari kartunya.`,
+            'warning',
+            6000
           );
         } else {
           get().addToast('Mograph AI berhasil dibuat untuk semua adegan!', 'success');
@@ -294,8 +322,28 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           get().addToast('Pembuatan ulang adegan dibatalkan.', 'info');
           return;
         }
-        if (!writeSceneModule(get, project.id, sceneId, { ...module, userEdited: true }, syncComposition(project).composition)) {
-          get().addToast('Proyek berganti, hasil adegan dibuang.', 'warning');
+        // A failed attempt keeps the visual the scene already had.
+        if (module.status === 'error' && sceneHasRenderableCode(currentModule(get, sceneId))) {
+          const reason = module.errors?.[0];
+          get().addToast(
+            `Adegan #${index + 1} gagal dibuat ulang, visual sebelumnya dipertahankan.${reason ? ` ${reason}` : ''}`,
+            'error',
+            7000
+          );
+          return;
+        }
+        const outcome = writeSceneModule(
+          get,
+          project.id,
+          sceneId,
+          { ...module, userEdited: true },
+          syncComposition(project).composition
+        );
+        if (outcome !== 'written') {
+          get().addToast(
+            outcome === 'scene-removed' ? 'Adegan sudah dihapus, hasil AI dibuang.' : 'Proyek berganti, hasil adegan dibuang.',
+            'warning'
+          );
           return;
         }
         if (module.status === 'error') {
@@ -349,7 +397,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           );
           return;
         }
-        const written = writeSceneModule(get, project.id, sceneId, {
+        const outcome = writeSceneModule(get, project.id, sceneId, {
           ...target,
           html: result.html,
           css: result.css,
@@ -360,7 +408,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           version: (target.version || 1) + 1,
           userEdited: true
         });
-        if (written) get().addToast(`Adegan #${index + 1} diperbaiki untuk MooTween.`, 'success');
+        if (outcome === 'written') get().addToast(`Adegan #${index + 1} diperbaiki untuk MooTween.`, 'success');
       } catch (err: unknown) {
         if (controller.signal.aborted) {
           get().addToast('Perbaikan adegan dibatalkan.', 'info');

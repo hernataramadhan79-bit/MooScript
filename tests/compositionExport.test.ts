@@ -801,6 +801,18 @@ describe('Phase 3: Composition & Export Tests', () => {
       const result = await exportMooProjectToMP4(projectStaleAudio as any, () => {});
       expect(result.durationSeconds).toBe(1.0); // Uses scenes duration because audioStale is true
     });
+
+    it('3f: follows the timeline by default, even when the audio file is longer', async () => {
+      // The store never passes audioStale, and it is lost on reload: the scenes must decide.
+      const projectWithLongAudio: MooProject = {
+        ...baseProject,
+        renderMode: 'legacy-canvas',
+        audioBlob: new Blob(['dummy audio bytes'], { type: 'audio/mp3' })
+      };
+
+      const result = await exportMooProjectToMP4(projectWithLongAudio, () => {});
+      expect(result.durationSeconds).toBe(1.0);
+    });
   });
 
   describe('EXPORT-001, PERF-001, UI-001: Canvas Pooling, Memory Leak Prevention & Stable Iframe Key', () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { MooProject } from '../types';
@@ -7,6 +7,7 @@ import { flushPendingSave } from '../store/slices/projectSlice';
 import { loadProjectFromDb } from '../db/mooDb';
 import { MAX_BACKUP_BYTES, parseProjectBackup, serializeProjectBackup } from '../db/projectBackup';
 import { safeFileName, triggerFileDownload } from '../utils/fileUtils';
+import { isFromModalDialog } from '../utils/hooks';
 import { PROJECT_TEMPLATES } from '../engine/templates/projectTemplates';
 import { getProjectDuration } from '../utils/projectDuration';
 
@@ -46,11 +47,25 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [projectToDelete, setProjectToDelete] = useState<MooProject | null>(null);
+  // Escape closes the rename field; the blur that follows must not save the typed title.
+  const renameCancelledRef = useRef(false);
+  // Work that belongs to the open project and stops when another project is opened.
+  const runningJob = useMooStore((s) =>
+    s.isExporting
+      ? 'Ekspor video'
+      : s.isCompilingMograph || s.revisingSceneId
+        ? 'Pembuatan visual AI'
+        : s.isGeneratingScript
+          ? 'Penyusunan naskah AI'
+          : s.isGeneratingAudio
+            ? 'Pembuatan suara'
+            : null
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !editingId) {
+      if (e.key === 'Escape' && !editingId && !isFromModalDialog(e)) {
         onClose();
       }
     };
@@ -61,16 +76,21 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   const handleStartRename = (p: MooProject) => {
+    renameCancelledRef.current = false;
     setEditingId(p.id);
     setEditingTitle(p.title);
   };
 
   const handleSaveRename = async (p: MooProject) => {
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
     const trimmed = editingTitle.trim();
+    setEditingId(null);
     if (trimmed && trimmed !== p.title) {
       await renameProject(p.id, trimmed);
     }
-    setEditingId(null);
   };
 
   const handleCreate = async () => {
@@ -209,6 +229,18 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           </div>
         </div>
 
+        {runningJob && (
+          <div
+            role="status"
+            className="mx-4 mt-3 p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 text-[11px] leading-relaxed flex gap-2"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] shrink-0">info</span>
+            <span>
+              {runningJob} sedang berjalan. Proses itu dibatalkan jika Anda membuka atau membuat proyek lain.
+            </span>
+          </div>
+        )}
+
         {/* Template starters */}
         <div className="px-4 pt-3 pb-1">
           <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Mulai dari template</span>
@@ -261,8 +293,11 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                         onChange={(e) => setEditingTitle(e.target.value)}
                         onBlur={() => handleSaveRename(p)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename(p);
-                          if (e.key === 'Escape') setEditingId(null);
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          if (e.key === 'Escape') {
+                            renameCancelledRef.current = true;
+                            setEditingId(null);
+                          }
                         }}
                         onClick={(e) => e.stopPropagation()}
                         className="bg-black border border-primary px-2 py-0.5 rounded text-xs text-white font-bold focus:outline-none"

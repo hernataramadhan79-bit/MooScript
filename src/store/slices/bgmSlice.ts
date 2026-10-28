@@ -8,42 +8,29 @@ import type { MooStoreState, BgmSlice } from '../types';
 
 export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (set, get) => {
   const handleBgmUpdate = async (newBgm: MooStoreState['project']['bgm']) => {
-    const { project, rawVoiceBlob, audioStale, addToast, remixAudio, generateBgmOnlyAudio } = get();
-    const updated = {
-      ...project,
-      bgm: newBgm
-    };
+    const { project, rawVoiceBlob, bgmOnlyAudio, audioStale, addToast } = get();
+    const updated = { ...project, bgm: newBgm };
+    set({ project: updated });
+    scheduleSave(updated, (msg) => get().addToast(msg, 'error'));
 
-    const hasAudio = !!project.audioBlob;
-
+    // A kept voice-over is remixed with the new music (or played plain for 'none').
     if (rawVoiceBlob) {
-      set({
-        project: updated,
-        audioStale: false
-      });
-      scheduleSave(updated);
-      await remixAudio();
+      await get().remixAudio();
       return;
     }
 
-    if (newBgm?.preset && newBgm.preset !== 'none') {
-      set({
-        project: updated,
-        audioStale: false
-      });
-      scheduleSave(updated);
-      await generateBgmOnlyAudio();
+    // No audio yet, or music only: the music track can simply be rendered again (or dropped).
+    if (!project.audioBlob || bgmOnlyAudio) {
+      await get().generateBgmOnlyAudio();
       return;
     }
 
-    if (hasAudio && !audioStale) {
+    // Audio saved before the voice-over was kept apart from the music cannot be remixed:
+    // the voice has to be generated again for the new music to be heard.
+    if (!audioStale) {
       addToast('BGM berubah. Generate ulang audio supaya kedengeran.', 'info');
     }
-    set({
-      project: updated,
-      audioStale: hasAudio ? true : audioStale
-    });
-    scheduleSave(updated);
+    set({ audioStale: true });
   };
 
   return {
@@ -53,6 +40,7 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
         get().addToast('Unggah berkas musik dulu untuk memakai BGM sendiri.', 'info');
         return;
       }
+      if (preset === project.bgm?.preset) return;
       return handleBgmUpdate({ ...project.bgm, preset });
     },
 
@@ -82,6 +70,8 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
       try {
         const buffer = await decodeCustomBgm(file);
         await saveBgmToDb(project.id, file, file.name);
+        // The track belongs to the project it was uploaded for; another one may be open by now.
+        if (get().project.id !== project.id) return;
         setCustomBgmBuffer(buffer);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -97,7 +87,7 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
       setCustomBgmBuffer(null);
       await deleteBgmFromDb(project.id);
       const { customName: _removed, ...rest } = project.bgm;
-      await handleBgmUpdate({ ...rest, preset: 'none' });
+      await handleBgmUpdate({ ...rest, preset: rest.preset === 'custom' ? 'none' : rest.preset });
     }
   };
 };

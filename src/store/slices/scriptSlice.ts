@@ -4,10 +4,18 @@ import type { WorldBible } from '../../engine/ai/llm';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { syncComposition } from '../../engine/composition/sync';
-import { saveProjectToDb } from '../../db/mooDb';
+import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
+import { stopPlaybackAudio } from './playbackSlice';
+import { flushPendingSave } from './projectSlice';
 import type { MooStoreState, ScriptSlice } from '../types';
 
 let scriptAbortController: AbortController | null = null;
+
+/**
+ * The whole project as it was before the last AI storyboard replaced it, so "Urungkan" brings
+ * back the scenes together with their visuals, title, palette and audio.
+ */
+let projectBeforeStoryboard: { project: MooProject; rawVoiceBlob: Blob | null; bgmOnlyAudio: boolean } | null = null;
 
 /** A shot list with a world bible needs more room than the old 3-6 scene storyboard. */
 const STORYBOARD_MIN_TOKENS = 4096;
@@ -45,6 +53,16 @@ export function applyWorldBible(project: MooProject, world: WorldBible | undefin
   return { ...project, theme, styleBrief };
 }
 
+/** Releases the preview URL of the audio that is being dropped. */
+function revokeUrl(url: string | null): void {
+  if (!url) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    // ignore
+  }
+}
+
 export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice> = (set, get) => ({
   isGeneratingScript: false,
   scriptPrompt: '',
@@ -63,43 +81,61 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
   undoGenerateScript: async () => {
     const snapshot = get().previousScenesSnapshot;
     if (!snapshot) return;
+    const before = projectBeforeStoryboard;
+    projectBeforeStoryboard = null;
+    const current = get().project;
+    get().pause();
+    stopPlaybackAudio();
+
+    if (before && before.project.id === current.id) {
+      revokeUrl(get().audioBlobUrl);
+      const restored = before.project;
+      get().setProject(restored, { preserveHistory: true });
+      set({
+        audioBlobUrl: restored.audioBlob ? URL.createObjectURL(restored.audioBlob) : null,
+        rawVoiceBlob: before.rawVoiceBlob,
+        bgmOnlyAudio: before.bgmOnlyAudio,
+        waveformPeaks: null,
+        previousScenesSnapshot: null,
+        activeSceneId: null,
+        currentFrame: 0
+      });
+      await flushPendingSave();
+      await saveVoiceTrackToDb(
+        restored.id,
+        before.rawVoiceBlob ? { kind: 'voice', blob: before.rawVoiceBlob } : before.bgmOnlyAudio ? { kind: 'bgm' } : null
+      );
+      get().addToast('Naskah sebelumnya dikembalikan.', 'success');
+      return;
+    }
 
     const totalDur = snapshot.reduce((acc, s) => acc + (s.durationInSeconds > 0 ? s.durationInSeconds : 3), 0);
-    const updatedProject: MooProject = {
-      ...get().project,
-      scenes: snapshot,
-      audioDuration: totalDur
-    };
-    const syncedProject = syncComposition(updatedProject);
-
+    const syncedProject = syncComposition({ ...current, scenes: snapshot, audioDuration: totalDur });
     set({
       project: syncedProject,
       previousScenesSnapshot: null,
-      audioStale: !!get().project.audioBlob
+      audioStale: !!current.audioBlob
     });
-
     await saveProjectToDb(syncedProject);
-    get().addToast('Restored previous storyboard scenes!', 'success');
+    get().addToast('Naskah sebelumnya dikembalikan.', 'success');
   },
 
   generateScript: async () => {
     const { settings, scriptPrompt, skills, activeSkillId, addToast } = get();
+    if (get().isGeneratingScript) return;
     const activeSkill = skills.find((s) => s.id === activeSkillId) || skills[0];
     const provider = settings.selectedLLMProvider;
     const apiKey = settings.apiKeys[provider] || '';
 
     if (!apiKey || apiKey.trim() === '') {
-      addToast(`Please configure your ${provider.toUpperCase()} API Key in Settings first.`, 'warning');
+      addToast(`Masukkan API Key ${provider.toUpperCase()} di Pengaturan terlebih dahulu.`, 'warning');
       return;
     }
 
-    // Save previous snapshot for undo upon success
-    const currentScenes = [...get().project.scenes];
-    set({
-      isGeneratingScript: true
-    });
-
-    scriptAbortController = new AbortController();
+    const startedProjectId = get().project.id;
+    set({ isGeneratingScript: true });
+    const controller = new AbortController();
+    scriptAbortController = controller;
 
     try {
       const storyboard = await generateStoryboard({
@@ -118,17 +154,26 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         prompt: scriptPrompt,
         skill: activeSkill,
         language: settings.outputLanguage || 'id',
-        signal: scriptAbortController.signal,
+        signal: controller.signal,
         maxTokens: Math.max(settings.maxOutputTokens || 2048, STORYBOARD_MIN_TOKENS)
       });
 
+      if (controller.signal.aborted) throw new DOMException('User cancelled script generation', 'AbortError');
+      const latest = get().project;
+      if (latest.id !== startedProjectId) {
+        set({ isGeneratingScript: false });
+        addToast('Proyek berganti, hasil naskah AI dibuang.', 'warning');
+        return;
+      }
+
+      const now = Date.now();
       const newScenes: Scene[] = storyboard.scenes.map((s, idx) => {
         const text = s.narration || (s as any).narrationText || (s as any).text || '';
         const visualIntent = s.visualIntent || text || `Scene ${idx + 1}`;
         const dur = s.durationHint && s.durationHint > 0 ? s.durationHint : calculateFallbackSceneDuration(text);
         const focusWords = s.emphasis || (s as any).focusWords || [];
         return {
-          id: `sc-ai-${Date.now()}-${idx}`,
+          id: `sc-ai-${now}-${idx}`,
           narrationText: text,
           text,
           visualIntent,
@@ -142,24 +187,25 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
           emphasis: focusWords,
           focusWords,
           durationInSeconds: dur,
-          wordTimestamps: computeDeterministicWordAlignment(text, dur),
-          showSubtitles: false
+          wordTimestamps: computeDeterministicWordAlignment(text, dur)
         };
       });
 
+      // The new storyboard has no voice-over yet: stop and release the old one.
+      get().pause();
+      stopPlaybackAudio();
+      revokeUrl(get().audioBlobUrl);
+      projectBeforeStoryboard = {
+        project: latest,
+        rawVoiceBlob: get().rawVoiceBlob ?? null,
+        bgmOnlyAudio: get().bgmOnlyAudio
+      };
+
       const totalDur = newScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
-      const oldUrl = get().audioBlobUrl;
-      if (oldUrl) {
-        try {
-          URL.revokeObjectURL(oldUrl);
-        } catch {
-          // ignore
-        }
-      }
       const updatedProject: MooProject = applyWorldBible(
         {
-          ...get().project,
-          title: storyboard.title || get().project.title,
+          ...latest,
+          title: storyboard.title || latest.title,
           scenes: newScenes,
           audioBlob: undefined,
           audioDuration: totalDur
@@ -168,31 +214,39 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       );
       const syncedProject = syncComposition(updatedProject);
 
+      // One undo step for the whole storyboard.
+      get().setProject(syncedProject, { preserveHistory: true });
       set({
-        project: syncedProject,
         audioBlobUrl: null,
         rawVoiceBlob: null,
+        bgmOnlyAudio: false,
         waveformPeaks: null,
-        previousScenesSnapshot: currentScenes,
+        previousScenesSnapshot: latest.scenes,
         isGeneratingScript: false,
-        audioStale: false
+        audioStale: false,
+        activeSceneId: null,
+        selectedLayerId: null,
+        currentFrame: 0
       });
-      await saveProjectToDb(syncedProject);
-      addToast('AI Storyboard generated successfully!', 'success');
+      await flushPendingSave();
+      await saveVoiceTrackToDb(syncedProject.id, null);
+      addToast(`Storyboard AI siap: ${newScenes.length} adegan.`, 'success');
     } catch (err: unknown) {
-      set({ isGeneratingScript: false });
       const isUserCancelled =
+        controller.signal.aborted ||
         (err instanceof DOMException && err.name === 'AbortError') ||
         (err instanceof Error && err.message.toLowerCase().includes('user cancelled'));
+      // A cancel already reset the flag; a newer run may own it by now.
+      if (scriptAbortController === controller || !isUserCancelled) set({ isGeneratingScript: false });
 
       if (isUserCancelled) {
-        addToast('AI Script generation cancelled', 'info');
+        addToast('Penyusunan naskah AI dibatalkan.', 'info');
       } else {
         const message = err instanceof Error ? err.message : String(err);
-        addToast(`AI Script Generation failed: ${message}`, 'error');
+        addToast(`Gagal menyusun naskah AI: ${message}`, 'error');
       }
     } finally {
-      scriptAbortController = null;
+      if (scriptAbortController === controller) scriptAbortController = null;
     }
   }
 });

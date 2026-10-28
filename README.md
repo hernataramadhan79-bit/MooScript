@@ -125,11 +125,14 @@ shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
 - TTS: OpenAI, ElevenLabs, or **offline Piper** voices running in a Web Worker (ONNX Runtime Web).
 - Word timestamps from Whisper alignment or a deterministic estimate; generated shots sync accents to them.
 - Procedural BGM presets or your own track, mixed with speech ducking via the Web Audio API.
+- The voice-over is stored apart from the music (per project, in IndexedDB), so changing the BGM preset, volume or ducking remixes it without generating the voice again, also after a reload. Without a voice-over the music becomes a music-only track; switching the music off removes it.
+- Scenes without narration stay silent for their own length instead of being sent to a TTS provider.
 
 ### Export
 
 - WebCodecs `VideoEncoder` + [Mediabunny](https://mediabunny.dev) MP4 muxing, with codec fallbacks, backpressure control and frame cleanup.
-- Quality presets (compact / standard / high) at 24, 30 or 60 fps; captions burned in or exported as SRT / WebVTT.
+- The video is as long as the timeline (the scenes decide); an audio track that runs longer is trimmed. Scenes without a visual of their own render with the same instant visual the preview shows.
+- Quality presets (compact / standard / high) at 24, 30 or 60 fps; captions burned in or exported as SRT / WebVTT. Captions follow the project setting, and each scene can opt out in its detail panel.
 - Standalone HTML export of the composition.
 
 ### App

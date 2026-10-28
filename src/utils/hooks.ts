@@ -22,6 +22,14 @@ export function useMediaQuery(query: string): boolean {
 }
 
 /**
+ * True when a key event comes from inside a modal <dialog> (a confirm sheet, the shortcut list).
+ * The dialog handles its own Escape, so a panel underneath must not close along with it.
+ */
+export function isFromModalDialog(e: KeyboardEvent): boolean {
+  return e.target instanceof Element && Boolean(e.target.closest('dialog'));
+}
+
+/**
  * Trailing debounce. When `resetKey` changes (e.g. another project was opened) the new
  * value is returned immediately, so switching context never shows stale content.
  */

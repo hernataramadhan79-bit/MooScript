@@ -187,14 +187,21 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     return bars;
   }, [waveformPeaks]);
 
+  // Peaks are read from whichever track is current; a result for a replaced track is dropped.
   useEffect(() => {
-    if (project.audioBlob && !waveformPeaks) {
-      extractWaveformPeaks(project.audioBlob).then((peaks) => {
-        if (peaks.length > 0) {
+    const blob = project.audioBlob;
+    if (!blob || waveformPeaks) return;
+    let cancelled = false;
+    extractWaveformPeaks(blob)
+      .then((peaks) => {
+        if (!cancelled && peaks.length > 0 && useMooStore.getState().project.audioBlob === blob) {
           setWaveformPeaks(peaks);
         }
-      }).catch(() => {});
-    }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [project.audioBlob, waveformPeaks, setWaveformPeaks]);
 
   // Pointer scrubbing on the compact track: tap or drag anywhere along the shots.

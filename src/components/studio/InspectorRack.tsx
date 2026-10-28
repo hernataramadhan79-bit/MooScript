@@ -33,23 +33,33 @@ const DebouncedSlider: React.FC<{
   max: number;
   step: number;
   onChangeComplete: (val: number) => void;
+  /** Called on every move, for a live readout while the store is only written on release. */
+  onInput?: (val: number) => void;
+  disabled?: boolean;
   className?: string;
-}> = ({ value, min, max, step, onChangeComplete, className }) => {
+  ariaLabel?: string;
+}> = ({ value, min, max, step, onChangeComplete, onInput, disabled, className, ariaLabel }) => {
   const [localVal, setLocalVal] = useState(value);
   const valRef = useRef(value);
-  
+  const committedRef = useRef(value);
+
   useEffect(() => {
     setLocalVal(value);
     valRef.current = value;
+    committedRef.current = value;
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
     setLocalVal(v);
     valRef.current = v;
+    onInput?.(v);
   };
 
+  // One commit per gesture, and none when the thumb ends where it started (a click or a blur).
   const handleCommit = () => {
+    if (valRef.current === committedRef.current) return;
+    committedRef.current = valRef.current;
     onChangeComplete(valRef.current);
   };
 
@@ -60,6 +70,8 @@ const DebouncedSlider: React.FC<{
       max={max}
       step={step}
       value={localVal}
+      disabled={disabled}
+      aria-label={ariaLabel}
       onChange={handleChange}
       onPointerUp={handleCommit}
       onKeyUp={handleCommit}
@@ -69,37 +81,89 @@ const DebouncedSlider: React.FC<{
   );
 };
 
+/** A labelled range whose readout follows the thumb live and whose value is committed on release. */
+const CommitSliderRow: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (val: number) => string;
+  onCommit: (val: number) => void;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
+}> = ({ label, value, min, max, step, format, onCommit, disabled, size = 'md' }) => {
+  const [live, setLive] = useState(value);
+  useEffect(() => setLive(value), [value]);
+  const small = size === 'sm';
+  return (
+    <div className={`flex flex-col ${small ? 'gap-1' : 'gap-1.5'}`}>
+      <div className={`flex items-center justify-between ${small ? 'text-[11px]' : 'text-[12px]'}`}>
+        <span className={`text-text-muted ${small ? '' : 'font-medium'}`}>{label}</span>
+        <span className={`font-mono text-on-surface ${small ? 'text-[10px]' : 'font-semibold'}`}>{format(live)}</span>
+      </div>
+      <DebouncedSlider
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        ariaLabel={label}
+        onInput={setLive}
+        onChangeComplete={onCommit}
+        className={`w-full ${small ? 'h-1 bg-surface-3' : 'h-1.5 bg-surface-2'} rounded-lg appearance-none cursor-pointer accent-accent disabled:opacity-40 disabled:cursor-not-allowed`}
+      />
+    </div>
+  );
+};
+
 const DebouncedColor: React.FC<{
   value: string;
   onChangeComplete: (val: string) => void;
   className?: string;
-}> = ({ value, onChangeComplete, className }) => {
+  ariaLabel?: string;
+}> = ({ value, onChangeComplete, className, ariaLabel }) => {
   const [localVal, setLocalVal] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const committedRef = useRef(value);
+
   useEffect(() => {
     setLocalVal(value);
+    committedRef.current = value;
   }, [value]);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    []
+  );
+
+  // Opening and closing the picker without choosing must not apply the color shown as default.
+  const commit = (v: string) => {
+    if (v.toLowerCase() === committedRef.current.toLowerCase()) return;
+    committedRef.current = v;
+    onChangeComplete(v);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     setLocalVal(v);
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      onChangeComplete(v);
-    }, 200);
+    timeoutRef.current = setTimeout(() => commit(v), 200);
   };
 
   const handleBlur = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    onChangeComplete(localVal);
+    commit(localVal);
   };
 
   return (
     <input
       type="color"
       value={localVal}
+      aria-label={ariaLabel}
       onChange={handleChange}
       onBlur={handleBlur}
       className={className}
@@ -169,6 +233,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     uploadCustomBgm,
     removeCustomBgm,
     audioStale,
+    bgmOnlyAudio,
     setSettingsOpen,
     addToast
   } = useMooStore(
@@ -212,6 +277,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       uploadCustomBgm: s.uploadCustomBgm,
       removeCustomBgm: s.removeCustomBgm,
       audioStale: s.audioStale,
+      bgmOnlyAudio: s.bgmOnlyAudio,
       setSettingsOpen: s.setSettingsOpen,
       addToast: s.addToast
     }))
@@ -295,13 +361,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     }
   };
 
-  const handleOverrideChange = (prop: keyof LayerOverride, val: number | string | boolean | undefined) => {
+  const handleOverridesChange = (changes: Partial<LayerOverride>) => {
     if (!activeScene || !activeLayer) return;
-    updateLayerOverride(activeScene.id, activeLayer.id, {
-      [prop]: val,
-      layerType: activeLayer.type
-    });
+    updateLayerOverride(activeScene.id, activeLayer.id, { ...changes, layerType: activeLayer.type });
   };
+
+  const handleOverrideChange = (prop: keyof LayerOverride, val: number | string | boolean | undefined) =>
+    handleOverridesChange({ [prop]: val });
 
   const [selectedArchetype, setSelectedArchetype] = useState<ProceduralArchetype>('auto');
   const customAudioInputRef = useRef<HTMLInputElement | null>(null);
@@ -523,6 +589,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const duckRatio = project.bgm?.duckRatio ?? 0.15;
 
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+  const [showProceduralOverwriteConfirm, setShowProceduralOverwriteConfirm] = useState(false);
 
   const hasProjectAudio = Boolean(project.audioBlob);
   const hasNarration = scenes.some((s) => (s.narrationText || s.text || '').trim().length > 0);
@@ -1041,10 +1108,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    handleOverrideChange('x', 0);
-                                    handleOverrideChange('y', 0);
-                                  }}
+                                  onClick={() => handleOverridesChange({ x: 0, y: 0 })}
                                   className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
                                   title="Pusat Canvas"
                                 >
@@ -1497,7 +1561,16 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 <button
                   type="button"
                   disabled={scenes.length === 0}
-                  onClick={() => compileAllScenesProcedural(selectedArchetype, true)}
+                  onClick={() => {
+                    const hasCustomVisuals = (project.composition?.scenes || []).some(
+                      (m) => m.userEdited || m.generatorVersion?.startsWith('generative')
+                    );
+                    if (hasCustomVisuals) {
+                      setShowProceduralOverwriteConfirm(true);
+                    } else {
+                      compileAllScenesProcedural(selectedArchetype, true);
+                    }
+                  }}
                   className="py-2 px-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[15px]">bolt</span>
@@ -2173,40 +2246,26 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
                         Kustomisasi Akustik Piper
                       </span>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-text-muted">Variasi Intonasi (Ekspresivitas)</span>
-                          <span className="font-mono text-on-surface text-[10px]">
-                            {(settings.piperNoiseScale ?? 0.667).toFixed(2)}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1.0"
-                          step="0.05"
-                          value={settings.piperNoiseScale ?? 0.667}
-                          onChange={(e) => updateSettings({ piperNoiseScale: parseFloat(e.target.value) })}
-                          className="w-full h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-text-muted">Variasi Ritme / Fonem</span>
-                          <span className="font-mono text-on-surface text-[10px]">
-                            {(settings.piperNoiseW ?? 0.8).toFixed(2)}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1.0"
-                          step="0.05"
-                          value={settings.piperNoiseW ?? 0.8}
-                          onChange={(e) => updateSettings({ piperNoiseW: parseFloat(e.target.value) })}
-                          className="w-full h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
-                        />
-                      </div>
+                      <CommitSliderRow
+                        size="sm"
+                        label="Variasi Intonasi (Ekspresivitas)"
+                        value={settings.piperNoiseScale ?? 0.667}
+                        min={0.1}
+                        max={1.0}
+                        step={0.05}
+                        format={(v) => v.toFixed(2)}
+                        onCommit={(v) => updateSettings({ piperNoiseScale: v })}
+                      />
+                      <CommitSliderRow
+                        size="sm"
+                        label="Variasi Ritme / Fonem"
+                        value={settings.piperNoiseW ?? 0.8}
+                        min={0.1}
+                        max={1.0}
+                        step={0.05}
+                        format={(v) => v.toFixed(2)}
+                        onCommit={(v) => updateSettings({ piperNoiseW: v })}
+                      />
                     </div>
                   )}
                 </div>
@@ -2214,20 +2273,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
               {/* Slider Kecepatan Bicara (Speech Rate) */}
               <div className="flex flex-col gap-1.5 pt-0.5">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-text-muted font-medium">Kecepatan Bicara</span>
-                  <span className="font-mono text-on-surface font-semibold">
-                    {(settings.speed ?? 1.05).toFixed(2)}x
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.05"
+                <CommitSliderRow
+                  label="Kecepatan Bicara"
                   value={settings.speed ?? 1.05}
-                  onChange={(e) => updateSettings({ speed: parseFloat(e.target.value) })}
-                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
+                  min={0.5}
+                  max={2.0}
+                  step={0.05}
+                  format={(v) => `${v.toFixed(2)}x`}
+                  onCommit={(v) => updateSettings({ speed: v })}
                 />
                 {/* Preset Chips Kecepatan */}
                 <div className="flex items-center gap-1.5 pt-0.5">
@@ -2341,13 +2394,17 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     {!hasProjectAudio ? 'volume_off' : audioStale ? 'warning' : 'check_circle'}
                   </span>
                   <span className="flex-1">
-                    {currentVoiceProvider === 'timer'
-                      ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
-                      : !hasProjectAudio
-                        ? 'Suara belum dibuat.'
-                        : audioStale
-                          ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
-                          : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
+                    {hasProjectAudio && bgmOnlyAudio
+                      ? audioStale
+                        ? 'Durasi adegan berubah. Tekan Generate Suara agar musik latar menyesuaikan.'
+                        : `Musik latar siap (${(project.audioDuration || 0).toFixed(1)} detik), tanpa narasi suara.`
+                      : currentVoiceProvider === 'timer' && !hasProjectAudio
+                        ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
+                        : !hasProjectAudio
+                          ? 'Suara belum dibuat.'
+                          : audioStale
+                            ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
+                            : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
                   </span>
                 </div>
 
@@ -2437,45 +2494,27 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 )}
               </div>
 
-              {/* Slider Volume */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-text-muted font-medium">Volume</span>
-                  <span className="font-mono text-on-surface font-semibold">
-                    {Math.round(bgmLevel * 100)}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={bgmLevel}
-                  disabled={currentBgmPreset === 'none'}
-                  onChange={(e) => updateBgmLevel(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent disabled:opacity-40 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Slider Ducking */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-text-muted font-medium">Sensitivitas Ducking</span>
-                  <span className="font-mono text-on-surface font-semibold">
-                    {Math.round(duckRatio * 100)}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={duckRatio}
-                  disabled={currentBgmPreset === 'none'}
-                  onChange={(e) => updateBgmDuckRatio(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent disabled:opacity-40 disabled:cursor-not-allowed"
-                />
-              </div>
+              {/* Volume & ducking: the mix is rendered once, when the thumb is released */}
+              <CommitSliderRow
+                label="Volume"
+                value={bgmLevel}
+                min={0}
+                max={1}
+                step={0.01}
+                disabled={currentBgmPreset === 'none'}
+                format={(v) => `${Math.round(v * 100)}%`}
+                onCommit={(v) => updateBgmLevel(v)}
+              />
+              <CommitSliderRow
+                label="Volume Musik Saat Ada Suara (Ducking)"
+                value={duckRatio}
+                min={0}
+                max={1}
+                step={0.01}
+                disabled={currentBgmPreset === 'none'}
+                format={(v) => `${Math.round(v * 100)}%`}
+                onCommit={(v) => updateBgmDuckRatio(v)}
+              />
             </div>
           </div>
         )}
@@ -2498,6 +2537,22 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         cancelLabel="Batal"
         variant="warning"
         icon="warning"
+      />
+
+      {/* Konfirmasi Ganti Semua Visual dengan Visual Instan */}
+      <ConfirmModal
+        isOpen={showProceduralOverwriteConfirm}
+        onClose={() => setShowProceduralOverwriteConfirm(false)}
+        onConfirm={() => {
+          setShowProceduralOverwriteConfirm(false);
+          compileAllScenesProcedural(selectedArchetype, true);
+        }}
+        title="Ganti Semua Visual?"
+        description="Beberapa adegan memakai visual AI atau sudah diedit manual. Visual instan akan menggantikan semuanya. Anda masih bisa mengembalikannya dengan Urungkan (Ctrl+Z)."
+        confirmLabel="Ganti Semua"
+        cancelLabel="Batal"
+        variant="warning"
+        icon="bolt"
       />
     </div>
   );

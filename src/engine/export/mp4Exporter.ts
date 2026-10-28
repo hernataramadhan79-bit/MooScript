@@ -153,6 +153,18 @@ async function yieldOrSleep(ms = 4): Promise<void> {
   }
 }
 
+/** Cuts the audio to the video length so the file does not run on past the last frame. */
+async function trimAudioBuffer(audioBuffer: AudioBuffer, durationSec: number): Promise<AudioBuffer> {
+  const length = Math.max(1, Math.ceil(durationSec * audioBuffer.sampleRate));
+  if (length >= audioBuffer.length) return audioBuffer;
+  const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, length, audioBuffer.sampleRate);
+  const bufferSource = offlineCtx.createBufferSource();
+  bufferSource.buffer = audioBuffer;
+  bufferSource.connect(offlineCtx.destination);
+  bufferSource.start(0);
+  return await offlineCtx.startRendering();
+}
+
 async function resampleAudioBuffer(audioBuffer: AudioBuffer, targetSampleRate = 48000): Promise<AudioBuffer> {
   if (audioBuffer.sampleRate === targetSampleRate) return audioBuffer;
   const numChannels = Math.min(2, audioBuffer.numberOfChannels);
@@ -239,8 +251,10 @@ export async function exportMooProjectToMP4(
     0
   );
 
-  const isAudioStale = (project as { audioStale?: boolean }).audioStale;
-  const useAudioDuration = opts?.useAudioDuration ?? (isAudioStale !== undefined ? !isAudioStale : true);
+  // The scenes decide the length, exactly as on the editor timeline. The audio length is only
+  // used on request (or when there are no scenes): a stale voice-over or a music-only track
+  // must never cut the video short or stretch it past the last shot.
+  const useAudioDuration = opts?.useAudioDuration === true;
 
   if (project.audioBlob && project.audioBlob.size > 0) {
     try {
@@ -272,6 +286,8 @@ export async function exportMooProjectToMP4(
     totalDuration = audioDuration;
   } else if (scenesDurationSum > 0) {
     totalDuration = scenesDurationSum;
+  } else if (audioDuration > 0) {
+    totalDuration = audioDuration;
   } else {
     totalDuration = 5; // Default 5 seconds if completely empty
   }
@@ -298,6 +314,17 @@ export async function exportMooProjectToMP4(
           targetAudioBuffer = audioBuffer;
         }
       }
+      if (
+        targetAudioBuffer &&
+        targetAudioBuffer.duration > totalDuration + 0.05 &&
+        typeof OfflineAudioContext !== 'undefined'
+      ) {
+        try {
+          targetAudioBuffer = await trimAudioBuffer(targetAudioBuffer, totalDuration);
+        } catch (e) {
+          console.warn('Audio trimming failed, proceeding with the full track:', e);
+        }
+      }
       hasAudioTrack = true;
     }
   }
@@ -311,9 +338,12 @@ export async function exportMooProjectToMP4(
 
   const hasGeneratedCompositionScenes = Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
 
+  // A composition project always renders through the same stage document as the editor preview,
+  // including scenes that still show their instant (procedural) visual.
   const isCompositionMode =
     (project.renderMode || 'composition') === 'composition' &&
-    hasGeneratedCompositionScenes;
+    project.scenes.length > 0 &&
+    Boolean(project.composition);
 
   // 5. Worker-driven rendering pipeline (OffscreenCanvas) with seamless main-thread fallback
   let workerChunks: Array<{
@@ -494,10 +524,14 @@ export async function exportMooProjectToMP4(
 
   let compRenderer: FrameRenderer | null = null;
   if (isCompositionMode) {
-    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Initializing composition headless sandbox...' });
+    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Menyiapkan panggung render...' });
     compRenderer = await createCompositionFrameRenderer(project, width, height);
     if (!compRenderer) {
-      throw new Error('Composition renderer gagal diinisialisasi untuk mode komposisi.');
+      if (hasGeneratedCompositionScenes) {
+        throw new Error('Composition renderer gagal diinisialisasi untuk mode komposisi.');
+      }
+      // Only instant visuals and no stage available: the canvas renderer still produces a video.
+      warnings.push('Panggung komposisi gagal dimuat; video dirender dengan renderer cadangan.');
     }
   }
 

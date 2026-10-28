@@ -17,6 +17,8 @@ import {
 } from '../engine/ai/localTts';
 import type { LLMProvider, PersonaSkill } from '../types';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { isFromModalDialog } from '../utils/hooks';
+import { triggerFileDownload } from '../utils/fileUtils';
 
 interface ProviderModelSelectorProps {
   provider: LLMProvider;
@@ -313,7 +315,7 @@ export const SettingsDrawer: React.FC = () => {
   useEffect(() => {
     if (!isSettingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isFromModalDialog(e)) {
         if (showAddSkillModal) {
           setShowAddSkillModal(false);
           return;
@@ -334,7 +336,7 @@ export const SettingsDrawer: React.FC = () => {
   const handleTestKey = async (provider: LLMProvider | 'elevenlabs') => {
     const key = settings.apiKeys[provider] || '';
     if (!key.trim()) {
-      addToast(`Please enter an API Key for ${provider.toUpperCase()} before testing.`, 'warning');
+      addToast(`Masukkan API Key ${provider.toUpperCase()} sebelum menguji.`, 'warning');
       return;
     }
     setTestingKey((prev) => ({ ...prev, [provider]: true }));
@@ -370,11 +372,11 @@ export const SettingsDrawer: React.FC = () => {
     const result = await requestPersistentStorage();
     setPersistenceStatus(result);
     if (result.persisted) {
-      addToast('Persistent storage granted by browser!', 'success');
+      addToast('Proteksi penyimpanan aktif: data proyek tidak akan dihapus otomatis oleh browser.', 'success');
     } else if (!result.supported) {
-      addToast('Storage persistence API is not supported in this browser.', 'warning');
+      addToast('Browser ini tidak mendukung proteksi penyimpanan.', 'warning');
     } else {
-      addToast('Browser denied persistent storage request.', 'warning');
+      addToast('Browser menolak permintaan proteksi penyimpanan.', 'warning');
     }
   };
 
@@ -395,15 +397,15 @@ export const SettingsDrawer: React.FC = () => {
     const jsonStr = exportSkillToJson(skill);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${skill.name.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.mooskill.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerFileDownload(url, `${skill.name.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.mooskill.json`);
+    // Revoking right away can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
   };
 
   const handleImportSkill = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so picking the same file again still fires a change.
+    e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -411,10 +413,10 @@ export const SettingsDrawer: React.FC = () => {
         const text = evt.target?.result as string;
         await importSkillFromJson(text);
         await refreshSkills();
-        addToast('Custom skill imported successfully!', 'success');
+        addToast('Persona kustom berhasil diimpor!', 'success');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Failed to import skill: ${msg}`, 'error');
+        addToast(`Gagal mengimpor persona: ${msg}`, 'error');
       }
     };
     reader.readAsText(file);
@@ -422,7 +424,7 @@ export const SettingsDrawer: React.FC = () => {
 
   const handleCreateSkill = async () => {
     if (!newSkillName.trim() || !newSkillPrompt.trim()) {
-      addToast('Skill Name and System Prompt are required.', 'warning');
+      addToast('Nama persona dan instruksi system prompt wajib diisi.', 'warning');
       return;
     }
     await addCustomSkill({
@@ -432,7 +434,7 @@ export const SettingsDrawer: React.FC = () => {
       systemPrompt: newSkillPrompt.trim()
     });
     await refreshSkills();
-    addToast('Custom skill created successfully!', 'success');
+    addToast('Persona kustom berhasil dibuat!', 'success');
     setShowAddSkillModal(false);
     setNewSkillName('');
     setNewSkillDesc('');
@@ -1307,7 +1309,7 @@ export const SettingsDrawer: React.FC = () => {
         onClose={() => setConfirmPurgeModels(false)}
         onConfirm={async () => {
           await purgeAllLocalModels();
-          setLocalModelsSizeBytes(0);
+          await refreshModelStatuses();
           addToast('Semua cache model suara lokal berhasil dihapus!', 'info');
         }}
         title="Hapus Cache Model Suara"
@@ -1327,7 +1329,7 @@ export const SettingsDrawer: React.FC = () => {
             await deleteSkill(skillToDelete);
             await refreshSkills();
             setSkillToDelete(null);
-            addToast('Custom persona skill berhasil dihapus!', 'info');
+            addToast('Persona kustom berhasil dihapus!', 'info');
           }
         }}
         title="Hapus Custom Persona Skill"
