@@ -10,11 +10,12 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
-  const { project, settings, setSettingsOpen, updateTitle, canUndo, canRedo, undo, redo } = useMooStore(
+  const { project, settings, setSettingsOpen, setShortcutsOpen, updateTitle, canUndo, canRedo, undo, redo } = useMooStore(
     useShallow((s) => ({
       project: s.project,
       settings: s.settings,
       setSettingsOpen: s.setSettingsOpen,
+      setShortcutsOpen: s.setShortcutsOpen,
       updateTitle: s.updateTitle,
       canUndo: s.canUndo,
       canRedo: s.canRedo,
@@ -144,6 +145,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                 />
               </div>
             )}
+
+            <IconButton
+              icon="keyboard"
+              aria-label="Shortcut keyboard (?)"
+              size="sm"
+              onClick={() => setShortcutsOpen(true)}
+              className="hidden lg:inline-flex"
+            />
 
             {/* Status Kunci API / Mode Lokal */}
             <button

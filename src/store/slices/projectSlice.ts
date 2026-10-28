@@ -239,7 +239,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     setProject: (project, options) => {
       if (options?.preserveHistory) {
         pushSnapshot(get().project);
-      } else {
+      } else if (!options?.skipHistory) {
         clearHistory();
       }
       set({
@@ -665,6 +665,16 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       get().addToast(`Resolution set to ${res} (${updated.width}×${updated.height})`, 'info');
     },
 
+    updateExportSettings: (settings) => {
+      const current = get().project;
+      const updated: MooProject = {
+        ...current,
+        exportSettings: { ...current.exportSettings, ...settings }
+      };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
     toggleGlobalSubtitles: () => {
       pushSnapshot(get().project);
       const currentVal = Boolean(get().project.theme.showSubtitles);
@@ -1071,6 +1081,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     reorderScenes: (fromIndex, toIndex) => {
       const current = get().project;
+      const count = current.scenes.length;
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= count || toIndex >= count) return;
+      pushSnapshot(current);
       const hasAudio = !!current.audioBlob;
       const list = [...current.scenes];
       const [moved] = list.splice(fromIndex, 1);

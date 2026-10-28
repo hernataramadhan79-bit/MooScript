@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useMooStore } from './store/useMooStore';
 import { Header } from './components/Header';
 import { CompositionStage } from './components/studio/CompositionStage';
@@ -8,6 +8,7 @@ import { InspectorRack, type InspectorTab } from './components/studio/InspectorR
 import { ToastContainer } from './components/ToastContainer';
 import { PwaReloadPrompt } from './components/PwaReloadPrompt';
 import { WelcomeModal } from './components/WelcomeModal';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { useMediaQuery } from './utils/hooks';
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts';
 
@@ -27,6 +28,8 @@ export const App: React.FC = () => {
   const focusScene = useMooStore((s) => s.focusScene);
   const isSettingsOpen = useMooStore((s) => s.isSettingsOpen);
   const isStageCollapsed = useMooStore((s) => s.previewMode === 'ticker');
+  const selectedLayerId = useMooStore((s) => s.selectedLayerId);
+  const setSelectedLayerId = useMooStore((s) => s.setSelectedLayerId);
   // Tailwind lg breakpoint. Only one layout is mounted so stage/timeline/inspector exist once.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -66,6 +69,45 @@ export const App: React.FC = () => {
     { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
     { id: 'ekspor', label: 'Ekspor', icon: 'download' }
   ];
+
+  // Swipe left/right on the mobile workspace to move between tabs. Gestures that start on
+  // fields, sliders or horizontally scrolling rows are left alone.
+  const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      e.touches.length !== 1 ||
+      target.closest('input, textarea, select, [role="slider"], [data-no-swipe], .overflow-x-auto')
+    ) {
+      swipeStartRef.current = null;
+      return;
+    }
+    swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  };
+  const handleSwipeEnd = (e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - start.t > 600) return;
+    const order = mobileTabs.map((t) => t.id);
+    const next = order.indexOf(mobileTab) + (dx < 0 ? 1 : -1);
+    if (next >= 0 && next < order.length) setMobileTab(order[next]);
+  };
+
+  // Jump to the layer controls once the Gaya tab has rendered. The tab itself switches
+  // instantly, so the scroll does too.
+  const [layerJumpRequest, setLayerJumpRequest] = useState(0);
+  useEffect(() => {
+    if (layerJumpRequest === 0 || mobileTab !== 'style') return;
+    document.getElementById('layer-inspector')?.scrollIntoView({ block: 'start' });
+  }, [layerJumpRequest, mobileTab]);
+
+  const openLayerEditor = () => {
+    setMobileTab('style');
+    setLayerJumpRequest((n) => n + 1);
+  };
 
   return (
     <div className="h-screen h-dvh w-full flex flex-col bg-background text-on-surface font-sans selection:bg-accent selection:text-on-accent overflow-hidden">
@@ -126,7 +168,11 @@ export const App: React.FC = () => {
 
             {/* Mobile bottom workspace. Both panels stay mounted so an AI generation, its cancel
                 button and the export settings survive switching tabs. */}
-            <div className="flex flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden">
+            <div
+              className="flex flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden"
+              onTouchStart={handleSwipeStart}
+              onTouchEnd={handleSwipeEnd}
+            >
               <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mobileTab === 'naskah' ? '' : 'hidden'}`}>
                 <SceneDeck
                   onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
@@ -143,7 +189,34 @@ export const App: React.FC = () => {
                 />
               </div>
 
-              {/* Mobile bottom navigation */}
+              {/* A layer picked on the stage: one tap to its controls in the Gaya tab */}
+              {selectedLayerId && mobileTab !== 'style' && (
+                <div className="shrink-0 px-2 pt-2 animate-fadeIn">
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-3 border border-accent/40 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={openLayerEditor}
+                      className="flex-1 min-w-0 min-h-[40px] px-2.5 rounded-lg flex items-center gap-2 text-left hover:bg-surface-hover"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-accent">layers</span>
+                      <span className="flex-1 min-w-0 text-[12px] text-on-surface truncate">
+                        Layer <strong className="font-mono text-accent">{selectedLayerId}</strong>
+                      </span>
+                      <span className="text-[12px] font-semibold text-accent shrink-0">Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLayerId(null)}
+                      aria-label="Batalkan pilihan layer"
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-text-muted hover:text-on-surface hover:bg-surface-hover"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile bottom navigation (swipe the panel above to move between tabs) */}
               <nav
                 aria-label="Panel studio"
                 className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-6 gap-1 select-none"
@@ -195,6 +268,9 @@ export const App: React.FC = () => {
 
       {/* 7. Welcome */}
       <WelcomeModal />
+
+      {/* 8. Keyboard shortcut reference (?) */}
+      <ShortcutsModal />
     </div>
   );
 };

@@ -17,7 +17,8 @@ import type {
   MotionNode,
   LayerOverride,
   ScenePalette,
-  SceneAssetAttachment
+  SceneAssetAttachment,
+  ProjectExportSettings
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
@@ -35,6 +36,8 @@ export interface UiSlice {
   setPreviewMode: (mode: PreviewMode) => void;
   isSettingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  isShortcutsOpen: boolean;
+  setShortcutsOpen: (open: boolean) => void;
   activeSceneId: string | null;
   setActiveSceneId: (id: string | null) => void;
   /** Selects a scene and moves the playhead into it, so the timeline keeps it selected. */
@@ -53,7 +56,14 @@ export interface UiSlice {
 export interface ProjectSlice {
   project: MooProject;
   projectsList: MooProject[];
-  setProject: (project: MooProject, options?: { keepStale?: boolean; preserveHistory?: boolean }) => void;
+  /**
+   * preserveHistory records an undo step; skipHistory leaves the history untouched (follow-up
+   * writes of one operation); otherwise the history is cleared (a different project was loaded).
+   */
+  setProject: (
+    project: MooProject,
+    options?: { keepStale?: boolean; preserveHistory?: boolean; skipHistory?: boolean }
+  ) => void;
   refreshProjectsList: () => Promise<void>;
   createNewProject: (title?: string) => Promise<string>;
   createProjectFromTemplate: (templateId: string) => Promise<string>;
@@ -64,6 +74,7 @@ export interface ProjectSlice {
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
+  updateExportSettings: (settings: Partial<ProjectExportSettings>) => void;
   toggleGlobalSubtitles: () => void;
   updateThemeFont: (font: 'Jakarta' | 'Mono' | 'Impact') => void;
   updateThemeHighlight: (color: string) => void;
@@ -195,7 +206,23 @@ export interface AssetSlice {
   removeAssetFromScene: (assetDataUrlOrLayerId: string, sceneId?: string) => void;
 }
 
+export type MographSceneStatus = 'pending' | 'generating' | 'ok' | 'error';
+
+export interface MographSlice {
+  /** Status line of the running "generate all scenes" job. */
+  mographProgress: string;
+  mographStats: { completed: number; total: number; sceneStatuses: Record<string, MographSceneStatus> } | null;
+  /** Scene being regenerated or repaired on its own, if any. */
+  revisingSceneId: string | null;
+  revisionProgress: string;
+  generateAllScenesAi: () => Promise<void>;
+  regenerateSceneAi: (sceneId: string, instruction?: string) => Promise<void>;
+  repairSceneAi: (sceneId: string) => Promise<void>;
+  cancelMographGeneration: () => void;
+}
+
 export type MooStoreState = UiSlice &
+  MographSlice &
   ProjectSlice &
   ScriptSlice &
   AudioSlice &

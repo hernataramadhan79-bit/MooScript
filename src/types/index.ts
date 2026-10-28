@@ -711,11 +711,29 @@ export interface MooProject {
     /** File name of the uploaded track, shown in the UI while preset is 'custom'. */
     customName?: string;
   };
+  exportSettings?: Partial<ProjectExportSettings>;
   createdAt?: number;
   updatedAt?: number;
 }
 
 export const CURRENT_SCHEMA_VERSION = 2;
+
+/** Export choices remembered with each project. */
+export interface ProjectExportSettings {
+  format: 'mp4' | 'webm';
+  fps: number;
+  quality: 'compact' | 'standard' | 'high';
+  watermark: boolean;
+  hud: boolean;
+}
+
+export const DEFAULT_EXPORT_SETTINGS: ProjectExportSettings = {
+  format: 'mp4',
+  fps: 30,
+  quality: 'standard',
+  watermark: false,
+  hud: false
+};
 
 export interface PersonaSkill {
   id: string;

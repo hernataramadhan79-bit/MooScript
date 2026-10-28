@@ -10,7 +10,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
     tag === 'textarea' ||
     tag === 'select' ||
     target.isContentEditable ||
-    Boolean(target.closest('[role="slider"], [role="dialog"], .cm-editor'))
+    Boolean(target.closest('[role="slider"], [role="dialog"], dialog, .cm-editor'))
   );
 }
 
@@ -73,6 +73,12 @@ export function useKeyboardShortcuts(): void {
 
       // Ignore any other shortcut if Ctrl/Alt/Meta is held (e.g. browser reloads, inspector)
       if (hasMetaOrCtrl || e.altKey) return;
+
+      if (e.key === '?') {
+        e.preventDefault();
+        useMooStore.getState().setShortcutsOpen(true);
+        return;
+      }
 
       switch (e.code) {
         // Play / Pause

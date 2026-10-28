@@ -12,6 +12,9 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
   isSettingsOpen: false,
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
 
+  isShortcutsOpen: false,
+  setShortcutsOpen: (isShortcutsOpen) => set({ isShortcutsOpen }),
+
   activeSceneId: null,
   setActiveSceneId: (activeSceneId) => set({ activeSceneId }),
   focusScene: (sceneId) => {

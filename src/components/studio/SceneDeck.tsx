@@ -183,6 +183,13 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     }))
   );
 
+  const isCompilingMograph = useMooStore((s) => s.isCompilingMograph);
+  const mographStats = useMooStore((s) => s.mographStats);
+  const revisingSceneId = useMooStore((s) => s.revisingSceneId);
+  const regenerateSceneAi = useMooStore((s) => s.regenerateSceneAi);
+  const cancelMographGeneration = useMooStore((s) => s.cancelMographGeneration);
+  const hasLlmKey = useMooStore((s) => Boolean((s.settings.apiKeys[s.settings.selectedLLMProvider] || '').trim()));
+
   const scenes = project.scenes || [];
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [openAssetPickerForScene, setOpenAssetPickerForScene] = useState<string | null>(null);
@@ -197,6 +204,67 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
       }
     }
   }, [activeSceneId]);
+  // Drag-to-reorder with pointer events, so it works with a finger as well as a mouse.
+  // `gap` is the slot the card would drop into: 0 = before the first card, n = after the last.
+  const [drag, setDrag] = useState<{ fromIndex: number; gap: number } | null>(null);
+  const dragRef = useRef<{ fromIndex: number; gap: number } | null>(null);
+  const autoScrollRef = useRef<number>(0);
+
+  const updateDrag = (next: { fromIndex: number; gap: number } | null) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const gapFromPointer = (clientY: number) => {
+    let gap = 0;
+    for (const sc of scenes) {
+      const rect = cardRefs.current[sc.id]?.getBoundingClientRect();
+      if (rect && clientY > rect.top + rect.height / 2) gap++;
+    }
+    return gap;
+  };
+
+  const dropTarget = (fromIndex: number, gap: number) => (gap > fromIndex ? gap - 1 : gap);
+
+  const startReorderDrag = (e: React.PointerEvent<HTMLButtonElement>, index: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateDrag({ fromIndex: index, gap: index });
+  };
+
+  const moveReorderDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const current = dragRef.current;
+    if (!current) return;
+    const gap = gapFromPointer(e.clientY);
+    if (gap !== current.gap) updateDrag({ ...current, gap });
+
+    // Scroll the list when the pointer nears its top or bottom edge.
+    const scroller = e.currentTarget.closest('.overflow-y-auto') as HTMLElement | null;
+    cancelAnimationFrame(autoScrollRef.current);
+    if (scroller) {
+      const box = scroller.getBoundingClientRect();
+      const edge = 56;
+      const speed = e.clientY < box.top + edge ? -10 : e.clientY > box.bottom - edge ? 10 : 0;
+      if (speed !== 0) {
+        autoScrollRef.current = requestAnimationFrame(() => scroller.scrollBy({ top: speed }));
+      }
+    }
+  };
+
+  const endReorderDrag = (commit: boolean) => {
+    cancelAnimationFrame(autoScrollRef.current);
+    const current = dragRef.current;
+    updateDrag(null);
+    if (!commit || !current) return;
+    const to = dropTarget(current.fromIndex, current.gap);
+    if (to !== current.fromIndex) reorderScenes(current.fromIndex, to);
+  };
+
+  const showDropLine = (gap: number) =>
+    drag !== null && drag.gap === gap && dropTarget(drag.fromIndex, gap) !== drag.fromIndex;
+
   const toggleDetail = (sceneId: string) => {
     setExpandedDetails((prev) => ({
       ...prev,
@@ -318,9 +386,15 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
             (compScene?.overrides && Object.keys(compScene.overrides).length > 0)
           );
           const compStatus = compScene?.status;
+          const isRevisingHere = revisingSceneId === scene.id;
+          const bulkStatus = mographStats?.sceneStatuses[scene.id];
+          const isBusyHere = isRevisingHere || bulkStatus === 'generating';
 
           return (
             <React.Fragment key={scene.id}>
+            {showDropLine(index) && (
+              <div aria-hidden="true" className="h-1 -my-1 rounded-full bg-accent shadow-[0_0_8px_rgba(132,204,22,0.6)]" />
+            )}
             <div
               key={scene.id}
               ref={(el) => {
@@ -332,6 +406,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 setActiveSceneId(scene.id);
               }}
               className={`p-2.5 sm:p-3 rounded-xl border transition-all duration-150 flex flex-col gap-2 cursor-pointer ${
+                drag?.fromIndex === index ? 'opacity-50 scale-[0.98]' : ''
+              } ${
                 isActive
                   ? 'bg-surface-2/70 border-accent/60 shadow-sm ring-1 ring-accent/20'
                   : 'bg-surface-1 border-border/70 hover:border-border hover:bg-surface-1/90'
@@ -340,6 +416,22 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               {/* Header Kartu: Identitas, Status, Durasi, dan Kontrol Manajemen */}
               <div className="flex items-center justify-between pb-1.5 border-b border-border/40 gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
+                  {scenes.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => startReorderDrag(e, index)}
+                      onPointerMove={moveReorderDrag}
+                      onPointerUp={() => endReorderDrag(true)}
+                      onPointerCancel={() => endReorderDrag(false)}
+                      style={{ touchAction: 'none' }}
+                      title="Tahan & geser untuk mengubah urutan"
+                      aria-label={`Geser untuk mengubah urutan adegan ${index + 1}`}
+                      className="w-7 h-8 lg:w-5 lg:h-6 -ml-1 rounded-md flex items-center justify-center text-text-faint hover:text-text hover:bg-surface-3 cursor-grab active:cursor-grabbing shrink-0"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[16px]">drag_indicator</span>
+                    </button>
+                  )}
                   <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-mono text-[11px] font-bold shrink-0 select-none">
                     #{String(index + 1).padStart(2, '0')}
                   </span>
@@ -351,6 +443,24 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       title="Kesalahan kompilasi adegan"
                     >
                       error
+                    </span>
+                  )}
+                  {compStatus === 'needs-repair' && (
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                      title="Adegan memakai API di luar MooTween. Perbaiki dari tab Gaya."
+                    >
+                      perlu perbaikan
+                    </span>
+                  )}
+                  {isBusyHere && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 bg-accent/15 text-accent border border-accent/30 animate-pulse">
+                      AI menyusun…
+                    </span>
+                  )}
+                  {bulkStatus === 'pending' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0 bg-surface-2 text-text-muted border border-border">
+                      antre
                     </span>
                   )}
                   {isEdited && (
@@ -427,7 +537,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               </div>
 
               {/* Baris Aksi & Studio Toolbar (Sleek, Anti-Slop, Non-Colliding) */}
-              <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={() => toggleDetail(scene.id)}
@@ -440,7 +550,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <span className="material-symbols-outlined text-[14px] text-text-muted">
                     {isDetailOpen ? 'expand_less' : 'tune'}
                   </span>
-                  <span>Detail & Aset</span>
+                  <span className="hidden sm:inline">Detail & Aset</span>
+                  <span className="sm:hidden">Detail</span>
                   {(scene.visualIntent || scene.visualConcept || (scene.focusWords?.length || 0) > 0) && (
                     <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Memiliki arahan visual / kata kunci" />
                   )}
@@ -458,11 +569,46 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       focusScene(scene.id);
                       compileSceneProcedural(scene.id, 'auto');
                     }}
-                    className="h-9 lg:h-7 px-3 lg:px-2.5 rounded-md bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 text-[12px] lg:text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
+                    className="h-9 lg:h-7 px-2.5 lg:px-2 rounded-md bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 text-[12px] lg:text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
                     title="Susun visual motion graphics instan tanpa kuota API (berdasarkan konteks naskah)"
                   >
-                    <span className="material-symbols-outlined text-[13px]">bolt</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[15px] lg:text-[13px]">bolt</span>
                     <span>Visual</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isRevisingHere) {
+                        cancelMographGeneration();
+                      } else if (!hasLlmKey) {
+                        setSettingsOpen(true);
+                      } else {
+                        focusScene(scene.id);
+                        regenerateSceneAi(scene.id);
+                      }
+                    }}
+                    disabled={!isRevisingHere && (revisingSceneId !== null || isCompilingMograph)}
+                    className={`h-9 lg:h-7 px-2.5 lg:px-2 rounded-md border text-[12px] lg:text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none ${
+                      isRevisingHere
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
+                        : 'bg-surface-2/60 hover:bg-surface-2 border-border/60 text-text-muted hover:text-text'
+                    }`}
+                    title={
+                      isRevisingHere
+                        ? 'Batalkan pembuatan ulang'
+                        : hasLlmKey
+                          ? 'Buat ulang visual adegan ini dengan AI'
+                          : 'Atur API key di Pengaturan untuk memakai AI'
+                    }
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`material-symbols-outlined text-[15px] lg:text-[13px] ${isRevisingHere ? 'animate-spin' : ''}`}
+                    >
+                      {isRevisingHere ? 'progress_activity' : 'auto_awesome'}
+                    </span>
+                    <span>{isRevisingHere ? 'Batal' : 'AI'}</span>
                   </button>
 
                   <div className="flex items-center bg-surface-2/70 border border-border/50 rounded-md p-0.5 shrink-0">
@@ -772,6 +918,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           );
         })
       )}
+
+        {showDropLine(scenes.length) && (
+          <div aria-hidden="true" className="h-1 rounded-full bg-accent shadow-[0_0_8px_rgba(132,204,22,0.6)]" />
+        )}
 
         {/* Tombol Tambah Adegan */}
         {scenes.length > 0 && (

@@ -9,6 +9,7 @@ import { createExportSlice } from './slices/exportSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import { createBgmSlice } from './slices/bgmSlice';
 import { createAssetSlice } from './slices/assetSlice';
+import { createMographSlice } from './slices/mographSlice';
 
 export type { MooStoreState };
 export { flushPendingSave };
@@ -23,5 +24,6 @@ export const useMooStore = create<MooStoreState>()((...a) => ({
   ...createExportSlice(...a),
   ...createSettingsSlice(...a),
   ...createBgmSlice(...a),
-  ...createAssetSlice(...a)
+  ...createAssetSlice(...a),
+  ...createMographSlice(...a)
 }));

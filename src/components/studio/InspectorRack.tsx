@@ -1,32 +1,17 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
-import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
-import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
-import { EXPORT_FPS_CHOICES, type ExportQuality } from '../../engine/export/exportOptions';
+import { mapFontDisplay } from '../../store/slices/mographSlice';
 import {
-  generateCustomScene,
-  repairGeneratedScene,
-  sceneToStoryBeat,
-  buildSceneGenerationContext
-} from '../../engine/ai/director/directorPipeline';
-import { callRawLLM } from '../../engine/ai/llm';
-import { buildCompositionDocument } from '../../engine/composition/buildDocument';
-import { syncComposition } from '../../engine/composition/sync';
-import {
-  extractLayersFromHtml,
   mergeEditableLayers,
   getLayerText,
   setLayerText
 } from '../../engine/composition/layers';
-import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { isLocalModelCached, downloadLocalModel, getLocalVoice, purgeLocalModel } from '../../engine/ai/localTts';
 import type {
   CaptionPosition,
   CaptionStyle,
   BgmPreset,
-  Composition,
-  SceneModule,
   EditableLayer,
   LayerOverride,
   ScenePalette
@@ -34,6 +19,7 @@ import type {
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { CommitNumberInput } from '../ui/CommitNumberInput';
 import { AssetManagerPanel } from './AssetManagerPanel';
+import { ExportPanel } from './ExportPanel';
 import {
   PROCEDURAL_ARCHETYPES,
   type ProceduralArchetype
@@ -129,30 +115,6 @@ export interface InspectorRackProps {
   onOpenCodeInspector?: (beatId: string) => void;
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-/** Scene code (SVG + CSS + timeline) runs long; a 2048-token cap truncates it mid-block. */
-const SCENE_CODEGEN_MIN_TOKENS = 4096;
-
-const mapFontDisplay = (fontFamily?: string): string => {
-  switch (fontFamily) {
-    case 'Mono':
-      return 'JetBrains Mono';
-    case 'Impact':
-      return 'Syne';
-    case 'Jakarta':
-    default:
-      return 'Plus Jakarta Sans';
-  }
-};
-
 export const InspectorRack: React.FC<InspectorRackProps> = ({
   className = '',
   defaultTab = 'mograph',
@@ -180,7 +142,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     compileAllScenesProcedural,
     setProject,
     isCompilingMograph,
-    setIsCompilingMograph,
+    mographProgress,
+    mographStats,
+    revisingSceneId,
+    revisionProgress,
+    generateAllScenesAi,
+    regenerateSceneAi,
+    repairSceneAi,
+    cancelMographGeneration,
     updateThemeFont,
     updateThemeCaptionPosition,
     updateThemeCaptionStyle,
@@ -199,13 +168,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     updateBgmDuckRatio,
     uploadCustomBgm,
     removeCustomBgm,
-    updateResolution,
-    isExporting,
-    exportProgress,
-    exportResult,
-    startExport,
-    cancelExport,
-    revokeExportResult,
     audioStale,
     setSettingsOpen,
     addToast
@@ -223,7 +185,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       compileAllScenesProcedural: s.compileAllScenesProcedural,
       setProject: s.setProject,
       isCompilingMograph: s.isCompilingMograph,
-      setIsCompilingMograph: s.setIsCompilingMograph,
+      mographProgress: s.mographProgress,
+      mographStats: s.mographStats,
+      revisingSceneId: s.revisingSceneId,
+      revisionProgress: s.revisionProgress,
+      generateAllScenesAi: s.generateAllScenesAi,
+      regenerateSceneAi: s.regenerateSceneAi,
+      repairSceneAi: s.repairSceneAi,
+      cancelMographGeneration: s.cancelMographGeneration,
       updateThemeFont: s.updateThemeFont,
       updateThemeCaptionPosition: s.updateThemeCaptionPosition,
       updateThemeCaptionStyle: s.updateThemeCaptionStyle,
@@ -242,13 +211,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       updateBgmDuckRatio: s.updateBgmDuckRatio,
       uploadCustomBgm: s.uploadCustomBgm,
       removeCustomBgm: s.removeCustomBgm,
-      updateResolution: s.updateResolution,
-      isExporting: s.isExporting,
-      exportProgress: s.exportProgress,
-      exportResult: s.exportResult,
-      startExport: s.startExport,
-      cancelExport: s.cancelExport,
-      revokeExportResult: s.revokeExportResult,
       audioStale: s.audioStale,
       setSettingsOpen: s.setSettingsOpen,
       addToast: s.addToast
@@ -312,11 +274,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   };
 
 
-  // Single Scene AI Revision States
+  // Single scene AI revision: the job itself runs in the store and survives tab switches.
   const [revisionPrompt, setRevisionPrompt] = useState<string>('');
-  const [isRevisingScene, setIsRevisingScene] = useState<boolean>(false);
-  const [revisionProgress, setRevisionProgress] = useState<string>('');
-  const singleSceneAbortRef = useRef<AbortController | null>(null);
+  const isRevisingScene = revisingSceneId !== null;
+  const isRevisingThisScene = Boolean(activeScene) && revisingSceneId === activeScene?.id;
 
   const getLayerIcon = (type: EditableLayer['type']) => {
     switch (type) {
@@ -399,235 +360,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
   const handleReviseSingleScene = async () => {
     if (!activeScene) return;
-    const provider = settings.selectedLLMProvider;
-    const apiKey = settings.apiKeys[provider] || '';
-    if (!apiKey) {
-      addToast(`Masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan.`, 'warning');
-      return;
-    }
-
-    const controller = new AbortController();
-    singleSceneAbortRef.current = controller;
-    setIsRevisingScene(true);
-    setRevisionProgress('Menghubungi AI...');
-
-    const modelToUse =
-      provider === 'gemini'
-        ? settings.geminiModel
-        : provider === 'openai'
-          ? settings.openaiModel
-          : provider === 'groq'
-            ? settings.groqModel
-            : provider === 'anthropic'
-              ? settings.anthropicModel
-              : settings.openrouterModel;
-
-    try {
-      const revisedVisualIntent = revisionPrompt.trim()
-        ? `${activeScene.visualIntent || activeScene.narrationText || ''}. Instruksi perubahan: ${revisionPrompt.trim()}`
-        : activeScene.visualIntent || activeScene.narrationText || 'Adegan mograph dinamis';
-
-      const sceneIndex = activeSceneIndex >= 0 ? activeSceneIndex : 0;
-      const sceneModule = await generateCustomScene({
-        beat: { ...sceneToStoryBeat(activeScene), visualIntent: revisedVisualIntent },
-        index: sceneIndex,
-        total: scenes.length,
-        aspectRatio: project.aspectRatio || '9:16',
-        wordTimestamps: activeScene.wordTimestamps,
-        ...buildSceneGenerationContext(project, sceneIndex, mapFontDisplay(project.theme.fontFamily)),
-        provider,
-        apiKey,
-        model: modelToUse,
-        onProgress: (status) => setRevisionProgress(status),
-        executeLlm: async ({ systemPrompt, userPrompt }) => {
-          return await callRawLLM({
-            provider,
-            apiKey,
-            model: modelToUse,
-            systemPrompt,
-            userPrompt,
-            signal: controller.signal,
-            maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
-            onActivity: (status) => setRevisionProgress(status)
-          });
-        }
-      });
-
-      if (controller.signal.aborted) {
-        addToast('Revisi adegan dibatalkan.', 'info');
-        return;
-      }
-
-      const currentComp = useMooStore.getState().project.composition;
-      const currentScenesList = currentComp?.scenes || [];
-      const updatedCompScenes = currentScenesList.map((mod) => {
-        if (mod.id !== activeScene.id && mod.beatId !== activeScene.id) return mod;
-        return {
-          ...sceneModule,
-          userEdited: true
-        };
-      });
-
-      const currentProject = useMooStore.getState().project;
-      // The revision instruction only steers this generation. Persisting it would make
-      // visualIntent grow with every revision ("..., Instruksi perubahan: ...").
-      const updatedProjectScenes = currentProject.scenes;
-
-      setProject(
-        {
-          ...currentProject,
-          scenes: updatedProjectScenes,
-          composition: {
-            ...(currentComp || {
-              id: `comp-${Date.now()}`,
-              width: currentProject.width || 1080,
-              height: currentProject.height || 1920,
-              fps: currentProject.fps || 30,
-              duration: currentProject.audioDuration || 10,
-              createdAt: Date.now()
-            }),
-            scenes: updatedCompScenes,
-            updatedAt: Date.now()
-          }
-        },
-        { keepStale: true, preserveHistory: true }
-      );
-
-      setRevisionPrompt('');
-      if (sceneModule.status === 'error') {
-        addToast('Gagal merevisi adegan. Silakan cek detail error.', 'error');
-      } else {
-        addToast(`Adegan #${activeSceneIndex + 1} berhasil direvisi!`, 'success');
-      }
-    } catch (err: unknown) {
-      if (controller.signal.aborted) {
-        addToast('Revisi dibatalkan.', 'info');
-        return;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Error merevisi adegan: ${msg}`, 'error');
-    } finally {
-      setIsRevisingScene(false);
-      setRevisionProgress('');
-      singleSceneAbortRef.current = null;
-    }
+    const instruction = revisionPrompt;
+    await regenerateSceneAi(activeScene.id, instruction);
+    setRevisionPrompt('');
   };
 
-  /**
-   * Repairs a scene saved before MooTween whose code uses APIs MooTween does not have. The repair
-   * prompt names each API and its replacement; the scene keeps its old code unless the fix validates.
-   */
-  const handleRepairLegacyScene = async () => {
-    if (!activeScene || !activeCompScene || activeCompScene.status !== 'needs-repair') return;
-    const provider = settings.selectedLLMProvider;
-    const apiKey = settings.apiKeys[provider] || '';
-    if (!apiKey) {
-      addToast(`Masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan.`, 'warning');
-      return;
-    }
-
-    const controller = new AbortController();
-    singleSceneAbortRef.current = controller;
-    setIsRevisingScene(true);
-    setRevisionProgress('Menghubungi AI...');
-
-    const modelToUse =
-      provider === 'gemini'
-        ? settings.geminiModel
-        : provider === 'openai'
-          ? settings.openaiModel
-          : provider === 'groq'
-            ? settings.groqModel
-            : provider === 'anthropic'
-              ? settings.anthropicModel
-              : settings.openrouterModel;
-
-    try {
-      const target = activeCompScene;
-      const result = await repairGeneratedScene({
-        originalCode: { html: target.html, css: target.css, buildJs: target.buildJs },
-        errors: target.errors || [],
-        visualIntent: activeScene.visualIntent || activeScene.narrationText || 'Adegan mograph dinamis',
-        narration: activeScene.narrationText,
-        durationSec: activeScene.durationInSeconds,
-        onProgress: (status) => setRevisionProgress(status),
-        executeLlm: async ({ systemPrompt, userPrompt }) => {
-          return await callRawLLM({
-            provider,
-            apiKey,
-            model: modelToUse,
-            systemPrompt,
-            userPrompt,
-            signal: controller.signal,
-            maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
-            onActivity: (status) => setRevisionProgress(status)
-          });
-        }
-      });
-
-      if (controller.signal.aborted) {
-        addToast('Perbaikan adegan dibatalkan.', 'info');
-        return;
-      }
-      if (!result.valid) {
-        addToast(`Perbaikan AI belum lolos validasi, kode lama dipertahankan: ${result.errors[0] || 'tidak diketahui'}`, 'error');
-        return;
-      }
-
-      const currentProject = useMooStore.getState().project;
-      const currentComp = currentProject.composition;
-      if (!currentComp) return;
-      setProject(
-        {
-          ...currentProject,
-          composition: {
-            ...currentComp,
-            scenes: currentComp.scenes.map((mod) =>
-              mod.id !== target.id
-                ? mod
-                : {
-                    ...mod,
-                    html: result.html,
-                    css: result.css,
-                    buildJs: result.buildJs,
-                    editableLayers: extractLayersFromHtml(result.html),
-                    status: 'ok' as const,
-                    errors: undefined,
-                    version: (mod.version || 1) + 1,
-                    userEdited: true
-                  }
-            ),
-            updatedAt: Date.now()
-          }
-        },
-        { keepStale: true, preserveHistory: true }
-      );
-      addToast(`Adegan #${activeSceneIndex + 1} diperbaiki untuk MooTween.`, 'success');
-    } catch (err: unknown) {
-      if (controller.signal.aborted) {
-        addToast('Perbaikan adegan dibatalkan.', 'info');
-        return;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Error memperbaiki adegan: ${msg}`, 'error');
-    } finally {
-      setIsRevisingScene(false);
-      setRevisionProgress('');
-      singleSceneAbortRef.current = null;
-    }
+  const handleRepairLegacyScene = () => {
+    if (activeScene) repairSceneAi(activeScene.id);
   };
 
-  // Mograph Compilation States
-  const [compilationProgress, setCompilationProgress] = useState<string>('');
-  const [generationStats, setGenerationStats] = useState<{
-    completed: number;
-    total: number;
-    sceneStatuses: Record<number, 'pending' | 'generating' | 'ok' | 'error'>;
-  } | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4');
-  const [exportFps, setExportFps] = useState<number>(30);
-  const [exportQuality, setExportQuality] = useState<ExportQuality>('standard');
 
   // Text position options
   const currentPosition = project.theme?.captionPosition || 'bottom';
@@ -781,410 +522,19 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const bgmLevel = project.bgm?.level ?? 0.18;
   const duckRatio = project.bgm?.duckRatio ?? 0.15;
 
-  // Resolution
-  const currentResolution: '1080p' | '720p' =
-    project.resolution ||
-    (project.width === 1080 || project.height === 1080 ? '1080p' : '720p');
-
-  // Export Watermark & HUD options
-  const [exportWatermark, setExportWatermark] = useState(false);
-  const [exportHud, setExportHud] = useState(false);
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
 
   const hasProjectAudio = Boolean(project.audioBlob);
   const hasNarration = scenes.some((s) => (s.narrationText || s.text || '').trim().length > 0);
-  // Mirrors exporter logic: watermark/HUD only apply to the legacy canvas renderer.
-  const isCompositionExport =
-    (project.renderMode || 'composition') === 'composition' &&
-    Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
-
-  // A finished MP4 is only valid for the exact project it was rendered from.
-  // Drop it as soon as anything that affects the output changes.
-  const exportSnapshotRef = useRef<unknown[] | null>(null);
-  useEffect(() => {
-    const snapshot = [
-      project.scenes,
-      project.composition,
-      project.audioBlob,
-      project.width,
-      project.height,
-      project.theme,
-      project.bgm,
-      exportFormat,
-      exportFps,
-      exportQuality,
-      exportWatermark,
-      exportHud
-    ];
-    const prev = exportSnapshotRef.current;
-    exportSnapshotRef.current = snapshot;
-    if (!prev || prev.every((v, i) => v === snapshot[i])) return;
-    if (useMooStore.getState().isExporting) return;
-    if (useMooStore.getState().exportResult) {
-      revokeExportResult();
-    }
-  }, [
-    project.scenes,
-    project.composition,
-    project.audioBlob,
-    project.width,
-    project.height,
-    project.theme,
-    project.bgm,
-    exportFormat,
-    exportFps,
-    exportQuality,
-    exportWatermark,
-    exportHud,
-    revokeExportResult
-  ]);
-
-  // MP4 Export trigger
-  const handleExportMedia = async () => {
-    if (isExporting) return;
-    // The exporter may switch to WebM when the browser has no H.264 encoder, so name the file by its real type.
-    const extOf = (blob: Blob) => (blob.type === 'video/webm' ? 'webm' : 'mp4');
-    if (exportResult?.objectUrl) {
-      const ext = extOf(exportResult.blob);
-      triggerFileDownload(exportResult.objectUrl, `${safeFileName(project.title)}.${ext}`);
-      addToast(`Mengunduh video ${ext.toUpperCase()}...`, 'success');
-      return;
-    }
-    await startExport({
-      format: exportFormat,
-      fps: exportFps,
-      quality: exportQuality,
-      watermark: exportWatermark,
-      hud: exportHud
-    });
-    const result = useMooStore.getState().exportResult;
-    if (result?.objectUrl) {
-      const ext = extOf(result.blob);
-      triggerFileDownload(result.objectUrl, `${safeFileName(project.title)}.${ext}`);
-      addToast(`Video ${ext.toUpperCase()} berhasil diunduh.`, 'success');
-    }
-  };
-
-  // Standalone HTML Mograph Export trigger
-  const handleExportHtml = async () => {
-    let projectToExport = project;
-    if (!projectToExport.composition) {
-      projectToExport = syncComposition(projectToExport);
-    }
-
-    let audioDataUrl: string | undefined;
-    if (project.audioBlob) {
-      try {
-        audioDataUrl = await blobToDataUrl(project.audioBlob);
-      } catch {
-        // Continue without audio if read fails
-      }
-    }
-
-    const htmlContent = buildCompositionDocument(projectToExport, {
-      standalone: true,
-      audioDataUrl
-    });
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `${safeFileName(project.title)}.html`);
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
-    addToast('HTML Standalone Mograph berhasil diunduh!', 'success');
-  };
-
-  // AI Mograph Generation Workflow
-  const handleGenerateCustomMograph = async (skipConfirm = false) => {
-    const currentProject = useMooStore.getState().project;
-    const provider = settings.selectedLLMProvider;
-    const apiKey = settings.apiKeys[provider] || '';
-
-    if (!apiKey) {
-      addToast(
-        `Silakan masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan terlebih dahulu.`,
-        'warning'
-      );
-      return;
-    }
-
-    // Check if any scene was manually edited by user
-    const existingModules = currentProject.composition?.scenes || [];
-    const hasUserEdited = existingModules.some((m) => m.userEdited === true);
-    if (hasUserEdited && !skipConfirm) {
+  // AI Mograph generation for every scene. The job runs in the store; this only asks before
+  // overwriting scenes the user edited by hand.
+  const handleGenerateCustomMograph = (skipConfirm = false) => {
+    const existingModules = useMooStore.getState().project.composition?.scenes || [];
+    if (!skipConfirm && existingModules.some((m) => m.userEdited === true)) {
       setShowOverwriteConfirm(true);
       return;
     }
-
-    const startedId = currentProject.id;
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setIsCompilingMograph(true);
-    setCompilationProgress('Menyiapkan brief style dan instruksi motion director...');
-
-    try {
-      const beats = currentProject.scenes;
-      const total = beats.length;
-      let failureCount = 0;
-      let completedCount = 0;
-
-      // Track live status of each scene for visual feedback
-      const initialStatuses: Record<number, 'pending' | 'generating' | 'ok' | 'error'> = {};
-      for (let i = 0; i < total; i++) {
-        initialStatuses[i] = 'pending';
-      }
-      setGenerationStats({ completed: 0, total, sceneStatuses: initialStatuses });
-
-      const modelToUse =
-        provider === 'gemini'
-          ? settings.geminiModel
-          : provider === 'openai'
-            ? settings.openaiModel
-            : provider === 'groq'
-              ? settings.groqModel
-              : provider === 'anthropic'
-                ? settings.anthropicModel
-                : settings.openrouterModel;
-
-      // Initialize composition in store
-      const initialCompScenes: SceneModule[] = beats.map((b) => ({
-        id: b.id,
-        beatId: b.id,
-        duration: b.durationInSeconds || 3.5,
-        html: '',
-        css: '',
-        buildJs: '',
-        status: 'pending' as const,
-        version: 1,
-        userEdited: false
-      }));
-
-      let runningComp: Composition = {
-        id: currentProject.composition?.id || `comp-${Date.now()}`,
-        width: currentProject.width || 1080,
-        height: currentProject.height || 1920,
-        fps: currentProject.fps || 30,
-        duration: beats.reduce((acc, b) => acc + (b.durationInSeconds || 3.5), 0),
-        globalCss: `body { background: ${currentProject.theme.bg}; }`,
-        scenes:
-          currentProject.composition?.scenes && currentProject.composition.scenes.length === total
-            ? [...currentProject.composition.scenes]
-            : initialCompScenes,
-        createdAt: currentProject.composition?.createdAt || Date.now(),
-        updatedAt: Date.now()
-      };
-
-      const finalScenes: SceneModule[] = new Array(total);
-      let nextIndex = 0;
-
-      const worker = async () => {
-        while (nextIndex < total) {
-          if (controller.signal.aborted) break;
-          const i = nextIndex++;
-          const beat = beats[i];
-
-          // Update scene status to generating
-          setGenerationStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  sceneStatuses: { ...prev.sceneStatuses, [i]: 'generating' }
-                }
-              : null
-          );
-          setCompilationProgress(
-            `Mendesain adegan ${i + 1} dari ${total}... (${completedCount}/${total} selesai)`
-          );
-
-          const projectNow = useMooStore.getState().project;
-          const sceneAbortController = new AbortController();
-          const onParentAbort = () => {
-            sceneAbortController.abort(controller.signal.reason);
-          };
-          controller.signal.addEventListener('abort', onParentAbort, { once: true });
-
-          let lastActivityTime = Date.now();
-          let currentActivityDetail = 'Menghubungkan ke AI...';
-          const sceneStartTime = Date.now();
-
-          const recordActivity = (detail: string) => {
-            lastActivityTime = Date.now();
-            currentActivityDetail = detail;
-          };
-
-          const ticker = setInterval(() => {
-            if (sceneAbortController.signal.aborted || controller.signal.aborted) {
-              clearInterval(ticker);
-              return;
-            }
-
-            const elapsedSec = Math.floor((Date.now() - sceneStartTime) / 1000);
-            const silenceSec = Math.floor((Date.now() - lastActivityTime) / 1000);
-
-            // True freeze watchdog: 180s silence cutoff
-            if (silenceSec >= 180) {
-              clearInterval(ticker);
-              sceneAbortController.abort(
-                new Error(
-                  `Koneksi tidak merespons: server AI tidak mengirim data selama ${silenceSec} detik. Periksa koneksi internet atau ganti model.`
-                )
-              );
-              return;
-            }
-
-            setCompilationProgress(
-              `Mendesain adegan ${i + 1} dari ${total}... (${elapsedSec}s) • ${currentActivityDetail}`
-            );
-          }, 1000);
-
-          try {
-            const sceneModule = await generateCustomScene({
-              beat: sceneToStoryBeat(beat),
-              index: i,
-              total,
-              aspectRatio: projectNow.aspectRatio || '9:16',
-              wordTimestamps: beat.wordTimestamps,
-              ...buildSceneGenerationContext({ ...projectNow, scenes: beats }, i, mapFontDisplay(projectNow.theme.fontFamily)),
-              provider,
-              apiKey,
-              model: modelToUse,
-              onProgress: (status) => {
-                recordActivity(status);
-              },
-              executeLlm: async ({ systemPrompt, userPrompt }) => {
-                return await callRawLLM({
-                  provider,
-                  apiKey,
-                  model: modelToUse,
-                  systemPrompt,
-                  userPrompt,
-                  signal: sceneAbortController.signal,
-                  maxTokens: Math.max(settings.maxOutputTokens || 2048, SCENE_CODEGEN_MIN_TOKENS),
-                  onActivity: (status) => {
-                    recordActivity(status);
-                  }
-                });
-              }
-            });
-
-            finalScenes[i] = sceneModule;
-            if (sceneModule.status !== 'ok') {
-              failureCount++;
-            }
-          } catch (err: unknown) {
-            failureCount++;
-            console.error(`[MooScript] Error generating scene #${i + 1}:`, err);
-            const errMsg = err instanceof Error ? err.message : String(err);
-            finalScenes[i] = {
-              id: beat.id,
-              beatId: beat.id,
-              duration: beat.durationInSeconds || 3.5,
-              html: '',
-              css: '',
-              buildJs: '',
-              status: 'error',
-              errors: [errMsg],
-              version: 1,
-              userEdited: false
-            };
-          } finally {
-            clearInterval(ticker);
-            controller.signal.removeEventListener('abort', onParentAbort);
-          }
-
-          if (controller.signal.aborted) break;
-
-          completedCount++;
-          const finishedStatus = finalScenes[i]?.status === 'ok' ? 'ok' : 'error';
-          setGenerationStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  completed: completedCount,
-                  sceneStatuses: { ...prev.sceneStatuses, [i]: finishedStatus }
-                }
-              : null
-          );
-
-          // PROGRESSIVE STORE UPDATE: safely merge completed scene into latest composition
-          const latestProj = useMooStore.getState().project;
-          const prevComp = latestProj.composition || runningComp;
-          runningComp = {
-            ...prevComp,
-            scenes: prevComp.scenes.map((s, idx) =>
-              idx === i && finalScenes[i] ? finalScenes[i] : s
-            ),
-            updatedAt: Date.now()
-          };
-          useMooStore.getState().setProject(
-            {
-              ...latestProj,
-              renderMode: 'composition' as const,
-              composition: runningComp
-            },
-            { keepStale: true }
-          );
-
-          // Brief 50ms tick to yield UI thread smoothly
-          await new Promise((r) => setTimeout(r, 50));
-        }
-      };
-
-      const CONCURRENCY = Math.min(2, total);
-      const workers = Array.from({ length: CONCURRENCY }, () => worker());
-      await Promise.all(workers);
-
-      if (controller.signal.aborted) {
-        addToast('Pembuatan mograph dibatalkan.', 'info');
-        return;
-      }
-
-      const latest = useMooStore.getState().project;
-      if (latest.id !== startedId) {
-        addToast('Project berganti, hasil visual dibuang.', 'warning');
-        return;
-      }
-
-      // Final composition duration & assembly
-      const totalCompDuration = finalScenes.reduce((acc, s) => acc + (s?.duration || 3), 0);
-      const newComp: Composition = {
-        ...runningComp,
-        duration: totalCompDuration,
-        scenes: finalScenes.filter(Boolean),
-        updatedAt: Date.now()
-      };
-
-      useMooStore.getState().setProject(
-        {
-          ...latest,
-          renderMode: 'composition' as const,
-          composition: newComp
-        },
-        { keepStale: true }
-      );
-
-      if (failureCount > 0) {
-        addToast(
-          `${failureCount} dari ${total} adegan mengalami kendala rendering. Anda dapat mengedit atau generate ulang di adegan.`,
-          'warning'
-        );
-      } else {
-        addToast('Mograph custom AI berhasil dihasilkan!', 'success');
-      }
-    } catch (err: unknown) {
-      if (controller.signal.aborted) {
-        addToast('Pembuatan mograph dibatalkan.', 'info');
-        return;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal mengenerate mograph: ${msg}`, 'error');
-    } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
-      setIsCompilingMograph(false);
-      setCompilationProgress('');
-      setGenerationStats(null);
-    }
+    generateAllScenesAi();
   };
 
   return (
@@ -1340,7 +690,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <button
                       type="button"
                       onClick={handleReviseSingleScene}
-                      disabled={isRevisingScene || !hasLlmApiKey}
+                      disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
                           ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
@@ -1377,7 +727,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <button
                       type="button"
                       onClick={handleRepairLegacyScene}
-                      disabled={isRevisingScene || !hasLlmApiKey}
+                      disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
                           ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
@@ -1385,10 +735,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       }
                       className="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-[11px] font-semibold hover:bg-amber-400 transition-colors self-start flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
                     >
-                      <span className={`material-symbols-outlined text-[14px] ${isRevisingScene ? 'animate-spin' : ''}`}>
-                        {isRevisingScene ? 'progress_activity' : 'auto_fix_high'}
+                      <span className={`material-symbols-outlined text-[14px] ${isRevisingThisScene ? 'animate-spin' : ''}`}>
+                        {isRevisingThisScene ? 'progress_activity' : 'auto_fix_high'}
                       </span>
-                      {isRevisingScene ? revisionProgress || 'Memperbaiki...' : 'Perbaiki dengan AI'}
+                      {isRevisingThisScene ? revisionProgress || 'Memperbaiki...' : 'Perbaiki dengan AI'}
                     </button>
                   </div>
                 )}
@@ -1411,7 +761,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     className="w-full px-2.5 py-1.5 rounded-xl bg-surface-1 border border-border text-[12px] text-on-surface placeholder:text-text-muted/60 focus:outline-none focus:border-accent resize-none"
                   />
 
-                  {revisionProgress && (
+                  {isRevisingThisScene && revisionProgress && (
                     <div className="p-2 rounded-lg bg-surface-1 border border-border text-[11px] text-accent flex items-center gap-2">
                       <span className="material-symbols-outlined animate-spin text-[14px]">sync</span>
                       <span className="truncate">{revisionProgress}</span>
@@ -1422,7 +772,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <button
                       type="button"
                       onClick={handleReviseSingleScene}
-                      disabled={isRevisingScene || !hasLlmApiKey}
+                      disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
                           ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
@@ -1430,7 +780,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       }
                       className="flex-1 py-1.5 px-3 rounded-xl bg-accent text-on-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
                     >
-                      {isRevisingScene ? (
+                      {isRevisingThisScene ? (
                         <>
                           <span className="material-symbols-outlined animate-spin text-[15px]">sync</span>
                           <span>Merevisi...</span>
@@ -1442,10 +792,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         </>
                       )}
                     </button>
-                    {isRevisingScene && (
+                    {isRevisingThisScene && (
                       <button
                         type="button"
-                        onClick={() => singleSceneAbortRef.current?.abort()}
+                        onClick={cancelMographGeneration}
                         className="py-1.5 px-2.5 rounded-xl bg-surface-1 border border-border text-[11px] text-text-muted hover:text-rose-400 transition-colors"
                       >
                         Batal
@@ -1455,7 +805,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 </div>
 
                 {/* 3. Layer Inspector & Non-Destructive Overrides */}
-                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
+                <div id="layer-inspector" className="scroll-mt-2 p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-accent">layers</span>
@@ -2176,22 +1526,22 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className="material-symbols-outlined animate-spin text-[16px] shrink-0">
                         sync
                       </span>
-                      <span className="truncate">{compilationProgress || 'Menyiapkan...'}</span>
+                      <span className="truncate">{mographProgress || 'Menyiapkan...'}</span>
                     </span>
-                    {generationStats && (
+                    {mographStats && (
                       <span className="text-[11px] font-mono text-text-muted shrink-0 ml-1">
-                        {Math.round((generationStats.completed / generationStats.total) * 100)}%
+                        {Math.round((mographStats.completed / mographStats.total) * 100)}%
                       </span>
                     )}
                   </div>
 
-                  {generationStats && (
+                  {mographStats && (
                     <>
                       <div className="w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
                         <div
                           className="bg-accent h-full transition-all duration-300 rounded-full"
                           style={{
-                            width: `${(generationStats.completed / generationStats.total) * 100}%`
+                            width: `${(mographStats.completed / mographStats.total) * 100}%`
                           }}
                         />
                       </div>
@@ -2199,7 +1549,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       {/* Scene Badges */}
                       <div className="flex flex-wrap gap-1 pt-0.5">
                         {project.scenes.map((b, idx) => {
-                          const st = generationStats.sceneStatuses[idx] || 'pending';
+                          const st = mographStats.sceneStatuses[b.id] || 'pending';
                           return (
                             <span
                               key={b.id}
@@ -2224,7 +1574,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => abortControllerRef.current?.abort()}
+                    onClick={cancelMographGeneration}
                     className="w-full mt-1 py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
                   >
                     Batalkan Pembuatan
@@ -3131,282 +2481,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         )}
 
         {/* ================= TAB EKSPOR ================= */}
-        {activeTab === 'ekspor' && (
-          <div className="flex flex-col gap-5">
-            {/* Resolusi Video */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Resolusi
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => updateResolution('1080p')}
-                  className={`py-2.5 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                    currentResolution === '1080p'
-                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                  }`}
-                >
-                  1080p (Full HD)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateResolution('720p')}
-                  className={`py-2.5 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                    currentResolution === '720p'
-                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                  }`}
-                >
-                  720p (HD)
-                </button>
-              </div>
-            </div>
-
-            {/* Format Video Kontainer */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Format Video
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExportFormat('mp4')}
-                  className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                    exportFormat === 'mp4'
-                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                  }`}
-                >
-                  ★ MP4 (H.264)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExportFormat('webm')}
-                  className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                    exportFormat === 'webm'
-                      ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                  }`}
-                >
-                  WebM (VP9)
-                </button>
-              </div>
-            </div>
-
-            {/* Frame Rate */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Frame Rate
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {EXPORT_FPS_CHOICES.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setExportFps(value)}
-                    className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                      exportFps === value
-                        ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                    }`}
-                  >
-                    {value} fps
-                  </button>
-                ))}
-              </div>
-              {exportFps === 60 && (
-                <span className="text-[10px] text-text-muted">
-                  60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.
-                </span>
-              )}
-            </div>
-
-            {/* Kualitas */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Kualitas
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    ['compact', 'Hemat'],
-                    ['standard', 'Standar'],
-                    ['high', 'Tinggi']
-                  ] as [ExportQuality, string][]
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setExportQuality(value)}
-                    className={`py-2 px-3 rounded-xl border text-[12px] font-semibold text-center transition-all active:scale-95 ${
-                      exportQuality === value
-                        ? 'bg-surface-3 border-accent text-accent ring-1 ring-accent/30 shadow-sm'
-                        : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Opsi Overlay Ekspor: hanya berlaku untuk render legacy (canvas) */}
-            {!isCompositionExport && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                  Opsi Ekspor
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={exportWatermark}
-                      onChange={(e) => setExportWatermark(e.target.checked)}
-                      className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-[12px] font-semibold text-on-surface">Watermark</span>
-                      <span className="text-[10px] text-text-muted">Logo MooScript</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={exportHud}
-                      onChange={(e) => setExportHud(e.target.checked)}
-                      className="w-4 h-4 rounded text-accent bg-surface-3 border-border focus:ring-accent accent-accent cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-[12px] font-semibold text-on-surface">Info FPS</span>
-                      <span className="text-[10px] text-text-muted">Overlay teknis</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Peringatan audio sebelum ekspor */}
-            {!hasProjectAudio && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-                Audio belum dibuat, video akan diekspor tanpa suara. Buka tab Audio untuk membuat suara.
-              </div>
-            )}
-            {hasProjectAudio && audioStale && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-                Naskah berubah sejak suara dibuat. Buat ulang suara di tab Audio agar video sesuai naskah.
-              </div>
-            )}
-
-            {/* Tombol Utama Download Video MP4 */}
-            <div className="flex flex-col gap-2.5">
-              <button
-                type="button"
-                onClick={handleExportMedia}
-                disabled={isExporting || scenes.length === 0}
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {isExporting ? 'sync' : 'download'}
-                </span>
-                <span>
-                  {isExporting
-                    ? 'Mengekspor Video...'
-                    : scenes.length === 0
-                      ? 'Tambahkan adegan dulu'
-                      : exportResult?.objectUrl
-                        ? `Unduh Lagi (${exportResult.blob.type === 'video/webm' ? 'WEBM' : 'MP4'})`
-                        : `Ekspor & Unduh ${exportFormat.toUpperCase()}`}
-                </span>
-              </button>
-
-              {isExporting && (
-                <button
-                  type="button"
-                  onClick={() => cancelExport()}
-                  className="w-full py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
-                >
-                  Batalkan Ekspor
-                </button>
-              )}
-
-              {/* Progress Bar Ekspor Elegan */}
-              {isExporting && exportProgress && (
-                <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-surface-2 border border-border">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-text-muted truncate">
-                      {exportProgress.statusText || 'Sedang memproses...'}
-                    </span>
-                    <span className="font-mono text-accent font-bold">
-                      {exportProgress.percent}%
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-surface-3 overflow-hidden">
-                    <div
-                      className="h-full bg-accent transition-all duration-150 rounded-full"
-                      style={{
-                        width: `${Math.min(100, Math.max(0, exportProgress.percent))}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Unduh Bundle Mograph Web HTML */}
-            <div className="flex flex-col gap-2 pt-1 border-t border-border">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Bundle Web Mograph
-              </span>
-              <button
-                type="button"
-                onClick={handleExportHtml}
-                className="py-2.5 px-3 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 text-on-surface text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[18px] text-accent">html</span>
-                <span>Unduh HTML Standalone Web</span>
-              </button>
-            </div>
-
-            {/* Tombol Subtitle */}
-            <div className="flex flex-col gap-2 pt-1 border-t border-border">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Subtitle
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    downloadSubtitleFile(project, 'srt');
-                    addToast('Mengunduh subtitle (.srt)...', 'success');
-                  }}
-                  className="py-2.5 px-2.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 text-on-surface text-[11px] sm:text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[16px] text-text-muted shrink-0">
-                    subtitles
-                  </span>
-                  <span className="truncate">Unduh Subtitle (.srt)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    downloadSubtitleFile(project, 'vtt');
-                    addToast('Mengunduh subtitle (.vtt)...', 'success');
-                  }}
-                  className="py-2.5 px-2.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 text-on-surface text-[11px] sm:text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[16px] text-text-muted shrink-0">
-                    subtitles
-                  </span>
-                  <span className="truncate">Unduh Subtitle (.vtt)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'ekspor' && <ExportPanel />}
       </div>
 
       {/* Konfirmasi Timpa Adegan yang Diedit Manual */}
