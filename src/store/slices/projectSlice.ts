@@ -155,7 +155,26 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
   const triggerSave = (project: MooProject) => {
     scheduleSave(project, (msg) => get().addToast(msg, 'error'));
   };
-  const pushSnapshot = (project: MooProject) => {
+  // Edits sent in a quick burst to the same field (typing, dragging a slider or a trim handle)
+  // share one undo step instead of filling the history with one step per keystroke.
+  let lastCoalesceKey: string | null = null;
+  let lastSnapshotAt = 0;
+  const COALESCE_WINDOW_MS = 1200;
+
+  const pushSnapshot = (project: MooProject, coalesceKey?: string) => {
+    const now = Date.now();
+    const isBurst =
+      coalesceKey !== undefined &&
+      coalesceKey === lastCoalesceKey &&
+      now - lastSnapshotAt < COALESCE_WINDOW_MS &&
+      historyPast.length > 0;
+    lastCoalesceKey = coalesceKey ?? null;
+    lastSnapshotAt = now;
+    if (isBurst) {
+      historyFuture = [];
+      set({ canRedo: false });
+      return;
+    }
     historyPast.push(snapshotProject(project));
     if (historyPast.length > MAX_HISTORY) {
       historyPast.shift();
@@ -165,6 +184,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
   };
 
   const clearHistory = () => {
+    lastCoalesceKey = null;
     historyPast = [];
     historyFuture = [];
     set({ canUndo: false, canRedo: false });
@@ -553,7 +573,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeHighlight: (textHighlight) => {
-      pushSnapshot(get().project);
+      pushSnapshot(get().project, 'theme:highlight');
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textHighlight }
@@ -563,7 +583,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemeBg: (bg) => {
-      pushSnapshot(get().project);
+      pushSnapshot(get().project, 'theme:bg');
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, bg }
@@ -573,7 +593,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateThemePrimary: (textPrimary) => {
-      pushSnapshot(get().project);
+      pushSnapshot(get().project, 'theme:primary');
       const updated = syncComposition({
         ...get().project,
         theme: { ...get().project.theme, textPrimary }
@@ -615,7 +635,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     },
 
     updateSubtitleCustomization: (customization: Partial<SubtitleCustomization>) => {
-      pushSnapshot(get().project);
+      pushSnapshot(get().project, `subtitle:${Object.keys(customization).sort().join(',')}`);
       const current = get().project.theme.subtitleCustomization || {};
       const updatedTheme = {
         ...get().project.theme,
@@ -659,7 +679,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
     updateSceneText: (id, text) => {
       const current = get().project;
-      pushSnapshot(current);
+      pushSnapshot(current, `text:${id}`);
       const hasAudio = !!current.audioBlob;
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== id) return s;
@@ -713,7 +733,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const currentProj = get().project;
       const comp = currentProj.composition || syncComposition(currentProj).composition;
       if (!comp) return;
-      pushSnapshot(currentProj);
+      pushSnapshot(currentProj, `layer:${sceneId}:${layerId}:${Object.keys(override).sort().join(',')}`);
       const updatedScenes = comp.scenes.map((mod) => {
         if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
         const currentOverrides = mod.overrides || {};
@@ -777,7 +797,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const currentProj = get().project;
       const comp = currentProj.composition || syncComposition(currentProj).composition;
       if (!comp) return;
-      pushSnapshot(currentProj);
+      pushSnapshot(currentProj, `palette:${sceneId}:${Object.keys(palette).sort().join(',')}`);
       const updatedScenes = comp.scenes.map((mod) => {
         if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
         return {
@@ -833,7 +853,17 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       };
       set({ project: updatedProject });
       triggerSave(updatedProject);
-      get().addToast(`Visual adegan #${idx + 1} berhasil dibangun secara instan!`, 'success');
+      const replacedCustomWork =
+        existingMod?.userEdited || existingMod?.generatorVersion?.startsWith('generative');
+      if (replacedCustomWork) {
+        get().addToast(
+          `Visual AI/editan adegan #${idx + 1} diganti visual instan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`,
+          'warning',
+          6000
+        );
+      } else {
+        get().addToast(`Visual adegan #${idx + 1} berhasil dibangun secara instan!`, 'success');
+      }
     },
 
     compileAllScenesProcedural: (archetype: ProceduralArchetype = 'auto', overwriteExisting = true) => {
@@ -904,7 +934,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         set({ audioStale: true });
         return;
       }
-      pushSnapshot(current);
+      pushSnapshot(current, `duration:${sceneId}`);
       const clampedDuration = Math.max(0.5, Math.min(60, Math.round(durationInSeconds * 10) / 10));
       const updatedScenes = current.scenes.map((s) => {
         if (s.id !== sceneId) return s;

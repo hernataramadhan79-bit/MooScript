@@ -451,7 +451,7 @@ export const SettingsDrawer: React.FC = () => {
       <div className="flex-1" onClick={() => setSettingsOpen(false)} />
 
       {/* Drawer Container */}
-      <div className="w-full max-w-lg bg-[#0e0e12] border-l border-white/[0.08] shadow-2xl flex flex-col h-full overflow-hidden animate-slideLeft">
+      <div role="dialog" aria-modal="true" aria-label="Pengaturan Studio" className="w-full max-w-lg bg-[#0e0e12] border-l border-white/[0.08] shadow-2xl flex flex-col h-full overflow-hidden animate-slideLeft pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Drawer Header */}
         <div className="h-11 sm:h-14 px-3.5 sm:px-5 border-b border-white/[0.08] flex items-center justify-between shrink-0 bg-white/[0.02]">
           <div className="flex items-center gap-2">
@@ -462,7 +462,8 @@ export const SettingsDrawer: React.FC = () => {
           <button
             type="button"
             onClick={() => setSettingsOpen(false)}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+            aria-label="Tutup pengaturan"
+            className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
           >
             <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
           </button>

@@ -37,6 +37,8 @@ export interface UiSlice {
   setSettingsOpen: (open: boolean) => void;
   activeSceneId: string | null;
   setActiveSceneId: (id: string | null) => void;
+  /** Selects a scene and moves the playhead into it, so the timeline keeps it selected. */
+  focusScene: (sceneId: string) => void;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
   toasts: ToastNotification[];

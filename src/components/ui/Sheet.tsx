@@ -48,20 +48,12 @@ export const Sheet: React.FC<SheetProps> = ({
 
     dialog.addEventListener('cancel', handleCancel);
     return () => dialog.removeEventListener('cancel', handleCancel);
-  }, [onClose]);
+  }, [onClose, isOpen]);
 
-  // Handle backdrop click
+  // The panel fills the dialog box, so a click whose target is the <dialog> itself landed on the
+  // backdrop. Coordinates are not used: keyboard-activated buttons report a click at (0, 0).
   const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const rect = dialog.getBoundingClientRect();
-    const isInDialog =
-      rect.top <= e.clientY &&
-      e.clientY <= rect.top + rect.height &&
-      rect.left <= e.clientX &&
-      e.clientX <= rect.left + rect.width;
-
-    if (!isInDialog) {
+    if (e.target === dialogRef.current) {
       onClose();
     }
   };
@@ -76,11 +68,11 @@ export const Sheet: React.FC<SheetProps> = ({
         side === 'right'
           ? 'mr-0 h-full max-h-screen w-full sm:w-[480px] rounded-l-2xl'
           : side === 'bottom'
-            ? 'mb-0 w-full rounded-t-2xl'
+            ? 'mb-0 w-full max-w-full rounded-t-2xl'
             : `w-[calc(100%-2rem)] ${maxWidth} rounded-2xl`
       }`}
     >
-      <div className="flex flex-col bg-surface-1 border border-border rounded-[inherit] max-h-[90vh] shadow-2xl overflow-hidden">
+      <div className="flex flex-col bg-surface-1 border border-border rounded-[inherit] max-h-[90vh] max-h-[90dvh] shadow-2xl overflow-hidden animate-fadeIn">
         {/* Header */}
         {(title || description) && (
           <div className="flex items-start justify-between p-4 sm:p-5 border-b border-border/80 bg-surface-1/90 backdrop-blur-md">

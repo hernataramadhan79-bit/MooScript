@@ -24,8 +24,9 @@ export type { InspectorTab };
 
 export const App: React.FC = () => {
   const initStore = useMooStore((s) => s.initStore);
-  const setActiveSceneId = useMooStore((s) => s.setActiveSceneId);
+  const focusScene = useMooStore((s) => s.focusScene);
   const isSettingsOpen = useMooStore((s) => s.isSettingsOpen);
+  const isStageCollapsed = useMooStore((s) => s.previewMode === 'ticker');
   // Tailwind lg breakpoint. Only one layout is mounted so stage/timeline/inspector exist once.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -46,13 +47,13 @@ export const App: React.FC = () => {
   };
 
   const handleEditScene = (sceneId: string) => {
-    setActiveSceneId(sceneId);
+    focusScene(sceneId);
     setInspectorTab('style');
     setMobileTab('style');
   };
 
   const handleOpenAssets = (sceneId?: string) => {
-    if (sceneId) setActiveSceneId(sceneId);
+    if (sceneId) focusScene(sceneId);
     setInspectorTab('asset');
     setMobileTab('asset');
   };
@@ -67,12 +68,12 @@ export const App: React.FC = () => {
   ];
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background text-on-surface font-sans selection:bg-accent selection:text-on-accent overflow-hidden">
+    <div className="h-screen h-dvh w-full flex flex-col bg-background text-on-surface font-sans selection:bg-accent selection:text-on-accent overflow-hidden">
       {/* 1. Header Minimalis Pro */}
       <Header onOpenExport={handleOpenExport} />
 
       {/* 2. Main Studio Workstation Layout: exactly one layout is mounted at a time */}
-      <main className="flex-1 pt-14 flex flex-col lg:flex-row overflow-hidden min-h-0">
+      <main className="flex-1 pt-[var(--header-h)] flex flex-col lg:flex-row overflow-hidden min-h-0">
         {isDesktop ? (
           <>
             {/* Zona 1: Storyboard / SceneDeck */}
@@ -107,37 +108,46 @@ export const App: React.FC = () => {
           </>
         ) : (
           <section className="flex-1 flex flex-col h-full bg-[#050507] overflow-hidden min-w-0">
-            {/* Mobile Top Viewport: Stage Preview + Compact Timeline */}
-            <div className="flex flex-none h-[38vh] sm:h-[42vh] bg-[#050507] flex-col border-b border-border">
-              <div className="flex-1 min-h-0 relative flex items-center justify-center p-1 overflow-hidden">
+            {/* Mobile top: stage preview (can be collapsed to give the editor more room) + transport */}
+            <div
+              className={`flex flex-none flex-col bg-[#050507] border-b border-border ${
+                isStageCollapsed ? '' : 'h-[44dvh] min-h-[260px] max-h-[520px]'
+              }`}
+            >
+              <div
+                className={`${isStageCollapsed ? 'hidden' : 'flex'} flex-1 min-h-0 relative items-center justify-center overflow-hidden`}
+              >
                 <CompositionStage className="w-full h-full" />
               </div>
-              <div className="shrink-0 px-1.5 py-1 bg-surface-1/40 border-t border-border/30">
+              <div className="shrink-0 px-2 pb-2 pt-1">
                 <TimelineBar compact />
               </div>
             </div>
 
-            {/* Mobile Bottom Workspace: Tabbed Drawer */}
+            {/* Mobile bottom workspace. Both panels stay mounted so an AI generation, its cancel
+                button and the export settings survive switching tabs. */}
             <div className="flex flex-1 flex-col min-h-0 bg-surface-1 overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {mobileTab === 'naskah' ? (
-                  <SceneDeck
-                    onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                    onEditScene={handleEditScene}
-                    onOpenAssets={handleOpenAssets}
-                  />
-                ) : (
-                  <InspectorRack
-                    activeTab={mobileTab}
-                    onTabChange={(t) => setMobileTab(t)}
-                    onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
-                    className="h-full border-0 rounded-none shadow-none"
-                  />
-                )}
+              <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${mobileTab === 'naskah' ? '' : 'hidden'}`}>
+                <SceneDeck
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+                  onEditScene={handleEditScene}
+                  onOpenAssets={handleOpenAssets}
+                />
+              </div>
+              <div className={`flex-1 min-h-0 overflow-hidden ${mobileTab === 'naskah' ? 'hidden' : 'flex flex-col'}`}>
+                <InspectorRack
+                  activeTab={mobileTab === 'naskah' ? 'mograph' : mobileTab}
+                  onTabChange={(t) => setMobileTab(t)}
+                  onOpenCodeInspector={(beatId) => setInspectingBeatId(beatId)}
+                  className="h-full border-0 rounded-none shadow-none"
+                />
               </div>
 
-              {/* Mobile Bottom Navigation Bar (5 Tab) */}
-              <nav className="shrink-0 border-t border-border bg-surface-1 px-1 py-1.5 grid grid-cols-6 gap-0.5 select-none">
+              {/* Mobile bottom navigation */}
+              <nav
+                aria-label="Panel studio"
+                className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-6 gap-1 select-none"
+              >
                 {mobileTabs.map((tab) => {
                   const isActive = mobileTab === tab.id;
                   return (
@@ -145,14 +155,15 @@ export const App: React.FC = () => {
                       key={tab.id}
                       type="button"
                       onClick={() => setMobileTab(tab.id)}
-                      className={`py-1.5 px-0.5 rounded-xl text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
-                        isActive
-                          ? 'bg-surface-3 text-accent shadow-sm'
-                          : 'text-text-muted hover:text-on-surface'
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`min-h-[48px] py-1 px-0.5 rounded-xl text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
+                        isActive ? 'bg-surface-3 text-accent' : 'text-text-muted hover:text-on-surface'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
-                      <span className="truncate max-w-[45px]">{tab.label}</span>
+                      <span aria-hidden="true" className={`material-symbols-outlined text-[20px] ${isActive ? 'fill' : ''}`}>
+                        {tab.icon}
+                      </span>
+                      <span className="truncate max-w-full">{tab.label}</span>
                     </button>
                   );
                 })}

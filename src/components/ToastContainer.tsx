@@ -10,7 +10,9 @@ export const ToastContainer: React.FC = () => {
   return (
     <aside
       aria-label="Notifications"
-      className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+      role="status"
+      aria-live="polite"
+      className="fixed top-[calc(var(--header-h)+0.5rem)] inset-x-4 sm:inset-x-auto sm:right-4 sm:w-full z-[60] flex flex-col gap-2 sm:max-w-sm pointer-events-none"
     >
       {toasts.map((toast) => {
         const isError = toast.type === 'error';
@@ -39,7 +41,7 @@ export const ToastContainer: React.FC = () => {
           <div
             key={toast.id}
             role="status"
-            className={`pointer-events-auto p-3 rounded-xl border shadow-xl backdrop-blur-md flex items-start gap-2.5 transition-all animate-in fade-in slide-in-from-top-2 duration-200 ${borderColor}`}
+            className={`pointer-events-auto p-3 rounded-xl border shadow-xl backdrop-blur-md flex items-start gap-2.5 transition-all animate-fadeIn ${borderColor}`}
           >
             <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${iconColor}`}>{iconName}</span>
             <div className="flex-1 text-xs leading-relaxed font-sans pr-1 break-words">{toast.message}</div>

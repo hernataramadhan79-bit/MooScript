@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
 import { extractWaveformPeaks } from '../../engine/audio/waveform';
+import { getProjectDuration, MAX_SCENE_SECONDS } from '../../utils/projectDuration';
 
 interface TimelineBarProps {
   className?: string;
@@ -24,6 +25,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     seekFrame,
     activeSceneId,
     setActiveSceneId,
+    focusScene,
     audioStale,
     audioBlobUrl,
     previewMode,
@@ -42,6 +44,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
       seekFrame: s.seekFrame,
       activeSceneId: s.activeSceneId,
       setActiveSceneId: s.setActiveSceneId,
+      focusScene: s.focusScene,
       audioStale: s.audioStale,
       audioBlobUrl: s.audioBlobUrl,
       previewMode: s.previewMode,
@@ -53,16 +56,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
   );
 
   const fps = project.fps || 30;
-  const calculatedSceneDuration = project.scenes.reduce(
-    (sum, s) => sum + (s.durationInSeconds || 3),
-    0
-  );
-  const totalDuration =
-    calculatedSceneDuration > 0
-      ? calculatedSceneDuration
-      : project.audioDuration && project.audioDuration > 0
-      ? project.audioDuration
-      : 0;
+  const totalDuration = getProjectDuration(project);
 
   const totalFrames = Math.max(1, Math.round(totalDuration * fps));
   const currentTimeSec = currentFrame / fps;
@@ -126,7 +120,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
 
   const handleSceneClick = (sceneId: string, startSec: number) => {
     seekFrame(Math.round(startSec * fps));
-    setActiveSceneId(sceneId);
+    focusScene(sceneId);
     if (onSelectScene) {
       onSelectScene(sceneId);
     }
@@ -157,17 +151,19 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     const onMove = (moveEvent: PointerEvent) => {
       const dx = moveEvent.clientX - startX;
       const deltaSec = (dx / Math.max(100, trackWidth)) * baseTotal;
-      const nextDur = Math.min(30, Math.max(0.5, Math.round((initialDuration + deltaSec) * 10) / 10));
+      const nextDur = Math.min(MAX_SCENE_SECONDS, Math.max(0.5, Math.round((initialDuration + deltaSec) * 10) / 10));
       setSceneDuration(sceneId, nextDur, true);
     };
 
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
 
   // Synthetic speech cadence audio waveform bars (deterministic & responsive)
@@ -201,222 +197,163 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     }
   }, [project.audioBlob, waveformPeaks, setWaveformPeaks]);
 
-  // 1. COMPACT VIEW (Docked or Mobile)
+  // Pointer scrubbing on the compact track: tap or drag anywhere along the shots.
+  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    seekFrame(Math.round(ratio * totalFrames));
+  };
+
+  const compactBtn =
+    'w-9 h-9 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/[0.06] text-zinc-300 flex items-center justify-center transition-colors';
+
+  // 1. COMPACT VIEW (mobile): big transport buttons and a draggable shot track
   const renderCompact = () => (
     <div
-      className={`flex flex-col justify-between px-2 py-1.5 bg-[#0a0b0e]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-lg select-none min-w-0 w-full gap-1.5 ${className}`}
+      className={`flex flex-col px-2 py-2 bg-[#0a0b0e]/95 border border-white/[0.08] rounded-xl select-none min-w-0 w-full gap-2 ${className}`}
     >
-      {/* Row 1: Transport Controls + Timecode + Active Shot + Theater */}
-      <div className="flex items-center justify-between gap-1 text-[10px] font-mono">
-        <div className="flex items-center gap-1">
-          {/* Step Back (1 frame) */}
-          <button
-            type="button"
-            onClick={() => seekFrame(Math.max(0, currentFrame - 1))}
-            title="Step back 1 frame"
-            className="w-6 h-6 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
-          >
-            <span className="material-symbols-outlined text-[14px]">skip_previous</span>
-          </button>
-
-          {/* Play / Pause */}
+      {/* Row 1: Play + loop, timecode, active shot + stage controls */}
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={togglePlay}
-            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            className="h-6 px-2 rounded-md bg-[#84cc16] hover:bg-[#9ae62e] text-black font-semibold flex items-center gap-0.5 active:scale-95 text-[10px] shadow-sm shadow-[#84cc16]/20"
+            aria-label={isPlaying ? 'Jeda' : 'Putar'}
+            className="h-9 w-11 rounded-lg bg-[#84cc16] hover:bg-[#9ae62e] text-black flex items-center justify-center active:scale-95 shadow-sm shadow-[#84cc16]/20"
           >
-            <span className="material-symbols-outlined text-[15px] font-bold">
-              {isPlaying ? 'pause' : 'play_arrow'}
-            </span>
-            <span className="hidden sm:inline text-[8px] font-mono opacity-80 uppercase">Space</span>
+            <span className="material-symbols-outlined fill text-[22px]">{isPlaying ? 'pause' : 'play_arrow'}</span>
           </button>
-
-          {/* Step Forward (1 frame) */}
-          <button
-            type="button"
-            onClick={() => seekFrame(Math.min(totalFrames, currentFrame + 1))}
-            title="Step forward 1 frame"
-            className="w-6 h-6 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-90 text-zinc-300 flex items-center justify-center border border-white/[0.06]"
-          >
-            <span className="material-symbols-outlined text-[14px]">skip_next</span>
-          </button>
-
-          {/* Loop */}
           <button
             type="button"
             onClick={toggleLoop}
-            title={isLooping ? 'Loop enabled' : 'Loop disabled'}
-            className={`w-6 h-6 rounded-md active:scale-90 flex items-center justify-center border transition-colors ${
-              isLooping
-                ? 'bg-[#84cc16]/15 border-[#84cc16]/40 text-[#84cc16]'
-                : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.06] text-zinc-400'
-            }`}
+            aria-label={isLooping ? 'Matikan putar ulang' : 'Putar ulang terus'}
+            aria-pressed={isLooping}
+            className={`${compactBtn} ${isLooping ? '!bg-[#84cc16]/15 !border-[#84cc16]/40 !text-[#84cc16]' : ''}`}
           >
-            <span className="material-symbols-outlined text-[13px]">repeat</span>
+            <span className="material-symbols-outlined text-[18px]">repeat</span>
           </button>
         </div>
 
-        {/* Center Timecode */}
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/70 border border-white/[0.08]">
+        <div className="flex items-baseline gap-1 px-2 py-1 rounded-md bg-black/70 border border-white/[0.08] font-mono text-[12px] tabular-nums">
           <span className="font-bold text-zinc-100">{formatTimecode(currentTimeSec)}</span>
           <span className="text-zinc-600">/</span>
           <span className="text-zinc-400">{formatTimecode(totalDuration)}</span>
         </div>
 
-        {/* Right: Active Shot + Theater */}
-        <div className="flex items-center gap-1">
-          {activeIndex >= 0 && sceneBoundaries[activeIndex] && (
-            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#84cc16]/10 text-[#84cc16] border border-[#84cc16]/25">
-              Shot {sceneBoundaries[activeIndex].shotNumber}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPreviewMode(previewMode === 'ticker' ? 'compact' : 'ticker')}
+            aria-label={previewMode === 'ticker' ? 'Tampilkan panggung' : 'Sembunyikan panggung'}
+            title={previewMode === 'ticker' ? 'Tampilkan panggung' : 'Sembunyikan panggung'}
+            className={compactBtn}
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              {previewMode === 'ticker' ? 'expand_more' : 'expand_less'}
             </span>
-          )}
-
+          </button>
           <button
             type="button"
             onClick={() => setPreviewMode('theater')}
-            title="Theater mode"
-            className="w-6 h-6 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 flex items-center justify-center transition-colors"
+            aria-label="Layar penuh"
+            title="Layar penuh"
+            className={compactBtn}
           >
-            <span className="material-symbols-outlined text-[13px]">open_in_full</span>
+            <span className="material-symbols-outlined text-[18px]">fullscreen</span>
           </button>
         </div>
       </div>
 
-      {/* Row 2: Scene Track & Scrubber */}
-      <div className="space-y-1">
-        <div className="relative h-5 w-full rounded bg-black/60 border border-white/[0.08] overflow-hidden flex items-stretch">
+      {/* Row 2: shot track, tap or drag to scrub */}
+      {sceneBoundaries.length > 0 ? (
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label="Posisi pemutaran"
+          aria-valuemin={0}
+          aria-valuemax={totalFrames}
+          aria-valuenow={currentFrame}
+          aria-valuetext={`${formatTimecode(currentTimeSec)}, shot ${activeIndex + 1}`}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            seekFromPointer(e);
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              seekFrame(currentFrame + (e.key === 'ArrowLeft' ? -fps : fps));
+            }
+          }}
+          style={{ touchAction: 'none' }}
+          className="relative h-8 w-full rounded-md bg-black/60 border border-white/[0.08] overflow-hidden flex items-stretch cursor-pointer"
+        >
           {sceneBoundaries.map((scene, idx) => {
-            const isCurrentPlaying = idx === activeIndex;
-            const isSelected = activeSceneId === scene.id;
-
+            const isCurrent = idx === activeIndex;
             return (
               <div
                 key={scene.id}
-                onClick={() => handleSceneClick(scene.id, scene.startSec)}
                 style={{ width: `${scene.widthPct}%` }}
-                title={`Shot ${scene.shotNumber} (${scene.durationInSeconds.toFixed(1)}s)`}
-                className={`relative h-full flex items-center justify-between px-1.5 border-r border-white/[0.06] transition-colors cursor-pointer group ${
-                  isSelected
-                    ? 'bg-[#84cc16]/15 ring-1 ring-inset ring-[#84cc16]/60'
-                    : isCurrentPlaying
-                    ? 'bg-white/[0.08]'
-                    : 'hover:bg-white/[0.04]'
+                className={`relative h-full flex items-center px-1.5 border-r border-white/[0.06] last:border-r-0 ${
+                  isCurrent ? 'bg-[#84cc16]/15' : ''
                 }`}
               >
                 <span
-                  className={`text-[8.5px] font-mono font-semibold truncate ${
-                    isSelected || isCurrentPlaying ? 'text-[#84cc16]' : 'text-zinc-400 group-hover:text-zinc-200'
+                  className={`text-[10px] font-mono font-semibold truncate ${
+                    isCurrent ? 'text-[#84cc16]' : 'text-zinc-500'
                   }`}
                 >
-                  Shot {scene.shotNumber}
+                  {scene.shotNumber}
                 </span>
               </div>
             );
           })}
 
-          {/* Vertical Playhead */}
+          {/* Played region + playhead */}
           <div
-            className="absolute top-0 bottom-0 w-[2px] bg-[#84cc16] pointer-events-none z-20"
+            className="absolute inset-y-0 left-0 bg-white/[0.04] pointer-events-none"
+            style={{ width: `${playheadPercent}%` }}
+          />
+          <div
+            className="absolute top-0 bottom-0 w-[2px] -ml-px bg-[#84cc16] pointer-events-none z-20 shadow-[0_0_6px_#84cc16]"
             style={{ left: `${playheadPercent}%` }}
-          >
-            <div className="w-2 h-2 bg-[#84cc16] rotate-45 -ml-[3px] -mt-[1px] rounded-[1px] shadow-[0_0_6px_#84cc16]" />
-          </div>
-        </div>
-
-        {/* Range Scrubber */}
-        <div className="px-0.5 py-0.5 flex items-center touch-none">
-          <input
-            className="w-full accent-[#84cc16] h-1 cursor-pointer bg-white/[0.06] rounded-full appearance-none"
-            max={totalFrames}
-            min={0}
-            step={1}
-            style={{ touchAction: 'none' }}
-            type="range"
-            value={currentFrame}
-            onChange={(e) => seekFrame(parseInt(e.target.value, 10))}
           />
         </div>
+      ) : (
+        <div className="h-8 w-full rounded-md border border-dashed border-white/[0.1] flex items-center justify-center text-[11px] text-zinc-500">
+          Belum ada shot
+        </div>
+      )}
 
-        {/* Audio Waveform Track (When Audio is Active) */}
-        {isAudioActive && (
-          <div
-            onClick={handleTrackScrub}
-            className="relative h-3.5 w-full rounded bg-black/50 border border-white/[0.06] overflow-hidden flex items-center px-1.5 cursor-pointer select-none group"
-            title="Audio Track"
-          >
-            <div className="flex items-center gap-1 shrink-0 mr-1.5 pointer-events-none">
-              <span className="w-1 h-1 rounded-full bg-[#84cc16]" />
-              <span className="text-[7px] font-mono font-semibold uppercase tracking-wider text-[#84cc16]">
-                Audio
-              </span>
-            </div>
-            <div className="relative flex-1 h-full flex items-center gap-[1.5px] overflow-hidden pointer-events-none">
-              {waveformBars.map((bar, i) => {
-                const barPct = (i / waveformBars.length) * 100;
-                const isPast = barPct <= playheadPercent;
-                return (
-                  <div
-                    key={i}
-                    className={`flex-1 min-w-[1px] rounded-full transition-colors ${
-                      isPast ? 'bg-[#84cc16]' : 'bg-[#84cc16]/25'
-                    }`}
-                    style={{ height: `${bar.height}%` }}
-                  />
-                );
-              })}
-            </div>
-            <div
-              className="absolute top-0 bottom-0 w-[2px] bg-[#84cc16] pointer-events-none z-10"
-              style={{ left: `${playheadPercent}%` }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Audio waveform (when a voice-over exists) */}
+      {isAudioActive && (
+        <div
+          className="relative h-4 w-full rounded bg-black/50 border border-white/[0.06] overflow-hidden flex items-center gap-[1.5px] px-1 pointer-events-none"
+          aria-hidden="true"
+        >
+          {waveformBars.map((bar, i) => {
+            const isPast = (i / waveformBars.length) * 100 <= playheadPercent;
+            return (
+              <div
+                key={i}
+                className={`flex-1 min-w-[1px] rounded-full ${isPast ? 'bg-[#84cc16]' : 'bg-[#84cc16]/25'}`}
+                style={{ height: `${bar.height}%` }}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
-  // 2. TICKER VIEW (When mobile preview is minimized to ticker)
+  // 2. TICKER VIEW: the mobile stage is hidden, so the compact bar stays as the only control
   if (previewMode === 'ticker') {
     return (
       <div className={`w-full ${className}`}>
-        <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#0a0b0e]/95 border-b border-white/[0.08] lg:hidden w-full select-none">
-          <button
-            type="button"
-            onClick={togglePlay}
-            className="h-6 px-2 rounded bg-[#84cc16] text-black font-semibold text-[11px] flex items-center gap-1 active:scale-95 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[14px] font-bold">
-              {isPlaying ? 'pause' : 'play_arrow'}
-            </span>
-            <span className="text-[9px] font-mono opacity-80">Space</span>
-          </button>
-
-          <div className="font-mono text-[10px] text-zinc-300 shrink-0">
-            <span className="font-bold text-zinc-100">{formatTimecode(currentTimeSec)}</span>
-            <span className="text-zinc-600"> / </span>
-            <span className="text-zinc-400">{formatTimecode(totalDuration)}</span>
-          </div>
-
-          <input
-            className="flex-1 accent-[#84cc16] h-1 cursor-pointer min-w-0 bg-white/[0.06] rounded-full appearance-none"
-            max={totalFrames}
-            min={0}
-            step={1}
-            type="range"
-            value={currentFrame}
-            onChange={(e) => seekFrame(parseInt(e.target.value, 10))}
-          />
-
-          <button
-            type="button"
-            onClick={() => setPreviewMode('compact')}
-            className="px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.1] flex items-center gap-1 active:scale-95 shrink-0"
-          >
-            <span>Stage</span>
-          </button>
-        </div>
-
+        <div className="lg:hidden">{renderCompact()}</div>
         <div className="hidden lg:block">{renderFullTimeline()}</div>
       </div>
     );

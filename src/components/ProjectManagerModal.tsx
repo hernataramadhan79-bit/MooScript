@@ -8,6 +8,7 @@ import { loadProjectFromDb } from '../db/mooDb';
 import { MAX_BACKUP_BYTES, parseProjectBackup, serializeProjectBackup } from '../db/projectBackup';
 import { safeFileName, triggerFileDownload } from '../utils/fileUtils';
 import { PROJECT_TEMPLATES } from '../engine/templates/projectTemplates';
+import { getProjectDuration } from '../utils/projectDuration';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -146,9 +147,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   };
 
   const formatTimestamp = (ts?: number) => {
-    if (!ts) return 'Recent';
+    if (!ts) return 'Baru';
     const date = new Date(ts);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString('id-ID', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -237,7 +238,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
             const isActive = p.id === activeProject.id;
             const isEditing = editingId === p.id;
             const sceneCount = p.scenes?.length || 0;
-            const duration = p.audioDuration || 0;
+            const duration = getProjectDuration(p);
 
             return (
               <div

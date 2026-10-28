@@ -27,6 +27,25 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+
+  /* iOS Safari zooms the page into any field under 16px. Touch phones get 16px text in fields. */
+  @media (pointer: coarse) and (max-width: 1023px) {
+    input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='color']),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-slideLeft,
+  .animate-pulse,
+  .animate-spin {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* Minimalist Range Slider */

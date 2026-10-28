@@ -54,6 +54,20 @@ export default {
       minHeight: {
         tap: 'var(--tap)'
       },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' }
+        },
+        slideLeft: {
+          from: { transform: 'translateX(24px)', opacity: '0' },
+          to: { transform: 'translateX(0)', opacity: '1' }
+        }
+      },
+      animation: {
+        fadeIn: 'fadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        slideLeft: 'slideLeft 220ms cubic-bezier(0.16, 1, 0.3, 1)'
+      },
       minWidth: {
         tap: 'var(--tap)'
       }

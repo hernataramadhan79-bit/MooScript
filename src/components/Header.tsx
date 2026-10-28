@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-40 h-14 bg-surface-1/95 backdrop-blur-xl border-b border-border select-none">
+      <header className="fixed top-0 inset-x-0 z-40 h-[var(--header-h)] pt-[env(safe-area-inset-top)] bg-surface-1/95 backdrop-blur-xl border-b border-border select-none">
         <div className="h-full px-2.5 sm:px-4 max-w-[1920px] mx-auto flex items-center justify-between gap-2 sm:gap-3">
           {/* Sisi Kiri: Logo + Judul Proyek */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
@@ -134,7 +134,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                   size="sm"
                   disabled={!canUndo}
                   onClick={undo}
-                  className="!w-8 !h-8 !min-w-[32px] !min-h-[32px] sm:!w-9 sm:!h-9 sm:!min-w-[36px] sm:!min-h-[36px]"
                 />
                 <IconButton
                   icon="redo"
@@ -142,7 +141,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                   size="sm"
                   disabled={!canRedo}
                   onClick={redo}
-                  className="!w-8 !h-8 !min-w-[32px] !min-h-[32px] sm:!w-9 sm:!h-9 sm:!min-w-[36px] sm:!min-h-[36px]"
                 />
               </div>
             )}

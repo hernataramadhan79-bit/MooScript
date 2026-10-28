@@ -8,7 +8,7 @@ export const AssetManagerPanel: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeProject = useMooStore((s) => s.project);
   const activeSceneId = useMooStore((s) => s.activeSceneId);
-  const setActiveSceneId = useMooStore((s) => s.setActiveSceneId);
+  const focusScene = useMooStore((s) => s.focusScene);
   const assets = useMooStore((s) => s.assets);
   const isLoadingAssets = useMooStore((s) => s.isLoadingAssets);
   const loadAssets = useMooStore((s) => s.loadAssets);
@@ -108,7 +108,7 @@ export const AssetManagerPanel: React.FC = () => {
           </div>
           <select
             value={targetSceneId || ''}
-            onChange={(e) => setActiveSceneId(e.target.value)}
+            onChange={(e) => focusScene(e.target.value)}
             className="w-full bg-surface-2 border border-border rounded-lg px-2.5 py-1.5 text-[12px] text-on-surface font-medium focus:outline-none focus:border-accent cursor-pointer"
           >
             {activeProject.scenes.map((s, idx) => (

@@ -171,7 +171,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     project,
     settings,
     activeSceneId,
-    setActiveSceneId,
+    focusScene,
     updateLayerOverride,
     resetLayerOverride,
     removeAssetFromScene,
@@ -214,7 +214,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       project: s.project,
       settings: s.settings,
       activeSceneId: s.activeSceneId,
-      setActiveSceneId: s.setActiveSceneId,
+      focusScene: s.focusScene,
       updateLayerOverride: s.updateLayerOverride,
       resetLayerOverride: s.resetLayerOverride,
       removeAssetFromScene: s.removeAssetFromScene,
@@ -809,7 +809,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       project.width,
       project.height,
       project.theme,
-      project.bgm
+      project.bgm,
+      exportFormat,
+      exportFps,
+      exportQuality,
+      exportWatermark,
+      exportHud
     ];
     const prev = exportSnapshotRef.current;
     exportSnapshotRef.current = snapshot;
@@ -826,6 +831,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     project.height,
     project.theme,
     project.bgm,
+    exportFormat,
+    exportFps,
+    exportQuality,
+    exportWatermark,
+    exportHud,
     revokeExportResult
   ]);
 
@@ -1302,7 +1312,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className="text-[11px] text-text-muted shrink-0">Pilih Adegan:</span>
                       <select
                         value={activeScene.id}
-                        onChange={(e) => setActiveSceneId(e.target.value)}
+                        onChange={(e) => focusScene(e.target.value)}
                         className="flex-1 bg-surface-2 border border-border rounded-lg px-2 py-1 text-[11px] text-on-surface focus:outline-none focus:border-accent"
                       >
                         {scenes.map((s, idx) => (
@@ -2117,7 +2127,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         <span className="material-symbols-outlined text-[15px] text-accent">{arch.icon}</span>
                         {isSel && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
                       </div>
-                      <span className="text-[10px] font-semibold leading-tight truncate">{arch.label}</span>
+                      <span className="text-[10px] font-semibold leading-tight line-clamp-2 min-h-[2lh]">{arch.label}</span>
                     </button>
                   );
                 })}
@@ -3295,13 +3305,21 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               <button
                 type="button"
                 onClick={handleExportMedia}
-                disabled={isExporting}
+                disabled={isExporting || scenes.length === 0}
                 className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">
                   {isExporting ? 'sync' : 'download'}
                 </span>
-                <span>{isExporting ? 'Mengekspor Video...' : `Unduh Video ${exportFormat.toUpperCase()}`}</span>
+                <span>
+                  {isExporting
+                    ? 'Mengekspor Video...'
+                    : scenes.length === 0
+                      ? 'Tambahkan adegan dulu'
+                      : exportResult?.objectUrl
+                        ? `Unduh Lagi (${exportResult.blob.type === 'video/webm' ? 'WEBM' : 'MP4'})`
+                        : `Ekspor & Unduh ${exportFormat.toUpperCase()}`}
+                </span>
               </button>
 
               {isExporting && (

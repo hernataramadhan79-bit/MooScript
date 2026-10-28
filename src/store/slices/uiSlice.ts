@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { ToastNotification } from '../../types';
 import type { MooStoreState, UiSlice } from '../types';
+import { getSceneStartSeconds, sceneSeconds } from '../../utils/projectDuration';
 
 export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set, get) => ({
   activeTab: 'ide',
@@ -13,6 +14,18 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
 
   activeSceneId: null,
   setActiveSceneId: (activeSceneId) => set({ activeSceneId }),
+  focusScene: (sceneId) => {
+    const { project, currentFrame, seekFrame } = get();
+    const start = getSceneStartSeconds(project.scenes || [], sceneId);
+    if (start === null) return;
+    const fps = project.fps || 30;
+    const startFrame = Math.round(start * fps);
+    const scene = project.scenes.find((s) => s.id === sceneId)!;
+    const endFrame = Math.round((start + sceneSeconds(scene)) * fps);
+    // The timeline follows the playhead, so move it into the scene unless it is already there.
+    if (currentFrame < startFrame || currentFrame >= endFrame) seekFrame(startFrame);
+    set({ activeSceneId: sceneId });
+  },
 
   selectedNodeId: null,
   setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),

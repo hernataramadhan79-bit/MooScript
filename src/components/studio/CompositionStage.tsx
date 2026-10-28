@@ -26,6 +26,12 @@ function withDraftOverride(
   };
 }
 import { useDebouncedValue } from '../../utils/hooks';
+import { getProjectDuration } from '../../utils/projectDuration';
+
+const formatClock = (sec: number) => {
+  const safe = Math.max(0, sec || 0);
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(Math.floor(safe % 60)).padStart(2, '0')}`;
+};
 
 interface CompositionStageProps {
   className?: string;
@@ -51,6 +57,10 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const activeSceneId = useMooStore((s) => s.activeSceneId);
   const updateLayerOverride = useMooStore((s) => s.updateLayerOverride);
   const resetLayerOverride = useMooStore((s) => s.resetLayerOverride);
+  const togglePlay = useMooStore((s) => s.togglePlay);
+  const seekFrame = useMooStore((s) => s.seekFrame);
+  const totalDuration = useMooStore((s) => getProjectDuration(s.project));
+  const totalFrames = Math.max(1, Math.round(totalDuration * fps));
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const theaterIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -163,8 +173,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   // Adjust theater container scale to fit fullscreen viewport
   const updateTheaterScale = React.useCallback(() => {
     if (typeof window === 'undefined') return;
-    const paddingX = 48;
-    const paddingY = 80;
+    const paddingX = 32;
+    const paddingY = 160;
     const availW = Math.max(100, window.innerWidth - paddingX);
     const availH = Math.max(100, window.innerHeight - paddingY);
     const scaleX = availW / width;
@@ -418,7 +428,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                   key={ratio}
                   type="button"
                   onClick={() => handleAspectRatioChange(ratio)}
-                  className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 ${
+                  aria-pressed={isSelected}
+                  className={`h-7 px-2 lg:h-auto lg:py-1 rounded text-[11px] font-medium transition-all duration-150 ${
                     isSelected
                       ? 'bg-white/15 text-white shadow-sm font-semibold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
@@ -443,13 +454,15 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                 setTimeout(requestLayerRects, 30);
               }}
               title="Pilih & Geser Layer Langsung di Panggung"
-              className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 flex items-center gap-1 ${
+              aria-label="Pilih & geser layer di panggung"
+              aria-pressed={isInteractiveEdit}
+              className={`h-7 min-w-[28px] px-1.5 lg:h-auto lg:px-2 lg:py-1 rounded text-[11px] font-medium transition-all duration-150 flex items-center justify-center gap-1 ${
                 isInteractiveEdit
                   ? 'bg-lime-500/20 text-[#84cc16] border border-lime-500/30 shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
               }`}
             >
-              <span className="material-symbols-outlined text-[12px] lg:text-[15px]">pan_tool_alt</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px] lg:text-[15px]">pan_tool_alt</span>
               <span className="hidden sm:inline">Pilih & Geser</span>
             </button>
 
@@ -460,13 +473,15 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               type="button"
               onClick={() => setShowSafeZone((v) => !v)}
               title="Batas Medsos & Grid"
-              className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 flex items-center gap-1 ${
+              aria-label="Tampilkan batas aman medsos & grid"
+              aria-pressed={showSafeZone}
+              className={`h-7 min-w-[28px] px-1.5 lg:h-auto lg:px-2 lg:py-1 rounded text-[11px] font-medium transition-all duration-150 flex items-center justify-center gap-1 ${
                 showSafeZone
                   ? 'bg-lime-500/20 text-[#84cc16] border border-lime-500/30 shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
               }`}
             >
-              <span className="material-symbols-outlined text-[12px] lg:text-[15px]">smartphone</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px] lg:text-[15px]">smartphone</span>
               <span className="hidden sm:inline">Batas Medsos</span>
             </button>
 
@@ -477,14 +492,15 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               type="button"
               onClick={handleToggleZoom}
               title={isFit ? 'Perbesar 100%' : 'Fit ke Layar'}
-              className={`px-1.5 py-0.5 lg:px-2 lg:py-1 rounded text-[9px] lg:text-[11px] font-medium transition-all duration-150 flex items-center gap-1 ${
+              aria-label={isFit ? 'Perbesar ke 100%' : 'Paskan ke layar'}
+              className={`h-7 min-w-[28px] px-1.5 lg:h-auto lg:px-2 lg:py-1 rounded text-[11px] font-medium transition-all duration-150 flex items-center justify-center gap-1 ${
                 !isFit
                   ? 'bg-white/15 text-white border border-white/20 shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
               }`}
             >
-              <span className="material-symbols-outlined text-[12px] lg:text-[15px]">fit_screen</span>
-              <span className="text-[9px] lg:text-[10px] font-mono text-zinc-400">{Math.round(scale * 100)}%</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px] lg:text-[15px]">fit_screen</span>
+              <span className="text-[10px] font-mono text-zinc-400 tabular-nums">{Math.round(scale * 100)}%</span>
             </button>
           </div>
         </div>
@@ -547,7 +563,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
         {/* Interactive On-Canvas Layer Selection & Gizmo Overlay */}
         {isInteractiveEdit && layerRects.length > 0 && (
-          <div className="absolute inset-0 z-25 pointer-events-none">
+          <div className="absolute inset-0 z-[25] pointer-events-none">
             {layerRects.map((rect) => {
               const isSelected = selectedLayerId === rect.id;
               return (
@@ -671,20 +687,67 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         </div>
       </div>
 
+      {scenes.length === 0 && (
+        <div className="absolute inset-x-0 bottom-0 top-10 flex items-center justify-center pointer-events-none p-4">
+          <div className="max-w-[260px] text-center flex flex-col items-center gap-2 px-4 py-3 rounded-xl bg-black/70 border border-white/10 backdrop-blur-sm">
+            <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-accent">movie_edit</span>
+            <p className="text-[12px] leading-relaxed text-zinc-300">
+              Panggung masih kosong. Tulis ide di panel <strong className="text-white">Naskah</strong> lalu tekan{' '}
+              <strong className="text-white">Susun Adegan</strong>, atau pilih template di menu proyek.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Fullscreen Theater Mode Overlay */}
       {previewMode === 'theater' &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none animate-fadeIn">
-            <div className="absolute top-4 right-4 z-50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pratinjau layar penuh"
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none animate-fadeIn"
+          >
+            <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 z-50">
               <button
                 type="button"
                 onClick={() => setPreviewMode('compact')}
-                className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-xl"
+                aria-label="Tutup layar penuh"
+                className="h-10 px-3.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-xl"
               >
-                <span className="material-symbols-outlined text-[18px]">close_fullscreen</span>
-                <span>Tutup Layar Penuh (Esc)</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close_fullscreen</span>
+                <span className="hidden sm:inline">Tutup (Esc)</span>
               </button>
+            </div>
+
+            {/* Transport: tap the picture or use the bar (phones have no Space key) */}
+            <div className="absolute inset-x-0 bottom-0 z-50 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 to-transparent">
+              <div className="mx-auto max-w-2xl flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  aria-label={isPlaying ? 'Jeda' : 'Putar'}
+                  className="w-11 h-11 shrink-0 rounded-full bg-[#84cc16] hover:bg-[#9ae62e] text-black flex items-center justify-center active:scale-95"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined fill text-[24px]">
+                    {isPlaying ? 'pause' : 'play_arrow'}
+                  </span>
+                </button>
+                <span className="font-mono text-[12px] text-zinc-300 tabular-nums shrink-0">
+                  {formatClock(currentTime)} / {formatClock(totalDuration)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={totalFrames}
+                  step={1}
+                  value={currentFrame}
+                  onChange={(e) => seekFrame(parseInt(e.target.value, 10))}
+                  aria-label="Posisi pemutaran"
+                  className="flex-1 min-w-0 accent-[#84cc16]"
+                />
+              </div>
             </div>
 
             <div
@@ -694,7 +757,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                 transform: `scale(${theaterScale})`,
                 transformOrigin: 'center center'
               }}
-              className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black"
+              onClick={togglePlay}
+              className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black cursor-pointer"
             >
               <iframe
                 key={`theater-${projectId}-${width}x${height}`}

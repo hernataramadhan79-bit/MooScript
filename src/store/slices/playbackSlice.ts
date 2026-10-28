@@ -1,26 +1,12 @@
 import type { StateCreator } from 'zustand';
 import type { MooStoreState, PlaybackSlice } from '../types';
+import { getProjectDuration } from '../../utils/projectDuration';
 
 let playbackAudioElement: HTMLAudioElement | null = null;
 let playbackRafId: number | null = null;
 let playbackStartTime = 0;
 let playbackStartFrame = 0;
 let isAudioMasterActive = false;
-
-function getPlaybackTotalDuration(project: any): number {
-  if (project?.audioDuration && project.audioDuration > 0) {
-    return project.audioDuration;
-  }
-  const calculated = (project?.scenes || []).reduce(
-    (sum: number, s: any) => sum + (s.durationInSeconds || 3),
-    0
-  );
-  if (calculated > 0) return calculated;
-  if (project?.composition?.duration && project.composition.duration > 0) {
-    return project.composition.duration;
-  }
-  return 0;
-}
 
 function cancelPlaybackRaf() {
   if (playbackRafId !== null) {
@@ -55,7 +41,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
 
   seekFrame: (currentFrame) => {
     const fps = get().project.fps || 30;
-    const totalDuration = getPlaybackTotalDuration(get().project);
+    const totalDuration = getProjectDuration(get().project);
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
     const clamped = Math.max(0, Math.min(currentFrame, maxFrames));
 
@@ -87,7 +73,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
 
     const state = get();
     const fps = state.project.fps || 30;
-    const totalDuration = getPlaybackTotalDuration(state.project);
+    const totalDuration = getProjectDuration(state.project);
     // Nothing to play in an empty project.
     if (totalDuration <= 0) return;
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
@@ -157,8 +143,15 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
       }
 
       const currentFps = get().project.fps || 30;
-      const currentTotalDuration = getPlaybackTotalDuration(get().project);
+      const currentTotalDuration = getProjectDuration(get().project);
       const currentMaxFrames = Math.max(1, Math.round(currentTotalDuration * currentFps));
+
+      // A voice-over shorter than the scenes ends early: keep the picture running on the clock.
+      if (isAudioMasterActive && playbackAudioElement?.ended) {
+        isAudioMasterActive = false;
+        playbackStartTime = performance.now();
+        playbackStartFrame = get().currentFrame;
+      }
 
       let targetFrame: number;
       if (isAudioMasterActive && playbackAudioElement && !playbackAudioElement.paused && !playbackAudioElement.ended) {
@@ -171,7 +164,7 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
       }
 
       // Check if finished
-      if (targetFrame >= currentMaxFrames || (isAudioMasterActive && playbackAudioElement?.ended)) {
+      if (targetFrame >= currentMaxFrames) {
         if (get().isLooping) {
           playbackStartTime = performance.now();
           playbackStartFrame = 0;

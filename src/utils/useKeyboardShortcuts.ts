@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { getProjectDuration } from './projectDuration';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -29,16 +30,16 @@ export function useKeyboardShortcuts(): void {
         project,
         activeSceneId,
         setActiveSceneId,
+        focusScene,
         duplicateScene,
         removeScene,
+        addToast,
         undo,
         redo
       } = useMooStore.getState();
       const fps = project.fps || 30;
       const scenes = project.scenes;
-      const totalDuration =
-        project.audioDuration ||
-        scenes.reduce((acc, sc) => acc + (sc.durationInSeconds || 3), 0);
+      const totalDuration = getProjectDuration(project);
       const totalFrames = Math.max(1, Math.round(totalDuration * fps));
 
       const hasMetaOrCtrl = e.ctrlKey || e.metaKey;
@@ -116,7 +117,7 @@ export function useKeyboardShortcuts(): void {
           if (scenes.length === 0) return;
           const curIdx = scenes.findIndex((s) => s.id === activeSceneId);
           const prevIdx = curIdx > 0 ? curIdx - 1 : scenes.length - 1;
-          setActiveSceneId(scenes[prevIdx].id);
+          focusScene(scenes[prevIdx].id);
           break;
         }
         case 'ArrowDown': {
@@ -124,7 +125,7 @@ export function useKeyboardShortcuts(): void {
           if (scenes.length === 0) return;
           const curIdx = scenes.findIndex((s) => s.id === activeSceneId);
           const nextIdx = curIdx >= 0 && curIdx < scenes.length - 1 ? curIdx + 1 : 0;
-          setActiveSceneId(scenes[nextIdx].id);
+          focusScene(scenes[nextIdx].id);
           break;
         }
 
@@ -133,9 +134,12 @@ export function useKeyboardShortcuts(): void {
         case 'Backspace': {
           if (activeSceneId && scenes.length > 1) {
             e.preventDefault();
+            const idx = scenes.findIndex((s) => s.id === activeSceneId);
             removeScene(activeSceneId);
-            const remaining = scenes.filter((s) => s.id !== activeSceneId);
-            setActiveSceneId(remaining[0]?.id || null);
+            const remaining = useMooStore.getState().project.scenes;
+            const next = remaining[Math.min(Math.max(0, idx), remaining.length - 1)];
+            if (next) focusScene(next.id);
+            addToast(`Adegan #${idx + 1} dihapus. Tekan Ctrl+Z untuk mengembalikan.`, 'info');
           }
           break;
         }

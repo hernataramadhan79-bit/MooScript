@@ -37,6 +37,8 @@
     --radius-full: 9999px;
 
     --tap: 44px; /* Minimum touch target WCAG / Mobile */
+    /* App header height, including the notch area when installed as a PWA */
+    --header-h: calc(3.5rem + env(safe-area-inset-top, 0px));
 
     /* Typography hierarchy (minimum 13px untuk kenyamanan mata) */
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
