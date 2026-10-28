@@ -30,7 +30,7 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 - Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master track scrubbed by frame, so preview and export are identical.
 - Each shot's selectors only match inside that shot, and `loop: true` repeats for the length of the shot.
-- **Flow transition** (default): the next shot is already underneath and lands with a short push while the current one hands off. Cut, fade, slide, zoom and wipe are also available.
+- **Flow transition** (default): the next shot already waits underneath, held at its first frame, while the current one hands off and dissolves; its own camera move is the first motion it makes, so shot starts never stutter. Cut, fade, slide, zoom and wipe are also available.
 - Per-scene CSS is scoped to its wrapper (`scopeCss.ts`), so shots never leak styles into each other.
 - Poster frames: while the editor is paused at the start of a shot whose first frame is empty, the preview shows its first frame with content. Playback and export always render the real timeline.
 - Non-destructive layer overrides (move, scale, rotate, opacity, color) and per-scene palettes.

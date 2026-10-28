@@ -202,14 +202,11 @@ export function getRuntimeScript(): string {
         const transEnd = accumulatedTime + duration;
 
         if (transitionType === 'flow') {
-          // Overlap: the next shot is already on screen underneath (its frame 0 is a composed poster) and
-          // lands with a short push, while the current shot plays its in-scene hand-off on top and dissolves.
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', clipPath: 'none' }, transStart);
-          masterTrack.travel(next.wrapper,
-            { scale: 1.12 },
-            { scale: 1, dur: transDur, curve: 'strong-out', showStart: false },
-            transStart
-          );
+          // Overlap: the next shot already waits underneath at its frame 0 while the current shot plays
+          // its in-scene hand-off on top and dissolves. The next shot is held still on purpose: moving
+          // its wrapper here (a scale push) fought its own camera move, so every shot start zoomed one
+          // way, stopped, and set off again from where the push began.
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
           masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: 'smooth-in' }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
