@@ -116,7 +116,7 @@ function statusPlaceholder(
   return {
     html: `<div class="moo-status-card" data-moo-placeholder="${scene.status}"><div class="moo-status-title">${esc(label)}</div><div class="moo-status-detail">${esc(detail.slice(0, 160))}</div></div>`,
     css: `.moo-status-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:64px;text-align:center;background:var(--moo-bg,#09090b);color:var(--moo-text,#f4f4f5);font-family:var(--moo-font-body,sans-serif)}.moo-status-title{font-size:44px;font-weight:700;opacity:.9}.moo-status-detail{font-size:26px;opacity:.85;max-width:85%;line-height:1.4}`,
-    buildJs: 'tl.from(".moo-status-card", { opacity: 0.9, duration: 0.1 });'
+    buildJs: 'shot.arrive(".moo-status-card", { opacity: 0.9, dur: 0.1 });'
   };
 }
 
@@ -362,7 +362,7 @@ MOO.scene('${mod.beatId.replace(/['\\]/g, '\\$&')}', {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline' 'unsafe-eval'; img-src data: blob:; media-src data: blob:; connect-src 'none';">
   <title>MooScript Stage</title>
-  <!-- MooTween: MooScript's animation engine (window.gsap stays as an alias for older scenes) -->
+  <!-- MooTween: MooScript's animation engine -->
   <script>
     (${installMooTween.toString()})(window);
   </script>

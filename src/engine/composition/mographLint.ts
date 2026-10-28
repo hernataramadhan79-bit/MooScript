@@ -35,10 +35,10 @@ const MOTION_KIT_CALLS = [
   'camera', 'hero', 'draw', 'pop', 'kinetic', 'count', 'reveal', 'punch', 'shake', 'flash', 'drift', 'orbit', 'particles', 'handoff'
 ];
 
-// Tween properties that only express "fade / slide in" — the default web entrance.
-const BASIC_TWEEN_KEYS = new Set([
-  'opacity', 'autoAlpha', 'x', 'y', 'xPercent', 'yPercent',
-  'duration', 'delay', 'ease', 'stagger', 'each', 'from', 'amount', 'immediateRender', 'overwrite'
+// Move properties that only express "fade / slide in" — the default web entrance.
+const BASIC_MOVE_KEYS = new Set([
+  'opacity', 'fade', 'x', 'y', 'shiftX', 'shiftY',
+  'dur', 'wait', 'curve', 'cascade', 'gap', 'from', 'total', 'showStart'
 ]);
 
 function visibleText(html: string): string {
@@ -70,10 +70,10 @@ function containsNarrationRun(screen: string[], narration: string[], run: number
   return false;
 }
 
-/** Collects the property keys of every tween call (.to / .from / .fromTo). */
-function tweenKeySets(js: string): string[][] {
+/** Collects the property keys of every move call (.go / .arrive / .travel). */
+function moveKeySets(js: string): string[][] {
   const sets: string[][] = [];
-  const re = /\.\s*(fromTo|from|to)\s*\(/g;
+  const re = /\.\s*(travel|arrive|go)\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(js)) !== null) {
     const body = js.slice(m.index + m[0].length, m.index + m[0].length + 400);
@@ -94,7 +94,7 @@ function tweenKeySets(js: string): string[][] {
   return sets;
 }
 
-/** Regex alternatives matching a tween's first argument when it is the camera (inline or via a variable). */
+/** Regex alternatives matching a move's first argument when it is the camera (inline or via a variable). */
 function cameraTargetPatterns(js: string): string[] {
   const cameraSelector = `root\\.querySelector(?:All)?\\(\\s*['"][^'"]*camera[^'"]*['"]\\s*\\)`;
   const targets = [cameraSelector, `['"][^'"]*camera[^'"]*['"]`];
@@ -103,14 +103,14 @@ function cameraTargetPatterns(js: string): string[] {
   return targets;
 }
 
-/** True when some tween targets the camera, either inline or through a variable bound to it. */
+/** True when some move targets the camera, either inline or through a variable bound to it. */
 function animatesCamera(js: string): boolean {
   if (/ctx\.camera\s*\(/.test(js)) return true;
-  return new RegExp(`\\.\\s*(?:fromTo|from|to)\\s*\\(\\s*(?:${cameraTargetPatterns(js).join('|')})`).test(js);
+  return new RegExp(`\\.\\s*(?:travel|arrive|go)\\s*\\(\\s*(?:${cameraTargetPatterns(js).join('|')})`).test(js);
 }
 
 /**
- * True when the camera, the scene root or every layer starts hidden (opacity/autoAlpha/scale 0).
+ * True when the camera, the scene root or every layer starts hidden (opacity/fade/scale 0).
  * The editor shows t=0 as the scene's still, so such a scene previews as an empty frame.
  */
 function hidesWholeFrameAtStart(js: string): boolean {
@@ -120,10 +120,10 @@ function hidesWholeFrameAtStart(js: string): boolean {
     `root\\.(?:children|firstElementChild)\\b`,
     `root\\.querySelectorAll\\(\\s*['"](?:\\*|\\[data-moo-layer\\])['"]\\s*\\)`
   ].join('|');
-  // .from(target, { ...hidden }) or .fromTo(target, { ...hidden }, ...) — the first object is the start state.
-  const re = new RegExp(`\\.\\s*(?:fromTo|from)\\s*\\(\\s*(?:${whole})\\s*,\\s*\\{([^}]*)\\}`, 'g');
+  // .arrive(target, { ...hidden }) or .travel(target, { ...hidden }, ...) — the first object is the start state.
+  const re = new RegExp(`\\.\\s*(?:travel|arrive)\\s*\\(\\s*(?:${whole})\\s*,\\s*\\{([^}]*)\\}`, 'g');
   for (const m of js.matchAll(re)) {
-    if (/\b(?:opacity|autoAlpha|scale)\s*:\s*0(?:\.0*)?\s*(?:[,}]|$)/.test(m[1])) return true;
+    if (/\b(?:opacity|fade|scale)\s*:\s*0(?:\.0*)?\s*(?:[,}]|$)/.test(m[1])) return true;
   }
   return false;
 }
@@ -143,10 +143,10 @@ export function lintMographQuality(
   if (!hasCamera) {
     add('no-camera', 2, 'Tidak ada lapisan kamera: bungkus seluruh isi scene dengan <div class="moo-camera" data-moo-layer="camera">.');
   } else if (!animatesCamera(js)) {
-    add('static-camera', 2, 'Kamera (.moo-camera) tidak dianimasikan: gerakkan kamera (scale/x/y/rotation) sepanjang ctx.dur.');
+    add('static-camera', 2, 'Kamera (.moo-camera) tidak dianimasikan: gerakkan kamera (ctx.camera, atau scale/x/y/spin lewat shot.travel) sepanjang ctx.dur.');
   }
   if (hidesWholeFrameAtStart(js)) {
-    add('empty-first-frame', 3, 'Frame 0 kosong: kamera/root/semua layer dimulai dari opacity 0 atau scale 0, jadi preview editor tampil hitam. Latar, kamera, dan subjek utama harus sudah terlihat di t=0; mulai dari keadaan terlihat (mis. fromTo scale 0.55 → 1).');
+    add('empty-first-frame', 3, 'Frame 0 kosong: kamera/root/semua layer dimulai dari opacity 0 atau scale 0, jadi preview editor tampil hitam. Latar, kamera, dan subjek utama harus sudah terlihat di t=0; mulai dari keadaan terlihat (mis. ctx.hero, atau shot.travel scale 0.55 → 1).');
   }
 
   // --- Web / card layout --------------------------------------------------
@@ -183,10 +183,10 @@ export function lintMographQuality(
   // --- Motion vocabulary -----------------------------------------------------
   // Mograph kit calls are motion vocabulary in their own right, never plain fade-ups.
   const kitMoves = (js.match(new RegExp(`ctx\\.(?:${MOTION_KIT_CALLS.join('|')})\\s*\\(`, 'g')) || []).length;
-  const tweens = tweenKeySets(js);
-  const totalMoves = tweens.length + kitMoves;
+  const moves = moveKeySets(js);
+  const totalMoves = moves.length + kitMoves;
   if (totalMoves > 0) {
-    const basic = tweens.filter((keys) => keys.every((k) => BASIC_TWEEN_KEYS.has(k))).length;
+    const basic = moves.filter((keys) => keys.every((k) => BASIC_MOVE_KEYS.has(k))).length;
     if (basic / totalMoves >= 0.6) {
       add('fade-up-only', 2, 'Animasi didominasi fade/slide masuk (opacity, x, y). Pakai bahasa gerak mograph: ctx.hero, ctx.pop, ctx.draw, ctx.kinetic, ctx.reveal, atau scale dengan overshoot dan stroke draw.');
     }
@@ -199,7 +199,7 @@ export function lintMographQuality(
   // Selector strings in tl calls resolve inside this shot; document-wide lookups do not and can grab
   // another shot's elements that share a class name.
   if (/\bdocument\s*\.\s*(?:querySelector(?:All)?|getElementById|getElementsBy(?:ClassName|TagName|Name))\s*\(/.test(js)) {
-    add('global-selector', 1, 'Pencarian elemen lewat document.* bisa mengenai elemen shot lain: pakai root.querySelector(...) atau selector string langsung di tl.to(...).');
+    add('global-selector', 1, 'Pencarian elemen lewat document.* bisa mengenai elemen shot lain: pakai root.querySelector(...) atau selector string langsung di shot.go(...).');
   }
   if (options.hasWordTimestamps && !/ctx\.(at|beat)\s*\(/.test(js)) {
     add('unsynced', 1, 'Timestamp kata tersedia tapi tidak dipakai: jatuhkan aksen tepat di ctx.beat(\'kata\', detikCadangan).');

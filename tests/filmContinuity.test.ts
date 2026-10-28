@@ -84,7 +84,7 @@ describe('Composition document: scoping, flow transition, world palette', () => 
           duration: 3,
           html: `<div class="scene-s${i + 1}"><div class="moo-camera" data-moo-layer="camera"></div></div>`,
           css: `.moo-camera { transform-origin: ${i === 0 ? '10%' : '90%'} 50%; }`,
-          buildJs: 'tl.to(root, { x: 1, duration: 1 }, 0);',
+          buildJs: 'shot.go(root, { x: 1, dur: 1 }, 0);',
           status: 'ok' as const,
           version: 1,
           userEdited: false
@@ -247,6 +247,6 @@ describe('Procedural archetypes move like shots', () => {
 
   it('keeps the poster layer visible at t=0', () => {
     const mod = compileProceduralScene(shot('p2'), 0, 1, undefined, 'stat-counter');
-    expect(mod.buildJs).toMatch(/\.fromTo\(card, \{ y: 60, scale: 0\.92, opacity: 1 \}/);
+    expect(mod.buildJs).toMatch(/\.travel\(card, \{ y: 60, scale: 0\.92, opacity: 1 \}/);
   });
 });

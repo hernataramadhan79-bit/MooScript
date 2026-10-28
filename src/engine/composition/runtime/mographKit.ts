@@ -1,14 +1,14 @@
 /**
  * Mograph helper kit installed on every scene's `ctx` inside the stage iframe.
  *
- * Generated scenes call these instead of re-inventing web-style tweens, so the model writes
+ * Generated scenes call these instead of re-inventing web-style moves, so the model writes
  * in a motion-graphics vocabulary (camera moves, line draws, overshoot pops, kinetic type,
- * counters, hand-offs) and every helper keeps its tweens inside [0, ctx.dur].
+ * counters, hand-offs) and every helper keeps its moves inside [0, ctx.dur] on the shot track.
  *
  * The function is embedded into the runtime with Function.prototype.toString(), so it must
  * stay self-contained: no imports and no references to anything outside its own body.
  */
-export function installMographKit(tl: any, root: any, ctx: any): void {
+export function installMographKit(shot: any, root: any, ctx: any): void {
   const dur = Math.max(0.1, Number(ctx.dur) || 3);
   const doc = root.ownerDocument || document;
   const viewport = doc.getElementById('moo-viewport');
@@ -31,12 +31,12 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     return [targets];
   };
 
-  // Start, duration and stagger that keep the whole group inside the shot.
-  const fit = (at: any, duration: number, stagger: number, count: number) => {
+  // Start, length and cascade gap that keep the whole group inside the shot.
+  const fit = (at: any, length: number, gap: number, count: number) => {
     const start = clampAt(at, 0);
     const room = Math.max(0.05, dur - start);
-    let d = Math.max(0.05, Math.min(duration, room));
-    let s = Math.max(0, stagger || 0);
+    let d = Math.max(0.05, Math.min(length, room));
+    let s = Math.max(0, gap || 0);
     if (count > 1 && d + s * (count - 1) > room) {
       s = Math.max(0, (room - d) / (count - 1));
       if (d + s * (count - 1) > room) d = Math.max(0.05, room - s * (count - 1));
@@ -66,12 +66,12 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
   };
 
   const HANDOFFS: Record<string, any> = {
-    zoom: { scale: 2.6, opacity: 0, ease: 'power4.in' },
-    'whip-left': { xPercent: -70, opacity: 0, ease: 'power3.in' },
-    'whip-right': { xPercent: 70, opacity: 0, ease: 'power3.in' },
-    'whip-up': { yPercent: -70, opacity: 0, ease: 'power3.in' },
-    drop: { yPercent: 45, rotation: 6, opacity: 0, ease: 'power3.in' },
-    spin: { rotation: 120, scale: 0.2, opacity: 0, ease: 'power3.in' }
+    zoom: { scale: 2.6, opacity: 0, curve: 'sharp-in' },
+    'whip-left': { shiftX: -70, opacity: 0, curve: 'strong-in' },
+    'whip-right': { shiftX: 70, opacity: 0, curve: 'strong-in' },
+    'whip-up': { shiftY: -70, opacity: 0, curve: 'strong-in' },
+    drop: { shiftY: 45, spin: 6, opacity: 0, curve: 'strong-in' },
+    spin: { spin: 120, scale: 0.2, opacity: 0, curve: 'strong-in' }
   };
 
   /** Exit move in the last 0.4s so the cut into the next shot feels continuous. */
@@ -81,19 +81,19 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const o = opts || {};
     const cam = o.target ? list(o.target) : [cameraEl()];
     const len = Math.min(0.4, dur * 0.25);
-    const vars = Object.assign({}, HANDOFFS[type || 'zoom'] || HANDOFFS.zoom, { duration: len });
-    tl.to(cam, vars, dur - len);
+    const vars = Object.assign({}, HANDOFFS[type || 'zoom'] || HANDOFFS.zoom, { dur: len });
+    shot.go(cam, vars, dur - len);
     return cam;
   });
 
   const CAMERA_MOVES: Record<string, any[]> = {
-    push: [{ scale: 1.18, rotation: -2 }, { scale: 1, rotation: 0 }],
+    push: [{ scale: 1.18, spin: -2 }, { scale: 1, spin: 0 }],
     pull: [{ scale: 1 }, { scale: 1.15 }],
-    'pan-left': [{ xPercent: 6, scale: 1.12 }, { xPercent: -6, scale: 1.12 }],
-    'pan-right': [{ xPercent: -6, scale: 1.12 }, { xPercent: 6, scale: 1.12 }],
-    'pan-up': [{ yPercent: 5, scale: 1.12 }, { yPercent: -5, scale: 1.12 }],
-    'pan-down': [{ yPercent: -5, scale: 1.12 }, { yPercent: 5, scale: 1.12 }],
-    roll: [{ rotation: -6, scale: 1.15 }, { rotation: 3, scale: 1.04 }]
+    'pan-left': [{ shiftX: 6, scale: 1.12 }, { shiftX: -6, scale: 1.12 }],
+    'pan-right': [{ shiftX: -6, scale: 1.12 }, { shiftX: 6, scale: 1.12 }],
+    'pan-up': [{ shiftY: 5, scale: 1.12 }, { shiftY: -5, scale: 1.12 }],
+    'pan-down': [{ shiftY: -5, scale: 1.12 }, { shiftY: 5, scale: 1.12 }],
+    roll: [{ spin: -6, scale: 1.15 }, { spin: 3, scale: 1.04 }]
   };
 
   /** Moves the whole world (.moo-camera) for the shot, then runs the hand-off (default 'zoom'). */
@@ -103,9 +103,9 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const move = CAMERA_MOVES[o.move] || CAMERA_MOVES.push;
     const withHandoff = o.handoff !== false && o.handoff !== 'none';
     const end = withHandoff ? dur - Math.min(0.4, dur * 0.25) : dur;
-    const from = Object.assign({ transformOrigin: o.origin || '50% 50%' }, move[0], o.from);
-    const to = Object.assign({}, move[1], o.to, { duration: Math.max(0.1, end), ease: o.ease || 'sine.inOut' });
-    tl.fromTo(cam, from, to, 0);
+    const from = Object.assign({ pivot: o.pivot || '50% 50%' }, move[0], o.from);
+    const to = Object.assign({}, move[1], o.to, { dur: Math.max(0.1, end), curve: o.curve || 'gentle-inout' });
+    shot.travel(cam, from, to, 0);
     if (withHandoff) ctx.handoff(typeof o.handoff === 'string' ? o.handoff : 'zoom');
     return [cam];
   });
@@ -115,7 +115,7 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const o = opts || {};
     const els = list(targets);
     if (els.length === 0) return els;
-    const f = fit(o.at, o.duration || 0.8, o.stagger ?? 0.1, els.length);
+    const f = fit(o.at, o.dur || 0.8, o.cascade ?? 0.1, els.length);
     const already = Math.max(0, Math.min(1, o.from || 0));
     els.forEach((el: any) => {
       let len = 0;
@@ -125,9 +125,9 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
         len = 0;
       }
       if (!len || !isFinite(len)) len = 1000;
-      tl.set(el, { strokeDasharray: len, strokeDashoffset: len * (1 - already) }, 0);
+      shot.pin(el, { strokeDasharray: len, strokeDashoffset: len * (1 - already) }, 0);
     });
-    tl.to(els, { strokeDashoffset: 0, duration: f.d, stagger: f.s, ease: o.ease || 'power2.inOut' }, f.start);
+    shot.go(els, { strokeDashoffset: 0, dur: f.d, cascade: f.s, curve: o.curve || 'smooth-inout' }, f.start);
     return els;
   });
 
@@ -136,11 +136,11 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const o = opts || {};
     const els = list(targets);
     if (els.length === 0) return els;
-    const f = fit(o.at, o.duration || 0.45, o.stagger ?? 0.08, els.length);
-    tl.fromTo(
+    const f = fit(o.at, o.dur || 0.45, o.cascade ?? 0.08, els.length);
+    shot.travel(
       els,
-      { scale: o.from ?? 0, transformOrigin: o.origin || '50% 50%' },
-      { scale: 1, duration: f.d, stagger: f.s, ease: o.ease || 'back.out(2.2)' },
+      { scale: o.from ?? 0, pivot: o.pivot || '50% 50%' },
+      { scale: 1, dur: f.d, cascade: f.s, curve: o.curve || 'overshoot-out(2.2)' },
       f.start
     );
     return els;
@@ -151,15 +151,15 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const o = opts || {};
     const els = list(targets);
     if (els.length === 0) return els;
-    const grow = Math.min(o.duration || 0.6, dur * 0.4);
-    tl.fromTo(
+    const grow = Math.min(o.dur || 0.6, dur * 0.4);
+    shot.travel(
       els,
-      { scale: o.from ?? 0.55, transformOrigin: o.origin || '50% 50%' },
-      { scale: 1, duration: grow, ease: o.ease || 'back.out(2)' },
+      { scale: o.from ?? 0.55, pivot: o.pivot || '50% 50%' },
+      { scale: 1, dur: grow, curve: o.curve || 'overshoot-out(2)' },
       0
     );
     if (dur - grow > 0.6 && o.breathe !== false) {
-      tl.to(els, { scale: o.breatheScale || 1.06, duration: dur - grow, ease: 'sine.inOut' }, grow);
+      shot.go(els, { scale: o.breatheScale || 1.06, dur: dur - grow, curve: 'gentle-inout' }, grow);
     }
     return els;
   });
@@ -205,11 +205,11 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
   });
 
   const KINETIC: Record<string, any> = {
-    rise: { from: { yPercent: 110, rotation: 8, opacity: 0 }, ease: 'expo.out', duration: 0.5 },
-    slam: { from: { scale: 2.6, opacity: 0 }, ease: 'power4.out', duration: 0.35 },
-    flip: { from: { rotationX: -90, opacity: 0, transformOrigin: '50% 100%' }, ease: 'back.out(1.8)', duration: 0.5 },
-    drop: { from: { yPercent: -140, opacity: 0 }, ease: 'bounce.out', duration: 0.6 },
-    type: { from: { opacity: 0 }, ease: 'none', duration: 0.02 }
+    rise: { from: { shiftY: 110, spin: 8, opacity: 0 }, curve: 'rush-out', dur: 0.5 },
+    slam: { from: { scale: 2.6, opacity: 0 }, curve: 'sharp-out', dur: 0.35 },
+    flip: { from: { tiltX: -90, opacity: 0, pivot: '50% 100%' }, curve: 'overshoot-out(1.8)', dur: 0.5 },
+    drop: { from: { shiftY: -140, opacity: 0 }, curve: 'bounce-out', dur: 0.6 },
+    type: { from: { opacity: 0 }, curve: 'linear', dur: 0.02 }
   };
 
   /** Kinetic type: splits the text and animates words or chars in a named style. */
@@ -218,9 +218,9 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const style = KINETIC[o.style] || KINETIC.rise;
     const parts = ctx.split(target, o.by || (o.style === 'type' ? 'chars' : 'words'));
     if (!parts || parts.length === 0) return [];
-    const defaultStagger = o.style === 'type' ? 0.04 : o.by === 'chars' ? 0.03 : 0.08;
-    const f = fit(o.at, o.duration || style.duration, o.stagger ?? defaultStagger, parts.length);
-    tl.from(parts, Object.assign({}, style.from, { duration: f.d, stagger: f.s, ease: o.ease || style.ease }), f.start);
+    const defaultGap = o.style === 'type' ? 0.04 : o.by === 'chars' ? 0.03 : 0.08;
+    const f = fit(o.at, o.dur || style.dur, o.cascade ?? defaultGap, parts.length);
+    shot.arrive(parts, Object.assign({}, style.from, { dur: f.d, cascade: f.s, curve: o.curve || style.curve }), f.start);
     return parts;
   });
 
@@ -239,8 +239,8 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const state = { v: Number(o.from) || 0 };
     const to = Number(o.to) || 0;
     el.textContent = fmt(state.v);
-    const f = fit(o.at, o.duration || 1.2, 0, 1);
-    tl.to(state, { v: to, duration: f.d, ease: o.ease || 'power2.out', onUpdate: () => { el.textContent = fmt(state.v); } }, f.start);
+    const f = fit(o.at, o.dur || 1.2, 0, 1);
+    shot.go(state, { v: to, dur: f.d, curve: o.curve || 'smooth-out', onFrame: () => { el.textContent = fmt(state.v); } }, f.start);
     return [el];
   });
 
@@ -250,7 +250,7 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const els = list(targets);
     if (els.length === 0) return els;
     const f = fit(o.at, 0.24, 0, 1);
-    tl.to(els, { scale: o.scale || 1.25, transformOrigin: '50% 50%', duration: f.d / 2, yoyo: true, repeat: 1, ease: 'power2.out' }, f.start);
+    shot.go(els, { scale: o.scale || 1.25, pivot: '50% 50%', dur: f.d / 2, pingpong: true, loop: 1, curve: 'smooth-out' }, f.start);
     return els;
   });
 
@@ -261,13 +261,13 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     if (els.length === 0) return els;
     const strength = o.strength || 14;
     const rand = typeof ctx.rand === 'function' ? ctx.rand : () => 0.5;
-    const keyframes: any[] = [];
+    const steps: any[] = [];
     for (let i = 0; i < 6; i++) {
-      keyframes.push({ x: (rand() - 0.5) * 2 * strength, rotation: (rand() - 0.5) * strength * 0.2, duration: 0.04 });
+      steps.push({ x: (rand() - 0.5) * 2 * strength, spin: (rand() - 0.5) * strength * 0.2, dur: 0.04 });
     }
-    keyframes.push({ x: 0, rotation: 0, duration: 0.05 });
+    steps.push({ x: 0, spin: 0, dur: 0.05 });
     const f = fit(o.at, 0.3, 0, 1);
-    tl.to(els, { keyframes }, f.start);
+    shot.go(els, { sequence: steps }, f.start);
     return els;
   });
 
@@ -279,7 +279,7 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
       'position:absolute;inset:0;pointer-events:none;z-index:50;opacity:0;background:' + (o.color || 'var(--moo-accent, #ffffff)');
     root.appendChild(layer);
     const f = fit(o.at, 0.16, 0, 1);
-    tl.fromTo(layer, { opacity: 0 }, { opacity: o.intensity || 0.7, duration: f.d / 2, yoyo: true, repeat: 1, ease: 'power1.out' }, f.start);
+    shot.travel(layer, { opacity: 0 }, { opacity: o.intensity || 0.7, dur: f.d / 2, pingpong: true, loop: 1, curve: 'soft-out' }, f.start);
     return [layer];
   });
 
@@ -290,12 +290,12 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const amount = o.amount || 40;
     const rand = typeof ctx.rand === 'function' ? ctx.rand : () => 0.5;
     els.forEach((el: any) => {
-      tl.to(el, {
-        y: '-=' + Math.round(amount * (0.5 + rand())),
-        x: '+=' + Math.round((rand() - 0.5) * amount),
-        rotation: (rand() - 0.5) * (o.rotate ?? 8),
-        duration: dur,
-        ease: 'sine.inOut'
+      shot.go(el, {
+        y: 'by(' + -Math.round(amount * (0.5 + rand())) + ')',
+        x: 'by(' + Math.round((rand() - 0.5) * amount) + ')',
+        spin: (rand() - 0.5) * (o.rotate ?? 8),
+        dur: dur,
+        curve: 'gentle-inout'
       }, 0);
     });
     return els;
@@ -306,10 +306,10 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const o = opts || {};
     const els = list(targets);
     if (els.length === 0) return els;
-    const vars: any = { rotation: 360 * (o.turns ?? 0.5), duration: dur, ease: 'none' };
-    if (typeof o.cx === 'number' && typeof o.cy === 'number') vars.svgOrigin = o.cx + ' ' + o.cy;
-    else vars.transformOrigin = o.origin || '50% 50%';
-    tl.to(els, vars, 0);
+    const vars: any = { spin: 360 * (o.turns ?? 0.5), dur: dur, curve: 'linear' };
+    if (typeof o.cx === 'number' && typeof o.cy === 'number') vars.pivotPoint = o.cx + ' ' + o.cy;
+    else vars.pivot = o.pivot || '50% 50%';
+    shot.go(els, vars, 0);
     return els;
   });
 
@@ -327,8 +327,8 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
     const els = list(targets);
     if (els.length === 0) return els;
     const r = REVEALS[o.dir] || REVEALS.left;
-    const f = fit(o.at, o.duration || 0.6, o.stagger ?? 0.08, els.length);
-    tl.fromTo(els, { clipPath: r[0] }, { clipPath: r[1], duration: f.d, stagger: f.s, ease: o.ease || 'expo.out' }, f.start);
+    const f = fit(o.at, o.dur || 0.6, o.cascade ?? 0.08, els.length);
+    shot.travel(els, { clipPath: r[0] }, { clipPath: r[1], dur: f.d, cascade: f.s, curve: o.curve || 'rush-out' }, f.start);
     return els;
   });
 
@@ -355,7 +355,7 @@ export function installMographKit(tl: any, root: any, ctx: any): void {
         ';background:' + (o.color || 'var(--moo-accent, #ffffff)');
       box.appendChild(dot);
       dots.push(dot);
-      tl.to(dot, { y: -rise * (0.5 + rand()), x: (rand() - 0.5) * 80, duration: dur, ease: 'none' }, 0);
+      shot.go(dot, { y: -rise * (0.5 + rand()), x: (rand() - 0.5) * 80, dur: dur, curve: 'linear' }, 0);
     }
     return dots;
   });

@@ -22,45 +22,59 @@ const FORBIDDEN_PATTERNS = [
   { pattern: /\bindexedDB\b/, message: 'Larangan keamanan: dilarang mengakses indexedDB' },
   { pattern: /\bsendBeacon\b/, message: 'Larangan keamanan: dilarang menggunakan sendBeacon' },
   { pattern: /\bnew\s+Image\b/, message: 'Larangan keamanan: dilarang membuat Image dinamis' },
-  { pattern: /\bDate\.now\s*\(/, message: 'Larangan determinisme: gunakan ctx.dur atau tl.time(), dilarang membaca Date.now()' },
-  { pattern: /\bperformance\s*\.\s*now/, message: 'Larangan determinisme: gunakan ctx.dur atau tl.time(), dilarang membaca performance.now()' },
+  { pattern: /\bDate\.now\s*\(/, message: 'Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca Date.now()' },
+  { pattern: /\bperformance\s*\.\s*now/, message: 'Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca performance.now()' },
   { pattern: /\bMath\.random\s*\(/, message: 'Larangan determinisme: gunakan ctx.rand() bukan Math.random()' },
-  { pattern: /\brequestAnimationFrame\s*\(/, message: 'Larangan determinisme: animasi harus didefinisikan lewat timeline tl MooTween' },
+  { pattern: /\brequestAnimationFrame\s*\(/, message: 'Larangan determinisme: taruh animasi di shot (shot.go / shot.arrive / ...), bukan requestAnimationFrame' },
   { pattern: /\[['"`]\s*(fetch|eval|parent|top)\s*['"`]\]/, message: 'Larangan keamanan: dilarang mengakses properti terlarang via bracket notation' },
   { pattern: /<script\b[^>]*>/i, message: 'Larangan HTML: dilarang menyematkan tag <script> di dalam potongan HTML scene' }
 ];
 
 /**
- * APIs that scene code written for GSAP may use but MooTween, MooScript's own engine, does not have.
- * Each message tells the repair pass what to use instead.
+ * Code written for another animation API (GSAP-style tl / gsap calls, option and property names,
+ * curves, positions). MooScript scenes use the MooTween scene API instead; each message names the
+ * replacement so the repair pass, and anyone pasting their own code, knows what to write.
  */
-const UNSUPPORTED_TIMELINE_APIS: Array<{ api: string; pattern: RegExp; fix: string }> = [
-  { api: 'registerPlugin', pattern: /\.\s*registerPlugin\s*\(/, fix: 'MooTween tidak memakai plugin; hapus registerPlugin()' },
-  { api: 'ScrollTrigger', pattern: /\bScrollTrigger\b|\bscrollTrigger\s*:/, fix: 'panggung digerakkan oleh waktu, bukan scroll; taruh tween di tl pada detik yang tepat' },
-  { api: 'MotionPathPlugin', pattern: /\bMotionPathPlugin\b|\bmotionPath\s*:/, fix: 'untuk gerak melingkar pakai ctx.orbit, untuk jalur lain pakai keyframes x/y' },
-  { api: 'MorphSVG', pattern: /\bMorphSVG(?:Plugin)?\b|\bmorphSVG\s*:/, fix: 'pakai attr: { d } dengan jumlah dan urutan titik yang sama di awal dan akhir' },
-  { api: 'SplitText', pattern: /\bSplitText\b/, fix: 'pakai ctx.kinetic(el, { style, by }) atau ctx.split(el, "chars")' },
-  { api: 'DrawSVGPlugin', pattern: /\bDrawSVG(?:Plugin)?\b|\bdrawSVG\s*:/, fix: 'pakai ctx.draw(paths, { at, duration })' },
-  { api: 'Draggable', pattern: /\bDraggable\b/, fix: 'film tidak punya interaksi; hapus Draggable' },
-  { api: 'ticker.add', pattern: /\bticker\s*\.\s*add\s*\(/, fix: 'tidak ada ticker real-time; pakai onUpdate pada tween di tl' },
-  { api: 'context', pattern: /\b(?:gsap|MooTween)\s*\.\s*context\s*\(/, fix: 'tulis tween langsung di tl tanpa context()' },
-  { api: 'quickTo', pattern: /\.\s*quickTo\s*\(/, fix: 'pakai tl.to() pada detik yang tepat' },
-  { api: 'quickSetter', pattern: /\.\s*quickSetter\s*\(/, fix: 'pakai tl.set() pada detik yang tepat' },
-  { api: 'matchMedia', pattern: /\b(?:gsap|MooTween)\s*\.\s*matchMedia\s*\(/, fix: 'ukuran panggung tetap; pakai ctx.stage.w / ctx.stage.h' }
+const FOREIGN_API: Array<{ api: string; pattern: RegExp; fix: string }> = [
+  { api: 'tl', pattern: /\btl\s*\.\s*[A-Za-z]+\s*\(/, fix: 'tulis gerak di shot: tl.to → shot.go, tl.from → shot.arrive, tl.fromTo → shot.travel, tl.set → shot.pin, tl.add → shot.nest, tl.addLabel → shot.mark, tl.call → shot.cue' },
+  { api: '.to/.from/.fromTo/.set', pattern: /\)\s*\.\s*(?:to|fromTo|set)\s*\(|\)\s*\.\s*from\s*\((?!\s*\))/, fix: 'rantai gerak memakai .go / .arrive / .travel / .pin' },
+  { api: 'gsap', pattern: /\bgsap\b/, fix: 'mesinnya MooTween: gsap.timeline → MooTween.track, gsap.utils → MooTween.math, gsap.to → shot.go' },
+  { api: 'plugin', pattern: /\b(?:registerPlugin|ScrollTrigger|SplitText|MotionPathPlugin|MorphSVG\w*|DrawSVG\w*|Draggable|TextPlugin)\b/, fix: 'MooTween tidak memakai plugin: teks pakai ctx.kinetic / ctx.split, garis pakai ctx.draw, putaran pakai ctx.orbit, morph pakai attrs: { d } dengan jumlah titik sama' },
+  { api: 'duration', pattern: /[{,]\s*duration\s*:/, fix: 'ganti duration → dur' },
+  { api: 'delay', pattern: /[{,]\s*delay\s*:/, fix: 'ganti delay → wait' },
+  { api: 'ease', pattern: /[{,]\s*ease\s*:/, fix: "ganti ease → curve, mis. curve: 'rush-out'" },
+  { api: 'stagger', pattern: /[{,]\s*stagger\s*:/, fix: "ganti stagger → cascade (each → gap, amount → total, from 'center' → 'middle', 'edges' → 'ends', 'end' → 'last')" },
+  { api: 'repeat', pattern: /[{,]\s*repeat(?:Delay)?\s*:/, fix: 'ganti repeat → loop (-1 → true), repeatDelay → loopGap' },
+  { api: 'yoyo', pattern: /[{,]\s*yoyo\s*:/, fix: 'ganti yoyo → pingpong' },
+  { api: 'keyframes', pattern: /[{,]\s*keyframes\s*:/, fix: 'ganti keyframes → sequence' },
+  { api: 'immediateRender', pattern: /[{,]\s*immediateRender\s*:/, fix: 'ganti immediateRender → showStart' },
+  { api: 'onStart/onUpdate/onComplete', pattern: /[{,]\s*on(?:Start|Update|Complete|Repeat|ReverseComplete)\s*:/, fix: 'ganti onStart → onBegin, onUpdate → onFrame, onComplete → onEnd' },
+  { api: 'rotation', pattern: /[{,]\s*rotation[XYZ]?\s*:/, fix: 'ganti rotation → spin, rotationX → tiltX, rotationY → tiltY' },
+  { api: 'xPercent/yPercent', pattern: /[{,]\s*[xy]Percent\s*:/, fix: 'ganti xPercent → shiftX, yPercent → shiftY' },
+  { api: 'transformOrigin', pattern: /[{,]\s*(?:transformOrigin|svgOrigin)\s*:/, fix: 'ganti transformOrigin → pivot, svgOrigin → pivotPoint' },
+  { api: 'transformPerspective', pattern: /[{,]\s*transformPerspective\s*:/, fix: 'ganti transformPerspective → depth' },
+  { api: 'autoAlpha', pattern: /[{,]\s*autoAlpha\s*:/, fix: 'ganti autoAlpha → fade' },
+  { api: 'attr', pattern: /[{,]\s*attr\s*:/, fix: 'ganti attr → attrs' },
+  { api: "'+=' / '-='", pattern: /:\s*(['"`])[+-]=/, fix: "nilai relatif ditulis 'by(40)' atau 'by(-0.5)'" },
+  { api: "posisi '<' / '>' / '+='", pattern: /,\s*(['"`])(?:[<>][^'"`]*|[+-]=[\d.]+|[A-Za-z_][\w-]*[+-]=[\d.]+)\1\s*\)/, fix: "waktu ditulis 'with' / 'after' / 'end+0.3' / 'end-0.3' / 'mark+0.2'" },
+  { api: 'curve lama', pattern: /(['"`])(?:power[0-4]|sine|expo|circ|back|elastic|quad|cubic|quart|quint|bounce)\.(?:in|out|inOut)\b/, fix: "curve ditulis nama-arah: power1/2/3/4 → soft/smooth/strong/sharp, sine → gentle, expo → rush, circ → arc, back → overshoot, elastic → spring; .inOut → -inout (mis. 'smooth-inout')" }
 ];
 
-/** Names of the APIs in this scene code that MooTween does not support (comments ignored). */
-export function findUnsupportedTimelineApis(buildJs: string): string[] {
+// A scene animates something when it calls a shot move or a ctx helper that adds one.
+const MOVES =
+  /\bshot\s*\.\s*(?:go|arrive|travel|pin|nest|cue)\b|\bctx\s*\.\s*(?:camera|hero|draw|pop|kinetic|count|reveal|punch|shake|flash|drift|orbit|particles|handoff)\b/;
+
+/** Names of the foreign APIs this scene code uses (comments ignored). */
+export function findForeignApis(buildJs: string): string[] {
   const clean = stripCommentsRespectingStrings(buildJs || '');
-  return UNSUPPORTED_TIMELINE_APIS.filter(({ pattern }) => pattern.test(clean)).map(({ api }) => api);
+  return FOREIGN_API.filter(({ pattern }) => pattern.test(clean)).map(({ api }) => api);
 }
 
-/** Repair instruction for one unsupported API, as used in validation errors. */
-export function unsupportedTimelineApiMessage(api: string): string {
-  const entry = UNSUPPORTED_TIMELINE_APIS.find((e) => e.api === api);
-  return `API di luar MooTween: ${api} — ${entry ? entry.fix : 'ganti dengan tl.* atau ctx.*'}`;
+/** Repair instruction for one foreign API, as used in validation errors. */
+export function foreignApiMessage(api: string): string {
+  const entry = FOREIGN_API.find((e) => e.api === api);
+  return `Bukan API MooScript: ${api} — ${entry ? entry.fix : 'pakai shot.* atau ctx.*'}`;
 }
-
 export function validateSceneCode(code: { html?: string; css?: string; buildJs?: string }): ValidationResult {
   const errors: string[] = [];
 
@@ -103,9 +117,10 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
     errors.push('Larangan CSS: dilarang url() eksternal (gunakan gradient/SVG inline atau data: URI)');
   }
 
-  // Check structure of build function
-  if (combinedJs && !combinedJs.includes('tl') && !combinedJs.includes('MooTween') && !combinedJs.includes('gsap') && !combinedJs.includes('build')) {
-    errors.push('Format tidak lengkap: buildJs harus memuat manipulasi timeline MooTween (tl)');
+  // Check structure of build function. Old tl/gsap code still passes here so saved projects and
+  // backups load; findForeignApis flags it as needs-repair instead.
+  if (combinedJs && !/\b(?:shot|ctx|MooTween|tl|gsap)\b/.test(combinedJs) && !combinedJs.includes('build')) {
+    errors.push('Format tidak lengkap: buildJs harus menggerakkan sesuatu lewat shot atau helper ctx.*');
   }
 
   // Syntax check (compile only — never executed on the host)
@@ -113,12 +128,12 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
     try {
       // Strip any accidental parameter re-declarations for the syntax check
       const checkJs = combinedJs
-        .replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\b[^\n;]*;?/g, '\n')
+        .replace(/(?:^|\n)\s*(?:const|let|var)\s+shot\b[^\n;]*;?/g, '\n')
         .replace(/(?:^|\n)\s*(?:const|let|var)\s+root\b[^\n;]*;?/g, '\n')
         .replace(/(?:^|\n)\s*(?:const|let|var)\s+ctx\b[^\n;]*;?/g, '\n')
-        .replace(/(?:^|\n)\s*(?:const|let|var)\s+(?:MooTween|gsap)\b[^\n;]*;?/g, '\n');
+        .replace(/(?:^|\n)\s*(?:const|let|var)\s+MooTween\b[^\n;]*;?/g, '\n');
 
-      new Function('tl', 'root', 'ctx', 'MooTween', 'gsap', checkJs);
+      new Function('shot', 'root', 'ctx', 'MooTween', checkJs);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // CSP restrictions on the host window (disallowing unsafe-eval/new Function) are host environment
@@ -257,16 +272,16 @@ export function validateGeneratedScene(code: { html?: string; css?: string; buil
 
   // Not part of validateSceneCode: saved projects and backups that use these must still load (they are
   // flagged for repair instead); new code has to stay inside the MooTween subset.
-  for (const api of findUnsupportedTimelineApis(code.buildJs || '')) {
-    errors.push(unsupportedTimelineApiMessage(api));
+  for (const api of findForeignApis(code.buildJs || '')) {
+    errors.push(foreignApiMessage(api));
   }
   if (!(code.html || '').trim()) {
     errors.push('Scene kosong: HTML tidak boleh kosong');
   }
   if (!(code.buildJs || '').trim()) {
-    errors.push('Scene statis: buildJs wajib menganimasikan sesuatu lewat timeline tl');
-  } else if (!/\btl\s*\./.test(code.buildJs || '') && !/\b(?:MooTween|gsap)\s*\./.test(code.buildJs || '')) {
-    errors.push('Scene statis: buildJs harus memanggil tl.to/from/fromTo/set (timeline MooTween)');
+    errors.push('Scene statis: buildJs wajib menganimasikan sesuatu lewat shot');
+  } else if (!MOVES.test(code.buildJs || '')) {
+    errors.push('Scene statis: buildJs harus memanggil shot.go / arrive / travel / pin atau helper ctx.*');
   }
 
   return { valid: errors.length === 0, errors, warnings: base.warnings };

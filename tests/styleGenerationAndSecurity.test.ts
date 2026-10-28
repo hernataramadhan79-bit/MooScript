@@ -36,7 +36,7 @@ describe('Style Generation and Security Safety (Phase 7)', () => {
 .test-scene { width: 100%; height: 100%; }
 \`\`\`
 \`\`\`javascript
-tl.from(root.querySelector("h1"), { opacity: 0, duration: 0.5 });
+shot.arrive(root.querySelector("h1"), { opacity: 0, dur: 0.5 });
 \`\`\``;
     });
 
@@ -111,7 +111,7 @@ tl.from(root.querySelector("h1"), { opacity: 0, duration: 0.5 });
 .card { width: 100%; }
 \`\`\`
 \`\`\`javascript
-tl.from(root.children, { opacity: 0, duration: 0.5 });
+shot.arrive(root.children, { opacity: 0, dur: 0.5 });
 \`\`\``;
       }
       return `\`\`\`html

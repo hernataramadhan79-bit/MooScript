@@ -83,7 +83,7 @@ describe('Master Plan regression suite', () => {
         fps: 30,
         globalCss: '',
         scenes: [
-          { beatId: 'sc-1', html: '<div class="t">Hi</div>', css: '', buildJs: 'tl.to(".t",{opacity:1});', status: 'ok', version: 1 }
+          { beatId: 'sc-1', html: '<div class="t">Hi</div>', css: '', buildJs: 'shot.go(".t",{opacity:1});', status: 'ok', version: 1 }
         ],
         createdAt: Date.now()
       }
@@ -155,20 +155,20 @@ describe('Master Plan regression suite', () => {
   describe('validator string-aware comment stripping', () => {
     it('still rejects parent.postMessage hidden after a // inside a string', () => {
       const res = validateSceneCode({
-        buildJs: 'const url = "http://example.com/x"; parent.postMessage("leak"); tl.to(root, { opacity: 1 });'
+        buildJs: 'const url = "http://example.com/x"; parent.postMessage("leak"); shot.go(root, { opacity: 1 });'
       });
       expect(res.valid).toBe(false);
     });
 
     it('does not flag forbidden words that only appear in real comments', () => {
       const res = validateSceneCode({
-        buildJs: '// fetch() is not allowed here\n/* eval(x) demo */\ntl.to(root, { opacity: 1 });'
+        buildJs: '// fetch() is not allowed here\n/* eval(x) demo */\nshot.go(root, { opacity: 1 });'
       });
       expect(res.valid).toBe(true);
     });
 
     it('keeps regex literals intact', () => {
-      const stripped = stripCommentsRespectingStrings('const re = /a\\/\\/b/gi; tl.to(root, {x: 1});');
+      const stripped = stripCommentsRespectingStrings('const re = /a\\/\\/b/gi; shot.go(root, {x: 1});');
       expect(stripped).toContain('/a\\/\\/b/gi');
     });
   });

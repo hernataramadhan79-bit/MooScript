@@ -17,7 +17,7 @@ export function resetSharedCanvas(): void {
 
 /**
  * MooRuntime client-side script injected into the isolated iframe sandbox.
- * Enforces determinism, drives the MooTween master timeline, and provides postMessage communication with host.
+ * Enforces determinism, drives the MooTween master track, and provides postMessage communication with host.
  */
 export function getRuntimeScript(): string {
   return `
@@ -38,7 +38,7 @@ export function getRuntimeScript(): string {
   const globalPrng = createPrng(1337);
   Math.random = globalPrng;
 
-  // 2. Frozen time tracking for deterministic timeline
+  // 2. Frozen time tracking for a deterministic track
   let virtualTimeSeconds = 0;
   Date.now = function() { return Math.round(virtualTimeSeconds * 1000); };
   if (window.performance) {
@@ -56,68 +56,20 @@ export function getRuntimeScript(): string {
     }
   };
 
-  // 4. Master Timeline Controller
-  let masterTl = null;
+  // 4. Master track controller
+  let masterTrack = null;
   let stageElem = null;
 
-  async function initMasterTimeline(compositionMeta) {
+  async function initMasterTrack(compositionMeta) {
     const engine = window.MooTween;
     if (!engine) {
       console.error('MooTween is not loaded inside iframe runtime');
       return;
     }
 
-    // MooTween never ticks in real time: playback is purely driven by host seek()
-    masterTl = engine.timeline({ paused: true });
-
-    function isEmptyTarget(targets) {
-      if (!targets) return true;
-      if (typeof NodeList !== 'undefined' && targets instanceof NodeList && targets.length === 0) return true;
-      if (typeof HTMLCollection !== 'undefined' && targets instanceof HTMLCollection && targets.length === 0) return true;
-      if (Array.isArray(targets) && targets.length === 0) return true;
-      return false;
-    }
-
-    function makeSafeTimeline(realTl) {
-      if (typeof Proxy === 'undefined') return realTl;
-      return new Proxy(realTl, {
-        get: function(target, prop, receiver) {
-          const val = Reflect.get(target, prop, receiver);
-          if (typeof val === 'function' && (prop === 'to' || prop === 'from' || prop === 'fromTo' || prop === 'set')) {
-            return function() {
-              const args = Array.prototype.slice.call(arguments);
-              const targets = args[0];
-              if (isEmptyTarget(targets)) {
-                return receiver;
-              }
-              const res = val.apply(target, args);
-              return res === target ? receiver : res;
-            };
-          }
-          return typeof val === 'function' ? val.bind(target) : val;
-        }
-      });
-    }
-
-    function makeSafeEngine(realEngine) {
-      if (typeof Proxy === 'undefined') return realEngine;
-      return new Proxy(realEngine, {
-        get: function(target, prop, receiver) {
-          const val = Reflect.get(target, prop, receiver);
-          if (typeof val === 'function' && (prop === 'to' || prop === 'from' || prop === 'fromTo' || prop === 'set')) {
-            return function() {
-              const args = Array.prototype.slice.call(arguments);
-              const targets = args[0];
-              if (isEmptyTarget(targets)) {
-                return target;
-              }
-              return val.apply(target, args);
-            };
-          }
-          return typeof val === 'function' ? val.bind(target) : val;
-        }
-      });
-    }
+    // MooTween never ticks in real time: playback is purely driven by host seek().
+    // Moves on empty or missing targets are no-ops inside MooTween, so scene code needs no guard.
+    masterTrack = engine.track({ paused: true });
 
     stageElem = document.getElementById('moo-stage');
     if (!stageElem) {
@@ -165,9 +117,9 @@ export function getRuntimeScript(): string {
       });
     }
 
-    // Phase 2: Set initial state at t=0 for all scene wrappers in master timeline
+    // Phase 2: Set initial state at t=0 for all scene wrappers in the master track
     for (let i = 0; i < sceneElements.length; i++) {
-      masterTl.set(sceneElements[i].wrapper, {
+      masterTrack.pin(sceneElements[i].wrapper, {
         visibility: i === 0 ? 'visible' : 'hidden',
         opacity: i === 0 ? 1 : 0,
         zIndex: 1,
@@ -177,7 +129,7 @@ export function getRuntimeScript(): string {
       }, 0);
     }
 
-    // Phase 3: Build individual scene timelines and inter-scene transitions
+    // Phase 3: Build each shot track and the inter-shot transitions
     for (let i = 0; i < sceneElements.length; i++) {
       const current = sceneElements[i];
       const sceneWrapper = current.wrapper;
@@ -188,7 +140,7 @@ export function getRuntimeScript(): string {
       const next = sceneElements[i + 1];
 
       // Ensure current scene wrapper is unconditionally visible and reset at accumulatedTime
-      masterTl.set(sceneWrapper, {
+      masterTrack.pin(sceneWrapper, {
         visibility: 'visible',
         opacity: 1,
         zIndex: 1,
@@ -197,7 +149,7 @@ export function getRuntimeScript(): string {
         clipPath: 'none'
       }, accumulatedTime);
 
-      // Context passed to build(tl, root, ctx)
+      // Context passed to build(shot, root, ctx)
       const scenePrng = createPrng(i + 1);
       const ctx = {
         dur: duration,
@@ -219,32 +171,29 @@ export function getRuntimeScript(): string {
         index: i
       };
 
-      // Selectors resolve inside this shot only, repeat: -1 covers this shot, and standalone
-      // MooTween.to()/from() calls made while it builds join its timeline.
-      const rawSceneTl = engine.timeline({ scope: sceneWrapper, repeatSpan: duration });
-      const safeSceneTl = makeSafeTimeline(rawSceneTl);
-      const safeEngine = makeSafeEngine(engine);
-      engine.activeTimeline = rawSceneTl;
+      // The shot's track: selectors resolve inside this shot only, and loop: true covers this shot.
+      // Sub-tracks made with MooTween.track() while it builds inherit that scope.
+      const shotTrack = engine.track({ scope: sceneWrapper, loopSpan: duration });
+      engine.activeTrack = shotTrack;
       try {
-        installMographKit(safeSceneTl, sceneWrapper, ctx);
+        installMographKit(shotTrack, sceneWrapper, ctx);
       } catch (kitErr) {
         console.warn('Mograph kit unavailable for scene ' + current.item.id, kitErr);
       }
       try {
         if (typeof def.build === 'function') {
-          def.build(safeSceneTl, sceneWrapper, ctx);
+          def.build(shotTrack, sceneWrapper, ctx);
         } else if (typeof def.buildSrc === 'string' && def.buildSrc.trim()) {
-          // 'gsap' stays as an alias so scenes saved before MooTween keep running.
-          const fn = new Function('tl', 'root', 'ctx', 'MooTween', 'gsap', def.buildSrc);
-          fn(safeSceneTl, sceneWrapper, ctx, safeEngine, safeEngine);
+          const fn = new Function('shot', 'root', 'ctx', 'MooTween', def.buildSrc);
+          fn(shotTrack, sceneWrapper, ctx, engine);
         }
       } catch (err) {
         console.error('Error in scene build(): ' + current.item.id, err);
       }
-      engine.activeTimeline = null;
+      engine.activeTrack = null;
 
-      // Add child scene timeline at accumulatedTime
-      masterTl.add(rawSceneTl, accumulatedTime);
+      // Place the shot track at accumulatedTime
+      masterTrack.nest(shotTrack, accumulatedTime);
 
       // Inter-scene transitions
       if (next) {
@@ -255,61 +204,61 @@ export function getRuntimeScript(): string {
         if (transitionType === 'flow') {
           // Overlap: the next shot is already on screen underneath (its frame 0 is a composed poster) and
           // lands with a short push, while the current shot plays its in-scene hand-off on top and dissolves.
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', clipPath: 'none' }, transStart);
-          masterTl.fromTo(next.wrapper,
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', clipPath: 'none' }, transStart);
+          masterTrack.travel(next.wrapper,
             { scale: 1.12 },
-            { scale: 1, duration: transDur, ease: 'power3.out', immediateRender: false },
+            { scale: 1, dur: transDur, curve: 'strong-out', showStart: false },
             transStart
           );
-          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
-          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.in' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
+          masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
+          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: 'smooth-in' }, transStart);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'fade') {
           // Crossfade: Next scene appears underneath at transStart, current scene fades out
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
-          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
-          masterTl.to(sceneWrapper, { opacity: 0, duration: transDur, ease: 'power2.inOut' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
+          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: 'smooth-inout' }, transStart);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'slide') {
           // Push slide: Next scene enters from right, current scene slides left. The next scene is made visible
-          // with its own set: a fromTo() with immediateRender: false never applies values only its from-vars name.
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' }, transStart);
-          masterTl.fromTo(next.wrapper,
+          // with its own pin: a travel() with showStart: false never applies values only its start props name.
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.travel(next.wrapper,
             { x: '100%' },
-            { x: '0%', duration: transDur, ease: 'power2.inOut', immediateRender: false },
+            { x: '0%', dur: transDur, curve: 'smooth-inout', showStart: false },
             transStart
           );
-          masterTl.to(sceneWrapper, { x: '-100%', duration: transDur, ease: 'power2.inOut' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
+          masterTrack.go(sceneWrapper, { x: '-100%', dur: transDur, curve: 'smooth-inout' }, transStart);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
           // Zoom transition: Next scene zooms from 0.92 to 1.0 and fades in on top, current scene zooms to 1.15 and fades
-          masterTl.set(next.wrapper, { visibility: 'visible', zIndex: 2, x: '0%', clipPath: 'none' }, transStart);
-          masterTl.fromTo(next.wrapper,
+          masterTrack.pin(next.wrapper, { visibility: 'visible', zIndex: 2, x: '0%', clipPath: 'none' }, transStart);
+          masterTrack.travel(next.wrapper,
             { scale: 0.92, opacity: 0 },
-            { scale: 1, opacity: 1, duration: transDur, ease: 'power2.out', immediateRender: false },
+            { scale: 1, opacity: 1, dur: transDur, curve: 'smooth-out', showStart: false },
             transStart
           );
-          masterTl.to(sceneWrapper, { scale: 1.15, opacity: 0, duration: transDur, ease: 'power2.in' }, transStart);
-          masterTl.set(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 0, zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', scale: 1, opacity: 1, zIndex: 1 }, transEnd);
+          masterTrack.go(sceneWrapper, { scale: 1.15, opacity: 0, dur: transDur, curve: 'smooth-in' }, transStart);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', scale: 1, opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'wipe') {
           // Vertical wipe: Next scene visible underneath, current scene wipes away
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
-          masterTl.set(sceneWrapper, { zIndex: 2 }, transStart);
-          masterTl.fromTo(sceneWrapper,
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
+          masterTrack.travel(sceneWrapper,
             { clipPath: 'inset(0% 0% 0% 0%)' },
-            { clipPath: 'inset(0% 0% 100% 0%)', duration: transDur, ease: 'power2.inOut', immediateRender: false },
+            { clipPath: 'inset(0% 0% 100% 0%)', dur: transDur, curve: 'smooth-inout', showStart: false },
             transStart
           );
-          masterTl.set(sceneWrapper, { visibility: 'hidden', clipPath: 'none', opacity: 0, zIndex: 1 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', clipPath: 'none', opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else {
           // Default cut: Instant switch at end of scene
-          masterTl.set(sceneWrapper, { visibility: 'hidden', opacity: 0 }, transEnd);
-          masterTl.set(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transEnd);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transEnd);
         }
       }
 
@@ -326,10 +275,10 @@ export function getRuntimeScript(): string {
     // Initial render at frame 0. Rendering to the end first initializes every tween now, in time
     // order, so each tween reads its start values once, before the editor pushes live overrides
     // (set_override_css).
-    if (masterTl) {
-      masterTl.progress(1, true);
+    if (masterTrack) {
+      masterTrack.progress(1, true);
       measurePosterOffsets(sceneElements);
-      masterTl.seek(0, false);
+      masterTrack.seek(0, false);
     }
 
     window.__MOO_READY__ = true;
@@ -428,10 +377,10 @@ export function getRuntimeScript(): string {
       const wrapper = sceneElements[i].wrapper;
       const dur = sceneElements[i].duration;
       try {
-        masterTl.seek(start + 0.001, true);
+        masterTrack.seek(start + 0.001, true);
         if (!hasVisibleContent(wrapper, stageArea)) {
           for (let k = 0; k < samples.length && samples[k] <= dur * 0.5; k++) {
-            masterTl.seek(start + samples[k], true);
+            masterTrack.seek(start + samples[k], true);
             if (hasVisibleContent(wrapper, stageArea)) {
               posterRanges.push({ start: start, end: start + samples[k] });
               break;
@@ -453,8 +402,8 @@ export function getRuntimeScript(): string {
         if (t >= posterRanges[i].start && t < posterRanges[i].end) { renderT = posterRanges[i].end; break; }
       }
     }
-    if (masterTl) {
-      masterTl.seek(renderT, false);
+    if (masterTrack) {
+      masterTrack.seek(renderT, false);
     }
     // Overlay hook (subtitles). Must never break seeking.
     if (typeof window.__MOO_AFTER_SEEK__ === 'function') {
@@ -462,7 +411,7 @@ export function getRuntimeScript(): string {
     }
   }
 
-  window.__MOO_INIT__ = initMasterTimeline;
+  window.__MOO_INIT__ = initMasterTrack;
   window.__MOO_SEEK__ = seekTo;
 
   // Canvas pooling for zero-allocation frame capture
@@ -488,7 +437,7 @@ export function getRuntimeScript(): string {
     if (!data || !data.type) return;
 
     if (data.type === 'init') {
-      await initMasterTimeline(data.meta);
+      await initMasterTrack(data.meta);
     } else if (data.type === 'seek') {
       const t = Number(data.time) || 0;
       seekTo(t, data.still === true);

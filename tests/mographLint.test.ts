@@ -38,8 +38,8 @@ const SLIDE_LIKE_RESPONSE = `\`\`\`html
 .scene-s1 .card { backdrop-filter: blur(20px); border-radius: 24px; padding: 32px; }
 \`\`\`
 \`\`\`javascript
-tl.from(root.querySelector('.card'), { opacity: 0, y: 40, duration: 0.6, ease: 'power3.out' });
-tl.from(root.querySelectorAll('h2, p'), { opacity: 0, y: 20, stagger: 0.1, duration: 0.5 }, '-=0.3');
+shot.arrive(root.querySelector('.card'), { opacity: 0, y: 40, dur: 0.6, curve: 'strong-out' });
+shot.arrive(root.querySelectorAll('h2, p'), { opacity: 0, y: 20, cascade: 0.1, dur: 0.5 }, 'end-0.3');
 \`\`\``;
 
 const MOGRAPH_RESPONSE = `\`\`\`html
@@ -58,10 +58,10 @@ const MOGRAPH_RESPONSE = `\`\`\`html
 \`\`\`
 \`\`\`javascript
 const cam = root.querySelector('.moo-camera');
-tl.fromTo(cam, { scale: 1.2 }, { scale: 1, duration: ctx.dur - 0.4, ease: 'sine.inOut' }, 0);
-tl.from(root.querySelector('.dot'), { scale: 0, transformOrigin: '50% 50%', duration: 0.5, ease: 'back.out(2)' }, 0);
-tl.from(root.querySelectorAll('.word span'), { yPercent: 110, rotation: 8, duration: 0.4, ease: 'expo.out' }, ctx.at('jutaan') || 0.6);
-tl.to(cam, { scale: 2.5, opacity: 0, duration: 0.4, ease: 'power4.in' }, ctx.dur - 0.4);
+shot.travel(cam, { scale: 1.2 }, { scale: 1, dur: ctx.dur - 0.4, curve: 'gentle-inout' }, 0);
+shot.arrive(root.querySelector('.dot'), { scale: 0, pivot: '50% 50%', dur: 0.5, curve: 'overshoot-out(2)' }, 0);
+shot.arrive(root.querySelectorAll('.word span'), { shiftY: 110, spin: 8, dur: 0.4, curve: 'rush-out' }, ctx.at('jutaan') || 0.6);
+shot.go(cam, { scale: 2.5, opacity: 0, dur: 0.4, curve: 'sharp-in' }, ctx.dur - 0.4);
 \`\`\``;
 
 const beat: StoryBeat = {
@@ -93,7 +93,7 @@ describe('Anti-PPT mograph linter', () => {
     const code = parseCodeBlocks(MOGRAPH_RESPONSE);
     const buildJs = code.buildJs
       .split('\n')
-      .filter((line) => !/^tl\.(to|fromTo)\(cam\b/.test(line))
+      .filter((line) => !/^shot\.(go|travel)\(cam\b/.test(line))
       .join('\n')
       .replace(/ctx\.at\('jutaan'\) \|\| /, '');
     const staticCam = { ...code, buildJs };
@@ -106,13 +106,13 @@ describe('Anti-PPT mograph linter', () => {
     const code = parseCodeBlocks(MOGRAPH_RESPONSE);
     const hiddenStart = {
       ...code,
-      buildJs: code.buildJs.replace("tl.fromTo(cam, { scale: 1.2 }", "tl.fromTo(cam, { scale: 1.2, opacity: 0 }")
+      buildJs: code.buildJs.replace("shot.travel(cam, { scale: 1.2 }", "shot.travel(cam, { scale: 1.2, opacity: 0 }")
     };
     const lint = lintMographQuality(hiddenStart);
     expect(lint.issues.map((i) => i.id)).toContain('empty-first-frame');
     expect(lint.needsRepair).toBe(true);
 
-    const rootHidden = { ...code, buildJs: `${code.buildJs}\ntl.from(root.children, { autoAlpha: 0, duration: 0.5 }, 0);` };
+    const rootHidden = { ...code, buildJs: `${code.buildJs}\nshot.arrive(root.children, { fade: 0, dur: 0.5 }, 0);` };
     expect(lintMographQuality(rootHidden).issues.map((i) => i.id)).toContain('empty-first-frame');
 
     // Secondary details may still enter from nothing

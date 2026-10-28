@@ -4,7 +4,7 @@ import { getRuntimeScript } from '../src/engine/composition/runtime/mooRuntime';
 import { lintMographQuality } from '../src/engine/composition/mographLint';
 
 interface Call {
-  method: 'to' | 'from' | 'fromTo' | 'set';
+  method: 'go' | 'arrive' | 'travel' | 'pin';
   targets: any;
   vars: any;
   fromVars?: any;
@@ -47,12 +47,12 @@ class FakeEl {
 
 function setup(dur = 4, words: Array<{ word: string; start: number }> = []) {
   const calls: Call[] = [];
-  const tl = {
-    to: (targets: any, vars: any, position: number) => calls.push({ method: 'to', targets, vars, position }),
-    from: (targets: any, vars: any, position: number) => calls.push({ method: 'from', targets, vars, position }),
-    set: (targets: any, vars: any, position: number) => calls.push({ method: 'set', targets, vars, position }),
-    fromTo: (targets: any, fromVars: any, vars: any, position: number) =>
-      calls.push({ method: 'fromTo', targets, fromVars, vars, position })
+  const shot = {
+    go: (targets: any, vars: any, position: number) => calls.push({ method: 'go', targets, vars, position }),
+    arrive: (targets: any, vars: any, position: number) => calls.push({ method: 'arrive', targets, vars, position }),
+    pin: (targets: any, vars: any, position: number) => calls.push({ method: 'pin', targets, vars, position }),
+    travel: (targets: any, fromVars: any, vars: any, position: number) =>
+      calls.push({ method: 'travel', targets, fromVars, vars, position })
   };
   const camera = new FakeEl();
   const title = new FakeEl('div', 'Satu ide besar');
@@ -89,14 +89,14 @@ function setup(dur = 4, words: Array<{ word: string; start: number }> = []) {
       return (seed - 1) / 2147483646;
     }
   };
-  installMographKit(tl, root, ctx);
+  installMographKit(shot, root, ctx);
   return { calls, ctx, camera, title, stat, paths, dots };
 }
 
 const endOf = (c: Call, count: number) => {
-  const d = c.vars.duration || 0;
-  const s = c.vars.stagger || 0;
-  const reps = c.vars.repeat ? c.vars.repeat + 1 : 1;
+  const d = c.vars.dur || 0;
+  const s = c.vars.cascade || 0;
+  const reps = c.vars.loop ? c.vars.loop + 1 : 1;
   return c.position + d * reps + s * (count - 1);
 };
 
@@ -106,13 +106,13 @@ describe('Mograph kit (ctx helpers)', () => {
     ctx.camera({ move: 'push' });
     ctx.handoff('whip-left');
 
-    const move = calls.find((c) => c.method === 'fromTo')!;
+    const move = calls.find((c) => c.method === 'travel')!;
     expect(move.targets).toBe(camera);
     expect(move.position).toBe(0);
-    expect(move.vars.duration).toBeCloseTo(3.6);
+    expect(move.vars.dur).toBeCloseTo(3.6);
     expect(move.fromVars.scale).toBeGreaterThan(1);
 
-    const exits = calls.filter((c) => c.method === 'to');
+    const exits = calls.filter((c) => c.method === 'go');
     expect(exits).toHaveLength(1);
     expect(exits[0].position).toBeCloseTo(3.6);
     expect(exits[0].vars.opacity).toBe(0);
@@ -123,15 +123,15 @@ describe('Mograph kit (ctx helpers)', () => {
     const { calls, ctx } = setup(4);
     ctx.hero('.title');
     const grow = calls[0];
-    expect(grow.method).toBe('fromTo');
+    expect(grow.method).toBe('travel');
     expect(grow.position).toBe(0);
     expect(grow.fromVars.scale).toBeGreaterThan(0.3);
     expect(grow.fromVars.opacity).toBeUndefined();
   });
 
-  it('squeezes stagger so late, crowded groups still finish inside the shot', () => {
+  it('squeezes the cascade so late, crowded groups still finish inside the shot', () => {
     const { calls, ctx, dots } = setup(4);
-    ctx.pop('.dot', { at: 3.5, stagger: 0.5 });
+    ctx.pop('.dot', { at: 3.5, cascade: 0.5 });
     const pop = calls[0];
     expect(pop.position).toBe(3.5);
     expect(endOf(pop, dots.length)).toBeLessThanOrEqual(4 + 1e-9);
@@ -140,11 +140,11 @@ describe('Mograph kit (ctx helpers)', () => {
   it('ctx.draw hides strokes by their length, then draws them in', () => {
     const { calls, ctx } = setup(4);
     ctx.draw('path', { at: 0.4, from: 0.25 });
-    const sets = calls.filter((c) => c.method === 'set');
+    const sets = calls.filter((c) => c.method === 'pin');
     expect(sets).toHaveLength(3);
     expect(sets[0].vars.strokeDasharray).toBe(500);
     expect(sets[0].vars.strokeDashoffset).toBeCloseTo(375);
-    const draw = calls.find((c) => c.method === 'to')!;
+    const draw = calls.find((c) => c.method === 'go')!;
     expect(draw.vars.strokeDashoffset).toBe(0);
     expect(draw.position).toBe(0.4);
   });
@@ -162,7 +162,7 @@ describe('Mograph kit (ctx helpers)', () => {
     expect(parts).toHaveLength(3);
     expect(title.textContent).toBe('Satu ide besar');
     const kin = calls[0];
-    expect(kin.method).toBe('from');
+    expect(kin.method).toBe('arrive');
     expect(kin.vars.scale).toBe(2.6);
     expect(kin.position).toBe(1);
   });
@@ -173,7 +173,7 @@ describe('Mograph kit (ctx helpers)', () => {
     expect(stat.textContent).toBe('0,0%');
     const tween = calls[0];
     tween.targets.v = 1234.5;
-    tween.vars.onUpdate();
+    tween.vars.onFrame();
     expect(stat.textContent).toBe('1.234,5%');
   });
 
@@ -182,8 +182,8 @@ describe('Mograph kit (ctx helpers)', () => {
     const b = setup(4);
     a.ctx.shake('.title', { at: 1 });
     b.ctx.shake('.title', { at: 1 });
-    expect(a.calls[0].vars.keyframes).toEqual(b.calls[0].vars.keyframes);
-    expect(a.calls[0].vars.keyframes.at(-1)).toMatchObject({ x: 0, rotation: 0 });
+    expect(a.calls[0].vars.sequence).toEqual(b.calls[0].vars.sequence);
+    expect(a.calls[0].vars.sequence.at(-1)).toMatchObject({ x: 0, spin: 0 });
   });
 
   it('a failing helper never breaks the rest of the scene', () => {
@@ -195,7 +195,7 @@ describe('Mograph kit (ctx helpers)', () => {
 describe('Runtime embedding', () => {
   it('embeds the kit into the stage runtime as valid JavaScript', () => {
     const script = getRuntimeScript();
-    expect(script).toContain('installMographKit(safeSceneTl, sceneWrapper, ctx)');
+    expect(script).toContain('installMographKit(shotTrack, sceneWrapper, ctx)');
     expect(script).toContain('ctx.camera =');
     expect(() => new Function(script)).not.toThrow();
   });
@@ -211,7 +211,7 @@ describe('Linter understands the kit', () => {
       buildJs: `ctx.camera({ move: 'push' });
 ctx.hero('.title');
 ctx.draw('path', { at: 0.3 });
-tl.from('.title span', { opacity: 0, y: 20, duration: 0.4 }, ctx.beat('satu', 1));`
+shot.arrive('.title span', { opacity: 0, y: 20, dur: 0.4 }, ctx.beat('satu', 1));`
     };
     expect(lintMographQuality(code, { hasWordTimestamps: true }).issues).toEqual([]);
   });

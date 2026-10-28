@@ -274,3 +274,26 @@ export const DEMO_PROJECT: MooProject = {
 };
 
 DEMO_PROJECT.scenes = DEMO_PROJECT.scenes.map((s) => migrateLegacyScene(s as any));
+
+/**
+ * The shipped demo above keeps the GSAP-style code that past builds stored, so the legacy demo
+ * detection and the needs-repair scan see real old data. This is the same demo in the MooScript API.
+ */
+const DEMO_SCENE_JS: Record<string, string> = {
+  'sc-1': `shot.arrive(root.querySelector(".sc1-badge"), { y: -30, opacity: 0, dur: 0.6, curve: "overshoot-out(1.7)" })
+  .arrive(root.querySelectorAll(".sc1-word"), { y: 60, opacity: 0, scale: 0.9, cascade: 0.18, dur: 0.7, curve: "strong-out" }, "end-0.3")
+  .arrive(root.querySelector(".sc1-sub"), { opacity: 0, y: 20, dur: 0.6 }, "end-0.2");`,
+  'sc-2': `shot.arrive(root.querySelector(".sc2-terminal"), { scale: 0.85, opacity: 0, y: 50, dur: 0.8, curve: "strong-out" })
+  .arrive(root.querySelectorAll(".sc2-line"), { opacity: 0, x: -20, cascade: 0.15, dur: 0.5, curve: "smooth-out" }, "end-0.3");`,
+  'sc-3': `shot.arrive(root.querySelector(".sc3-card"), { scale: 0.7, opacity: 0, dur: 0.8, curve: "overshoot-out(1.8)" })
+  .arrive(root.querySelector(".sc3-metric-val"), { scale: 1.3, opacity: 0, dur: 0.6, curve: "strong-out" }, "end-0.4")
+  .arrive(root.querySelector(".sc3-metric-lbl"), { y: 20, opacity: 0, dur: 0.5 }, "end-0.2");`
+};
+
+export const DEMO_PROJECT_MOOTWEEN: MooProject = {
+  ...DEMO_PROJECT,
+  composition: {
+    ...DEMO_COMPOSITION,
+    scenes: DEMO_COMPOSITION.scenes.map((m) => ({ ...m, buildJs: DEMO_SCENE_JS[m.id] ?? m.buildJs }))
+  }
+};

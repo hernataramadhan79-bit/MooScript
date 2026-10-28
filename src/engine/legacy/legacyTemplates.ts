@@ -112,14 +112,14 @@ function renderKineticQuote(
 
   const buildJs = `
 const container = root.querySelector(".${prefix}-container");
-if (container) tl.from(container, { opacity: 0, duration: 0.3 });
+if (container) shot.arrive(container, { opacity: 0, dur: 0.3 });
 const words = root.querySelectorAll(".${prefix}-w");
 if (words.length > 0) {
-  tl.from(words, { opacity: 0, y: 25, scale: 0.85, stagger: 0.08, duration: 0.5, ease: "back.out(1.7)" }, "-=0.1");
+  shot.arrive(words, { opacity: 0, y: 25, scale: 0.85, cascade: 0.08, dur: 0.5, curve: "overshoot-out(1.7)" }, "end-0.1");
 }
 const focusWords = root.querySelectorAll(".${prefix}-focus");
 if (focusWords.length > 0) {
-  tl.to(focusWords, { scale: 1.15, duration: 0.3, ease: "power2.out", stagger: 0.1 }, "-=0.2");
+  shot.go(focusWords, { scale: 1.15, dur: 0.3, curve: "smooth-out", cascade: 0.1 }, "end-0.2");
 }
 `.trim();
 
@@ -209,9 +209,9 @@ function renderMetricCounter(
 `.trim();
 
   const buildJs = `
-tl.from(root.querySelector(".${prefix}-card"), { scale: 0.8, opacity: 0, duration: 0.6, ease: "back.out(1.7)" })
-  .from(root.querySelector(".${prefix}-metric-val"), { scale: 1.3, opacity: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-  .from(root.querySelector(".${prefix}-metric-lbl"), { y: 20, opacity: 0, duration: 0.5 }, "-=0.2");
+shot.arrive(root.querySelector(".${prefix}-card"), { scale: 0.8, opacity: 0, dur: 0.6, curve: "overshoot-out(1.7)" })
+  .arrive(root.querySelector(".${prefix}-metric-val"), { scale: 1.3, opacity: 0, dur: 0.6, curve: "strong-out" }, "end-0.3")
+  .arrive(root.querySelector(".${prefix}-metric-lbl"), { y: 20, opacity: 0, dur: 0.5 }, "end-0.2");
 `.trim();
 
   return { html, css, buildJs };
@@ -292,8 +292,8 @@ function renderTerminalMockup(
 `.trim();
 
   const buildJs = `
-tl.from(root.querySelector(".${prefix}-terminal"), { scale: 0.88, opacity: 0, y: 35, duration: 0.7, ease: "power3.out" })
-  .from(root.querySelectorAll(".${prefix}-line"), { opacity: 0, x: -15, stagger: 0.1, duration: 0.4, ease: "power2.out" }, "-=0.2");
+shot.arrive(root.querySelector(".${prefix}-terminal"), { scale: 0.88, opacity: 0, y: 35, dur: 0.7, curve: "strong-out" })
+  .arrive(root.querySelectorAll(".${prefix}-line"), { opacity: 0, x: -15, cascade: 0.1, dur: 0.4, curve: "smooth-out" }, "end-0.2");
 `.trim();
 
   return { html, css, buildJs };
@@ -397,9 +397,9 @@ function renderVsComparison(
 `.trim();
 
   const buildJs = `
-tl.from(root.querySelector(".${prefix}-left"), { x: -30, opacity: 0, duration: 0.6, ease: "power3.out" })
-  .from(root.querySelector(".${prefix}-right"), { x: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-  .from(root.querySelector(".${prefix}-vs"), { scale: 0, opacity: 0, duration: 0.5, ease: "back.out(2)" }, "-=0.3");
+shot.arrive(root.querySelector(".${prefix}-left"), { x: -30, opacity: 0, dur: 0.6, curve: "strong-out" })
+  .arrive(root.querySelector(".${prefix}-right"), { x: 30, opacity: 0, dur: 0.6, curve: "strong-out" }, "end-0.3")
+  .arrive(root.querySelector(".${prefix}-vs"), { scale: 0, opacity: 0, dur: 0.5, curve: "overshoot-out(2)" }, "end-0.3");
 `.trim();
 
   return { html, css, buildJs };
@@ -488,8 +488,8 @@ function renderListStagger(
 `.trim();
 
   const buildJs = `
-tl.from(root.querySelector(".${prefix}-title"), { y: -20, opacity: 0, duration: 0.5, ease: "power2.out" })
-  .from(root.querySelectorAll(".${prefix}-item"), { x: -25, opacity: 0, stagger: 0.12, duration: 0.5, ease: "power2.out" }, "-=0.2");
+shot.arrive(root.querySelector(".${prefix}-title"), { y: -20, opacity: 0, dur: 0.5, curve: "smooth-out" })
+  .arrive(root.querySelectorAll(".${prefix}-item"), { x: -25, opacity: 0, cascade: 0.12, dur: 0.5, curve: "smooth-out" }, "end-0.2");
 `.trim();
 
   return { html, css, buildJs };

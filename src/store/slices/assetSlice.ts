@@ -105,13 +105,13 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       const safeAlt = escapeHtml(asset.name || 'Asset');
       const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${safeAlt}" style="${frameStyle}" /></div>`;
 
-      let animJs = `tl.from("${targetSelector}", { scale: 0, opacity: 0, duration: 0.7, ease: "back.out(1.7)" });`;
+      let animJs = `shot.arrive("${targetSelector}", { scale: 0, opacity: 0, dur: 0.7, curve: "overshoot-out(1.7)" });`;
       if (animPreset === 'slide') {
-        animJs = `tl.from("${targetSelector}", { y: 100, opacity: 0, duration: 0.6, ease: "power3.out" });`;
+        animJs = `shot.arrive("${targetSelector}", { y: 100, opacity: 0, dur: 0.6, curve: "strong-out" });`;
       } else if (animPreset === 'float') {
-        animJs = `tl.from("${targetSelector}", { scale: 0.8, opacity: 0, duration: 0.6, ease: "power2.out" }).to("${targetSelector}", { y: -15, repeat: -1, yoyo: true, duration: 1.5, ease: "sine.inOut" });`;
+        animJs = `shot.arrive("${targetSelector}", { scale: 0.8, opacity: 0, dur: 0.6, curve: "smooth-out" }).go("${targetSelector}", { y: -15, loop: true, pingpong: true, dur: 1.5, curve: "gentle-inout" });`;
       } else if (animPreset === 'zoom') {
-        animJs = `tl.from("${targetSelector}", { scale: 1.5, opacity: 0, duration: 0.5, ease: "power2.out" });`;
+        animJs = `shot.arrive("${targetSelector}", { scale: 1.5, opacity: 0, dur: 0.5, curve: "smooth-out" });`;
       }
 
       const mergedHtml = s.html ? s.html + imgHtml : imgHtml;

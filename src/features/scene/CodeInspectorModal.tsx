@@ -4,11 +4,12 @@ import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import {
-  findUnsupportedTimelineApis,
-  unsupportedTimelineApiMessage,
+  findForeignApis,
+  foreignApiMessage,
   validateSceneCode
 } from '../../engine/composition/validator';
 import type { SceneModule, Composition } from '../../types';
+import { MooApiGuidePanel } from './MooApiGuidePanel';
 
 interface CodeInspectorModalProps {
   beatId: string | null;
@@ -20,7 +21,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
   const project = useMooStore((s) => s.project);
   const addToast = useMooStore((s) => s.addToast);
 
-  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
+  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js' | 'guide'>('html');
   const [htmlCode, setHtmlCode] = useState('');
   const [cssCode, setCssCode] = useState('');
   const [jsCode, setJsCode] = useState('');
@@ -41,7 +42,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       // Default template if not yet generated
       setHtmlCode('<div class="scene-box">\n  <h1 class="headline">Custom Title</h1>\n</div>');
       setCssCode('.scene-box {\n  width: 100%;\n  height: 100%;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.headline {\n  font-size: 72px;\n  color: var(--moo-accent, #38bdf8);\n}');
-      setJsCode('tl.from(root.querySelector(".headline"), {\n  scale: 0.5,\n  opacity: 0,\n  duration: 0.8,\n  ease: "back.out(1.7)"\n});');
+      setJsCode('shot.arrive(".headline", {\n  scale: 0.5,\n  opacity: 0,\n  dur: 0.8,\n  curve: "overshoot-out(1.7)"\n}, 0);');
       setErrors([]);
     }
   }, [currentScene, beatId, isOpen]);
@@ -53,10 +54,10 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       addToast('Perubahan memiliki error validasi determinisme/keamanan', 'error');
       return;
     }
-    const unsupported = findUnsupportedTimelineApis(jsCode);
+    const unsupported = findForeignApis(jsCode);
     if (unsupported.length > 0) {
-      setErrors(unsupported.map(unsupportedTimelineApiMessage));
-      addToast('Kode memakai API yang tidak tersedia di MooTween', 'error');
+      setErrors(unsupported.map(foreignApiMessage));
+      addToast('Kode belum memakai API MooScript; lihat petunjuk di atas atau tab Panduan API', 'error');
       return;
     }
 
@@ -116,7 +117,8 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
   const tabs = [
     { value: 'html' as const, label: 'HTML Markup', icon: 'code' },
     { value: 'css' as const, label: 'CSS Styling', icon: 'css' },
-    { value: 'js' as const, label: 'MooTween Animation', icon: 'javascript' }
+    { value: 'js' as const, label: 'Animasi (shot)', icon: 'javascript' },
+    { value: 'guide' as const, label: 'Panduan API', icon: 'menu_book' }
   ];
 
   return (
@@ -124,7 +126,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
       isOpen={isOpen}
       onClose={onClose}
       title="Code Inspector: Mograph Editor"
-      description="Edit langsung struktur DOM, style CSS, dan timeline animasi MooTween untuk scene ini."
+      description="Edit langsung struktur DOM, style CSS, dan animasi scene ini. Animasi ditulis dengan API MooScript; lihat tab Panduan API."
       maxWidth="max-w-3xl"
     >
       <div className="flex flex-col gap-4">
@@ -169,9 +171,10 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
               value={jsCode}
               onChange={(e) => setJsCode(e.target.value)}
               className="w-full h-72 bg-transparent p-3 text-amber-300 focus:outline-none resize-none font-mono text-[13px] leading-relaxed"
-              placeholder="// Animasikan lewat timeline MooTween: tl.to / tl.from / ctx.*"
+              placeholder="// Gerak di shot: shot.go / shot.arrive / shot.travel / shot.pin, atau helper ctx.* (lihat Panduan API)"
             />
           )}
+          {activeTab === 'guide' && <MooApiGuidePanel />}
         </div>
 
         <div className="flex items-center justify-between pt-2">

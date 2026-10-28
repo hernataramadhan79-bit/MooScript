@@ -120,7 +120,7 @@ function wrapInCamera(html: string, sid: string): string {
 /** Starts the poster layers visible (opacity 1) instead of fading them in from nothing. */
 function keepPosterLayersVisible(buildJs: string, layers: string[]): string {
   return layers.reduce(
-    (js, name) => js.replace(new RegExp(`(\\.fromTo\\(${name}, \\{[^}]*?)opacity: 0(?=[ ,}])`), '$1opacity: 1'),
+    (js, name) => js.replace(new RegExp(`(\\.travel\\(${name}, \\{[^}]*?)opacity: 0(?=[ ,}])`), '$1opacity: 1'),
     buildJs
   );
 }
@@ -377,13 +377,13 @@ const subtext = root.querySelector('[data-moo-layer="Subtext"]');
 const barFill = root.querySelector('.${sid}-bar-fill');
 const orb = root.querySelector('[data-moo-layer="Ambient Glow"]');
 
-tl.fromTo(badge, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'back.out(1.7)' }, 0)
-  .fromTo(card, { y: 60, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: 'power3.out' }, 0.1)
-  .fromTo(statNum, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.65, ease: 'back.out(2)' }, 0.22)
-  .fromTo(headline, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power2.out' }, 0.35)
-  .fromTo(subtext, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.45, ease: 'power2.out' }, 0.45)
-  .fromTo(barFill, { scaleX: 0, transformOrigin: 'left center' }, { scaleX: 1, duration: 0.9, ease: 'power3.out' }, 0.35)
-  .to(orb, { x: -40, y: 40, scale: 1.15, duration: ${Math.max(1.5, duration - 0.2).toFixed(2)}, ease: 'sine.inOut' }, 0);
+shot.travel(badge, { y: -30, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'overshoot-out(1.7)' }, 0)
+  .travel(card, { y: 60, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.6, curve: 'strong-out' }, 0.1)
+  .travel(statNum, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, dur: 0.65, curve: 'overshoot-out(2)' }, 0.22)
+  .travel(headline, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'smooth-out' }, 0.35)
+  .travel(subtext, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.45)
+  .travel(barFill, { scaleX: 0, pivot: 'left center' }, { scaleX: 1, dur: 0.9, curve: 'strong-out' }, 0.35)
+  .go(orb, { x: -40, y: 40, scale: 1.15, dur: ${Math.max(1.5, duration - 0.2).toFixed(2)}, curve: 'gentle-inout' }, 0);
 `.trim();
   } else if (chosen === 'code-terminal') {
     const codeLines = chips.map((c, i) => `const step_${i + 1} = "${escapeHtml(c)}";`).join('\n');
@@ -472,11 +472,11 @@ const term = root.querySelector('[data-moo-layer="Terminal Window"]');
 const code = root.querySelector('[data-moo-layer="Code Block"]');
 const sub = root.querySelector('[data-moo-layer="Subtext"]');
 
-tl.fromTo(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(heading, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out' }, 0.1)
-  .fromTo(term, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.55, ease: 'back.out(1.4)' }, 0.2)
-  .fromTo(code, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power2.out' }, 0.38)
-  .fromTo(sub, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.45, ease: 'power2.out' }, 0.5);
+shot.travel(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(heading, { y: 30, opacity: 0 }, { y: 0, opacity: 1, dur: 0.5, curve: 'strong-out' }, 0.1)
+  .travel(term, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.55, curve: 'overshoot-out(1.4)' }, 0.2)
+  .travel(code, { opacity: 0, x: -20 }, { opacity: 1, x: 0, dur: 0.5, curve: 'smooth-out' }, 0.38)
+  .travel(sub, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.5);
 `.trim();
   } else if (chosen === 'split-versus') {
     const leftText = escapeHtml(chips[0] || 'CARA LAMA');
@@ -575,12 +575,12 @@ const vsBadge = root.querySelector('[data-moo-layer="VS Badge"]');
 const rightCard = root.querySelector('[data-moo-layer="Right Card"]');
 const sub = root.querySelector('[data-moo-layer="Subtext"]');
 
-tl.fromTo(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(title, { y: 25, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, 0.1)
-  .fromTo(leftCard, { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'power3.out' }, 0.2)
-  .fromTo(vsBadge, { scale: 0, rotation: -45 }, { scale: 1, rotation: 0, duration: 0.45, ease: 'back.out(2)' }, 0.35)
-  .fromTo(rightCard, { x: 80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'power3.out' }, 0.42)
-  .fromTo(sub, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.4, ease: 'power2.out' }, 0.58);
+shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(title, { y: 25, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'strong-out' }, 0.1)
+  .travel(leftCard, { x: -80, opacity: 0 }, { x: 0, opacity: 1, dur: 0.5, curve: 'strong-out' }, 0.2)
+  .travel(vsBadge, { scale: 0, spin: -45 }, { scale: 1, spin: 0, dur: 0.45, curve: 'overshoot-out(2)' }, 0.35)
+  .travel(rightCard, { x: 80, opacity: 0 }, { x: 0, opacity: 1, dur: 0.5, curve: 'strong-out' }, 0.42)
+  .travel(sub, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.4, curve: 'smooth-out' }, 0.58);
 `.trim();
   } else if (chosen === 'bento-list') {
     const itemsHtml = chips
@@ -659,10 +659,10 @@ const title = root.querySelector('[data-moo-layer="Headline"]');
 const items = root.querySelectorAll('.${sid}-bento-item');
 const sub = root.querySelector('[data-moo-layer="Subtext"]');
 
-tl.fromTo(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, 0.1)
-  .fromTo(items, { x: -50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, stagger: 0.14, ease: 'back.out(1.4)' }, 0.22)
-  .fromTo(sub, { y: 18, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.4, ease: 'power2.out' }, 0.55);
+shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'strong-out' }, 0.1)
+  .travel(items, { x: -50, opacity: 0 }, { x: 0, opacity: 1, dur: 0.45, cascade: 0.14, curve: 'overshoot-out(1.4)' }, 0.22)
+  .travel(sub, { y: 18, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.4, curve: 'smooth-out' }, 0.55);
 `.trim();
   } else if (chosen === 'chart-data') {
     html = `
@@ -734,11 +734,11 @@ const card = root.querySelector('[data-moo-layer="Main Card"]');
 const bars = root.querySelectorAll('.${sid}-bar');
 const sub = root.querySelector('[data-moo-layer="Subtext"]');
 
-tl.fromTo(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, 0.1)
-  .fromTo(card, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power3.out' }, 0.18)
-  .fromTo(bars, { scaleY: 0, transformOrigin: 'bottom center' }, { scaleY: 1, duration: 0.55, stagger: 0.12, ease: 'back.out(1.6)' }, 0.28)
-  .fromTo(sub, { y: 18, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.4, ease: 'power2.out' }, 0.55);
+shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'strong-out' }, 0.1)
+  .travel(card, { y: 40, opacity: 0 }, { y: 0, opacity: 1, dur: 0.5, curve: 'strong-out' }, 0.18)
+  .travel(bars, { scaleY: 0, pivot: 'bottom center' }, { scaleY: 1, dur: 0.55, cascade: 0.12, curve: 'overshoot-out(1.6)' }, 0.28)
+  .travel(sub, { y: 18, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.4, curve: 'smooth-out' }, 0.55);
 `.trim();
   } else if (chosen === 'social-quote') {
     html = `
@@ -796,10 +796,10 @@ const mark = root.querySelector('[data-moo-layer="Quote Mark"]');
 const text = root.querySelector('[data-moo-layer="Headline"]');
 const footer = root.querySelector('[data-moo-layer="Badge"]');
 
-tl.fromTo(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.55, ease: 'power3.out' }, 0)
-  .fromTo(mark, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2)' }, 0.15)
-  .fromTo(text, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' }, 0.25)
-  .fromTo(footer, { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0.42);
+shot.travel(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.55, curve: 'strong-out' }, 0)
+  .travel(mark, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, dur: 0.45, curve: 'overshoot-out(2)' }, 0.15)
+  .travel(text, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.5, curve: 'smooth-out' }, 0.25)
+  .travel(footer, { x: -20, opacity: 0 }, { x: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0.42);
 `.trim();
   } else if (chosen === 'glass-spotlight') {
     const chipsHtml = chips
@@ -875,11 +875,11 @@ const title = root.querySelector('[data-moo-layer="Headline"]');
 const body = root.querySelector('[data-moo-layer="Subtext"]');
 const chips = root.querySelectorAll('.${sid}-chip');
 
-tl.fromTo(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.55, ease: 'power3.out' }, 0.1)
-  .fromTo(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power2.out' }, 0.24)
-  .fromTo(body, { y: 20, opacity: 0 }, { y: 0, opacity: 0.92, duration: 0.45, ease: 'power2.out' }, 0.34)
-  .fromTo(chips, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, stagger: 0.1, ease: 'back.out(1.7)' }, 0.44);
+shot.travel(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.55, curve: 'strong-out' }, 0.1)
+  .travel(title, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'smooth-out' }, 0.24)
+  .travel(body, { y: 20, opacity: 0 }, { y: 0, opacity: 0.92, dur: 0.45, curve: 'smooth-out' }, 0.34)
+  .travel(chips, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, dur: 0.35, cascade: 0.1, curve: 'overshoot-out(1.7)' }, 0.44);
 `.trim();
   } else {
     // Default: 'kinetic-impact'
@@ -936,11 +936,11 @@ const title = root.querySelector('[data-moo-layer="Headline"]');
 const sub = root.querySelector('[data-moo-layer="Subtext"]');
 const orb = root.querySelector('[data-moo-layer="Ambient Glow"]');
 
-tl.fromTo(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' }, 0)
-  .fromTo(pill, { scale: 0.4, rotation: -6, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.48, ease: 'back.out(2)' }, 0.12)
-  .fromTo(title, { y: 45, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.55, ease: 'power3.out' }, 0.22)
-  .fromTo(sub, { y: 24, opacity: 0 }, { y: 0, opacity: 0.9, duration: 0.45, ease: 'power2.out' }, 0.38)
-  .to(orb, { scale: 1.2, x: -30, y: 30, duration: ${Math.max(1.5, duration - 0.2).toFixed(2)}, ease: 'sine.inOut' }, 0);
+shot.travel(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 'smooth-out' }, 0)
+  .travel(pill, { scale: 0.4, spin: -6, opacity: 0 }, { scale: 1, spin: 0, opacity: 1, dur: 0.48, curve: 'overshoot-out(2)' }, 0.12)
+  .travel(title, { y: 45, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.55, curve: 'strong-out' }, 0.22)
+  .travel(sub, { y: 24, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.38)
+  .go(orb, { scale: 1.2, x: -30, y: 30, dur: ${Math.max(1.5, duration - 0.2).toFixed(2)}, curve: 'gentle-inout' }, 0);
 `.trim();
   }
 

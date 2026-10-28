@@ -1,15 +1,14 @@
 /**
  * MooTween: MooScript's own animation engine, running inside the stage iframe.
  *
- * A seek-only engine with the timeline API MooScript scenes use: timelines with to / from / fromTo /
- * set, position parameters, staggers, eases, repeat/yoyo, keyframes, CSS, transform, color,
- * complex-string, SVG and attr properties, and callbacks. Nothing ticks in real time; every frame is
- * produced by seek(t). The API keeps the GSAP-style shape, so scenes written before MooTween run
- * unchanged.
+ * A seek-only engine. Scene code drives a track (the `shot`) with go / arrive / travel / pin, places
+ * moves with `at` (seconds, 'end', 'with', 'after', marks), and shapes them with dur, wait, curve,
+ * cascade, loop, pingpong and sequence. Properties cover transforms (x, y, spin, tilt, shift, scale,
+ * skew, pivot), opacity and fade, CSS numbers, colors, complex strings, SVG and attrs. Nothing ticks
+ * in real time; every frame is produced by seek(t). The full vocabulary is in mooApiGuide.ts.
  *
- * Rendering follows the order the existing scenes were authored against: moving forward, children
- * render in start order; moving backward, in reverse; a child whose clamped time did not change is
- * skipped, so a finished tween releases the properties it animated.
+ * Rendering order: moving forward, children render in start order; moving backward, in reverse; a
+ * child whose clamped time did not change is skipped, so a finished move releases its properties.
  *
  * The function is embedded into the runtime with Function.prototype.toString(), so it must stay
  * self-contained: no imports and no references to anything outside its own body.
@@ -18,8 +17,8 @@ export function installMooTween(win: any): any {
   const doc: any = win.document;
   const DEG = 180 / Math.PI;
   const RAD = Math.PI / 180;
-  // Seconds covered by repeat: -1 when no shot duration is known.
-  const REPEAT_SPAN = 3600;
+  // Seconds covered by loop: true when no shot duration is known.
+  const LOOP_SPAN = 3600;
 
   /* ------------------------------------------------------------------ *
    * Helpers
@@ -38,7 +37,7 @@ export function installMooTween(win: any): any {
     const r = Math.round(v * 100000) / 100000;
     return r === 0 ? 0 : r;
   };
-  // Timeline positions are kept at 1e-7 s so 3.2 + 3.6 lands exactly on 6.8.
+  // Track positions are kept at 1e-7 s so 3.2 + 3.6 lands exactly on 6.8.
   const roundTime = (v: number) => Math.round(v * 1e7) / 1e7 || 0;
   const clamp = (min: number, max: number, v: number) => (v < min ? min : v > max ? max : v);
   const isFn = (v: any) => typeof v === 'function';
@@ -56,48 +55,44 @@ export function installMooTween(win: any): any {
   const PLAIN_NUM = new RegExp('^' + NUM_SRC + '$', 'i');
   const NUM_UNIT = new RegExp('^(' + NUM_SRC + ')([a-z%]*)$', 'i');
 
-  /** '+=10px' -> { rel: 1, n: 10, u: 'px' }; '50%' -> { rel: 0, n: 50, u: '%' }; 3 -> { rel: 0, n: 3, u: '' }. */
+  /** 'by(-10px)' -> { rel: 1, n: -10, u: 'px' }; '50%' -> { rel: 0, n: 50, u: '%' }; 3 -> { rel: 0, n: 3, u: '' }. */
   function parseNumber(v: any): { rel: number; n: number; u: string } | null {
     if (typeof v === 'number') return isFinite(v) ? { rel: 0, n: v, u: '' } : null;
     if (typeof v !== 'string') return null;
     let s = v.trim();
     let rel = 0;
-    const op = s.slice(0, 2);
-    if (op === '+=' || op === '-=') {
-      rel = op === '+=' ? 1 : -1;
-      s = s.slice(2).trim();
+    const by = s.match(/^by\(\s*([^)]*?)\s*\)$/i);
+    if (by) {
+      rel = 1;
+      s = by[1];
     }
     const m = s.match(NUM_UNIT);
     return m ? { rel, n: parseFloat(m[1]), u: m[2] } : null;
   }
 
   /* ------------------------------------------------------------------ *
-   * Eases
+   * Curves: '<family>-<in|out|inout>(<params>)', e.g. 'rush-out', 'overshoot-out(1.7)'
    * ------------------------------------------------------------------ */
   type Ease = (p: number) => number;
   const easeMap: Record<string, Ease> = {};
   const outOf = (easeIn: Ease): Ease => (p) => 1 - easeIn(1 - p);
   const inOutOf = (easeIn: Ease): Ease => (p) => (p < 0.5 ? easeIn(p * 2) / 2 : 1 - easeIn((1 - p) * 2) / 2);
-  const registerEase = (names: string, easeIn: Ease, easeOut?: Ease) => {
+  const registerEase = (name: string, easeIn: Ease, easeOut?: Ease) => {
     const o = easeOut || outOf(easeIn);
-    const io = inOutOf(easeIn);
-    names.split(',').forEach((name) => {
-      easeMap[name] = o;
-      easeMap[name + '.in'] = easeIn;
-      easeMap[name + '.out'] = o;
-      easeMap[name + '.inout'] = io;
-    });
+    easeMap[name + '-in'] = easeIn;
+    easeMap[name + '-out'] = o;
+    easeMap[name + '-inout'] = inOutOf(easeIn);
   };
   const linear: Ease = (p) => p;
-  registerEase('none,linear,power0', linear, linear);
-  registerEase('power1,quad', (p) => p * p);
-  registerEase('power2,cubic', (p) => p * p * p);
-  registerEase('power3,quart', (p) => p * p * p * p);
-  registerEase('power4,quint,strong', (p) => p * p * p * p * p);
-  registerEase('sine', (p) => (p === 1 ? 1 : 1 - Math.cos(p * Math.PI * 0.5)));
+  registerEase('linear', linear, linear);
+  registerEase('soft', (p) => p * p);
+  registerEase('smooth', (p) => p * p * p);
+  registerEase('strong', (p) => p * p * p * p);
+  registerEase('sharp', (p) => p * p * p * p * p);
+  registerEase('gentle', (p) => (p === 1 ? 1 : 1 - Math.cos(p * Math.PI * 0.5)));
   // Blended so the curve lands exactly on 1; plain 2^(10(p-1)) stops short. Matches the reference scenes.
-  registerEase('expo', (p) => Math.pow(2, 10 * (p - 1)) * p + p * p * p * p * p * p * (1 - p));
-  registerEase('circ', (p) => 1 - Math.sqrt(Math.max(0, 1 - p * p)));
+  registerEase('rush', (p) => Math.pow(2, 10 * (p - 1)) * p + p * p * p * p * p * p * (1 - p));
+  registerEase('arc', (p) => 1 - Math.sqrt(Math.max(0, 1 - p * p)));
   const bounceOut: Ease = (p) => {
     const n1 = 7.5625;
     const d1 = 2.75;
@@ -126,28 +121,27 @@ export function installMooTween(win: any): any {
     return (p) => Math.floor((n + 1) * clamp(0, 1 - 1e-8, p)) / n;
   };
 
-  const DEFAULT_EASE = 'power1.out';
+  const DEFAULT_CURVE = 'soft-out';
   const easeCache: Record<string, Ease> = {};
-  function parseEase(ease: any, fallback?: Ease): Ease {
+  function parseCurve(ease: any, fallback?: Ease): Ease {
     if (isFn(ease)) return ease;
-    const dflt = fallback || easeMap[DEFAULT_EASE];
+    const dflt = fallback || easeMap[DEFAULT_CURVE];
     if (typeof ease !== 'string' || !ease.trim()) return dflt;
     const key = ease.trim();
     if (easeCache[key]) return easeCache[key];
-    const m = key.match(/^([a-z0-9]+)(?:\.(easeinout|easeout|easein|inout|out|in))?(?:\.config)?(?:\(([^)]*)\))?$/i);
+    const m = key.toLowerCase().match(/^([a-z]+)(?:-(inout|in|out))?(?:\(([^)]*)\))?$/);
     let result: Ease | undefined;
     if (m) {
-      const base = m[1].toLowerCase();
-      const raw = (m[2] || 'out').toLowerCase();
-      const dir = raw === 'easein' || raw === 'in' ? 'in' : raw === 'easeinout' || raw === 'inout' ? 'inout' : 'out';
+      const base = m[1];
+      const dir = m[2] || 'out';
       const args = (m[3] || '').split(',').map((s) => parseFloat(s)).filter((n) => isFinite(n));
-      if (base === 'back') result = backEase(dir, args[0]);
-      else if (base === 'elastic') result = elasticEase(dir, args[0], args[1]);
-      else if (base === 'steps' || base === 'steppedease') result = stepsEase(args[0]);
-      else result = easeMap[base + '.' + dir];
+      if (base === 'overshoot') result = backEase(dir, args[0]);
+      else if (base === 'spring') result = elasticEase(dir, args[0], args[1]);
+      else if (base === 'steps') result = stepsEase(args[0]);
+      else result = easeMap[base + '-' + dir];
     }
     if (!result) {
-      warnOnce('ease:' + key, 'Unknown ease "' + key + '", using ' + DEFAULT_EASE + '.');
+      warnOnce('curve:' + key, 'Unknown curve "' + key + '", using ' + DEFAULT_CURVE + '.');
       result = dflt;
     }
     easeCache[key] = result;
@@ -251,7 +245,7 @@ export function installMooTween(win: any): any {
     return [Math.round(h), Math.round(s * 100), Math.round(l * 100), c[3]];
   }
 
-  /** Color tween; an hsl() value on either side makes it travel through HSL instead of RGB. */
+  /** Color channel; an hsl() value on either side makes it travel through HSL instead of RGB. */
   function colorWriter(startStr: string, endStr: string, startC: number[], endC: number[], write: (v: string) => void) {
     if (/hsla?\(/i.test(startStr + ' ' + endStr)) {
       // A side written as hsl() keeps its exact numbers; an rgb side is converted.
@@ -461,9 +455,9 @@ export function installMooTween(win: any): any {
     }
   }
 
-  /** Linear part of rotate(rotation) skew(skewX, skewY) scale(scaleX, scaleY). */
+  /** Linear part of rotate(spin) skew(skewX, skewY) scale(scaleX, scaleY). */
   function linearOf(c: any): { a: number; b: number; c: number; d: number } {
-    const r = c.rotation * RAD;
+    const r = c.spin * RAD;
     const cr = Math.cos(r);
     const sr = Math.sin(r);
     const tx = Math.tan(c.skewX * RAD);
@@ -486,9 +480,9 @@ export function installMooTween(win: any): any {
       c.z = m[14];
       c.scaleX = sx;
       c.scaleY = sy;
-      c.rotationY = sx ? Math.asin(clamp(-1, 1, -m[2] / sx)) * DEG : 0;
-      c.rotationX = sy && sz ? Math.atan2(m[6] / sy, m[10] / sz) * DEG : 0;
-      c.rotation = sx ? Math.atan2(m[1] / sx, m[0] / sx) * DEG : 0;
+      c.tiltY = sx ? Math.asin(clamp(-1, 1, -m[2] / sx)) * DEG : 0;
+      c.tiltX = sy && sz ? Math.atan2(m[6] / sy, m[10] / sz) * DEG : 0;
+      c.spin = sx ? Math.atan2(m[1] / sx, m[0] / sx) * DEG : 0;
       if (m[11]) c.perspective = round(-1 / m[11]);
       return;
     }
@@ -502,7 +496,7 @@ export function installMooTween(win: any): any {
     const sy = cr * d - sr * cc;
     c.scaleX = sx;
     c.scaleY = sy;
-    c.rotation = rot * DEG;
+    c.spin = rot * DEG;
     c.skewX = sy ? Math.atan((cr * cc + sr * d) / sy) * DEG : 0;
   }
 
@@ -510,8 +504,8 @@ export function installMooTween(win: any): any {
   function transformCache(el: any): any {
     if (el.__mooTransform) return el.__mooTransform;
     const c: any = {
-      x: 0, y: 0, z: 0, xu: 'px', yu: 'px', xPercent: 0, yPercent: 0,
-      rotation: 0, rotationX: 0, rotationY: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1, perspective: 0,
+      x: 0, y: 0, z: 0, xu: 'px', yu: 'px', shiftX: 0, shiftY: 0,
+      spin: 0, tiltX: 0, tiltY: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1, perspective: 0,
       svg: isSvgChild(el), ox: 0, oy: 0, xOff: 0, yOff: 0
     };
     const style = computed(el);
@@ -541,10 +535,10 @@ export function installMooTween(win: any): any {
       const L = { a: round5(raw.a), b: round5(raw.b), c: round5(raw.c), d: round5(raw.d) };
       let px = c.x;
       let py = c.y;
-      if (c.xPercent || c.yPercent || c.xu === '%' || c.yu === '%') {
+      if (c.shiftX || c.shiftY || c.xu === '%' || c.yu === '%') {
         const bb = bboxOf(el);
-        px = (c.xu === '%' ? (c.x / 100) * bb.width : c.x) + (c.xPercent / 100) * bb.width;
-        py = (c.yu === '%' ? (c.y / 100) * bb.height : c.y) + (c.yPercent / 100) * bb.height;
+        px = (c.xu === '%' ? (c.x / 100) * bb.width : c.x) + (c.shiftX / 100) * bb.width;
+        py = (c.yu === '%' ? (c.y / 100) * bb.height : c.y) + (c.shiftY / 100) * bb.height;
       }
       const tx = px + c.ox - (L.a * c.ox + L.c * c.oy) + c.xOff;
       const ty = py + c.oy - (L.b * c.ox + L.d * c.oy) + c.yOff;
@@ -553,29 +547,26 @@ export function installMooTween(win: any): any {
     }
     let s = '';
     if (c.perspective) s += 'perspective(' + round(c.perspective) + 'px) ';
-    if (c.xPercent || c.yPercent) s += 'translate(' + round(c.xPercent) + '%, ' + round(c.yPercent) + '%) ';
+    if (c.shiftX || c.shiftY) s += 'translate(' + round(c.shiftX) + '%, ' + round(c.shiftY) + '%) ';
     if (c.z) s += 'translate3d(' + round(c.x) + c.xu + ', ' + round(c.y) + c.yu + ', ' + round(c.z) + 'px) ';
     else if (c.x || c.y) s += 'translate(' + round(c.x) + c.xu + ', ' + round(c.y) + c.yu + ') ';
-    if (c.rotation) s += 'rotate(' + round(c.rotation) + 'deg) ';
-    if (c.rotationY) s += 'rotateY(' + round(c.rotationY) + 'deg) ';
-    if (c.rotationX) s += 'rotateX(' + round(c.rotationX) + 'deg) ';
+    if (c.spin) s += 'rotate(' + round(c.spin) + 'deg) ';
+    if (c.tiltY) s += 'rotateY(' + round(c.tiltY) + 'deg) ';
+    if (c.tiltX) s += 'rotateX(' + round(c.tiltX) + 'deg) ';
     if (c.skewX || c.skewY) s += 'skew(' + round(c.skewX) + 'deg, ' + round(c.skewY) + 'deg) ';
     if (c.scaleX !== 1 || c.scaleY !== 1) s += 'scale(' + round(c.scaleX) + ', ' + round(c.scaleY) + ') ';
     el.style.transform = s || 'translate(0px, 0px)';
   }
 
+  // Transform properties a scene can animate, mapped to the transform cache.
   const TRANSFORM_ALIASES: Record<string, string> = {
-    x: 'x', y: 'y', z: 'z', translateX: 'x', translateY: 'y', translateZ: 'z',
-    xPercent: 'xPercent', yPercent: 'yPercent',
-    rotation: 'rotation', rotate: 'rotation', rotationZ: 'rotation', rotateZ: 'rotation',
-    rotationX: 'rotationX', rotateX: 'rotationX', rotationY: 'rotationY', rotateY: 'rotationY',
-    skewX: 'skewX', skewY: 'skewY', scaleX: 'scaleX', scaleY: 'scaleY',
-    transformPerspective: 'perspective'
+    x: 'x', y: 'y', z: 'z', shiftX: 'shiftX', shiftY: 'shiftY', spin: 'spin', tiltX: 'tiltX', tiltY: 'tiltY',
+    skewX: 'skewX', skewY: 'skewY', scaleX: 'scaleX', scaleY: 'scaleY', depth: 'perspective'
   };
-  const ANGLE_COMPONENTS: Record<string, boolean> = { rotation: true, rotationX: true, rotationY: true, skewX: true, skewY: true };
+  const ANGLE_COMPONENTS: Record<string, boolean> = { spin: true, tiltX: true, tiltY: true, skewX: true, skewY: true };
 
   /** Origin "a b" for an SVG element: percentages, keywords and px are relative to its bounding box. */
-  function svgOriginPoint(el: any, value: string, absolute: boolean): [number, number] {
+  function pivotPointOf(el: any, value: string, absolute: boolean): [number, number] {
     const words: Record<string, string> = { left: '0%', top: '0%', center: '50%', right: '100%', bottom: '100%' };
     const parts = String(value).trim().split(/\s+/).map((w) => words[w] || w);
     if (parts.length === 1) parts.push(parts[0] === '0%' || parts[0] === '100%' ? '50%' : parts[0]);
@@ -587,16 +578,16 @@ export function installMooTween(win: any): any {
   }
 
   /* ------------------------------------------------------------------ *
-   * Property tweens
+   * Channels
    * ------------------------------------------------------------------ */
-  // A property tween renders one property of one target: r(ratio, progress) writes the eased value,
-  // revert() writes what was there before the tween touched it.
-  interface PropTween {
+  // A channel renders one property of one target: r(ratio, progress) writes the eased value,
+  // revert() writes what was there before the move touched it.
+  interface Channel {
     r: (ratio: number, progress: number) => void;
     revert: () => void;
     tf?: any;
     el?: any;
-    /** Rendered only while the playhead moves backward (see buildPropTweens). */
+    /** Rendered only while the playhead moves backward (see buildChannels). */
     backwardOnly?: boolean;
   }
 
@@ -604,7 +595,6 @@ export function installMooTween(win: any): any {
     opacity: true, zIndex: true, fontWeight: true, lineHeight: true, flexGrow: true, flexShrink: true, order: true,
     zoom: true, fillOpacity: true, strokeOpacity: true, stopOpacity: true, floodOpacity: true, strokeMiterlimit: true
   };
-  const DISCRETE_START: Record<string, boolean> = { transformOrigin: true };
 
   function pxPerUnit(el: any, prop: string, unit: string): number {
     if (!unit || unit === 'px') return 1;
@@ -667,22 +657,22 @@ export function installMooTween(win: any): any {
     return (v) => Math.round(v / n) * n;
   }
 
-  function discretePT(write: (v: any) => void, before: any, start: any, end: any, atStart: boolean): PropTween {
+  function discreteChannel(write: (v: any) => void, before: any, start: any, end: any, atStart: boolean): Channel {
     return {
       r: (_ratio, progress) => write(atStart ? (progress > 0 ? end : start) : progress >= 1 ? end : start),
       revert: () => write(before)
     };
   }
 
-  /** Tween of a CSS string value: colors, numbers with units, or complex strings. */
-  function cssPT(el: any, prop: string, fromSpec: any, toSpec: any, mode: string, snap: any, autoRound: any): PropTween | null {
+  /** Channel for a CSS string value: colors, numbers with units, or complex strings. */
+  function cssChannel(el: any, prop: string, fromSpec: any, toSpec: any, mode: string, snap: any, roundPx: any): Channel | null {
     const custom = prop.indexOf('--') === 0;
     const read = () => (custom ? computed(el).getPropertyValue(prop).trim() : String(computed(el)[prop] ?? ''));
     const write = custom ? (v: string) => el.style.setProperty(prop, v) : (v: string) => (el.style[prop] = v);
     const before = read();
     let startStr = fromSpec === undefined ? before : String(fromSpec);
-    let endStr = toSpec === undefined ? (mode === 'fromTo' ? startStr : before) : String(toSpec);
-    if (mode === 'from' && toSpec === undefined) endStr = before;
+    let endStr = toSpec === undefined ? (mode === 'travel' ? startStr : before) : String(toSpec);
+    if (mode === 'arrive' && toSpec === undefined) endStr = before;
 
     // Numbers with units
     const startN = parseNumber(startStr);
@@ -704,12 +694,12 @@ export function installMooTween(win: any): any {
       else if (startN!.rel) start = current + startN!.rel * convert(el, prop, startN!.n, startN!.u || unit, unit);
       else start = convert(el, prop, startN!.n, startN!.u || unit, unit);
       let end: number;
-      if (toSpec === undefined) end = mode === 'fromTo' ? start : current;
+      if (toSpec === undefined) end = mode === 'travel' ? start : current;
       else if (endN!.rel) end = start + endN!.rel * convert(el, prop, endN!.n, endN!.u || unit, unit);
       else end = convert(el, prop, endN!.n, endN!.u || unit, unit);
       const snapFn = snapper(snap, prop);
-      // Pixel values (and z-index) land on whole numbers unless autoRound: false.
-      const integer = prop === 'zIndex' || (unit === 'px' && autoRound !== false);
+      // Pixel values (and z-index) land on whole numbers unless roundPx: false.
+      const integer = prop === 'zIndex' || (unit === 'px' && roundPx !== false);
       const out = (v: number) => {
         let n = snapFn ? snapFn(v) : v;
         if (integer) n = n < 0 ? -Math.round(-n) : Math.round(n);
@@ -739,19 +729,19 @@ export function installMooTween(win: any): any {
         };
       }
     }
-    return discretePT(write, before, startStr, endStr, DISCRETE_START[prop] === true && mode !== 'from');
+    return discreteChannel(write, before, startStr, endStr, false);
   }
 
-  function attrPT(el: any, name: string, fromSpec: any, toSpec: any, mode: string): PropTween {
+  function attrChannel(el: any, name: string, fromSpec: any, toSpec: any, mode: string): Channel {
     const before = el.getAttribute(name);
     const write = (v: any) => (v === null ? el.removeAttribute(name) : el.setAttribute(name, String(v)));
     const startStr = fromSpec === undefined ? before : String(fromSpec);
-    const endStr = toSpec === undefined ? (mode === 'fromTo' ? startStr : before) : String(toSpec);
+    const endStr = toSpec === undefined ? (mode === 'travel' ? startStr : before) : String(toSpec);
     const s = parseNumber(startStr === null ? '0' : startStr);
     const e = parseNumber(endStr);
     if (s && e) {
       const start = fromSpec === undefined ? s.n : numericEnd(fromSpec, parseFloat(before || '0') || 0);
-      const end = toSpec === undefined ? (mode === 'fromTo' ? start : parseFloat(before || '0') || 0) : numericEnd(toSpec, start);
+      const end = toSpec === undefined ? (mode === 'travel' ? start : parseFloat(before || '0') || 0) : numericEnd(toSpec, start);
       const unit = e.u || s.u;
       return { r: (ratio) => write(round(start + (end - start) * ratio) + unit), revert: () => write(before) };
     }
@@ -768,11 +758,11 @@ export function installMooTween(win: any): any {
         return { r: (ratio) => write(fillTemplate(b, b.nums.map((n, i) => a.nums[i] + (n - a.nums[i]) * ratio))), revert: () => write(before) };
       }
     }
-    return discretePT(write, before, startStr, endStr, false);
+    return discreteChannel(write, before, startStr, endStr, false);
   }
 
   /** Plain object property (counters) or a non-CSS element property such as textContent. */
-  function objectPT(target: any, prop: string, fromSpec: any, toSpec: any, mode: string, snap: any): PropTween {
+  function objectChannel(target: any, prop: string, fromSpec: any, toSpec: any, mode: string, snap: any): Channel {
     const getterSetter = isFn(target[prop]);
     const read = () => (getterSetter ? target[prop]() : target[prop]);
     const write = (v: any) => (getterSetter ? target[prop](v) : (target[prop] = v));
@@ -780,12 +770,12 @@ export function installMooTween(win: any): any {
     const text = typeof before === 'string';
     const beforeNum = typeof before === 'number' ? before : parseFloat(String(before ?? '').replace(/[^\d.eE+-]/g, '')) || 0;
     const startProbe = fromSpec === undefined ? before : fromSpec;
-    const endProbe = toSpec === undefined ? (mode === 'fromTo' ? startProbe : before) : toSpec;
+    const endProbe = toSpec === undefined ? (mode === 'travel' ? startProbe : before) : toSpec;
     const specIsNumber = (s: any) => s === undefined || !!parseNumber(s);
     const textIsNumber = !text || /^\s*[-+]?[\d.]*\s*$/.test(before) || fromSpec !== undefined || toSpec !== undefined;
     if (specIsNumber(fromSpec) && specIsNumber(toSpec) && textIsNumber && (fromSpec !== undefined || toSpec !== undefined || typeof before === 'number')) {
       const start = fromSpec === undefined ? beforeNum : numericEnd(fromSpec, beforeNum);
-      const end = toSpec === undefined ? (mode === 'fromTo' ? start : beforeNum) : numericEnd(toSpec, start);
+      const end = toSpec === undefined ? (mode === 'travel' ? start : beforeNum) : numericEnd(toSpec, start);
       const snapFn = snapper(snap, prop);
       const out = (v: number) => {
         const n = snapFn ? snapFn(v) : round(v);
@@ -800,14 +790,14 @@ export function installMooTween(win: any): any {
         return { r: (ratio) => write(fillTemplate(b, b.nums.map((n, i) => a.nums[i] + (n - a.nums[i]) * ratio))), revert: () => write(before) };
       }
     }
-    return discretePT(write, before, startProbe, endProbe, false);
+    return discreteChannel(write, before, startProbe, endProbe, false);
   }
 
-  function transformPTs(el: any, key: string, fromSpec: any, toSpec: any, mode: string, out: PropTween[]) {
+  function transformChannels(el: any, key: string, fromSpec: any, toSpec: any, mode: string, out: Channel[]) {
     const tf = transformCache(el);
     const comps = key === 'scale' ? ['scaleX', 'scaleY'] : [TRANSFORM_ALIASES[key]];
     for (const comp of comps) {
-      if (tf.svg && (comp === 'rotationX' || comp === 'rotationY' || comp === 'z' || comp === 'perspective')) {
+      if (tf.svg && (comp === 'tiltX' || comp === 'tiltY' || comp === 'z' || comp === 'perspective')) {
         warnOnce('svg3d', '3D transforms are not supported on SVG elements.');
         continue;
       }
@@ -816,7 +806,7 @@ export function installMooTween(win: any): any {
       const beforeUnit = unitKey ? tf[unitKey] : '';
       const toAngle = (spec: any, base: number) => {
         if (typeof spec === 'string') {
-          const p = parseNumber(spec.replace(/_(cw|ccw|short)$/, ''));
+          const p = parseNumber(spec);
           if (!p) return base;
           const deg = p.u === 'rad' ? p.n * DEG : p.u === 'turn' ? p.n * 360 : p.u === 'grad' ? p.n * 0.9 : p.n;
           return p.rel ? base + p.rel * deg : deg;
@@ -849,7 +839,7 @@ export function installMooTween(win: any): any {
       const current = unitKey ? inUnit(before, beforeUnit) : before;
       const endOf = ANGLE_COMPONENTS[comp] ? toAngle : unitKey ? lengthOf : numericEnd;
       const start = fromSpec === undefined ? current : endOf(fromSpec, current);
-      const end = toSpec === undefined ? (mode === 'fromTo' ? start : current) : endOf(toSpec, start);
+      const end = toSpec === undefined ? (mode === 'travel' ? start : current) : endOf(toSpec, start);
       out.push({
         tf,
         el,
@@ -865,20 +855,20 @@ export function installMooTween(win: any): any {
     }
   }
 
-  function originPT(el: any, key: string, fromSpec: any, toSpec: any, mode: string): PropTween {
+  function pivotChannel(el: any, key: string, fromSpec: any, toSpec: any, mode: string): Channel {
     const tf = transformCache(el);
     if (!tf.svg) {
       const before = computed(el).transformOrigin;
       const write = (v: string) => (el.style.transformOrigin = v);
       const start = fromSpec === undefined ? before : String(fromSpec);
-      const end = toSpec === undefined ? (mode === 'fromTo' ? start : before) : String(toSpec);
-      // A from() holds its origin until it finishes; to() and fromTo() switch as soon as they start.
-      return discretePT(write, before, start, end, mode !== 'from');
+      const end = toSpec === undefined ? (mode === 'travel' ? start : before) : String(toSpec);
+      // An arrive() holds its pivot until it finishes; go() and travel() switch as soon as they start.
+      return discreteChannel(write, before, start, end, mode !== 'arrive');
     }
     // SVG: the origin is baked into the matrix; an offset keeps the current picture when it moves.
     const state = (spec: any, base: any) => {
       if (spec === undefined) return base;
-      const [ox, oy] = svgOriginPoint(el, String(spec), key === 'svgOrigin');
+      const [ox, oy] = pivotPointOf(el, String(spec), key === 'pivotPoint');
       const L = linearOf(tf);
       const dx = base.ox - ox;
       const dy = base.oy - oy;
@@ -886,24 +876,24 @@ export function installMooTween(win: any): any {
     };
     const before = { ox: tf.ox, oy: tf.oy, xOff: tf.xOff, yOff: tf.yOff };
     const start = state(fromSpec, before);
-    const end = toSpec === undefined ? (mode === 'fromTo' ? start : before) : state(toSpec, start);
+    const end = toSpec === undefined ? (mode === 'travel' ? start : before) : state(toSpec, start);
     const apply = (s: any) => {
       tf.ox = s.ox;
       tf.oy = s.oy;
       tf.xOff = s.xOff;
       tf.yOff = s.yOff;
     };
-    const switched = (progress: number) => (mode === 'from' ? progress >= 1 : progress > 0);
+    const switched = (progress: number) => (mode === 'arrive' ? progress >= 1 : progress > 0);
     return { tf, el, r: (_ratio, progress) => apply(switched(progress) ? end : start), revert: () => apply(before) };
   }
 
-  function autoAlphaPT(el: any, fromSpec: any, toSpec: any, mode: string): PropTween {
+  function fadeChannel(el: any, fromSpec: any, toSpec: any, mode: string): Channel {
     const beforeOpacity = computed(el).opacity;
     const beforeVisibility = el.style.visibility;
     const parsed = parseFloat(beforeOpacity);
     const current = isFinite(parsed) ? parsed : 1;
     const start = fromSpec === undefined ? current : numericEnd(fromSpec, current);
-    const end = toSpec === undefined ? (mode === 'fromTo' ? start : current) : numericEnd(toSpec, start);
+    const end = toSpec === undefined ? (mode === 'travel' ? start : current) : numericEnd(toSpec, start);
     return {
       r: (ratio) => {
         const v = round(start + (end - start) * ratio);
@@ -917,18 +907,14 @@ export function installMooTween(win: any): any {
     };
   }
 
-  // Vars that configure a tween rather than name a property.
+  // Options that shape a move rather than name a property.
   const RESERVED: Record<string, boolean> = {};
-  ('duration,delay,ease,repeat,yoyo,repeatDelay,stagger,keyframes,immediateRender,onStart,onUpdate,onComplete,onRepeat,' +
-    'onReverseComplete,onInterrupt,onStartParams,onUpdateParams,onCompleteParams,onRepeatParams,onReverseCompleteParams,' +
-    'callbackScope,overwrite,lazy,id,paused,data,inherit,runBackwards,startAt,yoyoEase,easeEach,autoRound,force3D,' +
-    'smoothOrigin,reversed,defaults,snap,modifiers,parseTransform,scope,repeatSpan,position')
+  'dur,wait,curve,cascade,loop,pingpong,loopGap,sequence,stepCurve,showStart,onBegin,onFrame,onEnd,onLoop,onRewind,round,roundPx,defaults,scope,loopSpan,paused'
     .split(',')
     .forEach((k) => (RESERVED[k] = true));
-  const PLUGINS = ['scrollTrigger', 'motionPath', 'morphSVG', 'drawSVG', 'text', 'scrambleText', 'physics2D', 'inertia', 'pixi', 'scrollTo', 'splitText'];
 
-  function buildPropTweens(tw: any): PropTween[] {
-    const pts: PropTween[] = [];
+  function buildChannels(tw: any): Channel[] {
+    const pts: Channel[] = [];
     const mode = tw._mode;
     const fromVars = tw._fromVars || {};
     const toVars = tw._toVars || {};
@@ -936,52 +922,48 @@ export function installMooTween(win: any): any {
     const addKeys = (vars: any) => {
       for (const k in vars) if (!RESERVED[k] && keys.indexOf(k) < 0) keys.push(k);
     };
-    if (mode === 'from') addKeys(fromVars);
+    if (mode === 'arrive') addKeys(fromVars);
     else {
       addKeys(toVars);
-      if (mode === 'fromTo') addKeys(fromVars);
+      if (mode === 'travel') addKeys(fromVars);
     }
     const targets = tw._targets;
-    const snap = (mode === 'from' ? fromVars : toVars).snap;
-    // A fromTo() that does not render immediately applies values only its from-vars name when the
-    // playhead moves backward into it, never when it plays forward from before its start.
-    const fromOnlyBackward = mode === 'fromTo' && tw._revertBefore;
-    const autoRound = (mode === 'from' ? fromVars : toVars).autoRound;
+    const snap = (mode === 'arrive' ? fromVars : toVars).round;
+    // A travel() with showStart: false applies values only its start props name when the playhead
+    // moves backward into it, never when it plays forward from before its start.
+    const fromOnlyBackward = mode === 'travel' && tw._revertBefore;
+    const roundPx = (mode === 'arrive' ? fromVars : toVars).roundPx;
 
     const buildKey = (key: string, i: number, t: any) => {
       const el = isElement(t);
-      const fromSpec = mode === 'to' ? undefined : resolveSpec(fromVars[key], i, t, targets);
-      const toSpec = mode === 'from' ? undefined : resolveSpec(toVars[key], i, t, targets);
-      if (PLUGINS.indexOf(key) >= 0) {
-        warnOnce('plugin:' + key, '"' + key + '" needs a plugin MooTween does not have; ignored.');
-        return;
-      }
-      if (key === 'attr') {
+      const fromSpec = mode === 'go' ? undefined : resolveSpec(fromVars[key], i, t, targets);
+      const toSpec = mode === 'arrive' ? undefined : resolveSpec(toVars[key], i, t, targets);
+      if (key === 'attrs') {
         if (!el) return;
         const names: string[] = [];
         for (const n in fromSpec || {}) names.push(n);
         for (const n in toSpec || {}) if (names.indexOf(n) < 0) names.push(n);
         names.forEach((n) =>
-          pts.push(attrPT(t, n, fromSpec ? resolveSpec(fromSpec[n], i, t, targets) : undefined, toSpec ? resolveSpec(toSpec[n], i, t, targets) : undefined, mode))
+          pts.push(attrChannel(t, n, fromSpec ? resolveSpec(fromSpec[n], i, t, targets) : undefined, toSpec ? resolveSpec(toSpec[n], i, t, targets) : undefined, mode))
         );
         return;
       }
       if (!el) {
-        pts.push(objectPT(t, key, fromSpec, toSpec, mode, snap));
+        pts.push(objectChannel(t, key, fromSpec, toSpec, mode, snap));
         return;
       }
-      if (key === 'autoAlpha') {
-        pts.push(autoAlphaPT(t, fromSpec, toSpec, mode));
+      if (key === 'fade') {
+        pts.push(fadeChannel(t, fromSpec, toSpec, mode));
       } else if (key === 'scale' || TRANSFORM_ALIASES[key]) {
-        transformPTs(t, key, fromSpec, toSpec, mode, pts);
-      } else if (key === 'transformOrigin' || key === 'svgOrigin') {
-        pts.push(originPT(t, key, fromSpec, toSpec, mode));
+        transformChannels(t, key, fromSpec, toSpec, mode, pts);
+      } else if (key === 'pivot' || key === 'pivotPoint') {
+        pts.push(pivotChannel(t, key, fromSpec, toSpec, mode));
       } else if (key === 'transform') {
         const parsed = (spec: any) => {
           if (spec === undefined) return undefined;
           const p = probeElement();
           p.style.transform = String(spec);
-          const c: any = { x: 0, y: 0, z: 0, rotation: 0, rotationX: 0, rotationY: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
+          const c: any = { x: 0, y: 0, z: 0, spin: 0, tiltX: 0, tiltY: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
           const m = parseMatrix(computed(p).transform);
           p.style.transform = '';
           if (m) decompose(m, c);
@@ -989,23 +971,23 @@ export function installMooTween(win: any): any {
         };
         const f = parsed(fromSpec);
         const e = parsed(toSpec);
-        ['x', 'y', 'rotation', 'skewX', 'scaleX', 'scaleY'].forEach((comp) =>
-          transformPTs(t, comp, f ? f[comp] : undefined, e ? e[comp] : undefined, mode, pts)
+        ['x', 'y', 'spin', 'skewX', 'scaleX', 'scaleY'].forEach((comp) =>
+          transformChannels(t, comp, f ? f[comp] : undefined, e ? e[comp] : undefined, mode, pts)
         );
       } else if (['textContent', 'innerText', 'innerHTML', 'value', 'scrollTop', 'scrollLeft'].indexOf(key) >= 0) {
-        pts.push(objectPT(t, key, fromSpec, toSpec, mode, snap));
+        pts.push(objectChannel(t, key, fromSpec, toSpec, mode, snap));
       } else {
         const prop = camel(key);
         if (prop.indexOf('--') === 0 || prop in t.style) {
-          const pt = cssPT(t, prop, fromSpec, toSpec, mode, snap, autoRound);
+          const pt = cssChannel(t, prop, fromSpec, toSpec, mode, snap, roundPx);
           if (pt) pts.push(pt);
         } else if (key in t) {
-          pts.push(objectPT(t, key, fromSpec, toSpec, mode, snap));
+          pts.push(objectChannel(t, key, fromSpec, toSpec, mode, snap));
         } else {
-          warnOnce('prop:' + key, 'Unknown property "' + key + '"; set at the end of the tween.');
+          warnOnce('prop:' + key, 'Unknown property "' + key + '"; set at the end of the move.');
           const before = t[key];
           const write = (v: any) => (t[key] = v);
-          pts.push(discretePT(write, before, fromSpec === undefined ? before : fromSpec, toSpec === undefined ? before : toSpec, false));
+          pts.push(discreteChannel(write, before, fromSpec === undefined ? before : fromSpec, toSpec === undefined ? before : toSpec, false));
         }
       }
     };
@@ -1025,134 +1007,61 @@ export function installMooTween(win: any): any {
   /* ------------------------------------------------------------------ *
    * Animations
    * ------------------------------------------------------------------ */
-  let globalDefaults: any = { duration: 0.5, ease: DEFAULT_EASE };
-  let lastRoot: any = null;
+  const DEFAULTS: any = { dur: 0.5, curve: DEFAULT_CURVE };
 
+  /** Calls onBegin / onFrame / onEnd / onLoop / onRewind with the move's progress (this = the move). */
   function fire(anim: any, type: string) {
     const fn = anim.vars && anim.vars[type];
     if (!isFn(fn)) return;
     try {
-      fn.apply(anim.vars.callbackScope || anim, anim.vars[type + 'Params'] || []);
+      fn.call(anim, anim.progress());
     } catch (err) {
-      if (win.console) win.console.error('[MooTween] ' + type + ' callback failed', err);
+      if (win.console) win.console.error('[MooTween] ' + type + ' failed', err);
     }
   }
 
-  function repeatCount(anim: any): number {
-    const r = Number(anim._repeatRaw) || 0;
-    if (r >= 0) return Math.floor(r);
-    // repeat: -1 covers the shot it belongs to (or REPEAT_SPAN when no shot duration is known).
-    const owner = lineage(anim).find((a) => a._repeatSpan);
-    const span = owner ? owner._repeatSpan : 0;
-    const cycle = anim._dur + anim._rDelay;
-    return cycle > 0 ? Math.max(0, Math.ceil((span || REPEAT_SPAN) / cycle) - 1) : 0;
+  function loopCount(anim: any): number {
+    const raw = anim._loop;
+    if (raw !== true) return Math.max(0, Math.floor(Number(raw) || 0));
+    // loop: true covers the shot it belongs to (or LOOP_SPAN when no shot duration is known).
+    const owner = lineage(anim).find((a) => a._loopSpan);
+    const span = owner ? owner._loopSpan : 0;
+    const cycle = anim._dur + anim._loopGap;
+    return cycle > 0 ? Math.max(0, Math.ceil((span || LOOP_SPAN) / cycle) - 1) : 0;
   }
 
   const Anim: any = {
-    duration(this: any, value?: number) {
-      if (value !== undefined) warnOnce('duration-set', 'Setting duration() is not supported; ignored.');
-      return value !== undefined ? this : this._getDur();
+    /** Length of one pass, in seconds. */
+    duration(this: any) {
+      return this._getDur();
     },
+    /** Length including every loop. */
     totalDuration(this: any) {
       const dur = this._getDur();
-      const r = repeatCount(this);
-      return dur * (r + 1) + this._rDelay * r;
+      const r = loopCount(this);
+      return dur * (r + 1) + this._loopGap * r;
     },
     _getDur(this: any) {
       return this._dur;
     },
-    startTime(this: any) {
+    startsAt(this: any) {
       return this._start;
     },
-    endTime(this: any) {
-      return this._start + this.totalDuration() / (this._ts || 1);
+    endsAt(this: any) {
+      return this._start + this.totalDuration();
     },
-    delay(this: any) {
-      return this._delay || 0;
+    time(this: any) {
+      return this._time < 0 ? 0 : this._time;
     },
-    timeScale(this: any, value?: number) {
-      if (value === undefined) return this._ts;
-      const v = Number(value);
-      this._ts = v > 0 && isFinite(v) ? v : 1;
-      if (this.parent) this.parent._invalidate();
-      return this;
-    },
-    time(this: any, value?: number, suppressEvents?: boolean) {
-      if (value === undefined) return this._time < 0 ? 0 : this._time;
-      return this.totalTime(value, suppressEvents);
-    },
-    totalTime(this: any, value?: number, suppressEvents?: boolean) {
-      if (value === undefined) return this._tTime;
-      this.render(Number(value) || 0, !!suppressEvents, false);
-      return this;
-    },
-    progress(this: any, value?: number, suppressEvents?: boolean) {
+    progress(this: any, value?: number, silent?: boolean) {
       const dur = this.totalDuration();
       if (value === undefined) return dur ? clamp(0, 1, this._tTime / dur) : this._tTime > 0 || this._ratio === 1 ? 1 : 0;
-      return this.totalTime(clamp(0, 1, Number(value) || 0) * dur, suppressEvents);
+      return this.seek(clamp(0, 1, Number(value) || 0) * dur, silent);
     },
-    totalProgress(this: any, value?: number, suppressEvents?: boolean) {
-      return this.progress(value, suppressEvents);
-    },
-    seek(this: any, position: any, suppressEvents?: boolean) {
-      const t = typeof position === 'string' && this.labels && position in this.labels ? this.labels[position] : Number(position) || 0;
-      return this.totalTime(t, suppressEvents);
-    },
-    iteration(this: any) {
-      return (this._iteration || 0) + 1;
-    },
-    repeat(this: any, value?: number) {
-      if (value === undefined) return this._repeatRaw;
-      this._repeatRaw = value;
-      if (this.parent) this.parent._invalidate();
-      return this;
-    },
-    yoyo(this: any, value?: boolean) {
-      if (value === undefined) return this._yoyo;
-      this._yoyo = !!value;
-      return this;
-    },
-    paused(this: any, value?: boolean) {
-      if (value === undefined) return !!this._paused;
-      this._paused = !!value;
-      return this;
-    },
-    reversed(this: any) {
-      return false;
-    },
-    isActive(this: any) {
-      return false;
-    },
-    eventCallback(this: any, type: string, fn?: any, params?: any[]) {
-      if (fn === undefined) return this.vars[type];
-      this.vars[type] = fn;
-      if (params) this.vars[type + 'Params'] = params;
-      return this;
-    },
-    play(this: any) {
-      return this;
-    },
-    pause(this: any) {
-      return this;
-    },
-    resume(this: any) {
-      return this;
-    },
-    reverse(this: any) {
-      return this;
-    },
-    restart(this: any) {
-      return this;
-    },
-    invalidate(this: any) {
-      return this;
-    },
-    kill(this: any) {
-      if (this.parent) this.parent.remove(this);
-      return this;
-    },
-    then(this: any) {
-      warnOnce('then', 'Promises on animations are not supported in a seek-only stage.');
+    /** Renders the move at `time` seconds (a mark name works on tracks). silent skips callbacks. */
+    seek(this: any, time: any, silent?: boolean) {
+      const t = typeof time === 'string' && this.marks && time in this.marks ? this.marks[time] : Number(time) || 0;
+      this.render(t, !!silent, false);
       return this;
     }
   };
@@ -1161,12 +1070,11 @@ export function installMooTween(win: any): any {
     a.vars = vars || {};
     a.parent = null;
     a._start = 0;
-    a._delay = Number(a.vars.delay) || 0;
+    a._wait = Number(a.vars.wait) || 0;
     a._dur = 0;
-    a._ts = 1;
-    a._repeatRaw = Number(a.vars.repeat) || 0;
-    a._rDelay = Number(a.vars.repeatDelay) || 0;
-    a._yoyo = !!a.vars.yoyo;
+    a._loop = a.vars.loop === true ? true : Number(a.vars.loop) || 0;
+    a._loopGap = Number(a.vars.loopGap) || 0;
+    a._pingpong = !!a.vars.pingpong;
     a._tTime = 0;
     a._time = 0;
     a._neg = false;
@@ -1175,11 +1083,11 @@ export function installMooTween(win: any): any {
     a._paused = !!a.vars.paused;
   }
 
-  /** Iteration-local time for totalTime t (repeat, repeatDelay and yoyo applied). */
+  /** Pass-local time for totalTime t (loop, loopGap and pingpong applied). */
   function iterate(a: any, tTime: number, tDur: number, dur: number): [number, number] {
-    const r = repeatCount(a);
+    const r = loopCount(a);
     if (!r) return [Math.min(tTime, dur), 0];
-    const cycle = dur + a._rDelay;
+    const cycle = dur + a._loopGap;
     let iteration: number;
     let time: number;
     if (tTime >= tDur) {
@@ -1195,23 +1103,23 @@ export function installMooTween(win: any): any {
       }
       if (time > dur) time = dur;
     }
-    if (a._yoyo && iteration & 1) time = dur - time;
+    if (a._pingpong && iteration & 1) time = dur - time;
     return [time, iteration];
   }
 
-  /* ---------------------------- Tween ---------------------------- */
-  const TweenProto: any = Object.create(Anim);
+  /* ---------------------------- Move ------------------------------ */
+  const MoveProto: any = Object.create(Anim);
 
-  TweenProto.targets = function (this: any) {
+  MoveProto.targets = function (this: any) {
     return this._targets.slice();
   };
 
-  TweenProto._init = function (this: any) {
+  MoveProto._init = function (this: any) {
     this._initted = true;
-    this._pts = buildPropTweens(this);
+    this._pts = buildChannels(this);
   };
 
-  TweenProto._apply = function (this: any, ratio: number, progress: number, backward?: boolean) {
+  MoveProto._apply = function (this: any, ratio: number, progress: number, backward?: boolean) {
     const pts = this._pts;
     let dirty: any[] | null = null;
     for (let i = 0; i < pts.length; i++) {
@@ -1226,7 +1134,7 @@ export function installMooTween(win: any): any {
     if (dirty) dirty.forEach((pt: any) => writeTransform(pt.el, pt.tf));
   };
 
-  TweenProto._revert = function (this: any) {
+  MoveProto._revert = function (this: any) {
     const pts = this._pts;
     const els: any[] = [];
     for (let i = pts.length - 1; i >= 0; i--) {
@@ -1236,7 +1144,7 @@ export function installMooTween(win: any): any {
     els.forEach((el) => writeTransform(el, el.__mooTransform));
   };
 
-  TweenProto.render = function (this: any, totalTime: number, suppressEvents: boolean, force: boolean) {
+  MoveProto.render = function (this: any, totalTime: number, silent: boolean, force: boolean) {
     const dur = this._dur;
     const neg = totalTime < 0;
     if (!dur) {
@@ -1251,14 +1159,14 @@ export function installMooTween(win: any): any {
       else this._revert();
       this._ratio = ratio;
       this._neg = neg;
-      if (!suppressEvents) {
+      if (!silent) {
         if (ratio) {
-          fire(this, 'onStart');
-          fire(this, 'onUpdate');
-          fire(this, 'onComplete');
+          fire(this, 'onBegin');
+          fire(this, 'onFrame');
+          fire(this, 'onEnd');
         } else if (prevRatio === 1) {
-          fire(this, 'onUpdate');
-          fire(this, 'onReverseComplete');
+          fire(this, 'onFrame');
+          fire(this, 'onRewind');
         }
       }
       return this;
@@ -1281,43 +1189,39 @@ export function installMooTween(win: any): any {
     this._time = time;
     this._iteration = iteration;
     this._neg = neg;
-    if (!suppressEvents) {
-      if (!wasStarted && tTime > 0) fire(this, 'onStart');
-      fire(this, 'onUpdate');
-      if (iteration !== prevIteration) fire(this, 'onRepeat');
-      if (tTime === tDur && prevTTime !== tDur) fire(this, 'onComplete');
-      else if (tTime === 0 && wasStarted) fire(this, 'onReverseComplete');
+    if (!silent) {
+      if (!wasStarted && tTime > 0) fire(this, 'onBegin');
+      fire(this, 'onFrame');
+      if (iteration !== prevIteration) fire(this, 'onLoop');
+      if (tTime === tDur && prevTTime !== tDur) fire(this, 'onEnd');
+      else if (tTime === 0 && wasStarted) fire(this, 'onRewind');
     }
     return this;
   };
 
-  TweenProto.seek = function (this: any, position: any, suppressEvents?: boolean) {
-    return this.totalTime(Number(position) || 0, suppressEvents);
-  };
-
-  function createTween(mode: string, targets: any[], fromVars: any, toVars: any): any {
-    const tw = Object.create(TweenProto);
-    const vars = mode === 'from' ? fromVars : toVars;
+  function createMove(mode: string, targets: any[], fromVars: any, toVars: any): any {
+    const tw = Object.create(MoveProto);
+    const vars = mode === 'arrive' ? fromVars : toVars;
     initAnim(tw, vars);
     tw._mode = mode;
     tw._targets = targets;
     tw._fromVars = fromVars;
     tw._toVars = toVars;
-    tw._dur = Math.max(0, Number(vars.duration) || 0);
-    tw._ease = parseEase(vars.ease);
+    tw._dur = Math.max(0, Number(vars.dur) || 0);
+    tw._ease = parseCurve(vars.curve);
     tw._ratio = -1;
-    tw._revertBefore = mode !== 'to' && vars.immediateRender === false;
+    tw._revertBefore = mode !== 'go' && vars.showStart === false;
     return tw;
   }
 
-  /* --------------------------- Timeline --------------------------- */
-  const TimelineProto: any = Object.create(Anim);
+  /* ---------------------------- Track ----------------------------- */
+  const TrackProto: any = Object.create(Anim);
 
-  TimelineProto._getDur = function (this: any) {
+  TrackProto._getDur = function (this: any) {
     if (this._dirty) {
       let max = 0;
       for (let i = 0; i < this._children.length; i++) {
-        const end = this._children[i].endTime();
+        const end = this._children[i].endsAt();
         if (end > max) max = end;
       }
       this._durCache = max;
@@ -1326,19 +1230,19 @@ export function installMooTween(win: any): any {
     return this._durCache;
   };
 
-  TimelineProto._invalidate = function (this: any) {
+  TrackProto._invalidate = function (this: any) {
     lineage(this).forEach((t) => (t._dirty = true));
   };
 
-  TimelineProto.getChildren = function (this: any) {
+  TrackProto.children = function (this: any) {
     return this._children.slice();
   };
 
-  TimelineProto.recent = function (this: any) {
+  TrackProto.recent = function (this: any) {
     return this._recent;
   };
 
-  TimelineProto.remove = function (this: any, child: any) {
+  TrackProto.remove = function (this: any, child: any) {
     const i = this._children.indexOf(child);
     if (i >= 0) {
       this._children.splice(i, 1);
@@ -1349,47 +1253,44 @@ export function installMooTween(win: any): any {
     return this;
   };
 
-  TimelineProto.clear = function (this: any) {
+  TrackProto.clear = function (this: any) {
     this._children.slice().forEach((c: any) => this.remove(c));
-    this.labels = {};
+    this.marks = {};
     return this;
   };
 
-  /** Resolves a position parameter against the current end of the timeline. */
-  TimelineProto._position = function (this: any, position: any, child: any): number {
+  /**
+   * Resolves `at`: seconds; 'end' (default), 'with' (start of the previous move), 'after' (its end),
+   * or a mark name, each optionally followed by +n / -n seconds ('end-0.3', 'with+0.2', 'hit+0.1').
+   */
+  TrackProto._position = function (this: any, at: any): number {
     const end = this.duration();
-    const recent = this._recent;
-    const childDur = child ? child.totalDuration() / (child._ts || 1) : 0;
-    if (position === undefined || position === null || position === '') return end;
-    if (typeof position === 'number') return isFinite(position) ? position : end;
-    let s = String(position).trim();
-    const offset = (rest: string, base: number, pctOf: number) => {
-      const r = rest.trim();
-      if (!r) return base;
-      const m = r.match(/^([-+]=?)?\s*(-?(?:\d+\.?\d*|\.\d+))(%)?$/);
-      if (!m) return base;
-      const sign = m[1] && m[1][0] === '-' ? -1 : 1;
-      const n = parseFloat(m[2]) * (m[3] ? pctOf / 100 : 1);
-      return base + sign * n;
-    };
-    if (s[0] === '<' || s[0] === '>') {
-      const base = recent ? (s[0] === '<' ? recent._start : recent.endTime()) : s[0] === '<' ? 0 : end;
-      const pct = recent ? recent.totalDuration() / (recent._ts || 1) : 0;
-      return offset(s.slice(1), base, pct);
-    }
-    if (s.slice(0, 2) === '+=' || s.slice(0, 2) === '-=') return offset(s, end, childDur);
+    if (at === undefined || at === null || at === '') return end;
+    if (typeof at === 'number') return isFinite(at) ? at : end;
+    const s = String(at).trim();
     if (PLAIN_NUM.test(s)) return parseFloat(s);
-    const m = s.match(/^(.*?)([-+]=.*)?$/);
-    const label = m ? m[1].trim() : s;
-    if (!(label in this.labels)) this.labels[label] = end;
-    s = m && m[2] ? m[2] : '';
-    return offset(s, this.labels[label], childDur);
+    const m = s.match(/^(.*?)\s*(?:([-+])\s*(\d+\.?\d*|\.\d+))?$/);
+    const name = m ? m[1] : s;
+    const shift = m && m[2] ? (m[2] === '-' ? -1 : 1) * parseFloat(m[3]) : 0;
+    const recent = this._recent;
+    let base: number;
+    if (name === 'end') base = end;
+    else if (name === 'with') base = recent ? recent._start : 0;
+    else if (name === 'after') base = recent ? recent.endsAt() : end;
+    else {
+      if (!(name in this.marks)) {
+        warnOnce('mark:' + name, 'No mark "' + name + '" yet; placing it at the end of the track.');
+        this.marks[name] = end;
+      }
+      base = this.marks[name];
+    }
+    return base + shift;
   };
 
-  TimelineProto._insert = function (this: any, child: any, position: any) {
+  TrackProto._insert = function (this: any, child: any, position: any) {
     if (child.parent) child.parent.remove(child);
-    const at = this._position(position, child);
-    child._start = roundTime(at + (child._delay || 0));
+    const at = this._position(position);
+    child._start = roundTime(at + (child._wait || 0));
     child.parent = this;
     const kids = this._children;
     let i = kids.length;
@@ -1400,81 +1301,83 @@ export function installMooTween(win: any): any {
     return child;
   };
 
-  TimelineProto._scopeEl = function (this: any) {
+  TrackProto._scopeEl = function (this: any) {
     const scoped = lineage(this).find((t) => t._scope);
     if (scoped) return scoped._scope;
-    const active = api.activeTimeline;
+    const active = api.activeTrack;
     return active && lineage(this).indexOf(active) < 0 ? active._scopeEl() : null;
   };
 
-  TimelineProto._defaultsChain = function (this: any) {
+  TrackProto._defaultsChain = function (this: any) {
     const chain = lineage(this)
       .filter((t) => t.vars.defaults)
       .map((t) => t.vars.defaults)
       .reverse();
-    return Object.assign({}, globalDefaults, ...chain);
+    return Object.assign({}, DEFAULTS, ...chain);
   };
 
-  TimelineProto._hasPausedAncestor = function (this: any) {
+  TrackProto._hasPausedAncestor = function (this: any) {
     return lineage(this).some((t) => t._paused);
   };
 
-  /** Builds the animation for to/from/fromTo/set: a tween, or a group for staggers and keyframes. */
-  TimelineProto._make = function (this: any, mode: string, rawTargets: any, fromVars: any, toVars: any): any {
-    const raw = (mode === 'from' ? fromVars : toVars) || {};
+  /** Builds the move for go/arrive/travel/pin: one move, or a group for cascades and sequences. */
+  TrackProto._make = function (this: any, mode: string, rawTargets: any, fromVars: any, toVars: any): any {
+    const raw = (mode === 'arrive' ? fromVars : toVars) || {};
     const main = Object.assign({}, this._defaultsChain(), raw);
-    if (mode === 'from') fromVars = main;
+    if (mode === 'arrive') fromVars = main;
     else toVars = main;
     const targets = toArray(rawTargets, this._scopeEl());
     if (!targets.length) return null;
 
-    if (main.keyframes && typeof main.keyframes === 'object') return makeKeyframes(targets, main, raw);
+    if (main.sequence && typeof main.sequence === 'object') return makeSequence(targets, main, raw);
 
-    const stagger = main.stagger;
-    if (stagger !== undefined && stagger !== null && stagger !== 0 && targets.length > 1) {
-      const group = createTimeline({
-        onStart: main.onStart, onUpdate: main.onUpdate, onComplete: main.onComplete, onRepeat: main.onRepeat,
-        onReverseComplete: main.onReverseComplete, callbackScope: main.callbackScope,
-        onStartParams: main.onStartParams, onUpdateParams: main.onUpdateParams, onCompleteParams: main.onCompleteParams,
-        repeat: main.repeat, yoyo: main.yoyo, repeatDelay: main.repeatDelay, delay: main.delay
+    const cascade = main.cascade;
+    if (cascade !== undefined && cascade !== null && cascade !== 0 && targets.length > 1) {
+      const group = createTrack({
+        onBegin: main.onBegin, onFrame: main.onFrame, onEnd: main.onEnd, onLoop: main.onLoop, onRewind: main.onRewind,
+        loop: main.loop, pingpong: main.pingpong, loopGap: main.loopGap, wait: main.wait
       });
       group._group = true;
-      const offsets = staggerOffsets(stagger, targets);
+      const offsets = cascadeOffsets(cascade, targets);
+      // (each target's own move is built from `main` without the cascade and group options)
       const sub: any = {};
       for (const k in main) {
-        if (k === 'stagger' || k === 'delay' || k === 'repeat' || k === 'yoyo' || k === 'repeatDelay' || /^on[A-Z]/.test(k) || k === 'callbackScope') continue;
+        if (k === 'cascade' || k === 'wait' || k === 'loop' || k === 'pingpong' || k === 'loopGap' || /^on[A-Z]/.test(k)) continue;
         sub[k] = main[k];
       }
-      if (stagger && typeof stagger === 'object') {
-        if (stagger.repeat !== undefined) sub.repeat = stagger.repeat;
-        if (stagger.yoyo !== undefined) sub.yoyo = stagger.yoyo;
-        if (stagger.repeatDelay !== undefined) sub.repeatDelay = stagger.repeatDelay;
+      if (cascade && typeof cascade === 'object') {
+        if (cascade.loop !== undefined) sub.loop = cascade.loop;
+        if (cascade.pingpong !== undefined) sub.pingpong = cascade.pingpong;
+        if (cascade.loopGap !== undefined) sub.loopGap = cascade.loopGap;
       }
       targets.forEach((t, i) => {
-        const tw = mode === 'from'
-          ? createTween('from', [t], sub, null)
-          : mode === 'fromTo'
-            ? createTween('fromTo', [t], Object.assign({}, fromVars), Object.assign({}, sub))
-            : createTween(mode, [t], null, Object.assign({}, sub));
+        const tw = mode === 'arrive'
+          ? createMove('arrive', [t], sub, null)
+          : mode === 'travel'
+            ? createMove('travel', [t], Object.assign({}, fromVars), Object.assign({}, sub))
+            : createMove(mode, [t], null, Object.assign({}, sub));
         group._insert(tw, offsets[i]);
       });
       group._scope = null;
       return group;
     }
-    return mode === 'from' ? createTween('from', targets, main, null) : createTween(mode, targets, fromVars, main);
+    return mode === 'arrive' ? createMove('arrive', targets, main, null) : createMove(mode, targets, fromVars, main);
   };
 
-  /** Inserts a tween or group and renders it now when GSAP-style immediate rendering applies. */
-  TimelineProto._add = function (this: any, mode: string, targets: any, fromVars: any, toVars: any, position: any) {
-    const vars = (mode === 'from' ? fromVars : toVars) || {};
+  /**
+   * Inserts a move or group and renders it now when its start state shows at once: arrive() and
+   * travel() unless showStart: false, a pin() placed at the track's current time, or showStart: true.
+   */
+  TrackProto._add = function (this: any, mode: string, targets: any, fromVars: any, toVars: any, position: any) {
+    const vars = (mode === 'arrive' ? fromVars : toVars) || {};
     const anim = this._make(mode, targets, fromVars || {}, toVars || {});
     if (!anim) return this;
     this._insert(anim, position);
-    const immediate = vars.immediateRender;
-    const tweens = anim._group ? anim._children : [anim];
-    for (const tw of tweens) {
+    const immediate = vars.showStart;
+    const moves = anim._group ? anim._children : [anim];
+    for (const tw of moves) {
       if (tw._children) continue;
-      if (tw._mode !== 'to' && immediate !== false) {
+      if (tw._mode !== 'go' && immediate !== false) {
         tw.render(0, true, true);
       } else if (!tw._dur && immediate !== false && !anim._children && anim._start === this._time && !this._hasPausedAncestor()) {
         tw.render(0, true, false);
@@ -1485,47 +1388,39 @@ export function installMooTween(win: any): any {
     return this;
   };
 
-  TimelineProto.to = function (this: any, targets: any, vars: any, position?: any) {
-    return this._add('to', targets, null, vars, position);
+  /** Moves targets from where they are to `props`. */
+  TrackProto.go = function (this: any, targets: any, props: any, at?: any) {
+    return this._add('go', targets, null, props, at);
   };
-  TimelineProto.from = function (this: any, targets: any, vars: any, position?: any) {
-    return this._add('from', targets, vars, null, position);
+  /** Moves targets from `props` to where they are now; the start state shows at once. */
+  TrackProto.arrive = function (this: any, targets: any, props: any, at?: any) {
+    return this._add('arrive', targets, props, null, at);
   };
-  TimelineProto.fromTo = function (this: any, targets: any, fromVars: any, toVars: any, position?: any) {
-    return this._add('fromTo', targets, fromVars, toVars, position);
+  /** Moves targets from `start` to `end`; the start state shows at once. */
+  TrackProto.travel = function (this: any, targets: any, start: any, end: any, at?: any) {
+    return this._add('travel', targets, start, end, at);
   };
-  TimelineProto.set = function (this: any, targets: any, vars: any, position?: any) {
-    return this._add('to', targets, null, Object.assign({}, vars, { duration: 0 }), position);
+  /** Sets props instantly at `at`, and undoes them when the playhead goes back before it. */
+  TrackProto.pin = function (this: any, targets: any, props: any, at?: any) {
+    return this._add('go', targets, null, Object.assign({}, props, { dur: 0 }), at);
   };
-
-  TimelineProto.addLabel = function (this: any, label: string, position?: any) {
-    this.labels[label] = this._position(position, null);
+  /** Names a moment so later moves can use it as `at` ('hit', 'hit+0.2'). */
+  TrackProto.mark = function (this: any, name: string, at?: any) {
+    this.marks[name] = this._position(at);
     return this;
   };
-  TimelineProto.removeLabel = function (this: any, label: string) {
-    delete this.labels[label];
+  /** Runs fn(progress) when the playhead passes `at`, in either direction. */
+  TrackProto.cue = function (this: any, fn: any, at?: any) {
+    this._insert(createMove('go', [], null, { dur: 0, onEnd: fn, onRewind: fn }), at);
     return this;
   };
-
-  TimelineProto.call = function (this: any, fn: any, params?: any[], position?: any) {
-    const tw = createTween('to', [], null, { duration: 0, onComplete: fn, onReverseComplete: fn, onCompleteParams: params, onReverseCompleteParams: params });
-    this._insert(tw, position);
-    return this;
-  };
-
-  TimelineProto.add = function (this: any, child: any, position?: any) {
-    if (isFn(child)) return this.call(child, [], position);
-    if (typeof child === 'string') return this.addLabel(child, position);
-    if (Array.isArray(child)) {
-      const at = this._position(position, null);
-      child.forEach((c) => this.add(c, at));
-      return this;
-    }
-    if (child && (child._children || child._targets)) this._insert(child, position);
+  /** Places a sub-track (MooTween.track()) inside this one. */
+  TrackProto.nest = function (this: any, child: any, at?: any) {
+    if (child && child._children) this._insert(child, at);
     return this;
   };
 
-  TimelineProto.render = function (this: any, totalTime: number, suppressEvents: boolean, force: boolean) {
+  TrackProto.render = function (this: any, totalTime: number, silent: boolean, force: boolean) {
     const tDur = this.totalDuration();
     const dur = this.duration();
     const neg = totalTime < 0;
@@ -1538,127 +1433,134 @@ export function installMooTween(win: any): any {
     let prevTime = this._time;
     const prevTTime = this._tTime;
     const prevIteration = this._iteration;
-    if (iteration !== prevIteration && repeatCount(this)) {
+    if (iteration !== prevIteration && loopCount(this)) {
       // Finish the iteration we leave, then enter the new one from its boundary.
       const forward = tTime > prevTTime;
-      const oldBack = this._yoyo && prevIteration & 1;
-      this._renderChildren(forward !== !!oldBack ? dur : 0, prevTime, suppressEvents, force);
-      const newBack = this._yoyo && iteration & 1;
+      const oldBack = this._pingpong && prevIteration & 1;
+      this._renderChildren(forward !== !!oldBack ? dur : 0, prevTime, silent, force);
+      const newBack = this._pingpong && iteration & 1;
       const entry = forward !== !!newBack ? 0 : dur;
-      if (!this._yoyo) this._renderChildren(entry, forward !== !!oldBack ? dur : 0, true, force);
+      if (!this._pingpong) this._renderChildren(entry, forward !== !!oldBack ? dur : 0, true, force);
       prevTime = entry;
     }
     const local = this._ease ? (dur ? this._ease(clamp(0, 1, time / dur)) * dur : time) : time;
     const localPrev = this._ease && prevTime >= 0 ? (dur ? this._ease(clamp(0, 1, prevTime / dur)) * dur : prevTime) : prevTime;
-    this._renderChildren(neg ? totalTime : local, localPrev, suppressEvents, force);
+    this._renderChildren(neg ? totalTime : local, localPrev, silent, force);
     const wasStarted = prevTTime > 0;
     this._tTime = tTime;
     this._time = neg ? totalTime : time;
     this._iteration = iteration;
     this._neg = neg;
-    if (!suppressEvents) {
-      if (!wasStarted && tTime > 0) fire(this, 'onStart');
-      fire(this, 'onUpdate');
-      if (iteration !== prevIteration) fire(this, 'onRepeat');
-      if (tTime === tDur && prevTTime !== tDur && tDur > 0) fire(this, 'onComplete');
-      else if (tTime === 0 && wasStarted) fire(this, 'onReverseComplete');
+    if (!silent) {
+      if (!wasStarted && tTime > 0) fire(this, 'onBegin');
+      fire(this, 'onFrame');
+      if (iteration !== prevIteration) fire(this, 'onLoop');
+      if (tTime === tDur && prevTTime !== tDur && tDur > 0) fire(this, 'onEnd');
+      else if (tTime === 0 && wasStarted) fire(this, 'onRewind');
     }
     return this;
   };
 
-  TimelineProto._renderChildren = function (this: any, time: number, prevTime: number, suppressEvents: boolean, force: boolean) {
+  TrackProto._renderChildren = function (this: any, time: number, prevTime: number, silent: boolean, force: boolean) {
     const kids = this._children;
     if (time >= prevTime) {
       for (let i = 0; i < kids.length; i++) {
         const c = kids[i];
         if (c._start > time) break;
-        c.render(roundTime((time - c._start) * c._ts), suppressEvents, force);
+        c.render(roundTime(time - c._start), silent, force);
       }
     } else {
       for (let i = kids.length - 1; i >= 0; i--) {
         const c = kids[i];
-        if (c._start <= prevTime) c.render(roundTime((time - c._start) * c._ts), suppressEvents, force);
+        if (c._start <= prevTime) c.render(roundTime(time - c._start), silent, force);
       }
     }
   };
 
-  function createTimeline(vars?: any): any {
-    const tl = Object.create(TimelineProto);
-    initAnim(tl, vars || {});
-    tl._children = [];
-    tl.labels = {};
-    tl._recent = null;
-    tl._dirty = true;
-    tl._durCache = 0;
-    tl._scope = tl.vars.scope || null;
-    tl._repeatSpan = Number(tl.vars.repeatSpan) || 0;
-    tl._ease = null;
-    return tl;
+  function createTrack(vars?: any): any {
+    const track = Object.create(TrackProto);
+    initAnim(track, vars || {});
+    track._children = [];
+    track.marks = {};
+    track._recent = null;
+    track._dirty = true;
+    track._durCache = 0;
+    track._scope = track.vars.scope || null;
+    track._loopSpan = Number(track.vars.loopSpan) || 0;
+    track._ease = null;
+    return track;
   }
 
-  /** Array or object keyframes: one sequential child tween per segment (each linear unless eased). */
-  function makeKeyframes(targets: any[], vars: any, raw: any): any {
-    const group = createTimeline({
-      onStart: vars.onStart, onUpdate: vars.onUpdate, onComplete: vars.onComplete, onRepeat: vars.onRepeat,
-      callbackScope: vars.callbackScope, repeat: vars.repeat, yoyo: vars.yoyo, repeatDelay: vars.repeatDelay, delay: vars.delay
+  /**
+   * sequence: [{...}, {...}] runs one step after another (each step linear unless it names a curve;
+   * stepCurve sets the default). The object forms { '0%': {...}, '50%': {...} } and { x: [0, 80, 40] }
+   * spread the steps over `dur`.
+   */
+  function makeSequence(targets: any[], vars: any, raw: any): any {
+    const group = createTrack({
+      onBegin: vars.onBegin, onFrame: vars.onFrame, onEnd: vars.onEnd, onLoop: vars.onLoop,
+      loop: vars.loop, pingpong: vars.pingpong, loopGap: vars.loopGap, wait: vars.wait
     });
     group._group = true;
-    const total = Number(raw.duration);
-    const easeEach = vars.easeEach || 'none';
-    let frames: any[] = [];
-    const kf = vars.keyframes;
-    if (Array.isArray(kf)) {
-      const each = total > 0 ? total / kf.length : undefined;
-      frames = kf.map((f: any) => Object.assign({ duration: f.duration ?? each ?? globalDefaults.duration, ease: f.ease || easeEach }, f));
+    const total = Number(raw.dur);
+    const stepCurve = vars.stepCurve || 'linear';
+    let steps: any[] = [];
+    const seq = vars.sequence;
+    if (Array.isArray(seq)) {
+      const each = total > 0 ? total / seq.length : undefined;
+      steps = seq.map((f: any) => Object.assign({ dur: f.dur ?? each ?? DEFAULTS.dur, curve: f.curve || stepCurve }, f));
     } else {
-      const dur = total > 0 ? total : globalDefaults.duration;
-      const pctKeys = Object.keys(kf).filter((k) => /%$/.test(k)).sort((a, b) => parseFloat(a) - parseFloat(b));
+      const dur = total > 0 ? total : DEFAULTS.dur;
+      const pctKeys = Object.keys(seq).filter((k) => /%$/.test(k)).sort((a, b) => parseFloat(a) - parseFloat(b));
       if (pctKeys.length) {
         let last = 0;
         pctKeys.forEach((k) => {
           const pct = parseFloat(k) / 100;
-          frames.push(Object.assign({ ease: kf.easeEach || easeEach }, kf[k], { duration: Math.max(0, (pct - last) * dur) }));
+          steps.push(Object.assign({ curve: stepCurve }, seq[k], { dur: Math.max(0, (pct - last) * dur) }));
           last = pct;
         });
       } else {
-        const props = Object.keys(kf).filter((k) => Array.isArray(kf[k]));
-        const n = Math.max(0, ...props.map((p) => kf[p].length));
+        const props = Object.keys(seq).filter((k) => Array.isArray(seq[k]));
+        const n = Math.max(0, ...props.map((p) => seq[p].length));
         for (let i = 0; i < n; i++) {
-          const f: any = { duration: i === 0 ? 0 : dur / Math.max(1, n - 1), ease: kf.easeEach || easeEach };
+          const f: any = { dur: i === 0 ? 0 : dur / Math.max(1, n - 1), curve: stepCurve };
           props.forEach((p) => {
-            if (i < kf[p].length) f[p] = kf[p][i];
+            if (i < seq[p].length) f[p] = seq[p][i];
           });
-          frames.push(f);
+          steps.push(f);
         }
       }
     }
-    for (const f of frames) {
+    for (const f of steps) {
       const sub = Object.assign({}, f);
-      const delay = Number(sub.delay) || 0;
-      delete sub.delay;
-      group._insert(createTween('to', targets, null, sub), group.duration() + delay);
+      const wait = Number(sub.wait) || 0;
+      delete sub.wait;
+      group._insert(createMove('go', targets, null, sub), group.duration() + wait);
     }
-    if (raw.ease) group._ease = parseEase(raw.ease);
+    if (raw.curve) group._ease = parseCurve(raw.curve);
     return group;
   }
 
-  /** Start offset of each target for a stagger (number, object or function). */
-  function staggerOffsets(stagger: any, targets: any[]): number[] {
+  /**
+   * Start offset of each target for cascade: a number (gap between targets), a function
+   * (i, target, targets) => seconds, or { gap | total, from: 'first' | 'middle' | 'last' | 'ends' |
+   * index | 'shuffle', curve }.
+   */
+  function cascadeOffsets(cascade: any, targets: any[]): number[] {
     const n = targets.length;
-    if (isFn(stagger)) return targets.map((t, i) => Number(stagger(i, t, targets)) || 0);
-    if (typeof stagger === 'number') return targets.map((_t, i) => i * stagger);
-    const cfg = stagger || {};
-    if (cfg.grid) warnOnce('grid', 'stagger.grid is not supported; staggering in document order.');
+    if (isFn(cascade)) return targets.map((t, i) => Number(cascade(i, t, targets)) || 0);
+    if (typeof cascade === 'number') return targets.map((_t, i) => i * cascade);
+    const cfg = cascade || {};
     const from = cfg.from ?? 0;
-    const edges = from === 'edges';
+    const ends = from === 'ends';
     let origin: number;
     if (typeof from === 'number') origin = clamp(0, n - 1, from);
     else {
-      const ratio = from === 'center' || edges ? 0.5 : from === 'end' ? 1 : 0;
+      const ratio = from === 'middle' || ends ? 0.5 : from === 'last' ? 1 : 0;
       origin = n * ratio - 0.5;
     }
     let dist = targets.map((_t, i) => Math.abs(i - origin));
-    if (from === 'random') {
+    if (from === 'shuffle') {
       // Deterministic shuffle seeded by the target count.
       let seed = n * 9301 + 49297;
       const rand = () => {
@@ -1676,10 +1578,10 @@ export function installMooTween(win: any): any {
     const min = Math.min(...dist);
     const max = Math.max(...dist);
     const range = max - min;
-    let span = cfg.amount !== undefined ? Number(cfg.amount) || 0 : (Number(cfg.each) || 0) * (n - 1);
-    if (edges) span = -span;
+    let span = cfg.total !== undefined ? Number(cfg.total) || 0 : (Number(cfg.gap) || 0) * (n - 1);
+    if (ends) span = -span;
     const base = span < 0 ? -span : 0;
-    const ease = cfg.ease ? parseEase(cfg.ease) : null;
+    const ease = cfg.curve ? parseCurve(cfg.curve) : null;
     return dist.map((d) => {
       let norm = range ? (d - min) / range : 0;
       if (ease) norm = span < 0 ? 1 - ease(1 - norm) : ease(norm);
@@ -1690,34 +1592,13 @@ export function installMooTween(win: any): any {
   /* ------------------------------------------------------------------ *
    * Public API
    * ------------------------------------------------------------------ */
-  function hostTimeline(): any {
-    return api.activeTimeline || lastRoot;
-  }
-
-  /** Standalone tweens join the shot being built, starting with it (GSAP would play them in real time). */
-  function standalone(mode: string, targets: any, a: any, b?: any): any {
-    const host = hostTimeline();
-    if (!host) {
-      const tl = createTimeline();
-      tl._add(mode, targets, a, b, 0);
-      return tl._recent || tl;
-    }
-    host._add(mode, targets, a, b, 0);
-    return host._recent;
-  }
-
-  const utils: any = {
+  /** Number helpers for scene code: MooTween.math.clamp / mix / remap / normalize / cycle / snap. */
+  const math: any = {
     clamp(min: number, max: number, value?: number): any {
       return value === undefined ? (v: number) => clamp(min, max, v) : clamp(min, max, value);
     },
-    mapRange(inMin: number, inMax: number, outMin: number, outMax: number, value?: number): any {
-      const map = (v: number) => (inMax === inMin ? outMin : outMin + ((v - inMin) / (inMax - inMin)) * (outMax - outMin));
-      return value === undefined ? map : map(value);
-    },
-    normalize(min: number, max: number, value?: number): any {
-      return utils.mapRange(min, max, 0, 1, value);
-    },
-    interpolate(start: any, end: any, progress?: number): any {
+    /** mix(a, b, t): a value t of the way from a to b (numbers or colors). mix([a, b, c], t) walks a list. */
+    mix(start: any, end: any, t?: number): any {
       const lerp = (p: number) => {
         if (Array.isArray(start)) {
           const seg = clamp(0, start.length - 1, p * (start.length - 1));
@@ -1731,9 +1612,18 @@ export function installMooTween(win: any): any {
         return p < 1 ? start : end;
       };
       if (Array.isArray(start)) return end === undefined ? lerp : lerp(end);
-      return progress === undefined ? lerp : lerp(progress);
+      return t === undefined ? lerp : lerp(t);
     },
-    wrap(min: any, max?: any, value?: any): any {
+    /** remap(inMin, inMax, outMin, outMax, v): v moved from one range into another. */
+    remap(inMin: number, inMax: number, outMin: number, outMax: number, value?: number): any {
+      const map = (v: number) => (inMax === inMin ? outMin : outMin + ((v - inMin) / (inMax - inMin)) * (outMax - outMin));
+      return value === undefined ? map : map(value);
+    },
+    normalize(min: number, max: number, value?: number): any {
+      return math.remap(min, max, 0, 1, value);
+    },
+    /** cycle(min, max, v) keeps v inside [min, max); cycle(list, i) picks list[i] round-robin. */
+    cycle(min: any, max?: any, value?: any): any {
       if (Array.isArray(min)) {
         const list = min;
         const pickAt = (i: number) => list[((Math.floor(i) % list.length) + list.length) % list.length];
@@ -1743,176 +1633,33 @@ export function installMooTween(win: any): any {
       const w = (v: number) => (range ? ((((v - min) % range) + range) % range) + min : min);
       return value === undefined ? w : w(value);
     },
-    wrapYoyo(min: number, max: number, value?: number): any {
-      const range = max - min;
-      const w = (v: number) => {
-        const total = range * 2;
-        const x = (((v - min) % total) + total) % total;
-        return min + (x > range ? total - x : x);
-      };
-      return value === undefined ? w : w(value);
-    },
-    snap(inc: any, value?: number): any {
-      const fn = snapper(inc, '_') || ((v: number) => v);
-      const s = (v: number) => (typeof inc === 'number' || Array.isArray(inc) ? (snapper({ _: inc }, '_') as any)(v) : fn(v));
+    /** snap(step, v) rounds to a multiple of step; snap([a, b, c], v) picks the closest value. */
+    snap(step: any, value?: number): any {
+      const s = snapper({ _: step }, '_') || ((v: number) => v);
       return value === undefined ? s : s(value);
+    }
+  };
+
+  const api: any = {
+    version: '2.0.0',
+    /** The shot being built: sub-tracks created meanwhile resolve selectors inside it. */
+    activeTrack: null,
+    math,
+    /** A new track: { scope, loopSpan, defaults, paused }. Nest it into the shot with shot.nest(). */
+    track(options?: any): any {
+      return createTrack(options);
     },
-    random(min: any, max?: any, snap?: any, returnFunction?: boolean): any {
-      const make = () => {
-        if (Array.isArray(min)) return min[Math.floor(Math.random() * min.length)];
-        let v = min + Math.random() * (max - min);
-        if (snap) v = Math.round(v / snap) * snap;
-        return v;
-      };
-      return returnFunction || (Array.isArray(min) && max === true) ? make : make();
-    },
-    toArray(targets: any, scope?: any): any[] {
-      const host = hostTimeline();
+    /** Elements for a selector (inside the active shot), element, list or array. */
+    select(targets: any, scope?: any): any[] {
+      const host = api.activeTrack;
       return toArray(targets, scope || (host ? host._scopeEl() : null));
     },
-    selector(scope: any): any {
-      const root = toArray(scope)[0];
-      return (sel: string) => toArray(sel, root);
-    },
-    getUnit(value: any): string {
-      const p = parseNumber(value);
-      return p ? p.u : '';
-    },
-    splitColor(value: string): number[] | null {
-      const c = parseColor(value);
-      return c ? (c[3] === 1 ? c.slice(0, 3) : c) : null;
-    },
-    distribute(cfg: any): any {
-      return (i: number, target: any, list: any[]) => staggerOffsets(cfg, list)[i];
-    },
-    shuffle(list: any[]): any[] {
-      return list;
-    },
-    pipe(...fns: any[]): any {
-      return (v: any) => fns.reduce((acc, fn) => fn(acc), v);
-    },
-    unitize(fn: any, unit?: string): any {
-      return (v: any) => fn(parseFloat(v)) + (unit || utils.getUnit(v));
+    /** The easing function for a curve name, e.g. MooTween.curve('overshoot-out(1.7)')(0.5). */
+    curve(name: any): Ease {
+      return parseCurve(name);
     }
   };
-
-  const noop = () => undefined;
-  const api: any = {
-    version: '1.0.0',
-    activeTimeline: null,
-    utils,
-    ticker: {
-      lagSmoothing: noop,
-      fps: noop,
-      add(): void {
-        warnOnce('ticker.add', 'ticker.add() is not supported: MooTween renders by seek, never in real time.');
-      },
-      remove: noop,
-      time: 0,
-      frame: 0
-    },
-    config: noop,
-    defaults(vars?: any): any {
-      if (vars) globalDefaults = Object.assign({}, globalDefaults, vars);
-      return globalDefaults;
-    },
-    timeline(vars?: any): any {
-      const tl = createTimeline(vars);
-      if (!tl._paused) lastRoot = tl;
-      return tl;
-    },
-    to(targets: any, vars: any): any {
-      return standalone('to', targets, null, vars || {});
-    },
-    from(targets: any, vars: any): any {
-      return standalone('from', targets, vars || {});
-    },
-    fromTo(targets: any, fromVars: any, toVars: any): any {
-      return standalone('fromTo', targets, fromVars || {}, toVars || {});
-    },
-    set(targets: any, vars: any): any {
-      // Applied once at build time and never reverted, like a global GSAP set.
-      const host = hostTimeline();
-      const tw = createTween('to', toArray(targets, host ? host._scopeEl() : null), null, Object.assign({}, vars, { duration: 0 }));
-      tw.render(0, true, false);
-      return tw;
-    },
-    delayedCall(delay: number, fn: any, params?: any[]): any {
-      const host = hostTimeline();
-      if (host) host.call(fn, params || [], Number(delay) || 0);
-      return host;
-    },
-    getProperty(target: any, prop: string, unit?: string): any {
-      const el = toArray(target)[0];
-      if (!el) return undefined;
-      if (!isElement(el)) return el[prop];
-      if (TRANSFORM_ALIASES[prop] || prop === 'scale') {
-        const tf = transformCache(el);
-        return prop === 'scale' ? tf.scaleX : tf[TRANSFORM_ALIASES[prop]];
-      }
-      const v = computed(el)[camel(prop)];
-      if (unit === undefined) {
-        const p = parseNumber(v);
-        return p ? p.n : v;
-      }
-      return v;
-    },
-    parseEase(ease: any): Ease {
-      return parseEase(ease);
-    },
-    registerEase(name: string, fn: Ease): void {
-      easeMap[String(name).toLowerCase()] = fn;
-    },
-    registerPlugin(): void {
-      warnOnce('registerPlugin', 'MooTween has no plugins; registerPlugin() is ignored.');
-    },
-    context(fn?: any): any {
-      warnOnce('context', 'context() is not supported; running its function directly.');
-      if (isFn(fn)) fn();
-      return { add: noop, revert: noop, kill: noop };
-    },
-    matchMedia(): any {
-      warnOnce('matchMedia', 'matchMedia() is not supported.');
-      return { add: noop, revert: noop, kill: noop };
-    },
-    quickTo(): any {
-      warnOnce('quickTo', 'quickTo() is not supported.');
-      return noop;
-    },
-    quickSetter(): any {
-      warnOnce('quickSetter', 'quickSetter() is not supported.');
-      return noop;
-    },
-    killTweensOf: noop,
-    isTweening(): boolean {
-      return false;
-    },
-    getTweensOf(): any[] {
-      return [];
-    }
-  };
-
-  // Inert stand-ins for plugin globals that older scenes reference, so a line such as
-  // registerPlugin(ScrollTrigger) is skipped instead of aborting the rest of the scene's build.
-  const inertPlugin = { create: () => ({ kill: noop, revert: noop }), refresh: noop, register: noop, getAll: () => [] };
-  const PLUGIN_STUBS: Record<string, any> = {
-    ScrollTrigger: inertPlugin,
-    ScrollToPlugin: inertPlugin,
-    MotionPathPlugin: inertPlugin,
-    MorphSVGPlugin: inertPlugin,
-    DrawSVGPlugin: inertPlugin,
-    TextPlugin: inertPlugin,
-    CustomEase: { create: () => linear, register: noop },
-    Draggable: { create: () => [], get: () => undefined },
-    SplitText: function SplitText() {
-      warnOnce('SplitText', 'SplitText is not available in MooTween; use ctx.kinetic or ctx.split.');
-      return { chars: [], words: [], lines: [], revert: noop };
-    }
-  };
-  for (const name in PLUGIN_STUBS) if (win[name] === undefined) win[name] = PLUGIN_STUBS[name];
 
   win.MooTween = api;
-  // Alias for scenes written before MooTween.
-  win.gsap = api;
   return api;
 }

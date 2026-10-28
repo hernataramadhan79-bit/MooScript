@@ -709,17 +709,17 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-amber-300 font-semibold text-[12px]">
                       <span className="material-symbols-outlined text-[17px]">build</span>
-                      <span>Adegan ini memakai API yang tidak tersedia di MooTween</span>
+                      <span>Kode adegan ini bukan API MooScript</span>
                     </div>
                     <p className="text-[11px] text-amber-100/70 leading-relaxed">
-                      Adegan tetap diputar, tapi bagian yang memakai API ini dilewati. Kode belum diubah; AI akan mengganti
-                      hanya bagian berikut dan mempertahankan desainnya.
+                      Kodenya ditulis untuk API animasi lain (gaya GSAP), jadi adegan tampil diam sampai diperbaiki. Kode
+                      belum diubah; AI akan menerjemahkan bagian berikut ke API MooScript dan mempertahankan desainnya.
                     </p>
                     {activeCompScene.errors && activeCompScene.errors.length > 0 && (
                       <ul className="flex flex-col gap-1">
                         {activeCompScene.errors.map((err) => (
                           <li key={err} className="text-[11px] text-amber-200/90 font-mono leading-snug">
-                            {err.replace(/^API di luar MooTween: /, '')}
+                            {err.replace(/^Bukan API MooScript: /, '')}
                           </li>
                         ))}
                       </ul>

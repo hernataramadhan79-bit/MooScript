@@ -247,7 +247,7 @@ describe('Mograph, Style Tab, Layer Color/Palette & Asset Overhaul Suite', () =>
       expect(compScene?.html).toContain('background:rgba(24,24,27,0.85)');
       // Animation preset check (slide up)
       expect(compScene?.buildJs).toContain('y: 100');
-      expect(compScene?.buildJs).toContain('power3.out');
+      expect(compScene?.buildJs).toContain('strong-out');
     });
   });
 });

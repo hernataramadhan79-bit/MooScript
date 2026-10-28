@@ -1,6 +1,6 @@
 # MooScript Studio
 
-> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + a MooTween timeline, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
+> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + a MooTween track, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
 
 ---
 
@@ -28,8 +28,8 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ### Composition runtime
 
-- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master timeline scrubbed by frame, so preview and export are identical.
-- Each shot's selectors only match inside that shot, and `repeat: -1` loops for the length of the shot.
+- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master track scrubbed by frame, so preview and export are identical.
+- Each shot's selectors only match inside that shot, and `loop: true` repeats for the length of the shot.
 - **Flow transition** (default): the next shot is already underneath and lands with a short push while the current one hands off. Cut, fade, slide, zoom and wipe are also available.
 - Per-scene CSS is scoped to its wrapper (`scopeCss.ts`), so shots never leak styles into each other.
 - Poster frames: while the editor is paused at the start of a shot whose first frame is empty, the preview shows its first frame with content. Playback and export always render the real timeline.
@@ -39,12 +39,86 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 MooTween (`src/engine/composition/runtime/mooTween.ts`) is MooScript's own animation engine. It is seek-only: nothing runs on a real-time ticker, and every frame is produced by `seek(t)`, so the same time always renders the same picture in the editor, the MP4 and the HTML export.
 
-- **Timeline API**: `tl.to / from / fromTo / set / add / addLabel / call`, position parameters (`1.2`, `'+=0.3'`, `'<'`, `'>'`, `'<0.2'`, labels), `stagger`, `repeat` / `yoyo`, `keyframes`, callbacks and `MooTween.utils`.
-- **Properties**: HTML and SVG transforms (including `svgOrigin`), opacity / `autoAlpha`, numeric CSS with unit conversion, colors (hex, rgb, hsl, named, `var(--moo-*)`), `clipPath` / `filter` / `boxShadow`, SVG strokes and `attr`.
-- **Eases**: the `power`, `sine`, `expo`, `circ`, `back`, `elastic`, `bounce` and `steps` families.
-- Scene code receives it as `(tl, root, ctx, MooTween)`. The API keeps the familiar GSAP-style shape, and `gsap` remains as an alias, so scenes written before MooTween still run.
-- APIs outside this set (plugins, ticker, `context`, `quickTo`, …) are rejected for new code with a repair hint. Saved scenes that use them are marked **perlu perbaikan** and can be fixed with **Perbaiki dengan AI** in the scene inspector; their code is never rewritten without asking.
+- Scenes use MooScript's own API (see [Writing scene code](#writing-scene-code) below). The AI director is taught the same guide, and the scene code editor has it in the **Panduan API** tab.
+- Code in another API (`tl.to`, `gsap.*`, `duration:`, `ease: 'power2.out'`, plugins, …) is rejected for new scenes with the MooScript replacement. Saved scenes that use it are marked **perlu perbaikan** and can be fixed with **Perbaiki dengan AI** in the scene inspector; their code is never rewritten without asking.
 - A golden-frame suite (`tests/golden/`) renders 46 reference shots in Chromium and compares every frame with snapshots recorded from the previous engine.
+
+### Writing scene code
+
+A scene is three blocks: HTML, CSS and JavaScript. The JavaScript runs once, as a function of `(shot, root, ctx, MooTween)`, and only places moves on the shot; MooTween plays them by seeking. Do not redeclare those four names. The guide lives in [`runtime/mooApiGuide.ts`](src/engine/composition/runtime/mooApiGuide.ts), which feeds the AI prompt, the **Panduan API** tab and a test that checks this section lists every name.
+
+| Name | What it is |
+| --- | --- |
+| `shot` | This shot's track. Every move goes here. |
+| `root` | The shot's wrapper element. String selectors only match inside it. |
+| `ctx` | Motion helpers (`ctx.camera`, `ctx.hero`, …) and shot info: `ctx.dur`, `ctx.stage`, `ctx.rand()`. |
+| `MooTween` | The engine: `MooTween.track()` for sub-tracks, `MooTween.math`, `MooTween.select()`. |
+
+**Moves.** A target is a selector string, an element, a NodeList, an array, or a plain object (for counters). Every method returns the track, so calls chain.
+
+| Method | Does |
+| --- | --- |
+| `shot.go(target, props, at)` | Moves from the current state to `props`. |
+| `shot.arrive(target, props, at)` | Moves from `props` to the current state. The start state shows at once. |
+| `shot.travel(target, from, to, at)` | Moves from one set of props to another. The start state shows at once. |
+| `shot.pin(target, props, at)` | Sets props instantly at `at`, and undoes them when the playhead goes back past it. |
+| `shot.mark('hit', at)` | Names a time so other moves can use `'hit'` or `'hit+0.2'`. |
+| `shot.cue(fn, at)` | Calls `fn(progress)` when the playhead crosses `at`, forwards or backwards. |
+| `shot.nest(sub, at)` | Places a sub-track (`const sub = MooTween.track(); sub.go(...)`) inside the shot. |
+
+**Time (`at`)**, the last argument: a number of seconds; `'end'`, `'end+0.3'`, `'end-0.3'` (the end of everything placed so far, the default); `'with'`, `'with+0.2'` (with the start of the previous move); `'after'`, `'after-0.1'` (after the previous move ends); a mark name such as `'hit+0.1'`; or `ctx.beat('word', 1.2)` for the moment a word is spoken in the voice-over.
+
+**Options**, written next to the animated props:
+
+| Option | Does |
+| --- | --- |
+| `dur: 0.6` | Length in seconds (default 0.5). |
+| `wait: 0.2` | Starts that much after `at`. |
+| `curve: 'rush-out'` | The easing curve (default `'soft-out'`). |
+| `cascade: 0.08` or `{ gap \| total, from }` | Offsets several targets; `from`: `'first'`, `'middle'`, `'last'`, `'ends'`, an index or `'shuffle'`. |
+| `loop: 2` / `loop: true`, `pingpong: true`, `loopGap: 0.3` | Repeats (`true` = for the whole shot), going back and forth, with a gap. |
+| `sequence: [{ x: 80, dur: 0.3 }, { y: 40 }]` | Steps on the same target, linear unless a step has a curve. |
+| `showStart: false` | For `arrive` / `travel`: don't show the start state before the move begins. |
+| `onBegin` / `onFrame` / `onEnd` | `fn(progress)` when the move starts, on every frame, and when it ends. |
+| `round: { v: 1 }` | Rounds a value to a step (handy for counters). |
+
+**Properties**: `x`, `y` (px or `'50%'`), `shiftX` / `shiftY` (percent of the element's size), `scale`, `scaleX`, `scaleY`, `spin` (degrees), `tiltX` / `tiltY` with `depth` (3D, perspective in px), `skewX` / `skewY`, `pivot: '50% 100%'` (transform origin), `pivotPoint: '540 960'` (SVG origin in viewBox units), `opacity` and `fade` (also hides the element at 0), numeric CSS (`width`, `fontSize`, `borderRadius`, …), colors (`color`, `backgroundColor`, `fill`, `stroke`: hex, rgb, hsl, names, `var(--moo-accent)`), `clipPath` / `filter` / `boxShadow`, `strokeDasharray` / `strokeDashoffset`, and SVG attributes as `attrs: { cx, r, d }`. Relative values are written `'by(40)'` or `'by(-0.5)'`.
+
+**Curves** are written `name-direction`, where the direction is `-in`, `-out` (the default) or `-inout`: `linear`, `soft`, `smooth`, `strong`, `sharp` (from gentle to steep acceleration), `gentle`, `rush` (fast, then a hard brake), `arc`, `overshoot-out(1.7)`, `spring-out(1, 0.3)` (amplitude, period), `bounce-out` and `steps(5)`.
+
+**ctx helpers** place their own moves and keep everything inside `[0, ctx.dur]`: `ctx.camera({ move, handoff })`, `ctx.handoff('zoom')`, `ctx.hero(target)`, `ctx.draw(paths, { at, dur, cascade })`, `ctx.pop(targets, { at, cascade })`, `ctx.kinetic(el, { style, by, at })`, `ctx.count(el, { from, to, at, dur })`, `ctx.reveal(targets, { dir, at })`, `ctx.punch` / `ctx.shake` / `ctx.flash`, `ctx.drift`, `ctx.orbit` and `ctx.particles`.
+
+**Utilities**: `MooTween.math.clamp(min, max, v)`, `MooTween.math.mix(a, b, t)`, `MooTween.math.remap(inMin, inMax, outMin, outMax, v)`, `MooTween.math.cycle(list, i)` and `MooTween.select('.dot')`.
+
+**Rules**: `ctx.rand()` is the only source of randomness (`Math.random`, `Date.now` and `performance.now` are blocked); don't use `document.querySelector`; finish every move inside `[0, ctx.dur]`.
+
+```js
+const hit = ctx.beat('ide', 1.2);
+ctx.camera({ move: 'push', handoff: 'zoom' });
+ctx.hero('.core');
+shot.travel('.ring', { scale: 1, opacity: 0.9, pivot: '50% 50%' },
+  { scale: 4, opacity: 0, dur: 1.2, curve: 'rush-out', loop: 2 }, 0.15);
+shot.mark('hit', hit);
+ctx.draw('.links path', { at: 0.4, dur: 0.7, cascade: 0.12 });
+shot.arrive('.word span', { shiftY: 110, spin: 8, opacity: 0, dur: 0.5,
+  cascade: { gap: 0.08, from: 'middle' }, curve: 'rush-out' }, 'hit-0.15');
+shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
+```
+
+**Bringing GSAP-style code?** Rename as you go:
+
+| GSAP style | MooScript |
+| --- | --- |
+| `tl.to / from / fromTo / set` | `shot.go / arrive / travel / pin` |
+| `tl.add / addLabel / call`, `gsap.timeline()` | `shot.nest / mark / cue`, `MooTween.track()` |
+| `duration`, `delay`, `ease`, `stagger` (`each`, `amount`) | `dur`, `wait`, `curve`, `cascade` (`gap`, `total`) |
+| `repeat: -1`, `yoyo`, `repeatDelay`, `keyframes`, `immediateRender` | `loop: true`, `pingpong`, `loopGap`, `sequence`, `showStart` |
+| `onStart` / `onUpdate` / `onComplete` | `onBegin` / `onFrame` / `onEnd` |
+| `rotation`, `rotationX/Y`, `xPercent/yPercent`, `transformPerspective` | `spin`, `tiltX/Y`, `shiftX/Y`, `depth` |
+| `transformOrigin`, `svgOrigin`, `autoAlpha`, `attr` | `pivot`, `pivotPoint`, `fade`, `attrs` |
+| `'+=40'` (value), `'<'`, `'>'`, `'+=0.3'`, `'label+=0.2'` (position) | `'by(40)'`, `'with'`, `'after'`, `'end+0.3'`, `'label+0.2'` |
+| `power1–4`, `sine`, `expo`, `circ`, `back`, `elastic`, `.inOut` | `soft / smooth / strong / sharp`, `gentle`, `rush`, `arc`, `overshoot`, `spring`, `-inout` |
+| `gsap.utils.clamp / interpolate / mapRange / wrap / toArray` | `MooTween.math.clamp / mix / remap / cycle`, `MooTween.select` |
 
 ### Audio
 

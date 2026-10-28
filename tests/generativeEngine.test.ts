@@ -149,9 +149,9 @@ describe('Generative Mograph Engine Suite', () => {
 \`\`\`
 
 \`\`\`javascript
-tl.from('[data-moo-layer="wing"]', { duration: 1.2, x: -200, opacity: 0, ease: 'power3.out' })
-  .from('[data-moo-layer="lift-vector"]', { duration: 0.8, scaleY: 0, ease: 'back.out(1.7)' }, '-=0.4')
-  .from('[data-moo-layer="caption"]', { duration: 0.6, y: 30, opacity: 0 }, '-=0.2');
+shot.arrive('[data-moo-layer="wing"]', { dur: 1.2, x: -200, opacity: 0, curve: 'strong-out' })
+  .arrive('[data-moo-layer="lift-vector"]', { dur: 0.8, scaleY: 0, curve: 'overshoot-out(1.7)' }, 'end-0.4')
+  .arrive('[data-moo-layer="caption"]', { dur: 0.6, y: 30, opacity: 0 }, 'end-0.2');
 \`\`\`
     `;
 
@@ -170,7 +170,7 @@ tl.from('[data-moo-layer="wing"]', { duration: 1.2, x: -200, opacity: 0, ease: '
     expect(result.html).toContain('data-moo-layer="wing"');
     expect(result.html).toContain('data-moo-layer="lift-vector"');
     expect(result.html).toContain('data-moo-layer="caption"');
-    expect(result.buildJs).toContain('tl.from');
+    expect(result.buildJs).toContain('shot.arrive');
     expect(result.editableLayers).toBeDefined();
     expect(result.editableLayers!.length).toBe(3);
 
@@ -251,7 +251,7 @@ while(true) { eval("bad"); }
     expect(result.html).toContain('moo-camera');
     // Narration is spoken + captioned, never pasted into the frame
     expect(result.html).not.toContain('aliran fluida');
-    expect(result.buildJs).toContain('tl.');
+    expect(result.buildJs).toContain('shot.');
     expect(result.editableLayers).toBeDefined();
     expect(result.editableLayers!.length).toBeGreaterThan(0);
   });
@@ -362,7 +362,7 @@ while(true) { eval("bad"); }
       duration: 3,
       html: '<div data-moo-layer="s1">Scene 1 Content</div>',
       css: '',
-      buildJs: 'tl.to(".s1", { x: 10 });',
+      buildJs: 'shot.go(".s1", { x: 10 });',
       status: 'ok',
       version: 1,
       userEdited: false
@@ -374,7 +374,7 @@ while(true) { eval("bad"); }
       duration: 4,
       html: '<div data-moo-layer="s2">Scene 2 Original</div>',
       css: '',
-      buildJs: 'tl.to(".s2", { opacity: 1 });',
+      buildJs: 'shot.go(".s2", { opacity: 1 });',
       status: 'ok',
       version: 1,
       userEdited: false
@@ -445,7 +445,7 @@ while(true) { eval("bad"); }
             duration: 3.0,
             html: '<div data-moo-layer="box" class="box">MooScript</div>',
             css: '.box { width: 100px; height: 100px; background: #84cc16; }',
-            buildJs: 'tl.from("[data-moo-layer=\\"box\\"]", { scale: 0, duration: 1 });',
+            buildJs: 'shot.arrive("[data-moo-layer=\\"box\\"]", { scale: 0, dur: 1 });',
             status: 'ok',
             version: 1,
             userEdited: false
@@ -487,7 +487,7 @@ while(true) { eval("bad"); }
       {
         html: '<script>alert(1)</script>',
         css: '',
-        buildJs: 'tl.to(".box", { x: 10 });'
+        buildJs: 'shot.go(".box", { x: 10 });'
       }
     ];
 
@@ -585,10 +585,10 @@ Here is the motion graphic for your scene:
 \`\`\`typescript
 import gsap from 'gsap';
 
-export default function(tl, root, ctx, gsap) {
+export default function(shot, root, ctx, MooTween) {
   // Animate the air lines flowing past the parent wing
   const parentNode = root.querySelector('.airflow-canvas');
-  tl.fromTo('.air-line', { strokeDashoffset: 100 }, { strokeDashoffset: 0, duration: 2, ease: 'linear' });
+  shot.travel('.air-line', { strokeDashoffset: 100 }, { strokeDashoffset: 0, dur: 2, curve: 'linear' });
   const seed = Math.random();
 }
 \`\`\`
@@ -599,17 +599,17 @@ export default function(tl, root, ctx, gsap) {
     expect(parsed.css).toContain('.airflow-canvas');
     expect(parsed.buildJs).not.toContain('import gsap');
     expect(parsed.buildJs).not.toContain('export default');
-    expect(parsed.buildJs).toContain('tl.fromTo');
+    expect(parsed.buildJs).toContain('shot.travel');
     // Math.random() converted to ctx.rand()
     expect(parsed.buildJs).toContain('ctx.rand()');
 
-    // Validation should pass with NO false-positive on 'parent' or 'tl.fromTo'
+    // Validation should pass with NO false-positive on 'parent' or 'shot.travel'
     const validation = validateGeneratedScene(parsed);
     expect(validation.valid).toBe(true);
     expect(validation.errors).toEqual([]);
   });
 
-  it('14. parseCodeBlocks strips multiline gsap.timeline() redeclarations and unwraps functions with trailing comments', () => {
+  it('14. parseCodeBlocks strips multiline MooTween.track() redeclarations and unwraps functions with trailing comments', () => {
     const rawLlmResponse = `
 \`\`\`html
 <div class="scene-s1"><h1 class="title">Quantum Leap</h1></div>
@@ -621,23 +621,23 @@ export default function(tl, root, ctx, gsap) {
 
 \`\`\`javascript
 // Build scene animation
-export default function buildScene(tl, root, ctx, gsap) {
-  const tl = gsap.timeline({
+export default function buildScene(shot, root, ctx, MooTween) {
+  const shot = MooTween.track({
     paused: true,
-    defaults: { ease: 'power2.out', duration: 1 }
+    defaults: { curve: 'smooth-out', dur: 1 }
   });
   const root = document.querySelector('.scene-s1');
-  tl.from(root.querySelector('.title'), { y: 40, opacity: 0 });
+  shot.arrive(root.querySelector('.title'), { y: 40, opacity: 0 });
 }
 // End of scene 1
 \`\`\`
 `;
 
     const parsed = parseCodeBlocks(rawLlmResponse);
-    expect(parsed.buildJs).not.toContain('const tl =');
+    expect(parsed.buildJs).not.toContain('const shot =');
     expect(parsed.buildJs).not.toContain('const root =');
     expect(parsed.buildJs).not.toContain('export default');
-    expect(parsed.buildJs).toContain('tl.from');
+    expect(parsed.buildJs).toContain('shot.arrive');
 
     const validation = validateGeneratedScene(parsed);
     expect(validation.valid).toBe(true);
@@ -661,8 +661,8 @@ export default function buildScene(tl, root, ctx, gsap) {
 \`\`\`
 
 \`\`\`javascript
-const sceneTimeline = gsap.timeline();
-sceneTimeline.from(root.querySelector('.title'), { opacity: 0, duration: 1 });
+const sceneTimeline = MooTween.track();
+sceneTimeline.arrive(root.querySelector('.title'), { opacity: 0, dur: 1 });
 \`\`\`
 `;
 
@@ -670,7 +670,7 @@ sceneTimeline.from(root.querySelector('.title'), { opacity: 0, duration: 1 });
     expect(parsed.html).not.toContain('https://images.unsplash.com');
     expect(parsed.html).not.toContain('onclick=');
     expect(parsed.html).toContain('data:image/svg+xml');
-    expect(parsed.buildJs).toContain('tl.from');
+    expect(parsed.buildJs).toContain('shot.arrive');
 
     const validation = validateGeneratedScene(parsed);
     expect(validation.valid).toBe(true);

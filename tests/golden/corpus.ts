@@ -26,7 +26,7 @@ import type {
 import { REFERENCE_SCENE_EXAMPLE } from '../../src/engine/ai/director/motionLaws';
 import { parseCodeBlocks, synthesizeFallbackScene } from '../../src/engine/ai/director/directorPipeline';
 import { compileProceduralScene, type ProceduralArchetype } from '../../src/engine/composition/proceduralCompiler';
-import { DEMO_PROJECT } from '../fixtures/demoProject';
+import { DEMO_PROJECT_MOOTWEEN } from '../fixtures/demoProject';
 
 interface ShotSpec {
   id: string;
@@ -220,7 +220,7 @@ function kitCameraCases(): GoldenCase[] {
     ['pan-right', 'whip-up', ''],
     ['pan-up', 'drop', ''],
     ['pan-down', 'spin', ''],
-    ['roll', 'false', ", origin: '30% 70%', from: { rotation: -10 }, to: { scale: 1.3 }, ease: 'power2.inOut'"]
+    ['roll', 'false', ", pivot: '30% 70%', from: { spin: -10 }, to: { scale: 1.3 }, curve: 'smooth-inout'"]
   ];
   return combos.map(([move, handoff, extra]) => {
     const cls = `kc-${move}`;
@@ -252,13 +252,13 @@ function kitDrawPopHero(): GoldenCase {
   return single('kit-draw-pop-hero', {
     ...s,
     duration: 3.5,
-    buildJs: `ctx.draw('.kd-path', { at: 0.2, duration: 0.9 });
-ctx.draw([root.querySelector('.kd-line'), root.querySelector('.kd-poly')], { at: 0.5, stagger: 0.2, from: 0.3 });
-ctx.draw('.kd-ring', { at: 1.0, duration: 0.6, ease: 'power3.out' });
-ctx.pop('.kd-dots circle', { at: 0.8, stagger: 0.1 });
+    buildJs: `ctx.draw('.kd-path', { at: 0.2, dur: 0.9 });
+ctx.draw([root.querySelector('.kd-line'), root.querySelector('.kd-poly')], { at: 0.5, cascade: 0.2, from: 0.3 });
+ctx.draw('.kd-ring', { at: 1.0, dur: 0.6, curve: 'strong-out' });
+ctx.pop('.kd-dots circle', { at: 0.8, cascade: 0.1 });
 ctx.pop(root.querySelectorAll('.kd-missing'), { at: 0.5 });
 ctx.hero('.kd-hero');
-ctx.hero('.kd-badge', { from: 0.7, breathe: false, origin: '50% 100%' });`
+ctx.hero('.kd-badge', { from: 0.7, breathe: false, pivot: '50% 100%' });`
   });
 }
 
@@ -288,7 +288,7 @@ ctx.kinetic('.kk-b', { style: 'slam', at: ctx.beat('slam', 0.6) });
 ctx.kinetic('.kk-c', { style: 'flip', by: 'chars', at: ctx.beat('flip', 1.0) });
 ctx.kinetic('.kk-d', { style: 'drop', at: ctx.beat('nothing', 1.4) });
 ctx.kinetic('.kk-e', { style: 'type', at: 1.8 });
-ctx.kinetic('.kk-f', { at: 2.2, stagger: 0.2, ease: 'back.out(1.7)' });
+ctx.kinetic('.kk-f', { at: 2.2, cascade: 0.2, curve: 'overshoot-out(1.7)' });
 ctx.split('.kk-a', 'chars');`
   });
 }
@@ -309,7 +309,7 @@ function kitAccents(): GoldenCase {
     ...s,
     duration: 3.2,
     buildJs: `ctx.count('.ka-stat', { to: 87, suffix: '%', at: 0.2 });
-ctx.count('.ka-money', { from: 1000, to: 2500000, prefix: 'Rp ', decimals: 2, at: 0.5, duration: 1.5 });
+ctx.count('.ka-money', { from: 1000, to: 2500000, prefix: 'Rp ', decimals: 2, at: 0.5, dur: 1.5 });
 ctx.punch('.ka-box', { at: 1.0, scale: 1.4 });
 ctx.shake('.ka-shake', { at: 1.5, strength: 20 });
 ctx.flash({ at: 2.0, color: '#ffffff', intensity: 0.8 });
@@ -340,7 +340,7 @@ ${reveals.map((d, i) => `    <div class="kam-r kam-r-${d}" data-moo-layer="revea
     buildJs: `ctx.drift('.kam-glow', { amount: 60, rotate: 12 });
 ctx.orbit('.kam-sat', { turns: 1, cx: 540, cy: 760 });
 ctx.orbit('.kam-sq', { turns: 0.75 });
-ctx.orbit('.kam-spinner', { origin: '0% 0%' });
+ctx.orbit('.kam-spinner', { pivot: '0% 0%' });
 ${reveals.map((d, i) => `ctx.reveal('.kam-r-${d}', { dir: '${d}', at: ${(0.2 + i * 0.3).toFixed(1)} });`).join('\n')}
 ctx.particles({ count: 12, size: [4, 9], rise: 300 });
 ctx.particles({ count: 5, parent: '.kam-glow', color: '#ffee00' });`
@@ -365,8 +365,8 @@ function transitionCases(): GoldenCase[] {
       `.tb-${type} { background: #1e293b; }\n.tb-${type} .tb-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }`
     );
     const project = makeProject(`transition-${type}`, [
-      { id: `tr-${type}-a`, ...a, duration: 2.5, transition: type, buildJs: `ctx.camera({ move: 'push' });\ntl.to(root.querySelector('.ta-box'), { rotation: 90, duration: 2 }, 0);` },
-      { id: `tr-${type}-b`, ...b, duration: 2.5, transition: type, buildJs: `ctx.camera({ move: 'pull', handoff: false });\nctx.pop('.tb-dot', { at: 0.2, stagger: 0.15 });` }
+      { id: `tr-${type}-a`, ...a, duration: 2.5, transition: type, buildJs: `ctx.camera({ move: 'push' });\nshot.go(root.querySelector('.ta-box'), { spin: 90, dur: 2 }, 0);` },
+      { id: `tr-${type}-b`, ...b, duration: 2.5, transition: type, buildJs: `ctx.camera({ move: 'pull', handoff: false });\nctx.pop('.tb-dot', { at: 0.2, cascade: 0.15 });` }
     ]);
     return { name: `transition-${type}`, project };
   });
@@ -391,19 +391,19 @@ function apiPositions(): GoldenCase {
     ...s,
     duration: 4,
     buildJs: `const b = (n) => root.querySelector('.ap-b' + n);
-tl.addLabel('intro', 0.3);
-tl.to(b(1), { x: 300, duration: 0.6 })
-  .to(b(2), { x: 300, duration: 0.6 }, '-=0.3')
-  .to(b(3), { x: 300, duration: 0.5 }, '+=0.2')
-  .to(b(4), { x: 300, duration: 0.4 }, '<')
-  .to(b(5), { x: 300, duration: 0.4 }, '>')
-  .to(b(6), { x: 300, duration: 0.4 }, '<0.2')
-  .to(b(7), { x: 300, duration: 0.4 }, '>-0.1')
-  .to(b(8), { x: 300, duration: 0.5 }, 'intro')
-  .to(b(9), { x: 300, duration: 0.5 }, 'intro+=0.4')
-  .to(b(10), { x: 300, duration: 0.5, delay: 0.3 }, 1.0)
-  .to(b(11), { x: 300 });
-tl.to(b(12), { x: 300, duration: 0.3 }, 3.2);`
+shot.mark('intro', 0.3);
+shot.go(b(1), { x: 300, dur: 0.6 })
+  .go(b(2), { x: 300, dur: 0.6 }, 'end-0.3')
+  .go(b(3), { x: 300, dur: 0.5 }, 'end+0.2')
+  .go(b(4), { x: 300, dur: 0.4 }, 'with')
+  .go(b(5), { x: 300, dur: 0.4 }, 'after')
+  .go(b(6), { x: 300, dur: 0.4 }, 'with+0.2')
+  .go(b(7), { x: 300, dur: 0.4 }, 'after-0.1')
+  .go(b(8), { x: 300, dur: 0.5 }, 'intro')
+  .go(b(9), { x: 300, dur: 0.5 }, 'intro+0.4')
+  .go(b(10), { x: 300, dur: 0.5, wait: 0.3 }, 1.0)
+  .go(b(11), { x: 300 });
+shot.go(b(12), { x: 300, dur: 0.3 }, 3.2);`
   });
 }
 
@@ -421,12 +421,12 @@ ${Array.from({ length: 6 }, (_, r) => `.ast .as-row${r + 1} { top: ${200 + r * 2
   return single('api-stagger', {
     ...s,
     duration: 3,
-    buildJs: `tl.from(root.querySelectorAll('.as-row1 i'), { y: 100, opacity: 0, duration: 0.4, stagger: 0.1 }, 0.1);
-tl.from('.as-row2 i', { scale: 0, duration: 0.5, stagger: { each: 0.08, from: 'center' } }, 0.3);
-tl.to('.as-row3 i', { rotation: 180, duration: 0.6, stagger: { amount: 0.5, from: 'end' } }, 0.5);
-tl.to('.as-row4 i', { y: -80, duration: 0.4, stagger: { each: 0.1, from: 'edges' } }, 0.8);
-tl.to('.as-row5 i', { x: 60, duration: 0.4, stagger: { each: 0.1, from: 3 } }, 1.1);
-tl.fromTo('.as-row6 i', { opacity: 0.2 }, { opacity: 1, duration: 0.3, stagger: { amount: 0.6 } }, 1.4);`
+    buildJs: `shot.arrive(root.querySelectorAll('.as-row1 i'), { y: 100, opacity: 0, dur: 0.4, cascade: 0.1 }, 0.1);
+shot.arrive('.as-row2 i', { scale: 0, dur: 0.5, cascade: { gap: 0.08, from: 'middle' } }, 0.3);
+shot.go('.as-row3 i', { spin: 180, dur: 0.6, cascade: { total: 0.5, from: 'last' } }, 0.5);
+shot.go('.as-row4 i', { y: -80, dur: 0.4, cascade: { gap: 0.1, from: 'ends' } }, 0.8);
+shot.go('.as-row5 i', { x: 60, dur: 0.4, cascade: { gap: 0.1, from: 3 } }, 1.1);
+shot.travel('.as-row6 i', { opacity: 0.2 }, { opacity: 1, dur: 0.3, cascade: { total: 0.6 } }, 1.4);`
   });
 }
 
@@ -436,10 +436,10 @@ function apiRepeat(): GoldenCase {
   return single('api-repeat-yoyo', {
     ...s,
     duration: 3,
-    buildJs: `tl.to('.ar1', { x: 400, duration: 0.5, repeat: 3, yoyo: true, ease: 'sine.inOut' }, 0);
-tl.to('.ar2', { rotation: 360, duration: 0.7, repeat: 2, repeatDelay: 0.2, ease: 'none' }, 0.2);
-tl.to('.ar3', { scale: 1.5, duration: 0.4, repeat: -1, yoyo: true }, 0);
-tl.to('.ar4', { y: 200, duration: 0.3, repeat: 1, yoyo: true, repeatDelay: 0.3, ease: 'back.out(2)' }, 1.0);`
+    buildJs: `shot.go('.ar1', { x: 400, dur: 0.5, loop: 3, pingpong: true, curve: 'gentle-inout' }, 0);
+shot.go('.ar2', { spin: 360, dur: 0.7, loop: 2, loopGap: 0.2, curve: 'linear' }, 0.2);
+shot.go('.ar3', { scale: 1.5, dur: 0.4, loop: true, pingpong: true }, 0);
+shot.go('.ar4', { y: 200, dur: 0.3, loop: 1, pingpong: true, loopGap: 0.3, curve: 'overshoot-out(2)' }, 1.0);`
   });
 }
 
@@ -449,13 +449,13 @@ function apiKeyframes(): GoldenCase {
   return single('api-keyframes', {
     ...s,
     duration: 3,
-    buildJs: `tl.to('.ak1', { keyframes: [
-  { x: 200, duration: 0.4 },
-  { y: 300, duration: 0.5, ease: 'back.out(1.7)' },
-  { x: 0, rotation: 90, duration: 0.6 },
-  { scale: 0.5, opacity: 0.4, duration: 0.3, ease: 'none' }
+    buildJs: `shot.go('.ak1', { sequence: [
+  { x: 200, dur: 0.4 },
+  { y: 300, dur: 0.5, curve: 'overshoot-out(1.7)' },
+  { x: 0, spin: 90, dur: 0.6 },
+  { scale: 0.5, opacity: 0.4, dur: 0.3, curve: 'linear' }
 ] }, 0.1);
-tl.to('.ak2', { keyframes: [{ x: -150, duration: 0.3 }, { x: 150, duration: 0.3 }, { x: 0, duration: 0.3 }], ease: 'none' }, 1.0);`
+shot.go('.ak2', { sequence: [{ x: -150, dur: 0.3 }, { x: 150, dur: 0.3 }, { x: 0, dur: 0.3 }], curve: 'linear' }, 1.0);`
   });
 }
 
@@ -480,18 +480,18 @@ function apiTransforms(): GoldenCase {
   return single('api-transforms', {
     ...s,
     duration: 3,
-    buildJs: `tl.to('.at1', { x: 200, y: -100, rotation: 45, duration: 1 }, 0);
-tl.to('.at2', { xPercent: -50, yPercent: 100, scaleX: 1.5, scaleY: 0.5, duration: 1 }, 0.2);
-tl.to('.at3', { x: '50%', y: '20px', skewX: 20, skewY: -10, duration: 1 }, 0.4);
-tl.fromTo('.at4', { rotationY: -80, transformPerspective: 800 }, { rotationY: 0, duration: 1.2, ease: 'power2.out' }, 0.6);
-tl.to('.at5', { rotationX: 60, scale: 0.8, transformOrigin: '50% 100%', duration: 1 }, 0.8);
-tl.to('.at6', { rotation: -90, transformOrigin: 'left top', duration: 1 }, 1.0);
-tl.set('.at7', { scale: 1.3, rotation: 10, x: 40 }, 1.5);
-tl.to('.at8', { scale: 0, duration: 0.5 }, 2.0);
-tl.to('.at-svg-rect', { rotation: 90, transformOrigin: '50% 50%', duration: 1.5 }, 0);
-tl.to('.at-svg-circle', { rotation: 180, svgOrigin: '540 1400', duration: 1.5 }, 0.3);
-tl.to('.at-svg-g', { x: 100, y: 50, scale: 1.2, duration: 1 }, 0.5);
-tl.from('.at-svg-pre', { scale: 0, transformOrigin: '50% 50%', duration: 0.8 }, 1.0);`
+    buildJs: `shot.go('.at1', { x: 200, y: -100, spin: 45, dur: 1 }, 0);
+shot.go('.at2', { shiftX: -50, shiftY: 100, scaleX: 1.5, scaleY: 0.5, dur: 1 }, 0.2);
+shot.go('.at3', { x: '50%', y: '20px', skewX: 20, skewY: -10, dur: 1 }, 0.4);
+shot.travel('.at4', { tiltY: -80, depth: 800 }, { tiltY: 0, dur: 1.2, curve: 'smooth-out' }, 0.6);
+shot.go('.at5', { tiltX: 60, scale: 0.8, pivot: '50% 100%', dur: 1 }, 0.8);
+shot.go('.at6', { spin: -90, pivot: 'left top', dur: 1 }, 1.0);
+shot.pin('.at7', { scale: 1.3, spin: 10, x: 40 }, 1.5);
+shot.go('.at8', { scale: 0, dur: 0.5 }, 2.0);
+shot.go('.at-svg-rect', { spin: 90, pivot: '50% 50%', dur: 1.5 }, 0);
+shot.go('.at-svg-circle', { spin: 180, pivotPoint: '540 1400', dur: 1.5 }, 0.3);
+shot.go('.at-svg-g', { x: 100, y: 50, scale: 1.2, dur: 1 }, 0.5);
+shot.arrive('.at-svg-pre', { scale: 0, pivot: '50% 50%', dur: 0.8 }, 1.0);`
   });
 }
 
@@ -530,21 +530,21 @@ function apiCss(): GoldenCase {
   return single('api-css', {
     ...s,
     duration: 3,
-    buildJs: `tl.to('.ac-op', { opacity: 0.2, duration: 1 }, 0);
-tl.fromTo('.ac-aa', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6 }, 0.3);
-tl.to('.ac-aa2', { autoAlpha: 0, duration: 0.5 }, 1.0);
-tl.to('.ac-size', { width: 600, height: '8%', borderRadius: '50%', duration: 1 }, 0.2);
-tl.to('.ac-pos', { left: 500, top: '45%', duration: 1 }, 0.4);
-tl.to('.ac-type', { fontSize: 120, letterSpacing: 24, duration: 1 }, 0.3);
-tl.to('.ac-color', { color: '#ff0055', backgroundColor: 'hsl(200, 80%, 50%)', duration: 1 }, 0.5);
-tl.to('.ac-color2', { backgroundColor: 'rgba(255, 200, 0, 0.5)', color: 'teal', duration: 1 }, 0.8);
-tl.to('.ac-color3', { backgroundColor: 'var(--moo-accent)', duration: 0.8 }, 1.2);
-tl.fromTo('.ac-clip', { clipPath: 'inset(0% 50% 0% 50%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1 }, 0.3);
-tl.to('.ac-clip2', { clipPath: 'circle(10% at 50% 50%)', duration: 1 }, 0.6);
-tl.fromTo('.ac-clip3', { clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }, { clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', duration: 1 }, 1.0);
-tl.to('.ac-filter', { filter: 'blur(12px) brightness(1.5)', duration: 1 }, 0.4);
-tl.fromTo('.ac-shadow', { boxShadow: '0px 0px 0px rgba(0,0,0,0)' }, { boxShadow: '0px 20px 40px rgba(132,204,22,0.8)', duration: 1 }, 0.6);
-tl.to('.ac-mismatch', { clipPath: 'circle(30% at 50% 50%)', duration: 0.8 }, 1.4);`
+    buildJs: `shot.go('.ac-op', { opacity: 0.2, dur: 1 }, 0);
+shot.travel('.ac-aa', { fade: 0 }, { fade: 1, dur: 0.6 }, 0.3);
+shot.go('.ac-aa2', { fade: 0, dur: 0.5 }, 1.0);
+shot.go('.ac-size', { width: 600, height: '8%', borderRadius: '50%', dur: 1 }, 0.2);
+shot.go('.ac-pos', { left: 500, top: '45%', dur: 1 }, 0.4);
+shot.go('.ac-type', { fontSize: 120, letterSpacing: 24, dur: 1 }, 0.3);
+shot.go('.ac-color', { color: '#ff0055', backgroundColor: 'hsl(200, 80%, 50%)', dur: 1 }, 0.5);
+shot.go('.ac-color2', { backgroundColor: 'rgba(255, 200, 0, 0.5)', color: 'teal', dur: 1 }, 0.8);
+shot.go('.ac-color3', { backgroundColor: 'var(--moo-accent)', dur: 0.8 }, 1.2);
+shot.travel('.ac-clip', { clipPath: 'inset(0% 50% 0% 50%)' }, { clipPath: 'inset(0% 0% 0% 0%)', dur: 1 }, 0.3);
+shot.go('.ac-clip2', { clipPath: 'circle(10% at 50% 50%)', dur: 1 }, 0.6);
+shot.travel('.ac-clip3', { clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }, { clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', dur: 1 }, 1.0);
+shot.go('.ac-filter', { filter: 'blur(12px) brightness(1.5)', dur: 1 }, 0.4);
+shot.travel('.ac-shadow', { boxShadow: '0px 0px 0px rgba(0,0,0,0)' }, { boxShadow: '0px 20px 40px rgba(132,204,22,0.8)', dur: 1 }, 0.6);
+shot.go('.ac-mismatch', { clipPath: 'circle(30% at 50% 50%)', dur: 0.8 }, 1.4);`
   }, undefined, { divergences });
 }
 
@@ -565,13 +565,13 @@ function apiSvg(): GoldenCase {
   return single('api-svg', {
     ...s,
     duration: 3,
-    buildJs: `tl.fromTo('.as-path', { strokeDasharray: 1200, strokeDashoffset: 1200 }, { strokeDashoffset: 0, duration: 1.2 }, 0);
-tl.to('.as-dash', { strokeDasharray: '40 10', duration: 1 }, 0.3);
-tl.to('.as-c', { fill: '#38bdf8', stroke: 'rgb(255, 0, 100)', duration: 1 }, 0.2);
-tl.to('.as-c2', { attr: { cx: 800, cy: 400, r: 120 }, duration: 1 }, 0.5);
-tl.to('.as-morph', { attr: { d: 'M100 1200 L 540 900 L 980 1200' }, duration: 1 }, 0.8);
-tl.to('.as-rect', { attr: { width: 400, height: 50 }, duration: 0.8 }, 1.2);
-tl.to('.as-stroke-w', { strokeWidth: 20, duration: 1 }, 0.4);`
+    buildJs: `shot.travel('.as-path', { strokeDasharray: 1200, strokeDashoffset: 1200 }, { strokeDashoffset: 0, dur: 1.2 }, 0);
+shot.go('.as-dash', { strokeDasharray: '40 10', dur: 1 }, 0.3);
+shot.go('.as-c', { fill: '#38bdf8', stroke: 'rgb(255, 0, 100)', dur: 1 }, 0.2);
+shot.go('.as-c2', { attrs: { cx: 800, cy: 400, r: 120 }, dur: 1 }, 0.5);
+shot.go('.as-morph', { attrs: { d: 'M100 1200 L 540 900 L 980 1200' }, dur: 1 }, 0.8);
+shot.go('.as-rect', { attrs: { width: 400, height: 50 }, dur: 0.8 }, 1.2);
+shot.go('.as-stroke-w', { strokeWidth: 20, dur: 1 }, 0.4);`
   });
 }
 
@@ -582,22 +582,22 @@ function apiRelative(): GoldenCase {
     ...s,
     duration: 3,
     buildJs: `const a = root.querySelector('.ar21');
-tl.to(a, { x: 200, duration: 0.5 }, 0)
-  .to(a, { x: '+=150', rotation: '+=45', duration: 0.5 })
-  .to(a, { x: '-=100', y: '-=80', duration: 0.5 })
-  .to(a, { rotation: '-=90', scale: 1.5, duration: 0.5 });
+shot.go(a, { x: 200, dur: 0.5 }, 0)
+  .go(a, { x: 'by(150)', spin: 'by(45)', dur: 0.5 })
+  .go(a, { x: 'by(-100)', y: 'by(-80)', dur: 0.5 })
+  .go(a, { spin: 'by(-90)', scale: 1.5, dur: 0.5 });
 const b = root.querySelector('.ar22');
-tl.to(b, { x: 300, duration: 1.0 }, 0.2);
-tl.to(b, { x: -100, duration: 0.6 }, 0.6);
-tl.to(b, { opacity: 0.3, duration: 0.4 }, 0.8);
+shot.go(b, { x: 300, dur: 1.0 }, 0.2);
+shot.go(b, { x: -100, dur: 0.6 }, 0.6);
+shot.go(b, { opacity: 0.3, dur: 0.4 }, 0.8);
 const c = root.querySelector('.ar23');
-tl.to(c, { y: 400, duration: 0.6 }, 1.2);
-tl.to(c, { y: 0, x: 100, duration: 0.6 }, 0.4);
-tl.to(root.querySelector('.ar24'), { opacity: '-=0.5', duration: 0.5 }, 1.5);`
+shot.go(c, { y: 400, dur: 0.6 }, 1.2);
+shot.go(c, { y: 0, x: 100, dur: 0.6 }, 0.4);
+shot.go(root.querySelector('.ar24'), { opacity: 'by(-0.5)', dur: 0.5 }, 1.5);`
   });
 }
 
-// Left out on purpose: tl.to(el, { x }) followed by a later tl.from(el, { x }). GSAP's result depends on
+// Left out on purpose: shot.go(el, { x }) followed by a later shot.arrive(el, { x }). GSAP's result depends on
 // whether its ticker fired while the runtime waited for fonts, so it cannot serve as a reference.
 function apiFromImmediate(): GoldenCase {
   const b = boxes('af', 6);
@@ -605,14 +605,14 @@ function apiFromImmediate(): GoldenCase {
   return single('api-from-immediate', {
     ...s,
     duration: 3,
-    buildJs: `tl.from('.af1', { x: -300, opacity: 0, duration: 0.6 }, 1.0);
-tl.to('.af1', { y: 200, duration: 0.5 }, 2.0);
-tl.fromTo('.af2', { scale: 0 }, { scale: 1, duration: 0.5, immediateRender: false }, 1.2);
-tl.fromTo('.af3', { rotation: -90 }, { rotation: 0, duration: 0.5 }, 1.4);
-tl.from('.af4', { y: 100, duration: 0.4, immediateRender: false }, 0.8);
-tl.set('.af5', { opacity: 0.25 }, 0.5).set('.af5', { opacity: 1, x: 120 }, 1.5).set('.af5', { backgroundColor: '#ff0000' }, 2.2);
-tl.set('.af6', { x: 100 }, 0);
-tl.set('.af6', { y: 100 });`
+    buildJs: `shot.arrive('.af1', { x: -300, opacity: 0, dur: 0.6 }, 1.0);
+shot.go('.af1', { y: 200, dur: 0.5 }, 2.0);
+shot.travel('.af2', { scale: 0 }, { scale: 1, dur: 0.5, showStart: false }, 1.2);
+shot.travel('.af3', { spin: -90 }, { spin: 0, dur: 0.5 }, 1.4);
+shot.arrive('.af4', { y: 100, dur: 0.4, showStart: false }, 0.8);
+shot.pin('.af5', { opacity: 0.25 }, 0.5).pin('.af5', { opacity: 1, x: 120 }, 1.5).pin('.af5', { backgroundColor: '#ff0000' }, 2.2);
+shot.pin('.af6', { x: 100 }, 0);
+shot.pin('.af6', { y: 100 });`
   });
 }
 
@@ -636,14 +636,14 @@ const log = root.querySelector('.cb-log');
 const state = { p: 0 };
 let starts = 0;
 let completes = 0;
-tl.to(state, { p: 100, duration: 1.5, ease: 'none', onUpdate: function() { out.textContent = 'P' + Math.round(state.p); } }, 0.3);
-tl.to(root.querySelector('.cb-box'), {
+shot.go(state, { p: 100, dur: 1.5, curve: 'linear', onFrame: function() { out.textContent = 'P' + Math.round(state.p); } }, 0.3);
+shot.go(root.querySelector('.cb-box'), {
   x: 300,
-  duration: 0.5,
-  onStart: function() { starts++; log.textContent = 'S' + starts + ' C' + completes; },
-  onComplete: function() { completes++; log.textContent = 'S' + starts + ' C' + completes; }
+  dur: 0.5,
+  onBegin: function() { starts++; log.textContent = 'S' + starts + ' C' + completes; },
+  onEnd: function() { completes++; log.textContent = 'S' + starts + ' C' + completes; }
 }, 1.0);
-tl.to({ v: 0 }, { v: 1, duration: 0.4, onUpdate: function() { root.querySelector('.cb-bar').style.width = Math.round(this.progress() * 500) + 'px'; } }, 2.0);`
+shot.go({ v: 0 }, { v: 1, dur: 0.4, onFrame: function() { root.querySelector('.cb-bar').style.width = Math.round(this.progress() * 500) + 'px'; } }, 2.0);`
   });
 }
 
@@ -663,26 +663,26 @@ function apiUtilsNested(): GoldenCase {
   return single('api-utils-nested', {
     ...s,
     duration: 3.5,
-    buildJs: `const u = gsap.utils;
-const dots = u.toArray(root.querySelectorAll('.au-dot'));
+    buildJs: `const u = MooTween.math;
+const dots = MooTween.select(root.querySelectorAll('.au-dot'));
 dots.forEach((d, i) => {
-  tl.to(d, {
-    x: u.mapRange(0, dots.length - 1, -300, 300, i),
-    y: u.wrap([-100, 0, 100], i),
-    rotation: u.clamp(0, 90, i * 30),
-    opacity: u.interpolate(0.2, 1, i / (dots.length - 1)),
-    duration: 0.8
+  shot.go(d, {
+    x: u.remap(0, dots.length - 1, -300, 300, i),
+    y: u.cycle([-100, 0, 100], i),
+    spin: u.clamp(0, 90, i * 30),
+    opacity: u.mix(0.2, 1, i / (dots.length - 1)),
+    dur: 0.8
   }, 0.2 + i * 0.1);
 });
-gsap.set(root.querySelector('.au-pre'), { x: 50, rotation: 5 });
-tl.to(root.querySelector('.au-pre'), { x: 250, duration: 1 }, 1.0);
-const child = gsap.timeline();
-child.to(root.querySelector('.an-a'), { x: 300, duration: 0.6 }).to(root.querySelector('.an-b'), { y: -100, duration: 0.6 }, '-=0.2');
-tl.add(child, 0.5);
-const child2 = gsap.timeline();
-child2.fromTo(root.querySelector('.an-c'), { scale: 0.5 }, { scale: 1.2, duration: 0.8 });
-tl.add(child2, '+=0.3');
-tl.to(root.querySelector('.an-d'), { rotation: 90, duration: 0.5 }, '<');`
+shot.pin(root.querySelector('.au-pre'), { x: 50, spin: 5 }, 0);
+shot.go(root.querySelector('.au-pre'), { x: 250, dur: 1 }, 1.0);
+const child = MooTween.track();
+child.go(root.querySelector('.an-a'), { x: 300, dur: 0.6 }).go(root.querySelector('.an-b'), { y: -100, dur: 0.6 }, 'end-0.2');
+shot.nest(child, 0.5);
+const child2 = MooTween.track();
+child2.travel(root.querySelector('.an-c'), { scale: 0.5 }, { scale: 1.2, dur: 0.8 });
+shot.nest(child2, 'end+0.3');
+shot.go(root.querySelector('.an-d'), { spin: 90, dur: 0.5 }, 'with');`
   });
 }
 
@@ -695,21 +695,23 @@ function apiEmptyTargets(): GoldenCase {
   return single('api-empty-targets', {
     ...s,
     duration: 2.5,
-    buildJs: `tl.to('.does-not-exist', { x: 100, duration: 0.5 }, 0);
-tl.to([], { x: 100 }, 0.2);
-tl.from(root.querySelectorAll('.nope'), { opacity: 0 }, 0.3);
-tl.to(null, { x: 1 }, 0.4);
-tl.to(root.querySelector('.ae-real'), { x: 600, duration: 1 }, 0.5);`
+    buildJs: `shot.go('.does-not-exist', { x: 100, dur: 0.5 }, 0);
+shot.go([], { x: 100 }, 0.2);
+shot.arrive(root.querySelectorAll('.nope'), { opacity: 0 }, 0.3);
+shot.go(null, { x: 1 }, 0.4);
+shot.go(root.querySelector('.ae-real'), { x: 600, dur: 1 }, 0.5);`
   });
 }
 
+// Same order as the GSAP reference recording (none, linear, power0.out, power1.in, ... , unknownEase.out),
+// so element ids line up with the snapshot.
 const EASES = [
-  'none', 'linear', 'power0.out', 'power1.in', 'power1.out', 'power1.inOut', 'power2.in', 'power2.out', 'power2.inOut',
-  'power3.in', 'power3.out', 'power3.inOut', 'power4.in', 'power4.out', 'power4.inOut', 'quad.out', 'cubic.inOut',
-  'quart.in', 'quint.out', 'sine.in', 'sine.out', 'sine.inOut', 'expo.in', 'expo.out', 'expo.inOut', 'circ.in',
-  'circ.out', 'circ.inOut', 'back.in(1.7)', 'back.out(1.7)', 'back.inOut(2)', 'back.out', 'elastic.out(1, 0.3)',
-  'elastic.in', 'elastic.inOut(1.2, 0.5)', 'bounce.out', 'bounce.in', 'bounce.inOut', 'steps(5)', 'power2', 'expo',
-  'unknownEase.out'
+  'linear', 'linear', 'linear', 'soft-in', 'soft-out', 'soft-inout', 'smooth-in', 'smooth-out', 'smooth-inout',
+  'strong-in', 'strong-out', 'strong-inout', 'sharp-in', 'sharp-out', 'sharp-inout', 'soft-out', 'smooth-inout',
+  'strong-in', 'sharp-out', 'gentle-in', 'gentle-out', 'gentle-inout', 'rush-in', 'rush-out', 'rush-inout', 'arc-in',
+  'arc-out', 'arc-inout', 'overshoot-in(1.7)', 'overshoot-out(1.7)', 'overshoot-inout(2)', 'overshoot-out', 'spring-out(1, 0.3)',
+  'spring-in', 'spring-inout(1.2, 0.5)', 'bounce-out', 'bounce-in', 'bounce-inout', 'steps(5)', 'smooth', 'rush',
+  'wobble-out'
 ];
 
 function apiEases(): GoldenCase {
@@ -721,7 +723,7 @@ function apiEases(): GoldenCase {
   return single('api-eases', {
     ...s,
     duration: 2.6,
-    buildJs: EASES.map((e, i) => `tl.to(root.querySelector('.eg${i}'), { x: 800, duration: 2, ease: '${e}' }, 0.2);`).join('\n')
+    buildJs: EASES.map((e, i) => `shot.go(root.querySelector('.eg${i}'), { x: 800, dur: 2, curve: '${e}' }, 0.2);`).join('\n')
   });
 }
 
@@ -747,9 +749,9 @@ function apiOverrides(): GoldenCase[] {
     ...s,
     duration: 3,
     overrides,
-    buildJs: `tl.from(root.querySelector('.ao-title'), { y: 120, opacity: 0, duration: 0.6, ease: 'expo.out' }, 0.2);
-tl.to(root.querySelector('.ao-box'), { rotation: 45, scale: 1.3, duration: 1.2 }, 0.4);
-tl.fromTo(root.querySelector('.ao-icon'), { scale: 0.5 }, { scale: 1, x: 120, duration: 1, ease: 'back.out(1.7)' }, 0.6);`
+    buildJs: `shot.arrive(root.querySelector('.ao-title'), { y: 120, opacity: 0, dur: 0.6, curve: 'rush-out' }, 0.2);
+shot.go(root.querySelector('.ao-box'), { spin: 45, scale: 1.3, dur: 1.2 }, 0.4);
+shot.travel(root.querySelector('.ao-icon'), { scale: 0.5 }, { scale: 1, x: 120, dur: 1, curve: 'overshoot-out(1.7)' }, 0.6);`
   };
   // GSAP folds overrides baked into the document into its own transform and then loses them; MooTween
   // leaves CSS translate/scale/rotate alone, so the export must look exactly like the editor preview.
@@ -763,7 +765,7 @@ tl.fromTo(root.querySelector('.ao-icon'), { scale: 0.5 }, { scale: 1, x: 120, du
  * 6. Real projects
  * ------------------------------------------------------------------ */
 function demoProjectCase(): GoldenCase {
-  return { name: 'demo-project', project: DEMO_PROJECT };
+  return { name: 'demo-project', project: DEMO_PROJECT_MOOTWEEN };
 }
 
 /**

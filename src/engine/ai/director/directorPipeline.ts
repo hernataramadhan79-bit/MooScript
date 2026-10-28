@@ -63,7 +63,7 @@ export function cleanGeneratedJs(rawJs: string): string {
   // Strip any wrapping <script> tags
   js = js.replace(/<\/?script\b[^>]*>/gi, '');
 
-  // Strip ES import statements (e.g. `import gsap from 'gsap';` from GSAP-trained models, or multiline import { ... } from '...')
+  // Strip ES import statements (single-line or multiline import { ... } from '...')
   js = js.replace(/(?:^|\n)\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '\n');
   js = js.replace(/(?:^|\n)\s*import\s+['"][^'"]+['"]\s*;?/g, '\n');
   js = js.replace(/^\s*import\b[^\n;]+;?\s*$/gm, '').trim();
@@ -78,10 +78,10 @@ export function cleanGeneratedJs(rawJs: string): string {
   }
 
   // Unwrap outer function wrapper even with preceding comments or whitespace:
-  // e.g.: function(tl, root, ctx, MooTween) { ... }
-  // or: function buildScene(tl, root, ctx, gsap) { ... }   (older GSAP-style signature)
-  // or: (tl, root, ctx) => { ... }
-  // or: const build = (tl, root, ctx) => { ... }
+  // e.g.: function(shot, root, ctx, MooTween) { ... }
+  // or: function buildScene(shot, root, ctx) { ... }
+  // or: (shot, root, ctx) => { ... }
+  // or: const build = (shot, root, ctx) => { ... }
   const withoutComments = js
     .replace(/^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/g, '')
     .replace(/(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/|\s)*$/g, '');
@@ -90,7 +90,7 @@ export function cleanGeneratedJs(rawJs: string): string {
   );
   if (fnWrapperMatch && fnWrapperMatch[1]) {
     const body = fnWrapperMatch[1].trim();
-    if (body.includes('tl') || body.includes('MooTween') || body.includes('gsap') || body.includes('root') || body.includes('ctx')) {
+    if (body.includes('shot') || body.includes('MooTween') || body.includes('root') || body.includes('ctx')) {
       js = body;
     }
   }
@@ -101,30 +101,25 @@ export function cleanGeneratedJs(rawJs: string): string {
   );
   if (domLoadedMatch && (domLoadedMatch[1] || domLoadedMatch[2])) {
     const inner = (domLoadedMatch[1] || domLoadedMatch[2]).trim();
-    if (inner.includes('tl') || inner.includes('MooTween') || inner.includes('gsap')) {
+    if (inner.includes('shot') || inner.includes('MooTween') || inner.includes('ctx')) {
       js = inner;
     }
   }
 
-  // Strip duplicate declarations of parameters provided in runtime scope (tl, root, ctx, MooTween, gsap)
-  // Find any custom timeline variable names assigned to MooTween.timeline(...) / gsap.timeline(...) and normalize to tl
-  const customTlVarMatches = js.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\b/g);
-  for (const match of customTlVarMatches) {
-    const varName = match[1];
-    if (varName && varName !== 'tl') {
-      js = js.replace(new RegExp(`\\b${varName}\\s*\\.`, 'g'), 'tl.');
-    }
+  // A model sometimes builds its own track instead of using `shot`. A track that is never nested into
+  // the shot would never play, so its moves are moved onto `shot` and the declaration dropped
+  // (this also drops a multi-line `const shot = MooTween.track({...})` redeclaration).
+  const ownTracks = [...js.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:window\.)?MooTween\.track\b/g)]
+    .map((m) => m[1])
+    .filter((name) => !new RegExp(`\\bshot\\s*\\.\\s*nest\\s*\\(\\s*${name}\\b`).test(js));
+  for (const name of ownTracks) {
+    js = js.replace(new RegExp(`(?:^|\\n)\\s*(?:const|let|var)\\s+${name}\\s*=\\s*(?:window\\.)?MooTween\\.track\\s*\\([\\s\\S]*?\\)(?=\\s*\\.)`, 'g'), '\nshot');
+    js = js.replace(new RegExp(`(?:^|\\n)\\s*(?:const|let|var)\\s+${name}\\s*=\\s*(?:window\\.)?MooTween\\.track\\s*\\([\\s\\S]*?\\)\\s*;?`, 'g'), '\n');
+    js = js.replace(new RegExp(`\\b${name}\\s*\\.`, 'g'), 'shot.');
   }
 
-  // Strip chained or standalone MooTween.timeline(...) / gsap.timeline(...) declarations
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\s*\([\s\S]*?\)(?=\s*\.)/g, '\ntl');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*(?:window\.)?(?:MooTween|gsap)\.timeline\s*\([\s\S]*?\)\s*;?/g, '\n');
-
-  // Any other declaration of tl, root, ctx, MooTween, gsap
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+tl\b[^\n;]*;?/g, '\n');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+root\b[^\n;]*;?/g, '\n');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+ctx\b[^\n;]*;?/g, '\n');
-  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+(?:MooTween|gsap)\b[^\n;]*;?/g, '\n');
+  // Redeclarations of what the runtime passes in (shot, root, ctx, MooTween)
+  js = js.replace(/(?:^|\n)\s*(?:const|let|var)\s+(?:shot|root|ctx|MooTween)\b[^\n;]*;?/g, '\n');
 
   // Auto-fix determinism violations: replace Math.random() with ctx.rand()
   js = js.replace(/\bMath\.random\s*\([^)]*\)/g, 'ctx.rand()');
@@ -139,7 +134,7 @@ export function cleanGeneratedJs(rawJs: string): string {
 /**
  * Resilient multi-tier code block parser.
  * Handles JSON responses, markdown backticks (``` or ````), language variations,
- * untagged blocks, embedded styles/scripts, and guarantees valid MooTween timeline code.
+ * untagged blocks, embedded styles/scripts, and guarantees valid MooTween shot code.
  */
 export function parseCodeBlocks(rawText: string): { html: string; css: string; buildJs: string } {
   if (!rawText || !rawText.trim()) {
@@ -200,7 +195,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
     } else if (!css && (b.tag.includes('css') || b.tag.includes('style') || b.tag.includes('scss') || b.tag.includes('postcss'))) {
       css = b.content;
       used.add(i);
-    } else if (!buildJs && (b.tag.includes('javascript') || b.tag.includes('js') || b.tag.includes('typescript') || b.tag.includes('ts') || b.tag.includes('gsap') || b.tag.includes('moo') || b.tag.includes('script') || b.tag.includes('anim'))) {
+    } else if (!buildJs && (b.tag.includes('javascript') || b.tag.includes('js') || b.tag.includes('typescript') || b.tag.includes('ts') || b.tag.includes('moo') || b.tag.includes('script') || b.tag.includes('anim'))) {
       buildJs = b.content;
       used.add(i);
     }
@@ -220,7 +215,7 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
         html = b.content;
       } else if (!css && (/\{[\s\S]*?:[\s\S]*?\}/.test(b.content) || b.content.includes('.scene-') || b.content.includes('width:'))) {
         css = b.content;
-      } else if (!buildJs && !/^\s*</.test(b.content) && (/\b(tl|MooTween|gsap|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
+      } else if (!buildJs && !/^\s*</.test(b.content) && (/\b(shot|MooTween|root|ctx)\b/.test(b.content) || b.content.includes('function') || b.content.includes('=>'))) {
         buildJs = b.content;
       }
     }
@@ -240,8 +235,8 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
       }
     }
   }
-  if (!buildJs && /\btl\.(?:to|from|fromTo|set)\b/i.test(textToParse)) {
-    const jsSnippetMatch = textToParse.match(/(?:tl\.(?:to|from|fromTo|set)[\s\S]*?)(?:\s*;|\s*`{3,}|\s*$)/i);
+  if (!buildJs && /\b(?:shot|ctx)\.(?:go|arrive|travel|pin|camera|hero)\b/i.test(textToParse)) {
+    const jsSnippetMatch = textToParse.match(/(?:(?:shot|ctx)\.(?:go|arrive|travel|pin|camera|hero)[\s\S]*?)(?:\s*;|\s*`{3,}|\s*$)/i);
     if (jsSnippetMatch) {
       buildJs = jsSnippetMatch[0].replace(/`{3,}.*$/, '').trim();
     }
@@ -273,16 +268,16 @@ export function parseCodeBlocks(rawText: string): { html: string; css: string; b
 const D = ctx.dur || 3.5;
 const stage = root.firstElementChild || root;
 const targets = stage.children && stage.children.length > 0 ? stage.children : [stage];
-tl.fromTo(stage, { scale: 1.1 }, { scale: 1, duration: Math.max(0.5, D - 0.4), ease: 'sine.inOut' }, 0);
-tl.from(targets, {
+shot.travel(stage, { scale: 1.1 }, { scale: 1, dur: Math.max(0.5, D - 0.4), curve: 'gentle-inout' }, 0);
+shot.arrive(targets, {
   scale: 0.8,
-  rotation: -6,
-  transformOrigin: '50% 50%',
-  duration: Math.min(0.8, D * 0.3),
-  stagger: 0.12,
-  ease: 'back.out(1.8)'
+  spin: -6,
+  pivot: '50% 50%',
+  dur: Math.min(0.8, D * 0.3),
+  cascade: 0.12,
+  curve: 'overshoot-out(1.8)'
 }, 0);
-tl.to(stage, { scale: 1.6, opacity: 0, duration: 0.35, ease: 'power4.in' }, Math.max(0, D - 0.35));`;
+shot.go(stage, { scale: 1.6, opacity: 0, dur: 0.35, curve: 'sharp-in' }, Math.max(0, D - 0.35));`;
   }
 
   return { html, css, buildJs };
@@ -410,25 +405,25 @@ const line = root.querySelector('.synth-accent-line');
 const words = root.querySelectorAll('.synth-headline span');
 
 // Camera drifts for the whole shot
-tl.fromTo(cam, { scale: 1.15, rotation: -3 }, { scale: 1, rotation: 0, duration: Math.max(0.5, D - 0.4), ease: 'sine.inOut' }, 0);
-if (glow) tl.fromTo(glow, { scale: 0.7 }, { scale: 1.2, duration: D, ease: 'sine.inOut' }, 0);
+shot.travel(cam, { scale: 1.15, spin: -3 }, { scale: 1, spin: 0, dur: Math.max(0.5, D - 0.4), curve: 'gentle-inout' }, 0);
+if (glow) shot.travel(glow, { scale: 0.7 }, { scale: 1.2, dur: D, curve: 'gentle-inout' }, 0);
 
 // Core and rings are visible on frame 0 (the editor's still), then expand with overshoot
-if (core) tl.fromTo(core, { scale: 0.55, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.5, ease: 'back.out(2.5)' }, 0);
-tl.fromTo(rings, { scale: 0.6, rotation: -90, transformOrigin: '50% 50%' }, { scale: 1, rotation: 0, duration: 0.8, stagger: 0.12, ease: 'expo.out' }, 0);
-if (rings[1]) tl.to(rings[1], { rotation: 120, transformOrigin: '50% 50%', duration: D, ease: 'none' }, 0);
-if (satellite) tl.to(satellite, { rotation: 300, svgOrigin: '${cx} ${cy}', duration: D, ease: 'none' }, 0);
+if (core) shot.travel(core, { scale: 0.55, pivot: '50% 50%' }, { scale: 1, dur: 0.5, curve: 'overshoot-out(2.5)' }, 0);
+shot.travel(rings, { scale: 0.6, spin: -90, pivot: '50% 50%' }, { scale: 1, spin: 0, dur: 0.8, cascade: 0.12, curve: 'rush-out' }, 0);
+if (rings[1]) shot.go(rings[1], { spin: 120, pivot: '50% 50%', dur: D, curve: 'linear' }, 0);
+if (satellite) shot.go(satellite, { spin: 300, pivotPoint: '${cx} ${cy}', dur: D, curve: 'linear' }, 0);
 
 // Accent line draws, title snaps in word by word
 if (line) {
   const len = line.getTotalLength ? line.getTotalLength() : ${Math.round(w * 0.6)};
-  tl.set(line, { strokeDasharray: len, strokeDashoffset: len }, 0);
-  tl.to(line, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.inOut' }, 0.3);
+  shot.pin(line, { strokeDasharray: len, strokeDashoffset: len }, 0);
+  shot.go(line, { strokeDashoffset: 0, dur: 0.6, curve: 'smooth-inout' }, 0.3);
 }
-tl.from(words, { yPercent: 110, rotation: 8, scale: 0.8, opacity: 0, duration: 0.45, stagger: 0.07, ease: 'expo.out' }, 0.35);
+shot.arrive(words, { shiftY: 110, spin: 8, scale: 0.8, opacity: 0, dur: 0.45, cascade: 0.07, curve: 'rush-out' }, 0.35);
 
 // Hand-off into the next shot
-tl.to(cam, { scale: 2.4, opacity: 0, duration: 0.4, ease: 'power4.in' }, Math.max(0, D - 0.4));`;
+shot.go(cam, { scale: 2.4, opacity: 0, dur: 0.4, curve: 'sharp-in' }, Math.max(0, D - 0.4));`;
 
   return { html, css, buildJs };
 }

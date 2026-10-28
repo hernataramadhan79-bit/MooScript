@@ -4,38 +4,45 @@ import { normalizeProject } from '../src/db/mooDb';
 import { parseProjectBackup, serializeProjectBackup } from '../src/db/projectBackup';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
 import { buildSceneRepairPrompt } from '../src/engine/ai/director/motionLaws';
-import { DEMO_PROJECT } from './fixtures/demoProject';
+import { DEMO_PROJECT, DEMO_PROJECT_MOOTWEEN } from './fixtures/demoProject';
 import type { GeneratedScene, MooProject } from '../src/types';
 
 const LEGACY_JS = `gsap.registerPlugin(ScrollTrigger);
 tl.from(root.querySelector(".sc1-badge"), { y: -30, opacity: 0, duration: 0.6 });`;
 
 function withLegacyScene(): MooProject {
-  const project = structuredClone(DEMO_PROJECT);
+  const project = structuredClone(DEMO_PROJECT_MOOTWEEN);
   project.composition!.scenes[0].buildJs = LEGACY_JS;
   return project;
 }
 
 describe('legacy scenes that need repair', () => {
-  it('flags scenes that use APIs outside MooTween and never touches their code', () => {
+  it('flags scenes that are not written in the MooScript API and never touches their code', () => {
     const flagged = flagScenesNeedingRepair(withLegacyScene());
     const scene = flagged.composition!.scenes[0];
     expect(scene.status).toBe('needs-repair');
     expect(scene.buildJs).toBe(LEGACY_JS);
     expect(scene.errors).toEqual([
-      expect.stringMatching(/^API di luar MooTween: registerPlugin — /),
-      expect.stringMatching(/^API di luar MooTween: ScrollTrigger — /)
+      expect.stringMatching(/^Bukan API MooScript: tl — .*tl.from → shot.arrive/),
+      expect.stringMatching(/^Bukan API MooScript: gsap — /),
+      expect.stringMatching(/^Bukan API MooScript: plugin — /),
+      expect.stringMatching(/^Bukan API MooScript: duration — ganti duration → dur/)
     ]);
     expect(flagged.composition!.scenes.slice(1).map((s) => s.status)).toEqual(['ok', 'ok']);
   });
 
-  it('leaves projects that only use the subset untouched', () => {
-    const project = structuredClone(DEMO_PROJECT);
+  it('leaves projects written in the MooScript API untouched', () => {
+    const project = structuredClone(DEMO_PROJECT_MOOTWEEN);
     expect(flagScenesNeedingRepair(project)).toBe(project);
   });
 
-  it('clears the flag once the code is inside the subset, and ignores pending or error scenes', () => {
-    const base = DEMO_PROJECT.composition!.scenes[0];
+  it('flags every scene of the demo that past builds stored in GSAP style', () => {
+    const flagged = flagScenesNeedingRepair(structuredClone(DEMO_PROJECT));
+    expect(flagged.composition!.scenes.map((s) => s.status)).toEqual(['needs-repair', 'needs-repair', 'needs-repair']);
+  });
+
+  it('clears the flag once the code is in the MooScript API, and ignores pending or error scenes', () => {
+    const base = DEMO_PROJECT_MOOTWEEN.composition!.scenes[0];
     const repaired: GeneratedScene = { ...base, status: 'needs-repair', errors: ['old'] };
     expect(repairStateFor(repaired)).toEqual({ status: 'ok', errors: undefined });
     expect(repairStateFor({ ...base, status: 'error', buildJs: LEGACY_JS })).toBeNull();
@@ -65,7 +72,7 @@ describe('legacy scenes that need repair', () => {
       visualIntent: 'Badge muncul',
       durationSec: 3
     });
-    expect(prompt).toContain('API di luar MooTween: registerPlugin');
+    expect(prompt).toContain('Bukan API MooScript: plugin');
     expect(prompt).toContain('pertahankan desain, layout, warna, dan timing aslinya');
     expect(prompt).toContain(LEGACY_JS);
   });

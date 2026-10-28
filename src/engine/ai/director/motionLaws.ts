@@ -1,42 +1,20 @@
 import { escapeHtml } from '../../../utils/textUtils';
 import type { SceneAssetAttachment } from '../../../types';
+import { formatMooApiGuide } from '../../composition/runtime/mooApiGuide';
 
 /**
  * Core Motion Graphics Director Laws & Prompts
  * 
  * Grounded in generative cinematic motion design principles.
- * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and MooTween timeline code
+ * The AI generates bespoke HTML structure, SVG paths, scoped CSS, and MooTween shot code
  * based on the concept and narrative — NEVER constrained by fixed slide or text templates.
  */
 
 /**
- * MooTween is MooScript's own seek-only animation engine. This is the part of its timeline API the
- * model may use; anything outside it is rejected by the validator with a repair message.
+ * The scene API the model may use, rendered from the shared guide (runtime/mooApiGuide.ts) that the
+ * code editor and the README show too. Anything outside it is rejected with a repair message.
  */
-export const MOOTWEEN_RUNTIME_RULES = `=== MOOTWEEN TIMELINE (MooScript animation engine) ===
-- Animate through the provided 'tl' (a MooTween timeline). Signature: (tl, root, ctx, MooTween).
-- DO NOT redeclare 'tl', 'root', 'ctx', or 'MooTween'. No import/export, no function wrapper, no DOMContentLoaded.
-- Target elements with root.querySelector() / root.querySelectorAll(), or selector strings in tl calls
-  (they only match inside this shot). Never use document.querySelector / getElementById.
-- Total shot duration is ctx.dur seconds; every tween must finish within [0, ctx.dur].
-- Supported:
-  tl.to / tl.from / tl.fromTo / tl.set / tl.add / tl.addLabel / tl.call, chained or with a position:
-    seconds (1.2), '+=0.3' / '-=0.3', '<' / '>' (start / end of the previous tween), '<0.2', a label ('hit+=0.1').
-  vars: duration, delay, ease, stagger (number or { each | amount, from: 'start'|'center'|'end'|'edges'|index }),
-    repeat (-1 loops for the whole shot), yoyo, repeatDelay, keyframes: [{...}, {...}], immediateRender,
-    onStart / onUpdate / onComplete.
-  eases: 'none', power1-4 / quad / cubic / quart / quint / sine / expo / circ with .in .out .inOut,
-    'back.out(1.7)', 'elastic.out(1, 0.3)', 'bounce.out', 'steps(5)'.
-  properties: x, y (px or '%'), xPercent, yPercent, scale, scaleX, scaleY, rotation, rotationX, rotationY,
-    skewX, skewY, transformOrigin, svgOrigin (SVG, viewBox units), transformPerspective, opacity, autoAlpha,
-    numeric CSS (width, height, left, top, fontSize, letterSpacing, borderRadius ...), colors (hex, rgb, hsl,
-    var(--moo-*)), clipPath, filter, boxShadow (same shape at start and end), strokeDasharray,
-    strokeDashoffset, fill, stroke, attr: { cx, cy, r, d (same point count) }, relative '+=' / '-=' values,
-    plain objects for counters ({ v: 0 }).
-  helpers: MooTween.utils.clamp / interpolate / mapRange / wrap / toArray.
-- Not available (use the ctx helpers instead): plugins and registerPlugin (ScrollTrigger, MotionPath,
-  MorphSVG, SplitText, DrawSVG, Draggable, Text), ticker, context, matchMedia, quickTo, quickSetter.
-  Split text with ctx.kinetic / ctx.split, draw strokes with ctx.draw, move along a circle with ctx.orbit.`;
+export const MOOTWEEN_RUNTIME_RULES = formatMooApiGuide();
 
 /**
  * Reference scene shown to the model. It demonstrates the motion grammar (poster-ready frame 0,
@@ -89,12 +67,12 @@ ctx.particles({ count: 18, size: [3, 7] });
 
 // Frame 0 sudah jadi poster: inti terlihat sejak awal lalu mengembang, gelombang memancar
 ctx.hero('.ex-core');
-tl.fromTo('.ex-ring', { scale: 1, opacity: 0.9, transformOrigin: '50% 50%' },
-  { scale: 4, opacity: 0, duration: 1.2, ease: 'expo.out', repeat: 2 }, 0.15);
+shot.travel('.ex-ring', { scale: 1, opacity: 0.9, pivot: '50% 50%' },
+  { scale: 4, opacity: 0, dur: 1.2, curve: 'rush-out', loop: 2 }, 0.15);
 
 // Detail sekunder masuk: garis digambar keluar dari inti, node meletup di ujung garis
-ctx.draw('.ex-links path', { at: 0.4, duration: 0.7, stagger: 0.12 });
-ctx.pop('.ex-nodes circle', { at: 0.95, stagger: 0.12 });
+ctx.draw('.ex-links path', { at: 0.4, dur: 0.7, cascade: 0.12 });
+ctx.pop('.ex-nodes circle', { at: 0.95, cascade: 0.12 });
 
 // Kata kunci menghantam tepat saat diucapkan, inti ikut berdenyut
 ctx.kinetic('.ex-word', { style: 'rise', at: hit - 0.15 });
@@ -104,7 +82,7 @@ ctx.punch('.ex-core', { at: hit, scale: 1.35 });
 
 export const MOTION_DIRECTOR_SYSTEM_PROMPT = `
 You are the MooScript Elite Motion Graphics Director & Code Architect.
-You write one SHOT of a motion graphics film as HTML (mostly SVG), scoped CSS, and a MooTween timeline.
+You write one SHOT of a motion graphics film as HTML (mostly SVG), scoped CSS, and the moves of its MooTween shot.
 It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landing-page section.
 
 === STAGE CONTRACT (WAJIB) ===
@@ -135,33 +113,33 @@ It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landin
    (e.g. fromTo scale 0.55 → 1). Only secondary details (labels, nodes, lines, words) may enter from nothing.
 3. NO HOLDS: no moment longer than ~0.8s where nothing changes. Keep elements alive (drift, rotate, pulse, draw).
 4. ENTRANCE VOCABULARY — plain opacity/x/y fade-ups are the slide look. Prefer:
-   scale from 0 with overshoot (back.out), strokeDashoffset line draws, clip-path/mask reveals,
+   scale from 0 with overshoot ('overshoot-out'), strokeDashoffset line draws, clip-path/mask reveals,
    per-letter rotation/yPercent snaps, shape morphs, counters, objects flying in along a path.
 5. SYNC TO VOICE: place accents at ctx.beat('kata', <fallback>) (seconds within this shot).
    Focus words get a punch (ctx.punch, ctx.flash, ctx.shake, color hit).
 6. HAND-OFF: the last ~0.4s (position ctx.dur - 0.4) is an exit (ctx.camera does this via its handoff option) — whip, zoom-through, wipe, or objects
    leaving frame — so the cut into the next shot feels continuous.
-7. EASING CONTRAST: expo.out / back.out for snaps and pops, sine.inOut for drifts, power4.in for exits.
-   Absolute positions (seconds) on tl are preferred over long '-=0.3' chains.
+7. CURVE CONTRAST: 'rush-out' / 'overshoot-out' for snaps and pops, 'gentle-inout' for drifts, 'sharp-in' for exits.
+   Absolute times in seconds (or ctx.beat / shot.mark) are preferred over long 'end-0.3' chains.
 
-=== MOGRAPH KIT (ctx helpers — PREFER these over hand-written tweens) ===
-Every helper adds tweens to tl, accepts a selector / element / list, and keeps everything inside [0, ctx.dur].
+=== MOGRAPH KIT (ctx helpers — PREFER these over hand-written moves) ===
+Every helper adds moves to the shot, accepts a selector / element / list, and keeps everything inside [0, ctx.dur].
 - ctx.camera({ move, handoff, from, to })   move: 'push' | 'pull' | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down' | 'roll'
                                             moves .moo-camera for the whole shot, then runs the hand-off (default 'zoom';
                                             'whip-left' | 'whip-right' | 'whip-up' | 'drop' | 'spin' | false). Call it in EVERY shot.
 - ctx.beat('kata', fallbackSec)             time of a spoken word inside this shot (fallback when unknown). Use for every accent.
 - ctx.hero(target)                          main subject: visible on frame 0 at scale 0.55, grows with overshoot, then breathes.
-- ctx.draw(paths, { at, duration, stagger, from })   SVG stroke draw (path / line / circle / polyline).
-- ctx.pop(targets, { at, stagger, from })   overshoot scale pop for secondary details (from 0 by default).
+- ctx.draw(paths, { at, dur, cascade, from })   SVG stroke draw (path / line / circle / polyline).
+- ctx.pop(targets, { at, cascade, from })   overshoot scale pop for secondary details (from 0 by default).
 - ctx.kinetic(textEl, { style, by, at })    splits text and animates it. style: 'rise' | 'slam' | 'flip' | 'drop' | 'type'; by: 'words' | 'chars'.
-- ctx.count(el, { from, to, at, duration, decimals, prefix, suffix })   animated number counter.
+- ctx.count(el, { from, to, at, dur, decimals, prefix, suffix })   animated number counter.
 - ctx.reveal(targets, { dir, at })          clip-path wipe. dir: 'left' | 'right' | 'up' | 'down' | 'circle'.
 - ctx.punch(target, { at, scale })  ctx.shake(target, { at, strength })  ctx.flash({ at, color })   accents for focus words.
 - ctx.drift(targets, { amount, rotate })    slow float for the whole shot (nothing holds still).
 - ctx.orbit(targets, { turns, cx, cy })     spin around a point (cx/cy in SVG viewBox units).
 - ctx.particles({ count, size: [min, max], color, rise })   ambient particles behind the content, visible from frame 0.
 - ctx.stage = { w, h }                      stage size in px.
-Raw tl.to / tl.from / tl.fromTo stay available for anything the kit does not cover (morphing shapes, custom paths).
+Raw shot.go / shot.arrive / shot.travel / shot.pin stay available for anything the kit does not cover (morphing shapes, custom paths).
 
 === REFERENCE SHOT (acuan tata bahasa gerak — JANGAN tiru topik, bentuk, atau warnanya) ===
 ${REFERENCE_SCENE_EXAMPLE}
@@ -273,7 +251,7 @@ export function buildSceneCodegenPrompt(params: SceneCodegenParams): string {
        <img src="${asset.dataUrl}" alt="${escapeHtml(asset.assetName || 'Asset')}" class="moo-asset-img" />
      </div>
   2. Berikan CSS styling yang kohesif pada .moo-asset-frame dan .moo-asset-img (misal: potongan transparan, mask bentuk, frame bercahaya, ukuran proporsional; posisikan absolut di panggung, bukan kartu).
-  3. Animasikan dengan timeline MooTween (tl.from / tl.to) terkoordinasi dengan teks dan grafik adegan!`
+  3. Animasikan lewat shot MooTween (shot.arrive / shot.go atau ctx.pop / ctx.hero) terkoordinasi dengan teks dan grafik adegan!`
       ).join('\n') + '\n';
   }
 
@@ -339,7 +317,7 @@ ${worldSnippet ? `=== DUNIA FILM (sama di semua shot) ===\n${worldSnippet}\n` : 
 3. Root .scene-s${beatIndex + 1} berukuran 100% x 100%; semua isi berada di dalam <div class="moo-camera" data-moo-layer="camera">.
 4. Minimal 3 lapisan kedalaman bertanda data-moo-layer (latar, objek tengah, depan).
 5. Frame 0 = poster: latar, kamera, dan subjek utama SUDAH terlihat di t=0 (jangan mulai dari opacity 0 / scale 0). Kamera bergerak sepanjang ctx.dur, tidak ada jeda diam > 0.8s, dan ada aksi keluar di ctx.dur - 0.4.
-6. Kode timeline MooTween dieksekusi langsung dengan parameter (tl, root, ctx, MooTween). JANGAN deklarasikan ulang 'tl' atau 'root'. Hasilkan HANYA 3 blok kode tanpa kata pembuka atau penutup.
+6. Kode dieksekusi langsung dengan parameter (shot, root, ctx, MooTween). JANGAN deklarasikan ulang 'shot', 'root', 'ctx', atau 'MooTween'. Pakai HANYA API MooScript (shot.go / arrive / travel / pin, ctx.*), bukan tl atau gsap. Hasilkan HANYA 3 blok kode tanpa kata pembuka atau penutup.
 
 === FORMAT OUTPUT WAJIB ===
 Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tambahan di luar blok):
@@ -366,7 +344,7 @@ Tuliskan HANYA 3 blok kode persis seperti format berikut (tanpa penjelasan tamba
 \`\`\`
 
 \`\`\`javascript
-// Function signature: (tl, root, ctx, MooTween)
+// Function signature: (shot, root, ctx, MooTween)
 // root adalah elemen wadah scene. ctx.dur adalah durasi (${durationSec.toFixed(1)}s).
 ctx.camera({ move: 'push', handoff: 'zoom' });   // kamera + hand-off
 ctx.hero('.subjek-utama');                        // terlihat di frame 0
@@ -394,7 +372,7 @@ TUGAS ANDA:
 Segera tuliskan 3 blok kode lengkap (html, css, javascript) yang valid:
 1. Blok html: wadah <div class="scene-s1"> dengan elemen data-moo-layer="..."
 2. Blok css: styling ter-scope untuk scene
-3. Blok javascript: timeline MooTween (tl.from / tl.to) mengontrol animasi visual
+3. Blok javascript: gerak di shot MooTween (shot.arrive / shot.go dan helper ctx.*) mengontrol animasi visual
 
 PENTING:
 - Keluarkan HANYA 3 blok kode (\`\`\`html, \`\`\`css, \`\`\`javascript).
@@ -413,12 +391,12 @@ Perbaiki kode di bawah ini sehingga mematuhi seluruh aturan:
 1. Tidak ada Math.random(), gunakan ctx.rand()
 2. Tidak ada Date.now() atau performance.now()
 3. Tidak ada fetch/script/eval/Function
-4. Pastikan buildJs menganimasikan elemen via timeline tl
-5. JANGAN deklarasikan ulang const/let tl atau const/let root (langsung panggil tl.to / tl.from)
+4. Pastikan buildJs menganimasikan elemen lewat shot (shot.go / shot.arrive / shot.travel / shot.pin) atau helper ctx.*
+5. JANGAN deklarasikan ulang const/let shot atau const/let root (langsung panggil shot.go / shot.arrive)
 6. JANGAN gunakan import atau export default
 7. Keluarkan HANYA 3 blok kode (html, css, javascript) yang valid dan bersih tanpa penjelasan tambahan di luarnya.
-8. Pastikan sintaks JavaScript valid dan tidak ada kurung atau tanda petik yang terpotong. Langsung gunakan tl.to() atau tl.from().
-9. Untuk setiap "API di luar MooTween", ganti hanya pemanggilan itu sesuai petunjuknya; pertahankan desain, layout, warna, dan timing aslinya.
+8. Pastikan sintaks JavaScript valid dan tidak ada kurung atau tanda petik yang terpotong. Langsung gunakan shot.go() atau shot.arrive().
+9. Untuk setiap "Bukan API MooScript", terjemahkan ke API MooScript sesuai petunjuknya; pertahankan desain, layout, warna, dan timing aslinya.
 
 Kode Asli yang Bermasalah:
 \`\`\`html
@@ -462,7 +440,7 @@ ${timingLine ? `Timing suara: ${timingLine}\n` : ''}
 TUGAS: TULIS ULANG shot ini dari awal mengikuti STAGE CONTRACT dan MOTION GRAMMAR di system prompt.
 - Pertahankan ide visual dan id data-moo-layer yang masih relevan, buang kartu/paragraf/layout web.
 - Semua isi di dalam <div class="moo-camera" data-moo-layer="camera">, kamera bergerak sepanjang shot (ctx.camera).
-- Pakai MOGRAPH KIT (ctx.camera, ctx.hero, ctx.draw, ctx.pop, ctx.kinetic, ctx.count, ctx.beat) daripada tween fade manual.
+- Pakai MOGRAPH KIT (ctx.camera, ctx.hero, ctx.draw, ctx.pop, ctx.kinetic, ctx.count, ctx.beat) daripada gerak fade manual.
 - Frame 0 = poster: latar, kamera, dan subjek utama sudah terlihat di t=0.
 - Objek SVG yang menunjukkan subjek, maksimal 6 kata di layar, aksi keluar di ctx.dur - 0.4.
 - Root tetap class .scene-s${params.beatIndex + 1}.
