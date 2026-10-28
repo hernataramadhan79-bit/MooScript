@@ -425,8 +425,8 @@ export function getRuntimeScript(): string {
   }
 
   window.__MOO_TEARDOWN__ = resetSharedCanvas;
-  window.addEventListener('beforeunload', resetSharedCanvas);
-  window.addEventListener('unload', resetSharedCanvas);
+  // 'pagehide' rather than 'unload': browsers block unload listeners in embedded documents.
+  window.addEventListener('pagehide', resetSharedCanvas);
 
   // 5. Host Communication Protocol
   window.addEventListener('message', async function(ev) {

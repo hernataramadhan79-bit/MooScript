@@ -151,6 +151,11 @@ export default defineConfig({
       }
     }
   },
+  // The exporter is loaded on demand; pre-bundle its dependency at startup so the dev server does
+  // not re-optimize mid-session and break the import with "504 Outdated Optimize Dep".
+  optimizeDeps: {
+    include: ['mediabunny']
+  },
   server: {
     port: 3000,
     open: false
