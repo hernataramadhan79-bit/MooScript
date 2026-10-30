@@ -1,0 +1,53 @@
+---
+import HeroPlayground from '../islands/HeroPlayground';
+import { STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { HOME_COPY } from '../../data/homeCopy';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = HOME_COPY[locale].hero;
+---
+
+<section class="relative w-full bg-[#09090b]">
+  <div aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[#111116] lg:block"></div>
+
+  <div class="relative mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-8 px-5 py-10 md:px-10 md:py-14 lg:min-h-[calc(100svh-68px)] lg:grid-cols-12 lg:items-center lg:gap-10">
+    <div class="flex flex-col justify-between lg:col-span-5 lg:pr-6">
+      <div>
+        <h1 class="hero-arrive-1 text-[32px] font-extrabold tracking-tight text-[#f4f4f6] md:text-[42px]">
+          {copy.headline}
+        </h1>
+
+        <p class="hero-arrive-2 mt-5 max-w-[44ch] text-[17px] leading-[1.6] text-[#d4d4d8]">
+          {copy.subheadline}
+        </p>
+
+        <div class="hero-arrive-3 mt-7 flex flex-wrap items-center gap-3.5">
+          <a
+            href={STUDIO_URL}
+            class="inline-flex min-h-[48px] items-center justify-center rounded-md bg-[#84cc16] px-5 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
+          >
+            {copy.primaryCta} &rarr;
+          </a>
+          <a
+            href={localizePath('/templates', locale)}
+            class="inline-flex min-h-[48px] items-center justify-center rounded-md bg-[#181820] px-5 text-[15px] font-semibold text-[#f4f4f6] transition-colors hover:bg-[#22222d]"
+          >
+            {copy.secondaryCta}
+          </a>
+        </div>
+
+        <p class="hero-arrive-4 mt-6 text-[15px] text-[#a1a1aa]">
+          {copy.specLine}
+        </p>
+      </div>
+    </div>
+
+    <div class="rounded-xl bg-[#111116] p-2 sm:p-3 lg:col-span-7 lg:bg-transparent lg:p-0 lg:pl-4">
+      <HeroPlayground client:load locale={locale} />
+    </div>
+  </div>
+</section>

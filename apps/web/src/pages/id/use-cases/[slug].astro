@@ -1,0 +1,15 @@
+---
+import UseCasePage from '../../../components/templates/UseCasePage.astro';
+import { USE_CASE_PILLARS } from '../../../data/useCases';
+
+export function getStaticPaths() {
+  return USE_CASE_PILLARS.map((pillar) => ({
+    params: { slug: pillar.slug },
+    props: { pillar }
+  }));
+}
+
+const { pillar } = Astro.props;
+---
+
+<UseCasePage pillar={pillar} locale="id" />

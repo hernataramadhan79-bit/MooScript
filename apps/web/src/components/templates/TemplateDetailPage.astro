@@ -1,0 +1,152 @@
+---
+import { SHOWCASE_PRESETS, type MooShowcasePreset } from '@mooscript/presets';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SinglePresetStage from '../islands/SinglePresetStage';
+import ActionTileCta from '../sections/ActionTileCta.astro';
+import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
+
+interface Props {
+  preset: MooShowcasePreset;
+  locale: Locale;
+}
+
+const { preset, locale } = Astro.props;
+const pathname = localizePath(`/templates/${preset.slug}`, locale);
+const otherPresets = SHOWCASE_PRESETS.filter((p) => p.slug !== preset.slug);
+
+const breadcrumbs = [
+  { name: 'MooScript', url: new URL(localizePath('/', locale), SITE_URL).toString() },
+  {
+    name: locale === 'id' ? 'Template' : 'Templates',
+    url: new URL(localizePath('/templates', locale), SITE_URL).toString()
+  },
+  { name: preset.title[locale], url: new URL(pathname, SITE_URL).toString() }
+];
+---
+
+<BaseLayout
+  title={preset.seoTitle[locale]}
+  description={preset.summary[locale]}
+  locale={locale}
+  pathname={pathname}
+  keywords={preset.targetKeywords[locale]}
+  includeSoftwareSchema={true}
+  breadcrumbs={breadcrumbs}
+>
+  <section class="w-full bg-[#09090b] py-14 md:py-20">
+    <div class="mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-10 px-5 md:px-10 lg:grid-cols-12 lg:items-center">
+      <div class="lg:col-span-5">
+        <code class="rounded bg-[#181820] px-2.5 py-1 text-[13px] text-[#84cc16]">
+          ?template={preset.slug}
+        </code>
+        <h1 class="hero-arrive-1 mt-4 text-[32px] font-extrabold tracking-tight text-[#f4f4f6] md:text-[42px]">
+          {preset.title[locale]}
+        </h1>
+        <p class="hero-arrive-2 mt-4 max-w-[46ch] text-[17px] leading-[1.6] text-[#d4d4d8]">
+          {preset.summary[locale]}
+        </p>
+
+        <div class="hero-arrive-3 mt-7 flex flex-wrap items-center gap-3">
+          <a
+            href={buildStudioUrl(preset.slug)}
+            class="inline-flex min-h-[48px] items-center justify-center rounded-md bg-[#84cc16] px-5 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
+          >
+            {locale === 'id' ? 'Kustomisasi di MooScript Studio' : 'Customize in MooScript Studio'} &rarr;
+          </a>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7">
+        <SinglePresetStage client:load slug={preset.slug} locale={locale} />
+      </div>
+    </div>
+  </section>
+
+  <section class="w-full bg-[#111116] py-20">
+    <div class="mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-10 px-5 md:px-10 lg:grid-cols-12 lg:items-start">
+      <div class="lg:col-span-5" data-reveal style="--reveal-delay: 0ms;">
+        <h2 class="text-[28px] font-bold text-[#f4f4f6] md:text-[32px]">
+          {locale === 'id' ? 'Cara kerja kode' : 'How the code works'}
+        </h2>
+        <ul class="mt-5 flex flex-col gap-4 pl-5 text-[17px] leading-[1.6] text-[#d4d4d8]">
+          {preset.howItWorks[locale].map((point) => <li>{point}</li>)}
+        </ul>
+
+        <figure class="mt-8 overflow-hidden rounded-xl bg-[#09090b]" data-reveal style="--reveal-delay: 90ms;">
+          <video
+            data-ambient-video
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            poster="/media/stars-rise-over-la-silla-poster.jpg"
+            width="854"
+            height="480"
+            aria-hidden="true"
+            class="h-[210px] w-full object-cover"
+          >
+            <source src="/media/stars-rise-over-la-silla.webm" type="video/webm" />
+          </video>
+        </figure>
+
+        <figure class="mt-4 overflow-hidden rounded-xl bg-[#09090b]">
+          <img
+            src="/media/a-colorful-aurora-paints-the-night-sky.jpg"
+            width="1280"
+            height="1600"
+            loading="lazy"
+            decoding="async"
+            alt="Satellite view of night city lights and aurora"
+            class="h-[170px] w-full object-cover"
+          />
+        </figure>
+      </div>
+
+      <div class="flex flex-col gap-6 lg:col-span-7" data-reveal style="--reveal-delay: 120ms;">
+        {
+          preset.shots.map((shot, idx) => (
+            <div class="rounded-xl bg-[#09090b] p-6">
+              <div class="mb-3 flex items-center justify-between text-[15px] text-[#a1a1aa]">
+                <span>
+                  Shot {idx + 1} &middot; {shot.durationInSeconds}s
+                </span>
+                <code>buildJs</code>
+              </div>
+              <pre class="max-h-[340px] overflow-auto text-[13px] leading-[1.55] text-[#e4e4e7]"><code>{shot.buildJs}</code></pre>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="w-full bg-[#09090b] pt-16">
+    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10" data-reveal style="--reveal-delay: 0ms;">
+      <h2 class="mb-6 text-[24px] font-bold text-[#f4f4f6]">
+        {locale === 'id' ? 'Template lainnya' : 'More templates'}
+      </h2>
+      <table class="spec-lineup text-left text-[17px]">
+        <tbody>
+          {
+            otherPresets.map((item) => (
+              <tr>
+                <td class="pr-4 font-bold text-[#f4f4f6]">
+                  <a href={localizePath(`/templates/${item.slug}`, locale)} class="hover:text-[#84cc16]">
+                    {item.title[locale]}
+                  </a>
+                </td>
+                <td class="hidden pr-4 text-[#a1a1aa] sm:table-cell">{item.summary[locale]}</td>
+                <td class="text-right">
+                  <code class="text-[13px] text-[#84cc16]">{item.aspectRatio}</code>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <ActionTileCta locale={locale} />
+</BaseLayout>

@@ -1,0 +1,269 @@
+import type { StateCreator } from 'zustand';
+import type { EngineSettings } from '../../types';
+import { db, getCacheSize, clearAllCache, loadProjectFromDb, listProjectsFromDb, saveProjectToDb } from '../../db/mooDb';
+import { BUILTIN_SKILLS, getAllSkills, initializeSkills } from '../../engine/skills/skillManager';
+import { syncComposition } from '../../engine/composition/sync';
+import { syncCustomBgmForProject } from '../../db/customBgm';
+import { removePristineLegacyDemo } from '../../db/legacyDemo';
+import { loadProjectVoice } from '../../db/voiceTrack';
+import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
+import type { MooStoreState, SettingsSlice } from '../types';
+
+const ACTIVE_SKILL_KEY = 'mooscript_active_skill_id';
+let handledDeepLinkSlug: string | null = null;
+
+export function resetDeepLinkGuard(): void {
+  handledDeepLinkSlug = null;
+}
+
+function readStoredSkillId(): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_SKILL_KEY) : null;
+  } catch {
+    return null;
+  }
+}
+
+export const DEFAULT_SETTINGS: EngineSettings = {
+  apiKeys: {
+    gemini: '',
+    openai: '',
+    groq: '',
+    anthropic: '',
+    openrouter: '',
+    elevenlabs: ''
+  },
+  apiKeyStorage: 'persistent',
+  outputLanguage: 'id',
+  selectedLLMProvider: 'gemini',
+  selectedTTSProvider: 'fallback',
+  geminiModel: 'gemini-2.0-flash',
+  openaiModel: 'gpt-4o-mini',
+  groqModel: 'llama-3.3-70b-versatile',
+  anthropicModel: 'claude-sonnet-4-6',
+  openrouterModel: 'anthropic/claude-sonnet-4.6',
+  maxOutputTokens: 2048,
+  voiceIds: {
+    openai: 'alloy',
+    elevenlabs: '21m00Tcm4TlvDq8ikWAM',
+    local: 'id_ID-news_tts'
+  },
+  elevenLabsModel: 'eleven_flash_v2_5',
+  speed: 1.05,
+  stability: 85,
+  duckingDb: -12,
+  fps: 30
+};
+
+export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSlice> = (set, get) => ({
+  settings: DEFAULT_SETTINGS,
+
+  updateSettings: async (newSettings) => {
+    const merged = { ...get().settings, ...newSettings };
+    set({ settings: merged });
+
+    const isSession = merged.apiKeyStorage === 'session';
+    const settingsToPersist = isSession ? { ...merged, apiKeys: {} } : merged;
+
+    if (isSession) {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('mooscript_session_keys', JSON.stringify(merged.apiKeys));
+      }
+    } else {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('mooscript_session_keys');
+      }
+    }
+    await db.settings.put({ id: 'current', data: settingsToPersist });
+  },
+
+  updateApiKey: async (provider, key) => {
+    const updatedKeys = { ...get().settings.apiKeys, [provider]: key };
+    const merged = { ...get().settings, apiKeys: updatedKeys };
+    set({ settings: merged });
+
+    if (merged.apiKeyStorage === 'session') {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('mooscript_session_keys', JSON.stringify(updatedKeys));
+      }
+      await db.settings.put({ id: 'current', data: { ...merged, apiKeys: {} } });
+    } else {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('mooscript_session_keys');
+      }
+      await db.settings.put({ id: 'current', data: merged });
+    }
+  },
+
+  skills: BUILTIN_SKILLS,
+  activeSkillId: BUILTIN_SKILLS[0].id,
+  setActiveSkillId: (activeSkillId) => {
+    set({ activeSkillId });
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(ACTIVE_SKILL_KEY, activeSkillId);
+    } catch {
+      // ignore localStorage errors in private browsing
+    }
+  },
+  refreshSkills: async () => {
+    const all = await getAllSkills();
+    set({ skills: all });
+    // A deleted persona falls back to the default one.
+    if (!all.some((s) => s.id === get().activeSkillId) && all.length > 0) {
+      get().setActiveSkillId(all[0].id);
+    }
+  },
+
+  cacheSizeBytes: 0,
+  refreshCacheSize: async () => {
+    const size = await getCacheSize();
+    set({ cacheSizeBytes: size });
+  },
+
+  clearCache: async () => {
+    await clearAllCache();
+    await get().refreshCacheSize();
+  },
+
+  initStore: async () => {
+    await initializeSkills();
+    const skills = await getAllSkills();
+
+    // Load persisted settings & migrate legacy voiceId if needed
+    const storedSettings = await db.settings.get('current');
+    let settings = DEFAULT_SETTINGS;
+    if (storedSettings && storedSettings.data) {
+      const raw = storedSettings.data as any;
+      let voiceIds = { ...DEFAULT_SETTINGS.voiceIds };
+      if (raw.voiceIds && typeof raw.voiceIds === 'object') {
+        voiceIds = { ...voiceIds, ...raw.voiceIds };
+      } else if (raw.voiceId && typeof raw.voiceId === 'string') {
+        if (raw.selectedTTSProvider === 'elevenlabs') {
+          voiceIds.elevenlabs = raw.voiceId;
+        } else {
+          voiceIds.openai = raw.voiceId;
+        }
+      }
+      settings = {
+        ...DEFAULT_SETTINGS,
+        ...raw,
+        voiceIds
+      };
+
+      await db.settings.put({ id: 'current', data: settings });
+    }
+
+    // Restore session keys from sessionStorage if present (or clean up if persistent)
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        if (settings.apiKeyStorage === 'session') {
+          const sessionKeysRaw = sessionStorage.getItem('mooscript_session_keys');
+          if (sessionKeysRaw) {
+            const sessionKeys = JSON.parse(sessionKeysRaw);
+            settings = { ...settings, apiKeys: { ...settings.apiKeys, ...sessionKeys } };
+          }
+        } else {
+          sessionStorage.removeItem('mooscript_session_keys');
+        }
+      } catch {
+        // Ignore session storage error
+      }
+    }
+
+    // Load all projects from DB
+    let allProjects = await listProjectsFromDb();
+    // Older builds seeded a demo project; drop it while it is still untouched.
+    const legacyDemo = allProjects.find((p) => p.id === DEFAULT_PROJECT_ID);
+    if (await removePristineLegacyDemo(legacyDemo)) {
+      allProjects = allProjects.filter((p) => p.id !== DEFAULT_PROJECT_ID);
+    }
+    if (allProjects.length === 0) {
+      await saveProjectToDb(INITIAL_PROJECT);
+      allProjects = [INITIAL_PROJECT];
+    }
+
+    let activeId = DEFAULT_PROJECT_ID;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const savedId = localStorage.getItem('mooscript_active_project_id');
+        if (savedId && allProjects.some((p) => p.id === savedId)) {
+          activeId = savedId;
+        } else {
+          activeId = allProjects[0].id;
+        }
+      }
+    } catch {
+      activeId = allProjects[0].id;
+    }
+
+    // Load active project record (including audioBlob if present)
+    const storedProject = await loadProjectFromDb(activeId);
+    let project = storedProject || allProjects[0] || INITIAL_PROJECT;
+
+    // Migration: older persisted projects won't have captionStyle / captionPosition
+    if (!project.theme.captionStyle || !project.theme.captionPosition) {
+      project = {
+        ...project,
+        theme: {
+          ...project.theme,
+          captionStyle: project.theme.captionStyle || 'boxed',
+          captionPosition: project.theme.captionPosition || 'center'
+        }
+      };
+    }
+
+    // Migration: older persisted projects won't have bgm
+    if (!project.bgm) {
+      project = {
+        ...project,
+        bgm: { preset: 'none', level: 0.18, duckRatio: 0.15 }
+      };
+    }
+
+    if (!project.composition) {
+      project = syncComposition(project);
+    }
+
+    let blobUrl: string | null = null;
+    if (project.audioBlob) {
+      blobUrl = URL.createObjectURL(project.audioBlob);
+    }
+
+    const cacheSize = await getCacheSize();
+    await syncCustomBgmForProject(project.id);
+    const voice = await loadProjectVoice(project);
+    const storedSkillId = readStoredSkillId();
+
+    set({
+      skills,
+      settings,
+      project,
+      projectsList: allProjects,
+      audioBlobUrl: blobUrl,
+      cacheSizeBytes: cacheSize,
+      audioStale: false,
+      ...voice,
+      ...(storedSkillId && skills.some((s) => s.id === storedSkillId) ? { activeSkillId: storedSkillId } : {})
+    });
+    // The scene cards offer the project's images before the asset tab is ever opened.
+    await get().loadAssets(project.id);
+
+    // Deep-link integration (?template=[slug]) from mooscript.web.id
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const tplSlug = params.get('template')?.trim();
+      if (tplSlug && handledDeepLinkSlug !== tplSlug) {
+        handledDeepLinkSlug = tplSlug;
+        params.delete('template');
+        const nextQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+        try {
+          window.history.replaceState({}, '', cleanUrl);
+        } catch {
+          // ignore history errors in sandboxed/test environments
+        }
+        await get().createProjectFromTemplate(tplSlug);
+      }
+    }
+  }
+});

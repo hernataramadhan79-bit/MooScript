@@ -1,0 +1,64 @@
+---
+import type { Locale } from '../../config/site';
+import { HOME_COPY } from '../../data/homeCopy';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = HOME_COPY[locale].comparison;
+---
+
+<section class="w-full bg-[#111116] py-20 md:py-28">
+  <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
+    <div class="mb-10 max-w-[60ch]" data-reveal style="--reveal-delay: 0ms;">
+      <h2 class="text-[28px] font-bold text-[#f4f4f6] md:text-[32px]">{copy.heading}</h2>
+      <p class="mt-3 text-[17px] leading-[1.6] text-[#d4d4d8]">{copy.lead}</p>
+    </div>
+
+    <div class="hidden sm:block" data-reveal style="--reveal-delay: 80ms;">
+      <table class="spec-lineup text-left text-[17px]">
+        <thead>
+          <tr class="text-[#84cc16]">
+            <th class="w-[22%] pr-4 font-semibold">{copy.colMetric}</th>
+            <th class="w-[28%] pr-4 font-semibold">{copy.colMoo}</th>
+            <th class="w-[25%] pr-4 font-semibold text-[#a1a1aa]">{copy.colAe}</th>
+            <th class="w-[25%] font-semibold text-[#a1a1aa]">{copy.colRemotion}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            copy.rows.map((row) => (
+              <tr>
+                <td class="pr-4 font-medium text-[#a1a1aa]">{row.criterion}</td>
+                <td class="pr-4 font-semibold text-[#f4f4f6]">{row.mooscript}</td>
+                <td class="pr-4 text-[#a1a1aa]">{row.afterEffects}</td>
+                <td class="text-[#a1a1aa]">{row.remotion}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile Line-Up (unboxed rows matching blueprint) -->
+    <table class="spec-lineup text-left text-[15px] sm:hidden">
+      <tbody>
+        {
+          copy.rows.map((row) => (
+            <tr>
+              <td class="py-3.5">
+                <div class="text-[15px] font-medium text-[#a1a1aa]">{row.criterion}</div>
+                <div class="mt-1 text-[17px] font-bold text-[#84cc16]">{row.mooscript}</div>
+                <div class="mt-1.5 text-[15px] text-[#a1a1aa]">
+                  {copy.colAe}: {row.afterEffects} &middot; {copy.colRemotion}: {row.remotion}
+                </div>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

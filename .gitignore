@@ -36,6 +36,13 @@ coverage/
 
 # ONNX runtime wasm binaries (generated from node_modules)
 public/onnx/
+apps/studio/public/onnx/
+
+# Astro & Design Taste caches
+.astro/
+apps/web/.astro/
+.taste-skill/
+apps/web/.taste-skill/
 
 # Local AI-agent configs and working notes (kept on disk, not published)
 .claude/
@@ -46,9 +53,11 @@ SPECIFICATION.md
 
 # One-off local scripts
 scripts/
+apps/studio/scripts/
 
 # Local planning prompts
 docs/mootween-migration-prompt.md
 
 # Golden-frame mismatch reports (GOLDEN_REPORT=1)
 tests/golden/.report/
+apps/studio/tests/golden/.report/

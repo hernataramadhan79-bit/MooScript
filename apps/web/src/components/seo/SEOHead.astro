@@ -1,0 +1,137 @@
+---
+import { SITE_URL, STUDIO_URL, GITHUB_URL, RELEASE_VERSION, alternatePaths, type Locale } from '../../config/site';
+import type { FaqItem } from '../../data/faqs';
+
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  locale: Locale;
+  pathname: string;
+  ogImage?: string;
+  keywords?: string[];
+  includeSoftwareSchema?: boolean;
+  faqs?: FaqItem[];
+  breadcrumbs?: BreadcrumbItem[];
+}
+
+const {
+  title,
+  description,
+  locale,
+  pathname,
+  ogImage = '/og-default.png',
+  keywords = [],
+  includeSoftwareSchema = false,
+  faqs = [],
+  breadcrumbs = []
+} = Astro.props;
+
+const canonicalUrl = new URL(pathname, SITE_URL).toString();
+const ogImageUrl = new URL(ogImage, SITE_URL).toString();
+const alternates = alternatePaths(pathname);
+
+const schemas: Record<string, unknown>[] = [];
+
+if (includeSoftwareSchema) {
+  schemas.push({
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'MooScript Studio',
+    softwareVersion: RELEASE_VERSION,
+    applicationCategory: 'MultimediaApplication',
+    applicationSubCategory: 'Programmatic Motion Graphics & Video Editor',
+    operatingSystem: 'Web Browser (Chrome, Edge, Brave, Arc)',
+    url: STUDIO_URL,
+    downloadUrl: STUDIO_URL,
+    codeRepository: GITHUB_URL,
+    license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+    inLanguage: ['en', 'id'],
+    description,
+    featureList: [
+      'Deterministic MooTween SVG & DOM animation engine (zero GSAP dependency)',
+      'Hardware-accelerated MP4 (H.264 + AAC) export via WebCodecs and mediabunny',
+      'Transparent WebM (VP9 + Alpha) overlay export and Animated GIF encoder',
+      'Up to 300 MB local B-roll video layering and Brand Kit system',
+      'Multi-format batch export queue (9:16, 16:9, 1:1) and Cover PNG capture',
+      'Offline Piper ONNX neural TTS, Procedural Auto-SFX, and Music Beat-Sync'
+    ],
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD'
+    }
+  });
+}
+
+if (faqs.length > 0) {
+  schemas.push({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer
+      }
+    }))
+  });
+}
+
+if (breadcrumbs.length > 0) {
+  schemas.push({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbs.map((crumb, idx) => ({
+      '@type': 'ListItem',
+      position: idx + 1,
+      name: crumb.name,
+      item: crumb.url
+    }))
+  });
+}
+---
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{title}</title>
+<meta name="description" content={description} />
+{keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<link rel="icon" type="image/svg+xml" href="/logo.svg" />
+<link rel="alternate icon" href="/favicon.ico" />
+
+<link rel="canonical" href={canonicalUrl} />
+<link rel="alternate" hreflang="en" href={alternates.en} />
+<link rel="alternate" hreflang="id" href={alternates.id} />
+<link rel="alternate" hreflang="x-default" href={alternates.en} />
+
+<link rel="preconnect" href={STUDIO_URL} crossorigin />
+<link rel="dns-prefetch" href={STUDIO_URL} />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MooScript" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:locale" content={locale === 'id' ? 'id_ID' : 'en_US'} />
+<meta property="og:locale:alternate" content={locale === 'id' ? 'en_US' : 'id_ID'} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImageUrl} />
+
+{
+  schemas.map((schema) => (
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />
+  ))
+}

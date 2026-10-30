@@ -1,0 +1,15 @@
+---
+import { SHOWCASE_PRESETS } from '@mooscript/presets';
+import TemplateDetailPage from '../../../components/templates/TemplateDetailPage.astro';
+
+export function getStaticPaths() {
+  return SHOWCASE_PRESETS.map((preset) => ({
+    params: { slug: preset.slug },
+    props: { preset }
+  }));
+}
+
+const { preset } = Astro.props;
+---
+
+<TemplateDetailPage preset={preset} locale="id" />

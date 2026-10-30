@@ -22,27 +22,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Type check (TypeScript)
-        run: npx tsc -b
+      - name: Type check presets (@mooscript/presets)
+        run: pnpm --filter @mooscript/presets typecheck
 
-      - name: Lint check (ESLint)
-        run: npm run lint
+      - name: Type check studio (@mooscript/studio)
+        run: pnpm --filter @mooscript/studio exec tsc -b
+
+      - name: Lint check studio (ESLint)
+        run: pnpm --filter @mooscript/studio lint
 
       # The golden-frame suite runs in Vitest browser mode on Playwright's Chromium.
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm --filter @mooscript/studio exec playwright install --with-deps chromium
 
-      - name: Unit, integration & golden-frame tests (Vitest)
-        run: npm test
+      - name: Unit, integration & golden-frame tests (@mooscript/studio)
+        run: pnpm --filter @mooscript/studio test
 
-      - name: Production build (Vite)
-        run: npm run build
+      - name: Production build (@mooscript/studio)
+        run: pnpm --filter @mooscript/studio build
+
+      - name: Check & build landing page (@mooscript/web)
+        run: pnpm --filter @mooscript/web check && pnpm --filter @mooscript/web build

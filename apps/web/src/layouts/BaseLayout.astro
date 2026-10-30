@@ -1,0 +1,82 @@
+---
+import '../styles/global.css';
+import SEOHead from '../components/seo/SEOHead.astro';
+import Navbar from '../components/sections/Navbar.astro';
+import QuietFooter from '../components/sections/QuietFooter.astro';
+import type { Locale } from '../config/site';
+import type { FaqItem } from '../data/faqs';
+
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  locale: Locale;
+  pathname: string;
+  ogImage?: string;
+  keywords?: string[];
+  includeSoftwareSchema?: boolean;
+  faqs?: FaqItem[];
+  breadcrumbs?: BreadcrumbItem[];
+}
+
+const props = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang={props.locale}>
+  <head>
+    <SEOHead {...props} />
+  </head>
+  <body class="min-h-svh bg-[#09090b] text-[#f4f4f6] antialiased">
+    <Navbar locale={props.locale} pathname={props.pathname} />
+    <main id="main-content">
+      <slot />
+    </main>
+    <QuietFooter locale={props.locale} />
+
+    <script is:inline>
+      (function () {
+        var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var items = document.querySelectorAll('[data-reveal]');
+        if (reduced) {
+          for (var i = 0; i < items.length; i++) {
+            items[i].classList.add('is-visible');
+          }
+          var vids = document.querySelectorAll('video[data-ambient-video]');
+          for (var v = 0; v < vids.length; v++) {
+            try {
+              vids[v].pause();
+              vids[v].removeAttribute('autoplay');
+            } catch (_e) {}
+          }
+          return;
+        }
+
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(
+            function (entries) {
+              for (var j = 0; j < entries.length; j++) {
+                if (entries[j].isIntersecting) {
+                  entries[j].target.classList.add('is-visible');
+                  io.unobserve(entries[j].target);
+                }
+              }
+            },
+            { rootMargin: '0px 0px -8% 0px', threshold: 0.08 }
+          );
+          for (var k = 0; k < items.length; k++) {
+            io.observe(items[k]);
+          }
+        } else {
+          for (var m = 0; m < items.length; m++) {
+            items[m].classList.add('is-visible');
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

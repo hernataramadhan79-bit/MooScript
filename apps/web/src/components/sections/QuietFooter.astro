@@ -1,0 +1,48 @@
+---
+import { GITHUB_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { HOME_COPY } from '../../data/homeCopy';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = HOME_COPY[locale].footer;
+const nav = HOME_COPY[locale].nav;
+---
+
+<footer class="w-full bg-[#09090b] pt-24 pb-8 md:pt-36">
+  <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
+    <div class="grid grid-cols-1 gap-3 text-[15px] md:grid-cols-[1fr_auto_1fr] md:items-baseline">
+      <div class="text-[#a1a1aa]">{copy.tagline}</div>
+
+      <div class="flex flex-wrap items-center gap-6 text-[#f4f4f6]">
+        <a href={STUDIO_URL} class="transition-colors hover:text-[#84cc16]">Studio</a>
+        <a href={localizePath('/templates', locale)} class="transition-colors hover:text-[#84cc16]">
+          {nav.templates}
+        </a>
+        <a href={localizePath('/use-cases/code-to-video', locale)} class="transition-colors hover:text-[#84cc16]">
+          {nav.useCases}
+        </a>
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="transition-colors hover:text-[#84cc16]"
+        >
+          {nav.github}
+        </a>
+      </div>
+
+      <div class="text-[#a1a1aa] md:text-right">
+        <span class="tabular">2026</span>
+        <span class="mx-2">&middot;</span>
+        <a href={localizePath('/privacy', locale)} class="text-[#f4f4f6] transition-colors hover:text-[#84cc16]">
+          {copy.privacy}
+        </a>
+      </div>
+    </div>
+
+    <p class="mt-4 text-[15px] text-[#a1a1aa]">{copy.mediaCredits}</p>
+  </div>
+</footer>

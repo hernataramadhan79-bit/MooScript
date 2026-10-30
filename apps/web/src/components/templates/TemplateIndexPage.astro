@@ -1,0 +1,97 @@
+---
+import { SHOWCASE_PRESETS } from '@mooscript/presets';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionTileCta from '../sections/ActionTileCta.astro';
+import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const pathname = localizePath('/templates', locale);
+
+const title =
+  locale === 'id'
+    ? 'Direktori Template Motion Graphics MooTween | MooScript'
+    : 'Motion Graphics Code Templates & Presets | MooScript';
+const description =
+  locale === 'id'
+    ? 'Koleksi starter template animasi SVG dan MooTween siap pakai untuk tipografi kinetik, grafik data, bedah kode AI, dan video Shorts.'
+    : 'Ready-to-render MooTween and SVG motion graphics templates for kinetic typography, animated data charts, code walkthroughs, and 9:16 Shorts.';
+
+const breadcrumbs = [
+  { name: 'MooScript', url: new URL(localizePath('/', locale), SITE_URL).toString() },
+  {
+    name: locale === 'id' ? 'Template' : 'Templates',
+    url: new URL(pathname, SITE_URL).toString()
+  }
+];
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  locale={locale}
+  pathname={pathname}
+  includeSoftwareSchema={true}
+  breadcrumbs={breadcrumbs}
+>
+  <section class="w-full bg-[#09090b] py-16 md:py-22">
+    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
+      <h1 class="hero-arrive-1 text-[34px] font-extrabold tracking-tight text-[#f4f4f6] sm:text-[42px] lg:text-[46px]">
+        {locale === 'id' ? 'Template siap ekspor' : 'Ready-to-render shots'}
+      </h1>
+      <p class="hero-arrive-2 mt-4 max-w-[56ch] text-[17px] leading-[1.6] text-[#d4d4d8]">
+        {
+          locale === 'id'
+            ? 'Setiap template ditulis murni dengan SVG dan mesin MooTween bebas-GSAP. Buka detail kode atau luncurkan langsung ke MooScript Studio.'
+            : 'Every preset is authored in pure SVG and our clean-room MooTween engine. Inspect the shot code or open it directly inside MooScript Studio.'
+        }
+      </p>
+
+      <div class="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2">
+        {
+          SHOWCASE_PRESETS.map((preset, idx) => (
+            <article
+              class="flex flex-col justify-between rounded-xl bg-[#111116] p-7"
+              data-reveal
+              style={`--reveal-delay: ${idx * 70}ms;`}
+            >
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <code class="rounded bg-[#181820] px-2.5 py-1 text-[13px] text-[#84cc16]">
+                    {preset.aspectRatio} &middot; {preset.width}x{preset.height}
+                  </code>
+                  <code class="text-[13px] text-[#a1a1aa]">
+                    {preset.shots.length} {preset.shots.length === 1 ? 'shot' : 'shots'}
+                  </code>
+                </div>
+
+                <h2 class="mt-4 text-[26px] font-bold text-[#f4f4f6]">{preset.title[locale]}</h2>
+                <p class="mt-3 text-[16px] leading-[1.6] text-[#d4d4d8]">{preset.summary[locale]}</p>
+              </div>
+
+              <div class="mt-7 flex flex-wrap items-center gap-3">
+                <a
+                  href={buildStudioUrl(preset.slug)}
+                  class="inline-flex min-h-[44px] items-center justify-center rounded-md bg-[#84cc16] px-4 text-[14px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
+                >
+                  {locale === 'id' ? 'Kustomisasi di Studio' : 'Customize in Studio'} &rarr;
+                </a>
+                <a
+                  href={localizePath(`/templates/${preset.slug}`, locale)}
+                  class="inline-flex min-h-[44px] items-center justify-center rounded-md bg-[#181820] px-4 text-[14px] font-semibold text-[#f4f4f6] transition-colors hover:bg-[#22222d]"
+                >
+                  {locale === 'id' ? 'Bedah Kode' : 'Inspect Code'}
+                </a>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <ActionTileCta locale={locale} />
+</BaseLayout>

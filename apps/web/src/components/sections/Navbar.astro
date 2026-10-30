@@ -1,0 +1,90 @@
+---
+import { GITHUB_URL, RELEASE_VERSION, STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { HOME_COPY } from '../../data/homeCopy';
+
+interface Props {
+  locale: Locale;
+  pathname: string;
+}
+
+const { locale, pathname } = Astro.props;
+const copy = HOME_COPY[locale].nav;
+const homeHref = localizePath('/', locale);
+const useCaseHref = localizePath('/use-cases/code-to-video', locale);
+const templatesHref = localizePath('/templates', locale);
+const enHref = localizePath(pathname, 'en');
+const idHref = localizePath(pathname, 'id');
+---
+
+<header class="w-full bg-[#09090b]">
+  <div class="mx-auto flex min-h-[68px] w-full max-w-[1320px] items-center justify-between gap-3 px-5 md:px-10">
+    <div class="flex items-center gap-3">
+      <a href={homeHref} class="flex min-h-[44px] items-center gap-2.5 text-[#f4f4f6]">
+        <img src="/logo.svg" alt="MooScript logo" width="28" height="28" class="h-7 w-7 shrink-0" />
+        <span class="text-[17px] font-bold tracking-tight">MooScript</span>
+      </a>
+      <code class="hidden rounded bg-[#181820] px-2 py-0.5 text-[13px] text-[#a1a1aa] sm:inline-block">
+        {RELEASE_VERSION}
+      </code>
+    </div>
+
+    <nav aria-label="Main navigation" class="hidden items-center gap-7 lg:flex">
+      <a href={`${homeHref}#engine`} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
+        {copy.features}
+      </a>
+      <a href={`${homeHref}#ai-workflow`} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
+        {copy.aiWorkflow}
+      </a>
+      <a href={useCaseHref} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
+        {copy.useCases}
+      </a>
+      <a href={templatesHref} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
+        {copy.templates}
+      </a>
+      <a
+        href={GITHUB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]"
+      >
+        {copy.github}
+      </a>
+    </nav>
+
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div
+        role="group"
+        aria-label="Language switcher"
+        class="flex items-center rounded-md bg-[#111116] p-1 text-[15px]"
+      >
+        <a
+          href={enHref}
+          aria-current={locale === 'en' ? 'page' : undefined}
+          class:list={[
+            'flex min-h-[36px] min-w-[34px] items-center justify-center rounded px-2 font-medium transition-colors',
+            locale === 'en' ? 'bg-[#22222d] text-[#f4f4f6]' : 'text-[#a1a1aa] hover:text-[#f4f4f6]'
+          ]}
+        >
+          EN
+        </a>
+        <a
+          href={idHref}
+          aria-current={locale === 'id' ? 'page' : undefined}
+          class:list={[
+            'flex min-h-[36px] min-w-[34px] items-center justify-center rounded px-2 font-medium transition-colors',
+            locale === 'id' ? 'bg-[#22222d] text-[#f4f4f6]' : 'text-[#a1a1aa] hover:text-[#f4f4f6]'
+          ]}
+        >
+          ID
+        </a>
+      </div>
+
+      <a
+        href={STUDIO_URL}
+        class="inline-flex min-h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-[#84cc16] px-3.5 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022] sm:px-4"
+      >
+        {copy.launchStudio} &rarr;
+      </a>
+    </div>
+  </div>
+</header>
