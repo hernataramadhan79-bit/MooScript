@@ -10,6 +10,11 @@
  */
 
 import { audioBufferToWavBlob } from '../ai/tts';
+import { renderSfxTrack } from './sfx';
+import { voiceShift } from './voiceEdit';
+import type { SfxCue, VoiceEdit } from '../../types';
+
+export type { VoiceEdit };
 
 // ── Preset BGM generators (all procedural, no external files) ─────────────────
 
@@ -22,6 +27,11 @@ let customBgmBuffer: AudioBuffer | null = null;
 
 export function setCustomBgmBuffer(buffer: AudioBuffer | null): void {
   customBgmBuffer = buffer;
+}
+
+/** The decoded custom track, for beat detection. */
+export function getCustomBgmBuffer(): AudioBuffer | null {
+  return customBgmBuffer;
 }
 
 export function hasCustomBgm(): boolean {
@@ -469,6 +479,114 @@ export async function mixVoiceAndBgm(
 
   // 4. Render
   const mixed = await mixCtx.startRendering();
+  return audioBufferToWavBlob(mixed);
+}
+
+export interface ProjectMixOptions {
+  voice: AudioBuffer | null;
+  voiceEdit?: VoiceEdit;
+  bgmPreset: BgmPreset;
+  bgmLevel: number;
+  duckRatio: number;
+  /** Spoken words on the film's clock (before the voice edit's shift). */
+  wordTimestamps: Array<{ start: number; end: number }>;
+  sfxCues: SfxCue[];
+  sfxLevel: number;
+  /** The film's length; the mix covers it, and the voice-over if that runs longer. */
+  filmDuration: number;
+  sampleRate?: number;
+}
+
+/**
+ * The film's whole soundtrack: the voice-over (trimmed, shifted, faded), the music ducked under
+ * it, and the sound effects. Resolves to null when there is nothing to hear.
+ */
+export async function mixProjectAudio(opts: ProjectMixOptions): Promise<Blob | null> {
+  const sampleRate = opts.voice?.sampleRate || opts.sampleRate || 48000;
+  const edit = opts.voiceEdit || {};
+  const trimStart = Math.max(0, edit.trimStart || 0);
+  const trimEnd = Math.max(0, edit.trimEnd || 0);
+  const offset = edit.offset || 0;
+
+  // Where the voice lands on the film's clock.
+  let voicePart: { when: number; from: number; length: number } | null = null;
+  if (opts.voice) {
+    const usable = Math.max(0, opts.voice.duration - trimStart - trimEnd);
+    const skip = Math.max(0, -offset);
+    const length = usable - skip;
+    if (length > 0.01) voicePart = { when: Math.max(0, offset), from: trimStart + skip, length };
+  }
+  const hasMusicTrack = opts.bgmPreset !== 'none';
+  const cues = (opts.sfxCues || []).filter((c) => Number.isFinite(c.time));
+  const hasSfx = cues.length > 0 && opts.sfxLevel > 0;
+  if (!voicePart && !hasMusicTrack && !hasSfx) return null;
+
+  const duration = Math.max(0.1, opts.filmDuration, voicePart ? voicePart.when + voicePart.length : 0);
+  const totalSamples = Math.max(1, Math.ceil(duration * sampleRate));
+  const ctx = new OfflineAudioContext(2, totalSamples, sampleRate);
+
+  if (voicePart && opts.voice) {
+    const src = ctx.createBufferSource();
+    src.buffer = opts.voice;
+    const gain = ctx.createGain();
+    const level = Math.max(0.001, Math.min(2, edit.gain ?? 1));
+    const start = voicePart.when;
+    const end = start + voicePart.length;
+    const fadeIn = Math.min(Math.max(0, edit.fadeIn || 0), voicePart.length / 2);
+    const fadeOut = Math.min(Math.max(0, edit.fadeOut || 0), voicePart.length / 2);
+    gain.gain.setValueAtTime(fadeIn > 0 ? 0.0001 : level, start);
+    if (fadeIn > 0) gain.gain.linearRampToValueAtTime(level, start + fadeIn);
+    if (fadeOut > 0) {
+      gain.gain.setValueAtTime(level, end - fadeOut);
+      gain.gain.linearRampToValueAtTime(0.0001, end);
+    }
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(start, voicePart.from, voicePart.length);
+  }
+
+  if (hasMusicTrack) {
+    const bgmBuffer = await renderBgmBuffer(opts.bgmPreset, duration, sampleRate);
+    if (bgmBuffer) {
+      const shift = voiceShift(edit);
+      const spoken = voicePart
+        ? opts.wordTimestamps
+            .map((w) => ({ start: w.start + shift, end: w.end + shift }))
+            .filter((w) => w.end > voicePart!.when && w.start < voicePart!.when + voicePart!.length)
+        : [];
+      const curve = buildDuckingCurve(duration, spoken, {
+        duckRatio: opts.duckRatio,
+        attackSec: 0.08,
+        releaseSec: 0.35
+      });
+      const src = ctx.createBufferSource();
+      src.buffer = bgmBuffer;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(Math.max(0.001, opts.bgmLevel), 0);
+      const duck = ctx.createGain();
+      for (const pt of curve) {
+        if (pt.ramp === 'set') duck.gain.setValueAtTime(pt.value, pt.time);
+        else duck.gain.linearRampToValueAtTime(pt.value, pt.time);
+      }
+      src.connect(master);
+      master.connect(duck);
+      duck.connect(ctx.destination);
+      src.start(0);
+    }
+  }
+
+  if (hasSfx) {
+    const track = renderSfxTrack(cues, duration, sampleRate, opts.sfxLevel);
+    const buffer = ctx.createBuffer(2, track.left.length, sampleRate);
+    buffer.getChannelData(0).set(track.left);
+    buffer.getChannelData(1).set(track.right);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    src.start(0);
+  }
+
+  const mixed = await ctx.startRendering();
   return audioBufferToWavBlob(mixed);
 }
 

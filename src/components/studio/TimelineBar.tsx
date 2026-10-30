@@ -3,7 +3,8 @@ import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
 import { extractWaveformPeaks } from '../../engine/audio/waveform';
 import { getProjectDuration, MAX_SCENE_SECONDS } from '../../utils/projectDuration';
-import type { LayerMotion } from '../../types';
+import type { LayerMotion, SfxCue, SfxKind } from '../../types';
+import { SFX_KINDS, SFX_LABEL } from '../../engine/audio/sfx';
 
 interface TimelineBarProps {
   className?: string;
@@ -85,7 +86,14 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
     updateMarker,
     removeMarker,
     selectedLayerId,
-    updateLayerMotion
+    updateLayerMotion,
+    addSfxCue,
+    updateSfxCue,
+    removeSfxCue,
+    autoPlaceSfx,
+    analyzeMusicBeats,
+    snapCutsToBeats,
+    addToast
   } = useMooStore(
     useShallow((s) => ({
       project: s.project,
@@ -115,7 +123,14 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
       updateMarker: s.updateMarker,
       removeMarker: s.removeMarker,
       selectedLayerId: s.selectedLayerId,
-      updateLayerMotion: s.updateLayerMotion
+      updateLayerMotion: s.updateLayerMotion,
+      addSfxCue: s.addSfxCue,
+      updateSfxCue: s.updateSfxCue,
+      removeSfxCue: s.removeSfxCue,
+      autoPlaceSfx: s.autoPlaceSfx,
+      analyzeMusicBeats: s.analyzeMusicBeats,
+      snapCutsToBeats: s.snapCutsToBeats,
+      addToast: s.addToast
     }))
   );
 
@@ -386,11 +401,11 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         isLooping={isLooping}
         audioStale={audioStale}
         isAudioActive={isAudioActive}
-        audioLabel={bgmOnlyAudio ? 'Musik' : 'Suara'}
+        audioLabel={bgmOnlyAudio ? 'Audio' : 'Suara'}
         audioDuration={project.audioDuration || totalDuration}
         waveformPeaks={waveformPeaks}
         musicLabel={
-          project.bgm?.preset && project.bgm.preset !== 'none' && !bgmOnlyAudio
+          project.bgm?.preset && project.bgm.preset !== 'none'
             ? `${project.bgm.preset === 'custom' ? project.bgm.customName || 'Musik sendiri' : project.bgm.preset} · ${Math.round((project.bgm.level ?? 0) * 100)}%`
             : null
         }
@@ -418,6 +433,25 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         onRemoveMarker={removeMarker}
         onTheater={() => setPreviewMode('theater')}
         layerTrack={layerTrack}
+        sfxCues={project.sfxCues || []}
+        beats={project.musicBeats?.times || []}
+        beatsBpm={project.musicBeats?.bpm ?? null}
+        hasScenes={sceneBoundaries.length > 0}
+        onAddSfx={(kind) => addSfxCue(currentFrame / fps, kind)}
+        onUpdateSfx={updateSfxCue}
+        onRemoveSfx={removeSfxCue}
+        onAutoSfx={() => {
+          const n = autoPlaceSfx();
+          addToast(n > 0 ? `${n} efek suara ditempatkan. Geser atau hapus di track SFX.` : 'Tidak ada titik baru untuk efek suara.', 'info');
+        }}
+        onAnalyzeBeats={async () => {
+          const n = await analyzeMusicBeats();
+          if (n > 0) addToast(`${n} ketukan ditemukan. Potongan dan cue sekarang bisa menempel ke ketukan.`, 'success');
+        }}
+        onSnapToBeats={() => {
+          const n = snapCutsToBeats();
+          addToast(n > 0 ? `${n} potongan dipindah ke ketukan terdekat.` : 'Semua potongan sudah pas di ketukan.', 'info');
+        }}
       />
     );
   }
@@ -496,6 +530,16 @@ interface MultiTrackTimelineProps {
   onUpdateMarker: (id: string, update: { time?: number; label?: string }) => void;
   onRemoveMarker: (id: string) => void;
   onTheater: () => void;
+  sfxCues: SfxCue[];
+  beats: number[];
+  beatsBpm: number | null;
+  hasScenes: boolean;
+  onAddSfx: (kind: SfxKind) => void;
+  onUpdateSfx: (id: string, update: Partial<Omit<SfxCue, 'id'>>) => void;
+  onRemoveSfx: (id: string) => void;
+  onAutoSfx: () => void;
+  onAnalyzeBeats: () => void;
+  onSnapToBeats: () => void;
   layerTrack: {
     layerId: string;
     shotStart: number;
@@ -622,8 +666,9 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
     const list = [currentFrame / fps, ...markers.map((m) => m.time)];
     sceneBoundaries.forEach((s) => list.push(s.startSec, s.endSec));
     if (loopRange) list.push(loopRange.start, loopRange.end);
+    list.push(...props.beats);
     return list;
-  }, [currentFrame, fps, markers, sceneBoundaries, loopRange]);
+  }, [currentFrame, fps, markers, sceneBoundaries, loopRange, props.beats]);
 
   const snapTime = (t: number, ignore: number[] = []) => {
     const threshold = SNAP_PX / pxPerSec;
@@ -738,6 +783,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
   }, [step, safeTotal]);
 
   const selectedMarker = markers.find((m) => m.id === selectedMarkerId) || null;
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
+  const selectedCue = props.sfxCues.find((c) => c.id === selectedCueId) || null;
   const addMarkerHere = () => {
     const id = props.onAddMarker(currentTimeSec);
     setSelectedMarkerId(id);
@@ -839,6 +886,96 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Sound tools: effects and beats */}
+      <div className="flex items-center gap-1 flex-wrap">
+        <button
+          type="button"
+          className={toolBtn}
+          onClick={props.onAutoSfx}
+          disabled={!props.hasScenes}
+          title="Tempatkan whoosh di setiap potongan dan pop/hentakan di momen visual. Cue yang kamu taruh sendiri tetap."
+        >
+          <span className="material-symbols-outlined text-[15px]">graphic_eq</span>
+          SFX otomatis
+        </button>
+        <select
+          value=""
+          onChange={(e) => e.target.value && props.onAddSfx(e.target.value as SfxKind)}
+          disabled={!props.hasScenes}
+          aria-label="Tambah efek suara di playhead"
+          className="h-7 px-1.5 rounded-md bg-white/[0.04] border border-white/[0.06] text-[10px] font-semibold text-zinc-400 focus:outline-none disabled:opacity-40"
+        >
+          <option value="">+ SFX di playhead</option>
+          {SFX_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {SFX_LABEL[k]}
+            </option>
+          ))}
+        </select>
+        {selectedCue && (
+          <div className="flex items-center gap-1 pl-1">
+            <select
+              value={selectedCue.kind}
+              onChange={(e) => props.onUpdateSfx(selectedCue.id, { kind: e.target.value as SfxKind })}
+              aria-label="Jenis efek suara"
+              className="h-7 px-1.5 rounded-md bg-black/60 border border-orange-300/40 text-[10px] text-zinc-100 focus:outline-none"
+            >
+              {SFX_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {SFX_LABEL[k]}
+                </option>
+              ))}
+            </select>
+            <input
+              type="range"
+              min={0}
+              max={1.5}
+              step={0.05}
+              value={selectedCue.gain ?? 1}
+              onChange={(e) => props.onUpdateSfx(selectedCue.id, { gain: parseFloat(e.target.value) })}
+              aria-label="Volume efek suara ini"
+              title={`Volume ${Math.round((selectedCue.gain ?? 1) * 100)}%`}
+              className="w-16 accent-orange-300 h-1 cursor-pointer"
+            />
+            <button
+              type="button"
+              className={toolBtn}
+              onClick={() => {
+                props.onRemoveSfx(selectedCue.id);
+                setSelectedCueId(null);
+              }}
+              title="Hapus efek suara"
+              aria-label="Hapus efek suara"
+            >
+              <span className="material-symbols-outlined text-[15px]">delete</span>
+            </button>
+          </div>
+        )}
+        <span className="w-px h-5 bg-white/[0.08] mx-1" aria-hidden="true" />
+        <button
+          type="button"
+          className={toolBtn}
+          onClick={props.onAnalyzeBeats}
+          disabled={!props.musicLabel}
+          title={props.musicLabel ? 'Cari ketukan musik latar' : 'Pilih musik latar di tab Audio dulu'}
+        >
+          <span className="material-symbols-outlined text-[15px]">music_note</span>
+          {props.beats.length ? `Ketukan${props.beatsBpm ? ` · ${Math.round(props.beatsBpm)} BPM` : ''}` : 'Cari ketukan'}
+        </button>
+        {props.beats.length > 1 && (
+          <button
+            type="button"
+            className={toolBtn}
+            onClick={props.onSnapToBeats}
+            disabled={sceneBoundaries.length < 2}
+            title="Pindahkan setiap potongan antar-shot ke ketukan terdekat (durasi total tetap)"
+          >
+            <span className="material-symbols-outlined text-[15px]">align_horizontal_center</span>
+            Potongan ke ketukan
+          </button>
+        )}
       </div>
 
       {/* Tracks */}
@@ -1010,19 +1147,46 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                     </div>
                   )}
 
-                {/* Music track */}
+                {/* Sound effects */}
+                {props.hasScenes &&
+                  trackRow(
+                    'SFX',
+                    'graphic_eq',
+                    '20px',
+                    <SfxTrack
+                      cues={props.sfxCues}
+                      pxPerSec={pxPerSec}
+                      selectedId={selectedCueId}
+                      onSelect={(id) => setSelectedCueId(id)}
+                      onMove={(id, t) => props.onUpdateSfx(id, { time: t })}
+                      snapTime={snapTime}
+                      maxTime={totalDuration}
+                    />,
+                    'Efek suara; seret untuk memindah, klik untuk mengatur'
+                  )}
+
+                {/* Music track, with its beats */}
                 {props.musicLabel &&
                   trackRow(
                     'Musik',
                     'music_note',
                     '18px',
-                    <div
-                      className="absolute top-0.5 bottom-0.5 left-0 rounded-sm bg-violet-400/15 border border-violet-400/25 px-1.5 flex items-center"
-                      style={{ width: Math.max(2, totalDuration * pxPerSec) }}
-                    >
-                      <span className="text-[9px] text-violet-200/80 truncate capitalize">{props.musicLabel}</span>
-                    </div>,
-                    'Musik latar dicampur ke trek suara'
+                    <>
+                      <div
+                        className="absolute top-0.5 bottom-0.5 left-0 rounded-sm bg-violet-400/15 border border-violet-400/25 px-1.5 flex items-center"
+                        style={{ width: Math.max(2, totalDuration * pxPerSec) }}
+                      >
+                        <span className="text-[9px] text-violet-200/80 truncate capitalize">{props.musicLabel}</span>
+                      </div>
+                      {props.beats.map((b) => (
+                        <div
+                          key={b}
+                          className="absolute bottom-0.5 w-px h-2 bg-violet-200/60 pointer-events-none"
+                          style={{ left: b * pxPerSec }}
+                        />
+                      ))}
+                    </>,
+                    'Musik latar dicampur ke trek suara; garis kecil = ketukan'
                   )}
 
                 {/* Loop range shading */}
@@ -1218,6 +1382,77 @@ const LayerMotionTrack: React.FC<{
               />
             )}
           </div>
+        );
+      })}
+    </>
+  );
+};
+
+const SFX_COLOR: Record<SfxKind, string> = {
+  whoosh: 'bg-sky-400/30 border-sky-300/70',
+  pop: 'bg-orange-400/30 border-orange-300/70',
+  tick: 'bg-zinc-300/25 border-zinc-200/60',
+  riser: 'bg-fuchsia-400/30 border-fuchsia-300/70',
+  impact: 'bg-rose-400/30 border-rose-300/70'
+};
+
+/** Sound effect cues on the timeline; drag one to move it (it snaps like everything else). */
+const SfxTrack: React.FC<{
+  cues: SfxCue[];
+  pxPerSec: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onMove: (id: string, time: number) => void;
+  snapTime: (t: number, ignore?: number[]) => number;
+  maxTime: number;
+}> = ({ cues, pxPerSec, selectedId, onSelect, onMove, snapTime, maxTime }) => {
+  const [drag, setDrag] = useState<{ id: string; time: number } | null>(null);
+
+  const startDrag = (e: React.PointerEvent<HTMLButtonElement>, cue: SfxCue) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onSelect(cue.id);
+    const startX = e.clientX;
+    let last = cue.time;
+    const onPointerMove = (ev: PointerEvent) => {
+      const raw = cue.time + (ev.clientX - startX) / pxPerSec;
+      last = Math.round(Math.min(maxTime, Math.max(0, snapTime(raw, [cue.time]))) * 100) / 100;
+      setDrag({ id: cue.id, time: last });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setDrag(null);
+      if (Math.abs(last - cue.time) >= 0.01) onMove(cue.id, last);
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  if (cues.length === 0) {
+    return <span className="absolute top-1 left-1 text-[9px] text-zinc-600 whitespace-nowrap">Belum ada efek suara</span>;
+  }
+  return (
+    <>
+      {cues.map((cue) => {
+        const time = drag?.id === cue.id ? drag.time : cue.time;
+        const selected = cue.id === selectedId;
+        return (
+          <button
+            key={cue.id}
+            type="button"
+            onPointerDown={(e) => startDrag(e, cue)}
+            title={`${SFX_LABEL[cue.kind]} di ${time.toFixed(2)} dtk${cue.auto ? ' (otomatis)' : ''}`}
+            aria-label={`Efek suara ${SFX_LABEL[cue.kind]} di ${time.toFixed(2)} detik`}
+            className={`absolute top-0.5 bottom-0.5 -ml-1.5 min-w-[12px] px-1 rounded-sm border text-[9px] leading-[14px] text-zinc-100 cursor-grab active:cursor-grabbing ${SFX_COLOR[cue.kind]} ${
+              selected ? 'ring-1 ring-white' : ''
+            } ${cue.auto ? 'border-dashed' : ''}`}
+            style={{ left: time * pxPerSec }}
+          >
+            {pxPerSec > 60 ? SFX_LABEL[cue.kind] : ''}
+          </button>
         );
       })}
     </>

@@ -211,6 +211,9 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
   );
 
   const isCompilingMograph = useMooStore((s) => s.isCompilingMograph);
+  const hasRawVoice = useMooStore((s) => Boolean(s.rawVoiceBlob));
+  const isGeneratingAudio = useMooStore((s) => s.isGeneratingAudio);
+  const regenerateSceneVoice = useMooStore((s) => s.regenerateSceneVoice);
   const mographStats = useMooStore((s) => s.mographStats);
   const revisingSceneId = useMooStore((s) => s.revisingSceneId);
   const regenerateSceneAi = useMooStore((s) => s.regenerateSceneAi);
@@ -553,6 +556,18 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">arrow_downward</span>
                   </button>
+                  {hasRawVoice && narration.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => regenerateSceneVoice(scene.id)}
+                      disabled={isGeneratingAudio}
+                      title="Rekam ulang suara adegan ini saja (adegan lain dipakai dari cache)"
+                      aria-label={`Suara ulang adegan ${index + 1}`}
+                      className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">record_voice_over</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => duplicateScene(scene.id)}

@@ -229,7 +229,7 @@ describe('AUDIO-001: BGM Decoupling & Independent Audio Track', () => {
       const ttsSpy = vi.spyOn(ttsModule, 'generateProjectAudioPerScene');
       const openaiSpy = vi.spyOn(ttsModule, 'generateOpenAITTS');
       const elevenSpy = vi.spyOn(ttsModule, 'generateElevenLabsTTS');
-      const mixSpy = vi.spyOn(bgmMixerModule, 'mixVoiceAndBgm');
+      const mixSpy = vi.spyOn(bgmMixerModule, 'mixProjectAudio');
 
       const rawVoiceBlob = new Blob(['mock-raw-voice'], { type: 'audio/wav' });
       const testProj = createTestProject();
@@ -249,12 +249,13 @@ describe('AUDIO-001: BGM Decoupling & Independent Audio Track', () => {
       expect(openaiSpy).not.toHaveBeenCalled();
       expect(elevenSpy).not.toHaveBeenCalled();
 
-      // 2. mixVoiceAndBgm must be called with the decoded voice and active BGM settings
+      // 2. The mix must be made from the decoded voice and the active BGM settings
       expect(mixSpy).toHaveBeenCalledTimes(1);
       const mixArgs = mixSpy.mock.calls[0];
-      expect(mixArgs[1].bgmPreset).toBe('ambient');
-      expect(mixArgs[1].bgmLevel).toBe(0.2);
-      expect(mixArgs[1].duckRatio).toBe(0.12);
+      expect(mixArgs[0].voice).toBeTruthy();
+      expect(mixArgs[0].bgmPreset).toBe('ambient');
+      expect(mixArgs[0].bgmLevel).toBe(0.2);
+      expect(mixArgs[0].duckRatio).toBe(0.12);
 
       // 3. Audio state updated
       const state = useMooStore.getState();
@@ -266,7 +267,7 @@ describe('AUDIO-001: BGM Decoupling & Independent Audio Track', () => {
     });
 
     it('restores rawVoiceBlob when preset is "none" without re-synthesizing voice', async () => {
-      const mixSpy = vi.spyOn(bgmMixerModule, 'mixVoiceAndBgm');
+      const mixSpy = vi.spyOn(bgmMixerModule, 'mixProjectAudio');
       const rawVoiceBlob = new Blob(['mock-raw-voice-clean'], { type: 'audio/wav' });
 
       const testProj = createTestProject();
@@ -290,7 +291,7 @@ describe('AUDIO-001: BGM Decoupling & Independent Audio Track', () => {
     });
 
     it('does nothing if rawVoiceBlob is not present', async () => {
-      const mixSpy = vi.spyOn(bgmMixerModule, 'mixVoiceAndBgm');
+      const mixSpy = vi.spyOn(bgmMixerModule, 'mixProjectAudio');
 
       useMooStore.setState({
         project: createTestProject(),

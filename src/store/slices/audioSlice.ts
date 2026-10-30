@@ -8,12 +8,14 @@ import {
   calculateFallbackSceneDuration,
   computeDeterministicWordAlignment
 } from '../../engine/ai/tts';
-import { mixVoiceAndBgm, renderStandaloneBgm } from '../../engine/audio/bgmMixer';
+import { mixProjectAudio } from '../../engine/audio/bgmMixer';
+import { deleteCachedSceneAudio } from '../../db/mooDb';
+import { sceneAudioCacheKey } from '../../engine/ai/tts';
 import { synthesizeLocalTTS, isLocalModelCached } from '../../engine/ai/localTts';
 import { WHISPER_MAX_BYTES, alignScenesToTranscript, transcribeWords } from '../../engine/ai/voiceAlign';
 import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
-import { sceneSeconds } from '../../utils/projectDuration';
+import { getProjectDuration } from '../../utils/projectDuration';
 import type { MooStoreState, AudioSlice } from '../types';
 
 let audioAbortController: AbortController | null = null;
@@ -33,20 +35,43 @@ function absoluteWordTimings(scenes: Scene[]): Array<{ start: number; end: numbe
   return words;
 }
 
-function mixWithBgm(voiceBuffer: AudioBuffer, bgm: MooProject['bgm'], scenes: Scene[]): Promise<Blob> {
-  return mixVoiceAndBgm(voiceBuffer, {
-    bgmPreset: bgm.preset,
-    bgmLevel: bgm.level ?? 0.18,
-    voiceLevel: 1.0,
-    duckRatio: bgm.duckRatio ?? 0.15,
-    duckAttackSec: 0.08,
-    duckReleaseSec: 0.35,
-    wordTimestamps: absoluteWordTimings(scenes)
+/** The film's soundtrack: voice-over (as edited), music and sound effects; null when silent. */
+async function renderMix(project: MooProject, voice: Blob | AudioBuffer | null): Promise<Blob | null> {
+  const voiceBuffer = voice instanceof Blob ? await decodeAudioBlob(voice) : voice;
+  return mixProjectAudio({
+    voice: voiceBuffer,
+    voiceEdit: project.voiceEdit,
+    bgmPreset: project.bgm?.preset || 'none',
+    bgmLevel: project.bgm?.level ?? 0.18,
+    duckRatio: project.bgm?.duckRatio ?? 0.15,
+    wordTimestamps: absoluteWordTimings(project.scenes),
+    sfxCues: project.sfxCues || [],
+    sfxLevel: project.sfxLevel ?? DEFAULT_SFX_LEVEL,
+    filmDuration: getProjectDuration(project)
   });
 }
 
+export const DEFAULT_SFX_LEVEL = 0.8;
+
 const hasMusic = (bgm: MooProject['bgm'] | undefined): bgm is MooProject['bgm'] =>
   Boolean(bgm?.preset && bgm.preset !== 'none');
+
+const hasVoiceEdit = (edit: MooProject['voiceEdit']) =>
+  Boolean(edit && (edit.offset || edit.trimStart || edit.trimEnd || edit.fadeIn || edit.fadeOut || (edit.gain !== undefined && edit.gain !== 1)));
+
+/** The plain recording is not enough: music, sound effects or a voice edit have to be mixed in. */
+const needsMix = (p: MooProject) =>
+  hasMusic(p.bgm) || (p.sfxCues?.length ?? 0) > 0 || hasVoiceEdit(p.voiceEdit);
+
+/** Mix refreshes wait for a pause in edits (dragging a cue, a slider), then run once. */
+let mixRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+export function queueMixRefresh(run: () => Promise<void>, delayMs = 450): void {
+  if (mixRefreshTimer) clearTimeout(mixRefreshTimer);
+  mixRefreshTimer = setTimeout(() => {
+    mixRefreshTimer = null;
+    run().catch(() => {});
+  }, delayMs);
+}
 
 /** Same scenes in the same order: audio rendered for one list still lines up with the other. */
 const sameSceneOrder = (a: Scene[], b: Scene[]) => a.length === b.length && a.every((s, i) => s.id === b[i].id);
@@ -103,10 +128,10 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         const roundedDuration = timeByText(project.scenes).total;
 
         let musicBlob: Blob | undefined;
-        if (hasMusic(project.bgm) && roundedDuration > 0) {
+        if ((hasMusic(project.bgm) || (project.sfxCues?.length ?? 0) > 0) && roundedDuration > 0) {
           set({ isGeneratingAudio: true });
           try {
-            musicBlob = (await renderStandaloneBgm(project.bgm.preset, roundedDuration, project.bgm.level ?? 0.18)) ?? undefined;
+            musicBlob = (await renderMix({ ...project, scenes: timeByText(project.scenes).timed }, null)) ?? undefined;
           } catch (err: unknown) {
             set({ isGeneratingAudio: false });
             addToast(`Gagal membuat BGM audio: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -177,17 +202,16 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
 
         const bgmSettings = result.updatedProject.bgm;
         let finalAudioBlob = result.audioBlob;
-        if (hasMusic(bgmSettings)) {
+        if (needsMix(result.updatedProject)) {
           set({
             audioProgress: {
               currentScene: result.updatedProject.scenes.length,
               totalScenes: result.updatedProject.scenes.length,
               sceneId: 'bgm',
-              statusText: `Mencampur BGM: ${bgmSettings.preset}…`
+              statusText: 'Mencampur musik dan efek suara…'
             }
           });
-          const voiceBuffer = await decodeAudioBlob(result.audioBlob);
-          finalAudioBlob = await mixWithBgm(voiceBuffer, bgmSettings, result.updatedProject.scenes);
+          finalAudioBlob = (await renderMix(result.updatedProject, result.audioBlob)) ?? result.audioBlob;
         }
 
         if (controller.signal.aborted) throw new DOMException('Audio generation cancelled', 'AbortError');
@@ -461,8 +485,8 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         });
 
         let finalAudioBlob: Blob = file;
-        if (hasMusic(project.bgm)) {
-          finalAudioBlob = await mixWithBgm(voiceBuffer, project.bgm, timedScenes);
+        if (needsMix(project)) {
+          finalAudioBlob = (await renderMix({ ...project, scenes: timedScenes }, voiceBuffer)) ?? file;
         }
 
         if (controller.signal.aborted) return;
@@ -519,9 +543,8 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
 
       try {
         let finalAudioBlob: Blob = rawVoiceBlob;
-        if (hasMusic(project.bgm)) {
-          const voiceBuffer = await decodeAudioBlob(rawVoiceBlob);
-          finalAudioBlob = await mixWithBgm(voiceBuffer, project.bgm, project.scenes);
+        if (needsMix(project)) {
+          finalAudioBlob = (await renderMix(project, rawVoiceBlob)) ?? rawVoiceBlob;
         }
 
         // A newer remix, another project or a new voice-over makes this result obsolete.
@@ -543,12 +566,39 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       }
     },
 
+    refreshMix: async () => {
+      const { rawVoiceBlob, project, bgmOnlyAudio, audioStale, addToast } = get();
+      if (get().isGeneratingAudio) return;
+      if (rawVoiceBlob) return get().remixAudio();
+      if (!project.audioBlob || bgmOnlyAudio) return get().generateBgmOnlyAudio();
+      // An older track without its voice kept apart cannot be mixed again.
+      if (!audioStale) addToast('Buat ulang suara supaya perubahan audio kedengaran.', 'info');
+      set({ audioStale: true });
+    },
+
+    regenerateSceneVoice: async (sceneId) => {
+      const { project, settings, addToast } = get();
+      const scene = project.scenes.find((s) => s.id === sceneId);
+      if (!scene) return;
+      if (settings.selectedTTSProvider === 'fallback' || settings.selectedTTSProvider === 'timer') {
+        addToast('Pilih penyedia suara (lokal, OpenAI atau ElevenLabs) untuk membuat suara.', 'info');
+        return;
+      }
+      if (!(scene.narrationText || scene.text || '').trim()) {
+        addToast('Adegan ini belum punya narasi.', 'info');
+        return;
+      }
+      // Only this scene's take is dropped; the others come straight from the cache.
+      await deleteCachedSceneAudio(sceneAudioCacheKey(scene, settings));
+      await get().generateAudio();
+    },
+
     generateBgmOnlyAudio: async () => {
       const { project, addToast } = get();
       const seq = ++mixJobSeq;
 
-      if (!hasMusic(project.bgm)) {
-        // Music switched off: a music-only track has nothing left to play.
+      if (!hasMusic(project.bgm) && !(project.sfxCues?.length ?? 0)) {
+        // Music and sound effects off: a track without a voice has nothing left to play.
         if (get().bgmOnlyAudio && project.audioBlob) {
           const cleared = { ...project, audioBlob: undefined };
           set({ project: cleared, audioBlobUrl: swapAudioUrl(undefined), bgmOnlyAudio: false, waveformPeaks: null });
@@ -559,11 +609,10 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       }
       if (project.scenes.length === 0) return;
 
-      const totalDuration =
-        Math.round(project.scenes.reduce((acc, s) => acc + sceneSeconds(s), 0) * 100) / 100;
+      const totalDuration = Math.round(getProjectDuration(project) * 100) / 100;
 
       try {
-        const bgmBlob = await renderStandaloneBgm(project.bgm.preset, totalDuration, project.bgm.level ?? 0.18);
+        const bgmBlob = await renderMix(project, null);
         if (!bgmBlob) return;
 
         const latest = get().project;

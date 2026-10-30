@@ -254,6 +254,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     updateBgmPreset,
     updateBgmLevel,
     updateBgmDuckRatio,
+    updateVoiceEdit,
+    setSfxLevel,
+    autoPlaceSfx,
     uploadCustomBgm,
     removeCustomBgm,
     audioStale,
@@ -301,6 +304,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       updateBgmPreset: s.updateBgmPreset,
       updateBgmLevel: s.updateBgmLevel,
       updateBgmDuckRatio: s.updateBgmDuckRatio,
+      updateVoiceEdit: s.updateVoiceEdit,
+      setSfxLevel: s.setSfxLevel,
+      autoPlaceSfx: s.autoPlaceSfx,
       uploadCustomBgm: s.uploadCustomBgm,
       removeCustomBgm: s.removeCustomBgm,
       audioStale: s.audioStale,
@@ -310,6 +316,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     }))
   );
 
+  const hasRawVoice = useMooStore((s) => Boolean(s.rawVoiceBlob));
+  const voiceEdit = project.voiceEdit || {};
+  const voiceEditActive = Object.values(voiceEdit).some((v) => v !== undefined);
   const currentLlmProvider = settings.selectedLLMProvider;
   const currentLlmApiKey = settings.apiKeys[currentLlmProvider] || '';
   const hasLlmApiKey = Boolean(currentLlmApiKey.trim());
@@ -2554,6 +2563,120 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 disabled={currentBgmPreset === 'none'}
                 format={(v) => `${Math.round(v * 100)}%`}
                 onCommit={(v) => updateBgmDuckRatio(v)}
+              />
+            </div>
+
+            {/* Voice-over edit: trim, shift, fades and level, applied in the mix */}
+            {hasRawVoice && (
+              <div className="flex flex-col gap-3 pt-1 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Edit Suara</span>
+                  {voiceEditActive && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateVoiceEdit({ offset: undefined, trimStart: undefined, trimEnd: undefined, fadeIn: undefined, fadeOut: undefined, gain: undefined })
+                      }
+                      className="text-[10px] text-text-muted hover:text-rose-300"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-text-faint leading-snug">
+                  Subtitel dan ketukan kata ikut bergeser bersama suara.
+                </p>
+                <CommitSliderRow
+                  label="Geser suara"
+                  value={voiceEdit.offset ?? 0}
+                  min={-2}
+                  max={2}
+                  step={0.05}
+                  format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(2)} dtk`}
+                  onCommit={(v) => updateVoiceEdit({ offset: v })}
+                />
+                <CommitSliderRow
+                  label="Potong awal"
+                  value={voiceEdit.trimStart ?? 0}
+                  min={0}
+                  max={3}
+                  step={0.05}
+                  format={(v) => `${v.toFixed(2)} dtk`}
+                  onCommit={(v) => updateVoiceEdit({ trimStart: v })}
+                />
+                <CommitSliderRow
+                  label="Potong akhir"
+                  value={voiceEdit.trimEnd ?? 0}
+                  min={0}
+                  max={3}
+                  step={0.05}
+                  format={(v) => `${v.toFixed(2)} dtk`}
+                  onCommit={(v) => updateVoiceEdit({ trimEnd: v })}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <CommitSliderRow
+                    label="Fade masuk"
+                    value={voiceEdit.fadeIn ?? 0}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    size="sm"
+                    format={(v) => `${v.toFixed(2)} dtk`}
+                    onCommit={(v) => updateVoiceEdit({ fadeIn: v })}
+                  />
+                  <CommitSliderRow
+                    label="Fade keluar"
+                    value={voiceEdit.fadeOut ?? 0}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    size="sm"
+                    format={(v) => `${v.toFixed(2)} dtk`}
+                    onCommit={(v) => updateVoiceEdit({ fadeOut: v })}
+                  />
+                </div>
+                <CommitSliderRow
+                  label="Volume suara"
+                  value={voiceEdit.gain ?? 1}
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  onCommit={(v) => updateVoiceEdit({ gain: v })}
+                />
+              </div>
+            )}
+
+            {/* Sound effects */}
+            <div className="flex flex-col gap-3 pt-1 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Efek Suara (SFX)</span>
+                <span className="text-[10px] font-mono text-text-muted">{(project.sfxCues || []).length} cue</span>
+              </div>
+              <p className="text-[11px] text-text-faint leading-snug">
+                Whoosh di setiap potongan, pop dan hentakan di momen visual. Atur satu per satu di track SFX timeline.
+              </p>
+              <button
+                type="button"
+                disabled={scenes.length === 0}
+                onClick={() => {
+                  const n = autoPlaceSfx();
+                  addToast(n > 0 ? `${n} efek suara ditempatkan.` : 'Tidak ada titik baru untuk efek suara.', 'info');
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
+                SFX otomatis
+              </button>
+              <CommitSliderRow
+                label="Volume SFX"
+                value={project.sfxLevel ?? 0.8}
+                min={0}
+                max={1.5}
+                step={0.05}
+                disabled={(project.sfxCues || []).length === 0}
+                format={(v) => `${Math.round(v * 100)}%`}
+                onCommit={(v) => setSfxLevel(v)}
               />
             </div>
           </div>

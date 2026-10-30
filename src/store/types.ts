@@ -21,6 +21,9 @@ import type {
   SceneAssetAttachment,
   ProjectExportSettings,
   CreativeBrief,
+  SfxCue,
+  SfxKind,
+  VoiceEdit,
   TimelineMarker,
   LayerMotion
 } from '../types';
@@ -62,6 +65,9 @@ export interface UiSlice {
   /** Layers selected together with selectedLayerId (Shift+click), moved and aligned as a group. */
   extraSelectedLayerIds: string[];
   toggleLayerSelection: (layerId: string) => void;
+  /** Hits the stage reported for the open project (ctx.pop, ctx.punch, ...), on the film's clock. */
+  stageAccents: { time: number; kind: 'pop' | 'impact' }[];
+  setStageAccents: (accents: { time: number; kind: 'pop' | 'impact' }[]) => void;
 }
 
 export interface ProjectSlice {
@@ -85,6 +91,22 @@ export interface ProjectSlice {
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
+  /** Adds a sound effect at a film time and returns its id. */
+  addSfxCue: (time: number, kind: SfxKind) => string;
+  updateSfxCue: (id: string, update: Partial<Omit<SfxCue, 'id'>>) => void;
+  removeSfxCue: (id: string) => void;
+  /** Volume of the whole SFX track, 0-1.5. */
+  setSfxLevel: (level: number) => void;
+  /**
+   * Places sound effects on the cuts, on the hits the shots' code makes and on editor entrances,
+   * replacing earlier automatic ones and keeping the ones placed by hand. Returns how many.
+   */
+  autoPlaceSfx: () => number;
+  updateVoiceEdit: (edit: Partial<VoiceEdit>) => void;
+  /** Finds the beats of the project's music; resolves to how many were found. */
+  analyzeMusicBeats: () => Promise<number>;
+  /** Moves every cut between shots to the nearest beat (within half a beat); returns how many moved. */
+  snapCutsToBeats: () => number;
   /** Adds a marker at a time in seconds and returns its id. */
   addMarker: (time: number, label?: string) => string;
   updateMarker: (id: string, update: Partial<Omit<TimelineMarker, 'id'>>) => void;
@@ -183,6 +205,10 @@ export interface AudioSlice {
   deleteAudio: () => Promise<void>;
   auditionVoice: (provider?: TTSProvider, voiceId?: string) => Promise<void>;
   remixAudio: () => Promise<void>;
+  /** Mixes the project audio again after music, sound effects or the voice edit changed. */
+  refreshMix: () => Promise<void>;
+  /** Records a new take for one scene; the other scenes are reused from the cache. */
+  regenerateSceneVoice: (sceneId: string) => Promise<void>;
   generateBgmOnlyAudio: () => Promise<void>;
   waveformPeaks: number[] | null;
   setWaveformPeaks: (peaks: number[] | null) => void;

@@ -44,6 +44,11 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     return { start, d, s };
   };
 
+  // Tells the stage where the shot hits, so sound effects can land on it.
+  const accent = (kind: string, at: number) => {
+    if (typeof ctx.accent === 'function') ctx.accent(kind, at);
+  };
+
   const safe = (name: string, fn: (...args: any[]) => any) =>
     function (...args: any[]) {
       try {
@@ -137,6 +142,7 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const els = list(targets);
     if (els.length === 0) return els;
     const f = fit(o.at, o.dur || 0.45, o.cascade ?? 0.08, els.length);
+    accent('pop', f.start);
     shot.travel(
       els,
       { scale: o.from ?? 0, pivot: o.pivot || '50% 50%' },
@@ -250,6 +256,7 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const els = list(targets);
     if (els.length === 0) return els;
     const f = fit(o.at, 0.24, 0, 1);
+    accent('impact', f.start);
     shot.go(els, { scale: o.scale || 1.25, pivot: '50% 50%', dur: f.d / 2, pingpong: true, loop: 1, curve: 'smooth-out' }, f.start);
     return els;
   });
@@ -267,6 +274,7 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     }
     steps.push({ x: 0, spin: 0, dur: 0.05 });
     const f = fit(o.at, 0.3, 0, 1);
+    accent('impact', f.start);
     shot.go(els, { sequence: steps }, f.start);
     return els;
   });
@@ -279,6 +287,7 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
       'position:absolute;inset:0;pointer-events:none;z-index:50;opacity:0;background:' + (o.color || 'var(--moo-accent, #ffffff)');
     root.appendChild(layer);
     const f = fit(o.at, 0.16, 0, 1);
+    accent('impact', f.start);
     shot.travel(layer, { opacity: 0 }, { opacity: o.intensity || 0.7, dur: f.d / 2, pingpong: true, loop: 1, curve: 'soft-out' }, f.start);
     return [layer];
   });

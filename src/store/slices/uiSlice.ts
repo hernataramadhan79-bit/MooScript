@@ -35,6 +35,8 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
   selectedLayerId: null,
   setSelectedLayerId: (selectedLayerId) => set({ selectedLayerId, extraSelectedLayerIds: [] }),
   extraSelectedLayerIds: [],
+  stageAccents: [],
+  setStageAccents: (stageAccents) => set({ stageAccents }),
   toggleLayerSelection: (layerId) => {
     const { selectedLayerId, extraSelectedLayerIds } = get();
     if (!selectedLayerId) {

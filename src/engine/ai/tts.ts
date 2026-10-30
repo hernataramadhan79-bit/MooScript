@@ -542,6 +542,46 @@ export interface SceneAudioSegment {
   fromCache: boolean;
 }
 
+/** Everything that changes a take: provider, voice, model, delivery settings and the text. */
+export function buildSceneAudioCacheKey(p: {
+  provider: TTSProvider;
+  voiceId: string;
+  elevenLabsModel?: string;
+  speed: number;
+  stability: number;
+  noiseScale?: number;
+  noiseW?: number;
+  text: string;
+}): string {
+  // Piper's expressiveness settings change the voice, so they are part of a local voice's cache key.
+  const localVoiceParams = p.provider === 'local' ? `:${p.noiseScale ?? ''}:${p.noiseW ?? ''}` : '';
+  return `${p.provider}:${p.voiceId}:${p.elevenLabsModel || ''}:${p.speed}:${p.stability}${localVoiceParams}:${p.text}`;
+}
+
+/** The voice a project uses with the current settings. */
+export function resolveVoiceId(settings: EngineSettings): string {
+  const provider = settings.selectedTTSProvider;
+  return provider === 'local'
+    ? settings.voiceIds?.local || 'id_ID-news_tts'
+    : provider === 'elevenlabs'
+      ? settings.voiceIds?.elevenlabs || '21m00Tcm4TlvDq8ikWAM'
+      : settings.voiceIds?.openai || 'alloy';
+}
+
+/** Cache key of a scene's take as generateProjectAudioPerScene would record it now. */
+export function sceneAudioCacheKey(scene: Scene, settings: EngineSettings): string {
+  return buildSceneAudioCacheKey({
+    provider: settings.selectedTTSProvider,
+    voiceId: resolveVoiceId(settings),
+    elevenLabsModel: settings.elevenLabsModel,
+    speed: settings.speed ?? 1.05,
+    stability: settings.stability ?? 85,
+    noiseScale: settings.piperNoiseScale,
+    noiseW: settings.piperNoiseW,
+    text: (scene.narrationText || scene.text || '').trim()
+  });
+}
+
 /**
  * Generate audio for a single scene with cache check and word alignment clamping
  */
@@ -588,9 +628,16 @@ export async function generateSceneAudio(params: {
     };
   }
 
-  // Piper's expressiveness settings change the voice, so they are part of a local voice's cache key.
-  const localVoiceParams = provider === 'local' ? `:${params.noiseScale ?? ''}:${params.noiseW ?? ''}` : '';
-  const cacheKey = `${provider}:${voiceId}:${elevenLabsModel || ''}:${speed}:${stability}${localVoiceParams}:${rawText}`;
+  const cacheKey = buildSceneAudioCacheKey({
+    provider,
+    voiceId,
+    elevenLabsModel,
+    speed,
+    stability,
+    noiseScale: params.noiseScale,
+    noiseW: params.noiseW,
+    text: rawText
+  });
 
   // 1. Check IndexedDB cache first
   const cached = await getCachedSceneAudio(cacheKey);
@@ -893,12 +940,7 @@ export async function generateProjectAudioPerScene(params: {
   }
 
   const provider = settings.selectedTTSProvider;
-  const voiceId =
-    provider === 'local'
-      ? settings.voiceIds?.local || 'id_ID-news_tts'
-      : provider === 'elevenlabs'
-      ? settings.voiceIds?.elevenlabs || '21m00Tcm4TlvDq8ikWAM'
-      : settings.voiceIds?.openai || 'alloy';
+  const voiceId = resolveVoiceId(settings);
 
   const internalAbortController = new AbortController();
   const onCallerAbort = () => {

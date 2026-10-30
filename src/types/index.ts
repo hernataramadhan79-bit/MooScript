@@ -814,8 +814,47 @@ export interface MooProject {
   customFonts?: CustomFont[];
   /** Image data by asset id; scene markup refers to it as moo-asset:<id>. */
   assetData?: Record<string, string>;
+  /** Sound effects on the timeline. */
+  sfxCues?: SfxCue[];
+  /** 0-1.5 level of the whole SFX track (default 0.8). */
+  sfxLevel?: number;
+  voiceEdit?: VoiceEdit;
+  musicBeats?: MusicBeats;
   createdAt?: number;
   updatedAt?: number;
+}
+
+export type SfxKind = 'whoosh' | 'pop' | 'tick' | 'riser' | 'impact';
+
+/** A sound effect on the film's clock. `time` is the moment of the hit (a riser ends there). */
+export interface SfxCue {
+  id: string;
+  time: number;
+  kind: SfxKind;
+  /** 0-1.5 volume of this cue on top of the SFX track level. */
+  gain?: number;
+  /** Placed by "SFX otomatis"; placing again replaces these and keeps the ones made by hand. */
+  auto?: boolean;
+}
+
+/** Placement and shaping of the voice-over inside the film's mix, all in seconds. */
+export interface VoiceEdit {
+  /** Delay (positive) or advance (negative) of the whole voice-over. */
+  offset?: number;
+  /** Cut from the start / end of the recording. */
+  trimStart?: number;
+  trimEnd?: number;
+  fadeIn?: number;
+  fadeOut?: number;
+  /** 0-2 voice volume. */
+  gain?: number;
+}
+
+/** Beats of the project's music on the film's clock; `key` names the music they were found in. */
+export interface MusicBeats {
+  key: string;
+  times: number[];
+  bpm: number | null;
 }
 
 export interface TimelineMarker {

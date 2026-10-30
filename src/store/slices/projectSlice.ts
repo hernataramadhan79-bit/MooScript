@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment, CreativeBrief, CustomFont } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment, CreativeBrief, CustomFont, SfxCue, VoiceEdit } from '../../types';
 import {
   CURRENT_SCHEMA_VERSION,
   BUILTIN_THEMES,
@@ -9,6 +9,10 @@ import {
 } from '../../types';
 import { cleanWord } from '../../utils/textUtils';
 import { getBriefPlatform } from '../../engine/ai/brief';
+import { autoSfxCues } from '../../engine/audio/sfx';
+import { detectBeats, nearestBeat, presetBeats } from '../../engine/audio/beats';
+import { getCustomBgmBuffer } from '../../engine/audio/bgmMixer';
+import { queueMixRefresh } from './audioSlice';
 import {
   saveProjectToDb,
   loadProjectFromDb,
@@ -26,7 +30,13 @@ import { syncCustomBgmForProject } from '../../db/customBgm';
 import { loadProjectVoice, NO_VOICE } from '../../db/voiceTrack';
 import { getProjectTemplate } from '../../engine/templates/projectTemplates';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
-import { DEFAULT_SCENE_SECONDS, MAX_SCENE_SECONDS, getSceneStartSeconds, sceneSeconds } from '../../utils/projectDuration';
+import {
+  DEFAULT_SCENE_SECONDS,
+  MAX_SCENE_SECONDS,
+  getProjectDuration,
+  getSceneStartSeconds,
+  sceneSeconds
+} from '../../utils/projectDuration';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
 import {
@@ -64,6 +74,35 @@ function newElementHtml(kind: InsertElementKind, layerId: string): string {
     pill: 'width:420px;height:120px;margin:-60px 0 0 -210px;border-radius:9999px;'
   };
   return `<div data-moo-layer="${layerId}" class="moo-added-shape" style="${base}${shape[kind]}background:var(--moo-accent, #84cc16);"></div>`;
+}
+
+/**
+ * The project with its automatic sound effects placed again for its current cuts, shot hits and
+ * editor entrances. Cues placed by hand stay, and win over automatic ones that land on them.
+ */
+function withAutoSfx(project: MooProject, accents: { time: number; kind: 'pop' | 'impact' }[]): MooProject {
+  const scenes = project.scenes || [];
+  const cuts: { time: number; transition: string }[] = [];
+  const entrances: number[] = [];
+  let acc = 0;
+  scenes.forEach((s, i) => {
+    const start = acc;
+    acc += sceneSeconds(s);
+    if (i < scenes.length - 1) cuts.push({ time: acc, transition: s.transition || 'flow' });
+    const mod = project.composition?.scenes.find((m) => m.beatId === s.id);
+    for (const motion of Object.values(mod?.layerMotions || {})) {
+      if (motion.enter) entrances.push(start + (motion.enter.at || 0));
+    }
+  });
+  const auto = autoSfxCues({ cuts, accents, entrances, duration: acc });
+  const manual = (project.sfxCues || []).filter((c) => !c.auto);
+  const kept = auto.filter((a) => !manual.some((m) => Math.abs(m.time - a.time) < 0.2));
+  return { ...project, sfxCues: [...manual, ...kept].sort((a, b) => a.time - b.time) };
+}
+
+/** The parts of a project the audio mix is made from (besides the recording itself). */
+function audioMixChanged(a: MooProject, b: MooProject): boolean {
+  return a.sfxCues !== b.sfxCues || a.sfxLevel !== b.sfxLevel || a.voiceEdit !== b.voiceEdit;
 }
 
 /** Shortest piece a split or a moved cut may leave. */
@@ -287,6 +326,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         canRedo: true
       });
       triggerSave(restored);
+      if (audioMixChanged(current, restored)) queueMixRefresh(() => get().refreshMix(), 0);
       get().addToast('Perubahan dibatalkan (Undo)', 'info');
     },
 
@@ -306,6 +346,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         canRedo: historyFuture.length > 0
       });
       triggerSave(restored);
+      if (audioMixChanged(current, restored)) queueMixRefresh(() => get().refreshMix(), 0);
       get().addToast('Perubahan dikembalikan (Redo)', 'info');
     },
 
@@ -740,6 +781,178 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
       get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
+    },
+
+    addSfxCue: (time, kind) => {
+      const current = get().project;
+      pushSnapshot(current);
+      const id = `sfx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const cue: SfxCue = { id, time: Math.max(0, Math.round(time * 100) / 100), kind, gain: 1 };
+      const updated = { ...current, sfxCues: [...(current.sfxCues || []), cue].sort((a, b) => a.time - b.time) };
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix());
+      return id;
+    },
+
+    updateSfxCue: (id, update) => {
+      const current = get().project;
+      pushSnapshot(current, `sfx:${id}`);
+      const sfxCues = (current.sfxCues || [])
+        .map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                ...update,
+                time: Math.max(0, Math.round((update.time ?? c.time) * 100) / 100),
+                gain: Math.max(0, Math.min(1.5, update.gain ?? c.gain ?? 1)),
+                // A cue moved or changed by hand is no longer replaced by "SFX otomatis".
+                auto: false
+              }
+            : c
+        )
+        .sort((a, b) => a.time - b.time);
+      const updated = { ...current, sfxCues };
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix());
+    },
+
+    removeSfxCue: (id) => {
+      const current = get().project;
+      if (!(current.sfxCues || []).some((c) => c.id === id)) return;
+      pushSnapshot(current);
+      const updated = { ...current, sfxCues: (current.sfxCues || []).filter((c) => c.id !== id) };
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix());
+    },
+
+    setSfxLevel: (level) => {
+      const current = get().project;
+      pushSnapshot(current, 'sfx-level');
+      const updated = { ...current, sfxLevel: Math.max(0, Math.min(1.5, Math.round(level * 100) / 100)) };
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix());
+    },
+
+    autoPlaceSfx: () => {
+      const current = get().project;
+      if ((current.scenes || []).length === 0) return 0;
+      pushSnapshot(current);
+      const updated = withAutoSfx(current, get().stageAccents);
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix(), 0);
+      return (updated.sfxCues || []).filter((c) => c.auto).length;
+    },
+
+    updateVoiceEdit: (patch) => {
+      const current = get().project;
+      pushSnapshot(current, `voice-edit:${Object.keys(patch).sort().join(',')}`);
+      const next: VoiceEdit = { ...current.voiceEdit };
+      for (const [k, v] of Object.entries(patch) as [keyof VoiceEdit, number | undefined][]) {
+        if (v === undefined || !Number.isFinite(v)) delete next[k];
+        else next[k] = Math.round(v * 100) / 100;
+      }
+      const updated = { ...current, voiceEdit: next };
+      set({ project: updated });
+      triggerSave(updated);
+      queueMixRefresh(() => get().refreshMix());
+    },
+
+    analyzeMusicBeats: async () => {
+      const current = get().project;
+      const preset = current.bgm?.preset || 'none';
+      const duration = getProjectDuration(current);
+      let grid: { times: number[]; bpm: number | null } = { times: [], bpm: null };
+      let key: string = preset;
+      if (preset === 'custom') {
+        const buffer = getCustomBgmBuffer();
+        if (!buffer) {
+          get().addToast('Musik unggahan belum termuat. Unggah ulang musiknya.', 'warning');
+          return 0;
+        }
+        key = `custom:${current.bgm.customName || ''}:${Math.round(buffer.duration * 100)}`;
+        const mono = buffer.getChannelData(0);
+        const found = detectBeats(mono, buffer.sampleRate);
+        // The track loops to the film's length, and so do its beats.
+        const times: number[] = [];
+        for (let loop = 0; loop * buffer.duration < duration; loop++) {
+          for (const t of found.times) {
+            const at = loop * buffer.duration + t;
+            if (at < duration) times.push(Math.round(at * 1000) / 1000);
+          }
+        }
+        grid = { times, bpm: found.bpm };
+      } else if (preset !== 'none') {
+        grid = presetBeats(preset, duration);
+      }
+      if (grid.times.length === 0) {
+        get().addToast(
+          preset === 'none' ? 'Pilih musik latar dulu untuk mencari ketukan.' : 'Musik ini tidak punya ketukan yang jelas.',
+          'info'
+        );
+      }
+      const latest = get().project;
+      if (latest.id !== current.id) return 0;
+      const updated = { ...latest, musicBeats: { key, times: grid.times, bpm: grid.bpm } };
+      set({ project: updated });
+      triggerSave(updated);
+      return grid.times.length;
+    },
+
+    snapCutsToBeats: () => {
+      const current = get().project;
+      const beats = current.musicBeats?.times || [];
+      const scenes = current.scenes || [];
+      if (beats.length < 2 || scenes.length < 2) return 0;
+      const period = (beats[beats.length - 1] - beats[0]) / (beats.length - 1);
+      // Each cut moves to its nearest beat; a shot never gets shorter than the shortest piece.
+      const cuts: number[] = [];
+      let acc = 0;
+      for (const s of scenes.slice(0, -1)) {
+        acc += sceneSeconds(s);
+        cuts.push(acc);
+      }
+      const total = acc + sceneSeconds(scenes[scenes.length - 1]);
+      let moved = 0;
+      let prev = 0;
+      const snapped = cuts.map((c, i) => {
+        const next = i + 1 < cuts.length ? cuts[i + 1] : total;
+        const target = nearestBeat(beats, c, period / 2);
+        const ok = target - prev >= MIN_PIECE_SECONDS && next - target >= MIN_PIECE_SECONDS;
+        const t = ok ? target : c;
+        if (Math.abs(t - c) > 0.005) moved++;
+        prev = t;
+        return t;
+      });
+      if (moved === 0) return 0;
+      pushSnapshot(current);
+      const hasAudio = !!current.audioBlob;
+      let start = 0;
+      const updatedScenes = scenes.map((s, i) => {
+        const end = i < snapped.length ? snapped[i] : total;
+        const dur = Math.round((end - start) * 100) / 100;
+        start = end;
+        if (Math.abs(dur - sceneSeconds(s)) < 0.005) return s;
+        return {
+          ...s,
+          durationInSeconds: dur,
+          durationLocked: true,
+          wordTimestamps: hasAudio ? s.wordTimestamps : computeDeterministicWordAlignment(s.narrationText || s.text || '', dur)
+        };
+      });
+      let updated = syncComposition({ ...current, scenes: updatedScenes });
+      // Automatic cues follow the cuts they were placed on.
+      if ((updated.sfxCues || []).some((c) => c.auto)) {
+        updated = withAutoSfx(updated, get().stageAccents);
+        queueMixRefresh(() => get().refreshMix(), 0);
+      }
+      set({ project: updated });
+      triggerSave(updated);
+      return moved;
     },
 
     addMarker: (time, label) => {

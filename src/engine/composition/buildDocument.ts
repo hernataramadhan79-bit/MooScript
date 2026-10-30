@@ -7,6 +7,7 @@ import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
 import { scopeCss } from './scopeCss';
 import { resolveAssetRefs } from './assetRefs';
+import { voiceShift } from '../audio/voiceEdit';
 import { sceneHasRenderableCode } from './legacyScenes';
 import type { Scene } from '../../types';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
@@ -40,6 +41,14 @@ export function customFontCss(fonts: CustomFont[] | undefined): string {
       return family ? `@font-face{font-family:'${family}';font-display:block;src:url('${f.dataUrl}') format('${f.format}');}` : '';
     })
     .join('\n');
+}
+
+function shiftWords(
+  words: { word: string; start: number; end: number }[] | undefined,
+  shift: number
+): { word: string; start: number; end: number }[] {
+  if (!words || !shift) return words || [];
+  return words.map((w) => ({ ...w, start: Math.max(0, w.start + shift), end: Math.max(0, w.end + shift) }));
 }
 
 export interface BuildDocumentOptions {
@@ -352,6 +361,9 @@ MOO.scene(${jsString(mod.beatId)}, {
   </script>`
     : '';
 
+  // A trimmed or shifted voice-over moves its words; captions and word beats follow it.
+  const wordShift = voiceShift(project.voiceEdit);
+
   const meta = {
     scenes: resolved.map(({ mod }) => {
       const ts = timelineScenes.find((s) => s.id === mod.beatId);
@@ -359,7 +371,7 @@ MOO.scene(${jsString(mod.beatId)}, {
         id: mod.beatId,
         duration: durationOf(mod),
         transition: ts?.transition || 'flow',
-        wordTimestamps: ts?.wordTimestamps || []
+        wordTimestamps: shiftWords(ts?.wordTimestamps, wordShift)
       };
     })
   };
@@ -379,7 +391,7 @@ MOO.scene(${jsString(mod.beatId)}, {
         id: mod.beatId,
         duration: durationOf(mod),
         text: ts?.narrationText || ts?.text || '',
-        wordTimestamps: ts?.wordTimestamps || [],
+        wordTimestamps: shiftWords(ts?.wordTimestamps, wordShift),
         hideSubtitles: ts?.hideSubtitles
       };
     })

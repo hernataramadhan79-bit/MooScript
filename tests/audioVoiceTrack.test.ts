@@ -189,7 +189,7 @@ describe('changing the music', () => {
     const slow = new Blob(['slow mix']);
     const fast = new Blob(['fast mix']);
     let releaseSlow: () => void = () => {};
-    vi.spyOn(bgmMixerModule, 'mixVoiceAndBgm')
+    vi.spyOn(bgmMixerModule, 'mixProjectAudio')
       .mockImplementationOnce(() => new Promise((resolve) => (releaseSlow = () => resolve(slow))))
       .mockImplementationOnce(() => Promise.resolve(fast));
 

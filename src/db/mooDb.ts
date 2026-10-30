@@ -276,6 +276,14 @@ export async function getCachedSceneAudio(cacheKey: string): Promise<CachedScene
   }
 }
 
+export async function deleteCachedSceneAudio(cacheKey: string): Promise<void> {
+  try {
+    await db.sceneAudioCache.delete(cacheKey);
+  } catch (err) {
+    console.warn('Failed to delete from sceneAudioCache:', err);
+  }
+}
+
 export const SCENE_AUDIO_CACHE_MAX_BYTES = 200 * 1024 * 1024;
 
 /** Drops the least recently written entries until the cache fits `maxBytes`; the newest entry is always kept. */

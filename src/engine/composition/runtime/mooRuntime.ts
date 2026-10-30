@@ -132,6 +132,8 @@ export function getRuntimeScript(): string {
       }, 0);
     }
 
+    const shotAccents = [];
+
     // Phase 3: Build each shot track and the inter-shot transitions
     for (let i = 0; i < sceneElements.length; i++) {
       const current = sceneElements[i];
@@ -179,7 +181,14 @@ export function getRuntimeScript(): string {
           return match ? Math.max(0, match.start) : 0;
         },
         rand: scenePrng,
-        index: i
+        index: i,
+        // Hits the shot's code makes (ctx.pop, ctx.punch, ...), kept when they land on screen.
+        accent: function(kind, at) {
+          const t = accumulatedTime - inPoint + Number(at || 0);
+          if (t >= accumulatedTime - 0.001 && t < accumulatedTime + duration) {
+            shotAccents.push({ kind: kind, time: Math.round(t * 1000) / 1000 });
+          }
+        }
       };
 
       // The shot's track: selectors resolve inside this shot only, and loop: true covers this shot.
@@ -300,7 +309,8 @@ export function getRuntimeScript(): string {
     window.parent.postMessage({
       type: 'ready',
       duration: accumulatedTime,
-      totalScenes: scenes.length
+      totalScenes: scenes.length,
+      accents: shotAccents
     }, '*');
   }
 
