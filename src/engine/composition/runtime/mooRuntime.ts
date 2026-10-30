@@ -99,6 +99,7 @@ export function getRuntimeScript(): string {
 
       const sceneWrapper = document.createElement('div');
       sceneWrapper.className = 'moo-scene-wrapper';
+      if (def.clearBg) sceneWrapper.setAttribute('data-clear-bg', '');
       sceneWrapper.id = 'scene-' + sceneItem.id;
       sceneWrapper.style.position = 'absolute';
       sceneWrapper.style.inset = '0';
@@ -562,7 +563,7 @@ export function getRuntimeScript(): string {
           '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
           '<style><![CDATA[' + styles + ']]></style>' +
           '<foreignObject width="100%" height="100%">' +
-          '<div' + wrapperXmlns + ' style="width:100%;height:100%;position:relative;background:' + mooBg + ';color:' + mooText + ';--moo-bg:' + mooBg + ';--moo-accent:' + mooAccent + ';--moo-text:' + mooText + ';--moo-primary:' + mooPrimary + ';overflow:hidden;">' +
+          '<div' + wrapperXmlns + ' style="width:100%;height:100%;position:relative;background:' + (data.transparent ? 'transparent' : mooBg) + ';color:' + mooText + ';--moo-bg:' + mooBg + ';--moo-accent:' + mooAccent + ';--moo-text:' + mooText + ';--moo-primary:' + mooPrimary + ';overflow:hidden;">' +
           serialized +
           '</div>' +
           '</foreignObject>' +
@@ -588,9 +589,14 @@ export function getRuntimeScript(): string {
             if (!sharedExportCtx) {
               throw new Error('Canvas 2D context is unavailable');
             }
-            // Clear with solid background first so output is never transparent zeros
-            sharedExportCtx.fillStyle = mooBg;
-            sharedExportCtx.fillRect(0, 0, width, height);
+            // Clear with solid background first so output is never transparent zeros, unless the
+            // caller asked for alpha (B-roll underneath, transparent video).
+            if (data.transparent) {
+              sharedExportCtx.clearRect(0, 0, width, height);
+            } else {
+              sharedExportCtx.fillStyle = mooBg;
+              sharedExportCtx.fillRect(0, 0, width, height);
+            }
             sharedExportCtx.drawImage(img, 0, 0, width, height);
             img.onload = null;
             img.onerror = null;

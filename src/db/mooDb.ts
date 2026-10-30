@@ -463,7 +463,8 @@ export async function listAssetsFromDb(projectId: string): Promise<AssetRecord[]
     const records = await db.assets.where('projectId').equals(projectId).sortBy('createdAt');
     return await Promise.all(
       records.map(async (r) => {
-        if (r.dataUrl || !r.blob) return r;
+        // Videos stay blobs; a data URL of footage would be huge and is never needed.
+        if (r.dataUrl || !r.blob || (r.mimeType || '').startsWith('video/')) return r;
         try {
           return { ...r, dataUrl: await blobToDataUrl(r.blob) };
         } catch {

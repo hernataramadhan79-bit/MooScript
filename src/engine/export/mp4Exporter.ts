@@ -12,6 +12,7 @@ import {
 } from 'mediabunny';
 import type { AspectRatio, MooProject, ThemeTokens } from '../../types';
 import { drawReframed, frameSize, type ReframeOptions } from './reframe';
+import { createBrollReader, drawBrollFrame, type BrollReader } from './brollReader';
 import { resolveTheme } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
@@ -38,7 +39,7 @@ export interface ExportResult {
   height: number;
 }
 
-export type ExportContainerFormat = 'mp4' | 'webm';
+export type ExportContainerFormat = 'mp4' | 'webm' | 'gif';
 
 export interface ExportOptions {
   /** Output frame rate; defaults to the project's own fps. */
@@ -51,6 +52,10 @@ export interface ExportOptions {
   useWorker?: boolean;
   /** Renders into another frame shape (crop or fit) instead of the project's own. */
   reframe?: ReframeOptions;
+  /** Video files of the B-roll assets, by asset id. */
+  brollSources?: Record<string, Blob>;
+  /** WebM (VP9) with an alpha channel: only the graphics, every shot's background cleared. */
+  transparent?: boolean;
 }
 
 export async function runWorkerRenderPipeline(
@@ -205,7 +210,8 @@ export async function exportMooProjectToMP4(
 
   // 1. Verify WebCodecs VideoEncoder availability via mediabunny for the requested container.
   // Browsers without an H.264 encoder (e.g. Firefox, some Linux builds) fall back to WebM/VP9.
-  let isWebm = opts?.format === 'webm';
+  const transparent = opts?.transparent === true;
+  let isWebm = opts?.format === 'webm' || transparent;
   if (typeof VideoEncoder === 'undefined') {
     throw new Error(
       'WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.'
@@ -221,6 +227,9 @@ export async function exportMooProjectToMP4(
     throw new Error(
       `WebCodecs tidak dapat meng-encode ${isWebm ? 'VP9 (WebM)' : 'H.264 (MP4)'} pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.`
     );
+  }
+  if (transparent && !(await canEncodeVideo('vp9', { width: outSize.width, height: outSize.height, alpha: 'keep' }))) {
+    throw new Error('Browser ini belum bisa membuat video transparan (VP9 dengan alpha). Coba Google Chrome versi terbaru.');
   }
   const audioCodec = isWebm ? 'opus' : 'aac';
 
@@ -537,10 +546,26 @@ export async function exportMooProjectToMP4(
   const canvasRenderer = new CanvasRenderer(undefined, width, height);
   const rawCanvas = canvasRenderer.getCanvas();
 
+  if (transparent && !isCompositionMode) {
+    throw new Error('Video transparan hanya tersedia untuk proyek komposisi.');
+  }
+  // The canvas renderer's canvas has no alpha; a transparent video renders into one that keeps it.
+  let frameCanvas = rawCanvas as HTMLCanvasElement;
+  if (transparent) {
+    frameCanvas = document.createElement('canvas');
+    frameCanvas.width = width;
+    frameCanvas.height = height;
+  }
+
   let compRenderer: FrameRenderer | null = null;
+  let brollReader: BrollReader | null = null;
   if (isCompositionMode) {
     onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Menyiapkan panggung render...' });
-    compRenderer = await createCompositionFrameRenderer(project, width, height);
+    compRenderer = await createCompositionFrameRenderer(project, width, height, transparent ? { clearBackgrounds: true } : undefined);
+    brollReader = await createBrollReader(project.scenes, opts?.brollSources);
+    if (!brollReader && project.scenes.some((s) => s.broll)) {
+      warnings.push('Video B-roll tidak bisa dibaca; shot dengan B-roll dirender tanpa video.');
+    }
     if (!compRenderer) {
       if (hasGeneratedCompositionScenes) {
         throw new Error('Composition renderer gagal diinisialisasi untuk mode komposisi.');
@@ -551,7 +576,7 @@ export async function exportMooProjectToMP4(
   }
 
   // With a reframe, frames are drawn at the project's size and redrawn into this canvas.
-  let outputCanvas = rawCanvas as HTMLCanvasElement;
+  let outputCanvas = frameCanvas;
   if (reframe) {
     outputCanvas = document.createElement('canvas');
     outputCanvas.width = outSize.width;
@@ -559,7 +584,8 @@ export async function exportMooProjectToMP4(
   }
   const videoSource = new CanvasSource(outputCanvas, {
     codec: isWebm ? 'vp9' : 'avc',
-    bitrate
+    bitrate,
+    ...(transparent ? { alpha: 'keep' as const } : {})
   });
   output.addVideoTrack(videoSource);
 
@@ -604,7 +630,11 @@ export async function exportMooProjectToMP4(
       // 1. Draw frame deterministically: RenderState = f(currentFrame, fps, project)
       if (compRenderer) {
         try {
-          await compRenderer.renderFrame(frame, frame / fps, rawCanvas as HTMLCanvasElement);
+          const footage = brollReader ? await brollReader.frameAt(frame / fps) : null;
+          await compRenderer.renderFrame(frame, frame / fps, frameCanvas, {
+            transparent,
+            underlay: footage ? (ctx) => drawBrollFrame(ctx, footage.canvas, footage.broll, width, height) : undefined
+          });
           consecutiveFrameFailures = 0;
         } catch (frameErr) {
           consecutiveFrameFailures++;
@@ -622,7 +652,7 @@ export async function exportMooProjectToMP4(
         });
       }
 
-      if (reframe) drawReframed(rawCanvas as HTMLCanvasElement, outputCanvas, reframe.mode);
+      if (reframe) drawReframed(frameCanvas, outputCanvas, reframe.mode, transparent);
 
       // 2. Add canvas frame to Mediabunny (auto-encodes, respects dequeue backpressure, and closes frame)
       await videoSource.add(frame / fps, 1 / fps);
@@ -698,5 +728,6 @@ export async function exportMooProjectToMP4(
     if (compRenderer) {
       compRenderer.cleanup();
     }
+    brollReader?.dispose();
   }
 }

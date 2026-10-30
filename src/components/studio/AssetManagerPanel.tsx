@@ -3,7 +3,25 @@ import React, { useEffect, useRef } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import type { AssetRecord } from '../../db/mooDb';
 import type { AssetAnimationPreset, AssetFramePreset } from '../../store/types';
-import { MAX_ASSET_BYTES } from '../../store/slices/assetSlice';
+import { MAX_ASSET_BYTES, MAX_VIDEO_BYTES } from '../../store/slices/assetSlice';
+
+/** A small muted preview of a video asset (first frame). */
+const VideoThumb: React.FC<{ blob?: Blob; name: string }> = ({ blob, name }) => {
+  const [url, setUrl] = React.useState<string | null>(null);
+  useEffect(() => {
+    if (!blob) return;
+    const u = URL.createObjectURL(blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [blob]);
+  return url ? (
+    <video src={url} muted playsInline preload="metadata" aria-label={name} className="w-10 h-10 rounded-lg object-cover bg-black/40 border border-border/80" />
+  ) : (
+    <div className="w-10 h-10 rounded-lg bg-black/40 border border-border/80 flex items-center justify-center">
+      <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-text-muted">movie</span>
+    </div>
+  );
+};
 
 export const AssetManagerPanel: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,6 +35,8 @@ export const AssetManagerPanel: React.FC = () => {
   const deleteAsset = useMooStore((s) => s.deleteAsset);
   const insertAssetIntoScene = useMooStore((s) => s.insertAssetIntoScene);
   const removeAssetFromScene = useMooStore((s) => s.removeAssetFromScene);
+  const setSceneBroll = useMooStore((s) => s.setSceneBroll);
+  const updateSceneBroll = useMooStore((s) => s.updateSceneBroll);
   const addToast = useMooStore((s) => s.addToast);
   const [selectedAnimPreset, setSelectedAnimPreset] = React.useState<AssetAnimationPreset>('pop');
   const [selectedFramePreset, setSelectedFramePreset] = React.useState<AssetFramePreset>('cutout');
@@ -31,8 +51,16 @@ export const AssetManagerPanel: React.FC = () => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (file.type.startsWith('video/')) {
+      if (file.size > MAX_VIDEO_BYTES) {
+        addToast('Ukuran video melebihi batas 300 MB.', 'error');
+        return;
+      }
+      await addAsset(file);
+      return;
+    }
     if (!file.type.startsWith('image/')) {
-      addToast('Harap pilih berkas gambar (PNG, JPG, WebP, SVG).', 'error');
+      addToast('Harap pilih gambar (PNG, JPG, WebP, SVG) atau video (MP4, WebM, MOV).', 'error');
       return;
     }
 
@@ -85,7 +113,7 @@ export const AssetManagerPanel: React.FC = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
           className="hidden"
           onChange={handleFileChange}
         />
@@ -93,8 +121,72 @@ export const AssetManagerPanel: React.FC = () => {
 
       {/* Info subheader */}
       <p className="text-[11px] text-text-muted leading-relaxed">
-        Unggah gambar, logo, atau stiker (maks 5 MB) tersimpan di browser Anda untuk disisipkan ke adegan.
+        Unggah gambar, logo, atau stiker (maks 5 MB), atau video untuk B-roll (maks 300 MB). Semua tersimpan di browser Anda.
       </p>
+
+      {/* B-roll of the target shot */}
+      {targetScene?.broll && (
+        <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-surface-1 border border-accent/40">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-on-surface flex items-center gap-1">
+              <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-accent">movie</span>
+              B-roll Shot #{targetSceneIdx + 1}
+            </span>
+            <button type="button" onClick={() => setSceneBroll(targetScene.id, null)} className="text-[10px] text-text-muted hover:text-rose-300">
+              Lepas
+            </button>
+          </div>
+          <span className="text-[10px] text-text-muted truncate">
+            {assets.find((a) => a.id === targetScene.broll!.assetId)?.name || 'Video tidak ditemukan di proyek ini'}
+          </span>
+          <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+            Mulai dari detik
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={targetScene.broll.start}
+              onChange={(e) => updateSceneBroll(targetScene.id, { start: parseFloat(e.target.value) || 0 })}
+              className="w-20 h-7 px-1.5 rounded-md bg-surface-2 border border-border text-[11px] font-mono text-on-surface text-center focus:outline-none focus:border-accent"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-1">
+            {(
+              [
+                ['cover', 'Penuhi layar'],
+                ['contain', 'Utuh']
+              ] as const
+            ).map(([fit, name]) => (
+              <button
+                key={fit}
+                type="button"
+                aria-pressed={targetScene.broll!.fit === fit}
+                onClick={() => updateSceneBroll(targetScene.id, { fit })}
+                className={`py-1 rounded-lg text-[10px] font-medium border ${
+                  targetScene.broll!.fit === fit ? 'bg-accent/15 border-accent text-accent font-bold' : 'bg-surface-2 border-border text-text-muted'
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          <label className="flex flex-col gap-1 text-[10px] text-text-muted">
+            Gelapkan video {Math.round(targetScene.broll.dim * 100)}%
+            <input
+              type="range"
+              min={0}
+              max={0.85}
+              step={0.05}
+              value={targetScene.broll.dim}
+              onChange={(e) => updateSceneBroll(targetScene.id, { dim: parseFloat(e.target.value) })}
+              className="w-full accent-accent h-1"
+            />
+          </label>
+          <span className="text-[10px] text-text-faint leading-snug">
+            Latar shot ini dikosongkan supaya video terlihat; grafik dan teks tetap di atasnya.
+          </span>
+        </div>
+      )}
 
       {/* Target Adegan untuk Disisipkan */}
       {activeProject.scenes.length > 0 && (
@@ -189,6 +281,8 @@ export const AssetManagerPanel: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
           {assets.map((asset) => {
+            const isVideo = asset.mimeType.startsWith('video/');
+            const isBroll = targetScene?.broll?.assetId === asset.id;
             const html = targetCompScene?.html || '';
             const isInserted = html.includes(assetRef(asset.id)) || Boolean(asset.dataUrl && html.includes(asset.dataUrl));
             return (
@@ -198,11 +292,15 @@ export const AssetManagerPanel: React.FC = () => {
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="relative shrink-0">
-                    <img
-                      src={asset.dataUrl}
-                      alt={asset.name}
-                      className="w-10 h-10 rounded-lg object-contain bg-black/40 border border-border/80 p-0.5"
-                    />
+                    {isVideo ? (
+                      <VideoThumb blob={asset.blob} name={asset.name} />
+                    ) : (
+                      <img
+                        src={asset.dataUrl}
+                        alt={asset.name}
+                        className="w-10 h-10 rounded-lg object-contain bg-black/40 border border-border/80 p-0.5"
+                      />
+                    )}
                     {isInserted && (
                       <span className="absolute -top-1 -right-1 bg-accent text-black rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold shadow" title="Aktif di shot ini">
                         ✓
@@ -214,13 +312,29 @@ export const AssetManagerPanel: React.FC = () => {
                       {asset.name}
                     </span>
                     <span className="text-[10px] font-mono text-text-muted uppercase">
-                      {asset.mimeType.replace('image/', '')}
+                      {isVideo ? 'video' : asset.mimeType.replace('image/', '')}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
-                  {isInserted ? (
+                  {isVideo ? (
+                    <button
+                      type="button"
+                      disabled={!targetScene}
+                      onClick={() =>
+                        targetScene &&
+                        setSceneBroll(targetScene.id, isBroll ? null : { assetId: asset.id, start: 0, fit: 'cover', dim: 0.35 })
+                      }
+                      title={isBroll ? `Lepas dari Shot #${targetSceneIdx + 1}` : `Putar di belakang Shot #${targetSceneIdx + 1}`}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                        isBroll ? 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25' : 'bg-accent/15 text-accent hover:bg-accent/25'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">{isBroll ? 'remove_circle' : 'movie'}</span>
+                      <span>{isBroll ? 'Lepas' : 'B-roll'}</span>
+                    </button>
+                  ) : isInserted ? (
                     <button
                       type="button"
                       onClick={() => handleRemove(asset)}

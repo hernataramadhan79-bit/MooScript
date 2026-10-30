@@ -50,7 +50,9 @@ export const MultiFormatExport: React.FC = () => {
     setIsCovering(true);
     try {
       const { renderCoverPng } = await import('../../engine/export/cover');
-      const blob = await renderCoverPng(project, currentFrame / (project.fps || 30), { aspect, mode });
+      const { brollSourcesFor } = await import('../../store/slices/exportSlice');
+      const state = useMooStore.getState();
+      const blob = await renderCoverPng(project, currentFrame / (project.fps || 30), { aspect, mode }, await brollSourcesFor(state));
       const url = URL.createObjectURL(blob);
       triggerFileDownload(url, `${base}-cover-${aspect.replace(':', 'x')}.png`);
       setTimeout(() => URL.revokeObjectURL(url), 15000);
@@ -105,7 +107,8 @@ export const MultiFormatExport: React.FC = () => {
       {queue.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {queue.map((item) => {
-            const ext = item.result?.blob.type === 'video/webm' ? 'webm' : 'mp4';
+            const type = item.result?.blob.type;
+            const ext = type === 'image/gif' ? 'gif' : type === 'video/webm' ? 'webm' : 'mp4';
             return (
               <li key={item.aspect} className="flex items-center gap-2 p-2 rounded-xl bg-surface-2 border border-border text-[11px]">
                 <span className="font-mono text-on-surface w-10">{item.aspect}</span>

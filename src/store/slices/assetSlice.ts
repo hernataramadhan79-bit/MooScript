@@ -7,6 +7,8 @@ import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composi
 import { escapeHtml } from '../../utils/textUtils';
 import { assetRef, pruneAssetData } from '../../engine/composition/assetRefs';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
+/** Footage for B-roll is kept as a blob in IndexedDB, so it may be much larger than an image. */
+export const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
 
 export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> = (set, get) => ({
   assets: [],
@@ -25,6 +27,25 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
   },
 
   addAsset: async (file: File): Promise<AssetRecord | null> => {
+    if (file.type.startsWith('video/')) {
+      if (file.size > MAX_VIDEO_BYTES) {
+        get().addToast('Ukuran video melebihi batas 300 MB.', 'error');
+        return null;
+      }
+      const project = get().project;
+      const record: AssetRecord = {
+        id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        projectId: project.id,
+        name: file.name,
+        mimeType: file.type,
+        blob: file,
+        createdAt: Date.now()
+      };
+      await saveAssetToDb(record);
+      if (get().project.id === project.id) set({ assets: [...get().assets, record] });
+      get().addToast(`Video "${file.name}" siap dipakai sebagai B-roll.`, 'success');
+      return record;
+    }
     const allowedMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
     if (!allowedMimes.includes(file.type) && !file.type.startsWith('image/')) {
       get().addToast('Format berkas tidak didukung. Harap unggah PNG, JPG, WebP, atau SVG.', 'error');

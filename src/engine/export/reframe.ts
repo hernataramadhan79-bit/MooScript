@@ -31,14 +31,24 @@ export function placeFrame(
 }
 
 /** Draws one rendered frame into a frame of another shape. */
-export function drawReframed(src: CanvasImageSource & { width: number; height: number }, dst: HTMLCanvasElement, mode: ReframeMode): void {
+export function drawReframed(
+  src: CanvasImageSource & { width: number; height: number },
+  dst: HTMLCanvasElement,
+  mode: ReframeMode,
+  transparent = false
+): void {
   const ctx = dst.getContext('2d');
   if (!ctx) return;
   const target = { width: dst.width, height: dst.height };
   ctx.save();
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, target.width, target.height);
-  if (mode === 'fit') {
+  if (transparent) {
+    // A transparent video keeps empty bands empty.
+    ctx.clearRect(0, 0, target.width, target.height);
+  } else {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, target.width, target.height);
+  }
+  if (mode === 'fit' && !transparent) {
     // The empty bands show a darkened, blurred cover of the same frame instead of black bars.
     const cover = placeFrame(src, target, 'crop');
     ctx.filter = 'blur(36px) brightness(0.55)';

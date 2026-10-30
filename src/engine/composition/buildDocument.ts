@@ -60,6 +60,11 @@ export interface BuildDocumentOptions {
    * after load (set_override_css), so dragging a layer never changes the document and reloads the iframe.
    */
   omitOverrides?: boolean;
+  /**
+   * Clears every shot's own background, so only the graphics are drawn (transparent video export).
+   * Shots with B-roll are always cleared, so the footage shows through.
+   */
+  clearBackgrounds?: boolean;
 }
 
 /** Layer-override CSS for every scene of a composition, scoped to each scene's DOM id. */
@@ -171,6 +176,9 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
   const height = comp.height || 1920;
   const aspectRatio = `${width} / ${height}`;
   const timelineScenes = project.scenes || [];
+  // With B-roll (or a transparent export) the stage must be see-through where a shot clears its
+  // background, so each shot carries the background instead of the viewport.
+  const seeThrough = Boolean(options?.clearBackgrounds) || timelineScenes.some((s) => s.broll);
 
   // Order generated scenes according to the timeline, then append leftovers.
   const orderedModules: GeneratedScene[] = [];
@@ -233,6 +241,7 @@ MOO.scene(${jsString(mod.beatId)}, {
   transition: ${safeJson(ts?.transition || 'flow')},
   transitionDuration: ${safeJson(ts?.transitionDuration ?? null)},
   transitionCurve: ${safeJson(ts?.transitionCurve ?? null)},
+  clearBg: ${safeJson(Boolean(ts?.broll))},
   inPoint: ${safeJson(mod.inPoint ?? 0)},
   sourceDuration: ${safeJson(mod.sourceDuration ?? null)},
   seed: ${safeJson(mod.seed ?? null)}
@@ -424,7 +433,7 @@ MOO.scene(${jsString(mod.beatId)}, {
     html, body {
       width: 100%;
       height: 100%;
-      background: #000000;
+      background: ${seeThrough && !options?.standalone ? 'transparent' : '#000000'};
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -448,7 +457,7 @@ MOO.scene(${jsString(mod.beatId)}, {
       width: ${width}px;
       height: ${height}px;
       aspect-ratio: ${aspectRatio};
-      background: var(--moo-bg);
+      background: ${seeThrough && !options?.standalone ? 'transparent' : 'var(--moo-bg)'};
       overflow: hidden;
       transform-origin: center center;
     }
@@ -460,6 +469,17 @@ MOO.scene(${jsString(mod.beatId)}, {
       height: 100%;
       overflow: hidden;
     }
+
+    /* Each shot carries the background; a cleared one (B-roll, transparent export) lets what is
+       behind the stage show through. */
+    ${
+      seeThrough
+        ? `.moo-scene-wrapper { background: var(--moo-bg); }
+    .moo-scene-wrapper[data-clear-bg] { background: transparent; }
+    .moo-scene-wrapper[data-clear-bg] > :first-child { background: transparent !important; }`
+        : ''
+    }
+    ${options?.clearBackgrounds ? '.moo-scene-wrapper { background: transparent; } .moo-scene-wrapper > :first-child { background: transparent !important; }' : ''}
 
     /* Global styles */
     ${comp.globalCss || ''}

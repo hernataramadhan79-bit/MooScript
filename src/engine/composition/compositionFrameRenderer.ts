@@ -1,15 +1,35 @@
 import type { MooProject } from '../../types';
-import { buildCompositionDocument } from './buildDocument';
+import { buildCompositionDocument, type BuildDocumentOptions } from './buildDocument';
+
+export interface FrameDrawOptions {
+  /** Leave uncovered pixels transparent instead of filling them (alpha output). */
+  transparent?: boolean;
+  /** Draws under the stage frame (B-roll footage); runs after the clear, before the frame. */
+  underlay?: (ctx: CanvasRenderingContext2D) => void;
+}
 
 export interface FrameRenderer {
-  renderFrame: (frame: number, timeSec: number, targetCanvas: HTMLCanvasElement) => Promise<void>;
+  renderFrame: (frame: number, timeSec: number, targetCanvas: HTMLCanvasElement, draw?: FrameDrawOptions) => Promise<void>;
   cleanup: () => void;
+}
+
+/** Clears the target (or fills it), draws the underlay, then the stage frame on top. */
+function paintFrame(ctx: CanvasRenderingContext2D, source: CanvasImageSource, width: number, height: number, draw?: FrameDrawOptions): void {
+  if (draw?.transparent) {
+    ctx.clearRect(0, 0, width, height);
+  } else {
+    ctx.fillStyle = '#09090b';
+    ctx.fillRect(0, 0, width, height);
+  }
+  draw?.underlay?.(ctx);
+  ctx.drawImage(source, 0, 0, width, height);
 }
 
 export async function createCompositionFrameRenderer(
   project: MooProject,
   width: number,
-  height: number
+  height: number,
+  documentOptions?: BuildDocumentOptions
 ): Promise<FrameRenderer | null> {
   if (typeof document === 'undefined' || !document.body) {
     return null;
@@ -44,7 +64,7 @@ export async function createCompositionFrameRenderer(
         isResolved = true;
         clearTimeout(timeoutId);
         resolve({
-          renderFrame: async (frame: number, timeSec: number, targetCanvas: HTMLCanvasElement): Promise<void> => {
+          renderFrame: async (frame: number, timeSec: number, targetCanvas: HTMLCanvasElement, draw?: FrameDrawOptions): Promise<void> => {
             const targetIframe = iframe;
             if (!targetIframe) throw new Error(`Iframe unavailable for frame ${frame}`);
             const contentWindow = targetIframe.contentWindow;
@@ -64,11 +84,7 @@ export async function createCompositionFrameRenderer(
                 if (payload.bitmap) {
                   try {
                     const ctx = targetCanvas.getContext('2d');
-                    if (ctx) {
-                      ctx.fillStyle = '#09090b';
-                      ctx.fillRect(0, 0, width, height);
-                      ctx.drawImage(payload.bitmap, 0, 0, width, height);
-                    }
+                    if (ctx) paintFrame(ctx, payload.bitmap, width, height, draw);
                     payload.bitmap.close?.();
                     res();
                   } catch (err) {
@@ -83,11 +99,7 @@ export async function createCompositionFrameRenderer(
                 img.onload = () => {
                   try {
                     const ctx = targetCanvas.getContext('2d');
-                    if (ctx) {
-                      ctx.fillStyle = '#09090b';
-                      ctx.fillRect(0, 0, width, height);
-                      ctx.drawImage(img, 0, 0, width, height);
-                    }
+                    if (ctx) paintFrame(ctx, img, width, height, draw);
                     res();
                   } finally {
                     img.onload = null;
@@ -122,7 +134,9 @@ export async function createCompositionFrameRenderer(
                   time: timeSec,
                   id: frame,
                   width,
-                  height
+                  height,
+                  // An underlay needs the stage's empty pixels to stay see-through.
+                  transparent: Boolean(draw?.transparent || draw?.underlay)
                 },
                 '*'
               );
@@ -181,7 +195,7 @@ export async function createCompositionFrameRenderer(
       // Opaque-origin sandbox: postMessage + foreignObject rasterization work fine
       // without allow-same-origin, and scene JS can never reach host IndexedDB.
       iframe.setAttribute('sandbox', 'allow-scripts');
-      iframe.srcdoc = buildCompositionDocument(project);
+      iframe.srcdoc = buildCompositionDocument(project, documentOptions);
 
       document.body.appendChild(iframe);
     } catch {

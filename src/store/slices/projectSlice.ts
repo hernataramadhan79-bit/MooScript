@@ -803,6 +803,39 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
     },
 
+    setSceneBroll: (sceneId, broll) => {
+      const current = get().project;
+      if (!current.scenes.some((s) => s.id === sceneId)) return;
+      pushSnapshot(current);
+      const scenes = current.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        if (!broll) {
+          const { broll: _removed, ...rest } = s;
+          return rest;
+        }
+        return { ...s, broll: { ...broll, start: Math.max(0, broll.start), dim: Math.max(0, Math.min(0.85, broll.dim)) } };
+      });
+      const updated = { ...current, scenes };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    updateSceneBroll: (sceneId, patch) => {
+      const current = get().project;
+      const scene = current.scenes.find((s) => s.id === sceneId);
+      if (!scene?.broll) return;
+      pushSnapshot(current, `broll:${sceneId}`);
+      const broll = {
+        ...scene.broll,
+        ...patch,
+        start: Math.max(0, Math.round((patch.start ?? scene.broll.start) * 100) / 100),
+        dim: Math.max(0, Math.min(0.85, patch.dim ?? scene.broll.dim))
+      };
+      const updated = { ...current, scenes: current.scenes.map((s) => (s.id === sceneId ? { ...s, broll } : s)) };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
     applyBrandToProject: () => {
       const kit = get().settings.brandKit;
       if (!kit) {

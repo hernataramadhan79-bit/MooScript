@@ -24,6 +24,7 @@ import type {
   SfxCue,
   SfxKind,
   ShotTemplate,
+  SceneBroll,
   VoiceEdit,
   TimelineMarker,
   LayerMotion
@@ -93,6 +94,9 @@ export interface ProjectSlice {
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
+  /** Puts footage behind a shot (null removes it); a patch updates the current B-roll. */
+  setSceneBroll: (sceneId: string, broll: SceneBroll | null) => void;
+  updateSceneBroll: (sceneId: string, patch: Partial<Omit<SceneBroll, 'assetId'>>) => void;
   /** Applies the brand kit from the settings to this project (palette, logo, font, cards). */
   applyBrandToProject: () => void;
   removeBrandFromProject: () => void;

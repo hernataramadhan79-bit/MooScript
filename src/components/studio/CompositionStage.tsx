@@ -36,6 +36,7 @@ const ALIGN_BUTTONS: { mode: AlignMode; icon: string; label: string }[] = [
   { mode: 'bottom', icon: 'align_vertical_bottom', label: 'Rata bawah' }
 ];
 import { useDebouncedValue } from '../../utils/hooks';
+import { BrollPreview } from './BrollPreview';
 import { alignOffsets, distributeOffsets, snapMove, unionBox, type AlignMode } from '../../engine/composition/layerAlign';
 import { getProjectDuration } from '../../utils/projectDuration';
 
@@ -667,6 +668,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           }}
           className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-border bg-black transition-transform duration-150 ease-out"
         >
+        <BrollPreview timeSec={currentTime} isPlaying={isPlaying} />
         <iframe
           key={`${projectId}-${width}x${height}`}
           ref={iframeRef}
@@ -687,7 +689,9 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               setTimeout(requestLayerRects, 60);
             }
           }}
-          className="w-full h-full border-0 pointer-events-none"
+          className="relative w-full h-full border-0 pointer-events-none"
+          // Same color scheme as the stage document, or Chromium paints the iframe opaque and hides the B-roll.
+          style={{ colorScheme: 'normal' }}
         />
 
         {/* Center Snap Alignment Guides during Drag */}
@@ -904,6 +908,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
               onClick={togglePlay}
               className="relative shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black cursor-pointer"
             >
+              <BrollPreview timeSec={currentTime} isPlaying={isPlaying} />
               <iframe
                 key={`theater-${projectId}-${width}x${height}`}
                 ref={theaterIframeRef}
@@ -923,7 +928,9 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                     );
                   }
                 }}
-                className="w-full h-full border-0 pointer-events-none"
+                className="relative w-full h-full border-0 pointer-events-none"
+          // Same color scheme as the stage document, or Chromium paints the iframe opaque and hides the B-roll.
+          style={{ colorScheme: 'normal' }}
               />
             </div>
           </div>,

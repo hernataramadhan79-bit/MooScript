@@ -69,7 +69,7 @@ export const ExportPanel: React.FC = () => {
 
   // Export choices are remembered per project.
   const exportSettings = { ...DEFAULT_EXPORT_SETTINGS, ...project.exportSettings };
-  const { format, fps, quality, watermark, hud } = exportSettings;
+  const { format, fps, quality, watermark, hud, transparent } = exportSettings;
 
   const scenes = project.scenes || [];
   const hasProjectAudio = Boolean(project.audioBlob);
@@ -98,7 +98,8 @@ export const ExportPanel: React.FC = () => {
       fps,
       quality,
       watermark,
-      hud
+      hud,
+      transparent
     ];
     const prev = exportSnapshotRef.current;
     exportSnapshotRef.current = snapshot;
@@ -118,11 +119,13 @@ export const ExportPanel: React.FC = () => {
     quality,
     watermark,
     hud,
+    transparent,
     revokeExportResult
   ]);
 
   // The exporter may switch to WebM when the browser has no H.264 encoder, so name the file by its real type.
-  const resultExt = exportResult?.blob.type === 'video/webm' ? 'webm' : 'mp4';
+  const resultExt =
+    exportResult?.blob.type === 'image/gif' ? 'gif' : exportResult?.blob.type === 'video/webm' ? 'webm' : 'mp4';
   const resultFileName = `${safeFileName(project.title)}.${resultExt}`;
 
   const [canShareFiles, setCanShareFiles] = useState(false);
@@ -141,7 +144,7 @@ export const ExportPanel: React.FC = () => {
 
   const handleExport = async () => {
     if (isExporting || scenes.length === 0) return;
-    await startExport({ format, fps, quality, watermark, hud });
+    await startExport({ format, fps, quality, watermark, hud, transparent: format !== 'gif' && Boolean(transparent) });
     if (useMooStore.getState().exportResult) {
       addToast('Video selesai dirender. Tonton pratinjaunya lalu unduh.', 'success');
     }
@@ -204,14 +207,22 @@ export const ExportPanel: React.FC = () => {
             </span>
           </div>
 
-          <video
-            key={exportResult.objectUrl}
-            src={exportResult.objectUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className={`w-full rounded-xl bg-black border border-border ${isPortrait ? 'max-h-[360px] object-contain' : ''}`}
-          />
+          {resultExt === 'gif' ? (
+            <img
+              src={exportResult.objectUrl}
+              alt="Pratinjau GIF"
+              className={`w-full rounded-xl bg-black border border-border object-contain ${isPortrait ? 'max-h-[360px]' : ''}`}
+            />
+          ) : (
+            <video
+              key={exportResult.objectUrl}
+              src={exportResult.objectUrl}
+              controls
+              playsInline
+              preload="metadata"
+              className={`w-full rounded-xl bg-black border border-border ${isPortrait ? 'max-h-[360px] object-contain' : ''}`}
+            />
+          )}
 
           {exportResult.warnings.length > 0 && (
             <ul className="flex flex-col gap-1 text-[11px] text-amber-300/90 leading-relaxed">
@@ -273,15 +284,38 @@ export const ExportPanel: React.FC = () => {
       {/* Format Video Kontainer */}
       <div className="flex flex-col gap-2.5">
         <SectionLabel>Format Video</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button type="button" onClick={() => updateExportSettings({ format: 'mp4' })} className={optionClass(format === 'mp4')}>
-            MP4 (H.264)
+            MP4
           </button>
           <button type="button" onClick={() => updateExportSettings({ format: 'webm' })} className={optionClass(format === 'webm')}>
-            WebM (VP9)
+            WebM
+          </button>
+          <button type="button" onClick={() => updateExportSettings({ format: 'gif' })} className={optionClass(format === 'gif')}>
+            GIF
           </button>
         </div>
-        <span className="text-[10px] text-text-muted">MP4 paling cocok untuk diunggah ke medsos.</span>
+        <span className="text-[10px] text-text-muted">
+          {format === 'gif'
+            ? 'GIF berputar terus tanpa suara, maks 480 px dan 12 fps supaya ukurannya wajar.'
+            : 'MP4 paling cocok untuk diunggah ke medsos.'}
+        </span>
+        {format !== 'gif' && (
+          <label className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+            <input
+              type="checkbox"
+              checked={Boolean(transparent)}
+              onChange={(e) => updateExportSettings({ transparent: e.target.checked })}
+              className="w-4 h-4 mt-0.5 rounded accent-accent cursor-pointer"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-semibold text-on-surface">Latar transparan (WebM)</span>
+              <span className="text-[10px] text-text-muted leading-snug">
+                Hanya grafik dan teks, tanpa latar shot, untuk ditumpuk di atas video lain di CapCut, Premiere atau DaVinci.
+              </span>
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Frame Rate */}
@@ -392,7 +426,9 @@ export const ExportPanel: React.FC = () => {
                 ? 'Tambahkan adegan dulu'
                 : exportResult
                   ? 'Render Ulang'
-                  : `Render Video ${format.toUpperCase()}`}
+                  : format === 'gif'
+                    ? 'Buat GIF'
+                    : `Render Video ${format.toUpperCase()}`}
           </span>
         </button>
 

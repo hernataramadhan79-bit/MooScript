@@ -269,6 +269,8 @@ export interface Scene {
   hideSubtitles?: boolean;
   /** Set on the intro / outro card scenes the brand kit adds; they are replaced when it is applied again. */
   brandCard?: 'intro' | 'outro';
+  /** Video footage playing behind this shot's graphics (the shot's own background is cleared). */
+  broll?: SceneBroll;
   /** @deprecated legacy canvas renderer only; captions follow the project setting and `hideSubtitles`. */
   showSubtitles?: boolean;
 
@@ -861,6 +863,16 @@ export interface MusicBeats {
   bpm: number | null;
 }
 
+/** B-roll for one shot: which video, where in it to start, how it fills the frame, how dark. */
+export interface SceneBroll {
+  assetId: string;
+  /** Seconds into the video where the shot starts. */
+  start: number;
+  fit: 'cover' | 'contain';
+  /** 0-0.85 black over the video so the graphics stay readable. */
+  dim: number;
+}
+
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 export interface BrandWatermark {
@@ -925,11 +937,13 @@ export const CURRENT_SCHEMA_VERSION = 2;
 
 /** Export choices remembered with each project. */
 export interface ProjectExportSettings {
-  format: 'mp4' | 'webm';
+  format: 'mp4' | 'webm' | 'gif';
   fps: number;
   quality: 'compact' | 'standard' | 'high';
   watermark: boolean;
   hud: boolean;
+  /** WebM with an alpha channel: only the graphics, for layering in another editor. */
+  transparent?: boolean;
 }
 
 export const DEFAULT_EXPORT_SETTINGS: ProjectExportSettings = {

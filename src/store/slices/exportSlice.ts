@@ -1,8 +1,20 @@
 import type { StateCreator } from 'zustand';
-import type { ExportOptions } from '../../engine/export/mp4Exporter';
+import type { ExportOptions, ExportProgress } from '../../engine/export/mp4Exporter';
 import type { MooStoreState, ExportSlice, ExportQueueItem } from '../types';
+import { listAssetsFromDb } from '../../db/mooDb';
 
 let exportAbortController: AbortController | null = null;
+
+/** The video files of the B-roll the project's shots use, by asset id (loaded from the DB if needed). */
+export async function brollSourcesFor(state: Pick<MooStoreState, 'project' | 'assets'>): Promise<Record<string, Blob> | undefined> {
+  const ids = new Set(state.project.scenes.map((s) => s.broll?.assetId).filter((id): id is string => Boolean(id)));
+  if (ids.size === 0) return undefined;
+  let assets = state.assets;
+  if ([...ids].some((id) => !assets.some((a) => a.id === id && a.blob))) {
+    assets = await listAssetsFromDb(state.project.id);
+  }
+  return Object.fromEntries(assets.filter((a) => ids.has(a.id) && a.blob).map((a) => [a.id, a.blob as Blob]));
+}
 
 /**
  * Keeps the screen awake while exporting (phones suspend the tab, and the encode with it, when the
@@ -68,13 +80,19 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
     try {
       // Dynamic import is deliberate: keeps mediabunny + the MP4 encoder out of the initial bundle.
-      const { exportMooProjectToMP4 } = await import('../../engine/export/mp4Exporter');
-      const result = await exportMooProjectToMP4(
-        get().project,
-        (progress) => set({ exportProgress: progress }),
-        localController.signal,
-        opts
-      );
+      const brollSources = await brollSourcesFor(get());
+      const onProgress = (progress: ExportProgress) => set({ exportProgress: progress });
+      // GIF has its own encoder; video goes through WebCodecs.
+      const result =
+        opts?.format === 'gif'
+          ? await (await import('../../engine/export/gifExport')).exportGif(get().project, onProgress, localController.signal, {
+              brollSources,
+              reframe: opts.reframe
+            })
+          : await (await import('../../engine/export/mp4Exporter')).exportMooProjectToMP4(get().project, onProgress, localController.signal, {
+              ...opts,
+              brollSources
+            });
       set({ isExporting: false, exportResult: result });
     } catch (err: unknown) {
       set({ isExporting: false });
@@ -127,6 +145,8 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
     try {
       const { exportMooProjectToMP4 } = await import('../../engine/export/mp4Exporter');
+      const { exportGif } = await import('../../engine/export/gifExport');
+      const brollSources = await brollSourcesFor(get());
       for (let i = 0; i < aspects.length; i++) {
         if (localController.signal.aborted) {
           patchItem(i, { status: 'cancelled' });
@@ -134,13 +154,13 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
         }
         patchItem(i, { status: 'rendering' });
         try {
-          const result = await exportMooProjectToMP4(
-            get().project,
-            (progress) =>
-              set({ exportProgress: { ...progress, statusText: `${aspects[i]} (${i + 1}/${aspects.length}): ${progress.statusText}` } }),
-            localController.signal,
-            { ...opts, reframe: { aspect: aspects[i], mode } }
-          );
+          const onProgress = (progress: ExportProgress) =>
+            set({ exportProgress: { ...progress, statusText: `${aspects[i]} (${i + 1}/${aspects.length}): ${progress.statusText}` } });
+          const reframe = { aspect: aspects[i], mode };
+          const result =
+            opts?.format === 'gif'
+              ? await exportGif(get().project, onProgress, localController.signal, { brollSources, reframe })
+              : await exportMooProjectToMP4(get().project, onProgress, localController.signal, { ...opts, brollSources, reframe });
           patchItem(i, { status: 'done', result });
         } catch (err: unknown) {
           const aborted = localController.signal.aborted || (err instanceof DOMException && err.name === 'AbortError');
