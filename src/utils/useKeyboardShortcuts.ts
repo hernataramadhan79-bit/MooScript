@@ -108,6 +108,58 @@ export function useKeyboardShortcuts(): void {
           }
           break;
 
+        // Loop range in / out at the playhead, X clears it
+        case 'KeyI':
+          e.preventDefault();
+          useMooStore.getState().setLoopPoint('start', currentFrame / fps);
+          break;
+        case 'KeyO':
+          e.preventDefault();
+          useMooStore.getState().setLoopPoint('end', currentFrame / fps);
+          break;
+        case 'KeyX':
+          if (useMooStore.getState().loopRange) {
+            e.preventDefault();
+            useMooStore.getState().clearLoopRange();
+          }
+          break;
+
+        // Split the shot under the playhead
+        case 'KeyS': {
+          const t = currentFrame / fps;
+          let acc = 0;
+          const target = scenes.find((s) => {
+            const end = acc + (s.durationInSeconds > 0 ? s.durationInSeconds : 3);
+            const hit = t >= acc && t < end;
+            acc = end;
+            return hit;
+          });
+          if (target) {
+            e.preventDefault();
+            useMooStore.getState().splitSceneAt(target.id, t);
+          }
+          break;
+        }
+
+        // Marker at the playhead
+        case 'KeyM':
+          if (totalDuration > 0) {
+            e.preventDefault();
+            useMooStore.getState().addMarker(currentFrame / fps);
+            addToast(`Marker ditambahkan di ${(currentFrame / fps).toFixed(1)} dtk.`, 'info', 2000);
+          }
+          break;
+
+        // Jump to start / end
+        case 'Home':
+          e.preventDefault();
+          seekFrame(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          seekFrame(totalFrames);
+          break;
+
         // Step 1 Frame Left / Right
         case 'ArrowLeft':
           e.preventDefault();

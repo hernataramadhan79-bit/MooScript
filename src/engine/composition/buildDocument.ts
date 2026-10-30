@@ -1,11 +1,12 @@
-import type { Composition, GeneratedScene, MooProject, ScenePalette } from '../../types';
+import type { Composition, CustomFont, GeneratedScene, MooProject, ScenePalette } from '../../types';
 import { getRuntimeScript } from './runtime/mooRuntime';
 import { installMooTween } from './runtime/mooTween';
-import { compileOverridesCss, compileScenePaletteCss } from './layers';
+import { compileLayerMotionJs, compileOverridesCss, compileScenePaletteCss } from './layers';
 import { buildCaptionScript } from './captions';
 import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
 import { scopeCss } from './scopeCss';
+import { resolveAssetRefs } from './assetRefs';
 import { sceneHasRenderableCode } from './legacyScenes';
 import type { Scene } from '../../types';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
@@ -30,6 +31,17 @@ const EMBEDDED_FONT_CSS = `
 @font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:700 800;font-display:swap;src:url('${jakarta800}') format('woff2');}
 `;
 
+/** @font-face rules for the fonts uploaded to the project (data URIs, like the built-in ones). */
+export function customFontCss(fonts: CustomFont[] | undefined): string {
+  return (fonts || [])
+    .filter((f) => /^data:(font|application)\/[\w.+-]+;base64,[A-Za-z0-9+/=]+$/.test(f.dataUrl))
+    .map((f) => {
+      const family = f.family.replace(/[^\w\- ]/g, '').trim();
+      return family ? `@font-face{font-family:'${family}';font-display:block;src:url('${f.dataUrl}') format('${f.format}');}` : '';
+    })
+    .join('\n');
+}
+
 export interface BuildDocumentOptions {
   standalone?: boolean;
   audioDataUrl?: string;
@@ -47,7 +59,7 @@ export function compileCompositionOverridesCss(
 ): string {
   if (!comp) return '';
   return comp.scenes
-    .map((mod) => compileOverridesCss(toDomId(mod.beatId), mod.overrides, options))
+    .map((mod) => compileOverridesCss(toDomId(mod.beatId), mod.overrides, options, mod.layerMotions))
     .filter(Boolean)
     .join('\n');
 }
@@ -190,7 +202,7 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
     .map(({ mod, css }, idx) => {
       const domId = toDomId(mod.beatId);
       const paletteRule = compileScenePaletteCss(domId, mod.palette);
-      const overrides = options?.omitOverrides ? '' : compileOverridesCss(domId, mod.overrides);
+      const overrides = options?.omitOverrides ? '' : compileOverridesCss(domId, mod.overrides, undefined, mod.layerMotions);
       return `/* Scene ${idx + 1} (${mod.beatId}) */\n${scopeCss(css || '', domIdSelector(domId))}\n${paletteRule}\n${overrides}`;
     })
     .join('\n\n');
@@ -203,9 +215,14 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
       return `
 // Register Scene ${idx + 1}
 MOO.scene(${jsString(mod.beatId)}, {
-  html: ${safeJson(html || '')},
-  buildSrc: ${safeJson(buildJs || '')},
-  transition: ${safeJson(ts?.transition || 'flow')}
+  html: ${safeJson(resolveAssetRefs(html || '', project.assetData))},
+  buildSrc: ${safeJson((buildJs || '') + compileLayerMotionJs(mod.layerMotions, mod.inPoint || 0))},
+  transition: ${safeJson(ts?.transition || 'flow')},
+  transitionDuration: ${safeJson(ts?.transitionDuration ?? null)},
+  transitionCurve: ${safeJson(ts?.transitionCurve ?? null)},
+  inPoint: ${safeJson(mod.inPoint ?? 0)},
+  sourceDuration: ${safeJson(mod.sourceDuration ?? null)},
+  seed: ${safeJson(mod.seed ?? null)}
 });
 `;
     })
@@ -382,6 +399,7 @@ MOO.scene(${jsString(mod.beatId)}, {
   <style>
     /* Self-contained WOFF2 fonts (local @fontsource, data-URI) — primary type source */
     ${EMBEDDED_FONT_CSS}
+    ${customFontCss(project.customFonts)}
     * {
       box-sizing: border-box;
       margin: 0;

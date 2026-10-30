@@ -241,7 +241,7 @@ describe('Mograph, Style Tab, Layer Color/Palette & Asset Overhaul Suite', () =>
       );
 
       expect(compScene).toBeDefined();
-      expect(compScene?.html).toContain('data:image/png;base64,prod_data');
+      expect(compScene?.html).toContain('moo-asset:asset-test-1');
       // Frame preset check (bento card background and border radius)
       expect(compScene?.html).toContain('border-radius:24px');
       expect(compScene?.html).toContain('background:rgba(24,24,27,0.85)');

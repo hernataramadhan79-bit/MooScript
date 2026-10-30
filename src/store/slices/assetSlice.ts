@@ -5,6 +5,7 @@ import { saveAssetToDb, listAssetsFromDb, deleteAssetFromDb } from '../../db/moo
 import { syncComposition } from '../../engine/composition/sync';
 import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composition/layers';
 import { escapeHtml } from '../../utils/textUtils';
+import { assetRef, pruneAssetData } from '../../engine/composition/assetRefs';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> = (set, get) => ({
@@ -104,7 +105,8 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       const targetSelector = `.moo-asset-container.moo-asset-${layerId}`;
 
       const safeAlt = escapeHtml(asset.name || 'Asset');
-      const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${asset.dataUrl}" alt="${safeAlt}" style="${frameStyle}" /></div>`;
+      // The image data lives once in the project's asset table; the markup only refers to it.
+      const imgHtml = `\n<div class="moo-asset-container moo-asset-${layerId}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:auto;"><img data-moo-layer="${layerId}" src="${assetRef(asset.id)}" alt="${safeAlt}" style="${frameStyle}" /></div>`;
 
       let animJs = `shot.arrive("${targetSelector}", { scale: 0, opacity: 0, dur: 0.7, curve: "overshoot-out(1.7)" });`;
       if (animPreset === 'slide') {
@@ -134,6 +136,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
 
     const updatedProject = syncComposition({
       ...current,
+      assetData: asset.dataUrl ? { ...(current.assetData || {}), [asset.id]: asset.dataUrl } : current.assetData,
       composition: { ...activeComp, scenes: compScenes }
     });
 
@@ -146,10 +149,18 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     const targetId = sceneId || get().activeSceneId || current.scenes[0]?.id;
     if (!targetId || !current.composition) return;
 
+    // An image may sit in the markup as a reference to the asset table or, in older projects, inline.
+    const refIds = [
+      ...get().assets.filter((a) => a.dataUrl === assetDataUrlOrLayerId).map((a) => a.id),
+      ...Object.entries(current.assetData || {})
+        .filter(([, data]) => data === assetDataUrlOrLayerId)
+        .map(([id]) => id)
+    ];
+    const identifiers = [...new Set(refIds)].map(assetRef).concat(assetDataUrlOrLayerId);
     let changed = false;
     const compScenes = current.composition.scenes.map((s) => {
       if (s.beatId !== targetId || !s.html) return s;
-      const updatedHtml = removeAssetFromHtml(s.html, assetDataUrlOrLayerId);
+      const updatedHtml = identifiers.reduce((html, id) => removeAssetFromHtml(html, id), s.html);
       if (updatedHtml === s.html) return s;
       changed = true;
       return {
@@ -165,10 +176,12 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       return;
     }
 
-    const updatedProject = syncComposition({
-      ...current,
-      composition: { ...current.composition, scenes: compScenes }
-    });
+    const updatedProject = pruneAssetData(
+      syncComposition({
+        ...current,
+        composition: { ...current.composition, scenes: compScenes }
+      })
+    );
 
     get().setProject(updatedProject, { preserveHistory: true, keepStale: true });
     get().addToast('Aset berhasil dihapus dari adegan.', 'info');

@@ -7,25 +7,36 @@ import {
   compileCompositionOverridesCss
 } from '../../engine/composition/buildDocument';
 
-type LayerRect = { id: string; tagName: string; x: number; y: number; width: number; height: number };
+/** k: how many stage px the layer moves per px of its own translate (its ancestors' scale). */
+type LayerRect = { id: string; tagName: string; x: number; y: number; width: number; height: number; k?: number };
 
-/** Composition with one layer's override replaced by an in-progress drag value. */
-function withDraftOverride(
+/** Composition with some layers' overrides replaced by in-progress drag values. */
+function withDraftOverrides(
   comp: Composition,
   sceneId: string,
-  layerId: string,
-  draft: Partial<LayerOverride>
+  drafts: Record<string, Partial<LayerOverride>>
 ): Composition {
   return {
     ...comp,
-    scenes: comp.scenes.map((mod) =>
-      mod.beatId !== sceneId && mod.id !== sceneId
-        ? mod
-        : { ...mod, overrides: { ...mod.overrides, [layerId]: { ...mod.overrides?.[layerId], ...draft } } }
-    )
+    scenes: comp.scenes.map((mod) => {
+      if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+      const overrides = { ...mod.overrides };
+      for (const [layerId, draft] of Object.entries(drafts)) overrides[layerId] = { ...overrides[layerId], ...draft };
+      return { ...mod, overrides };
+    })
   };
 }
+
+const ALIGN_BUTTONS: { mode: AlignMode; icon: string; label: string }[] = [
+  { mode: 'left', icon: 'align_horizontal_left', label: 'Rata kiri' },
+  { mode: 'hcenter', icon: 'align_horizontal_center', label: 'Tengah horizontal' },
+  { mode: 'right', icon: 'align_horizontal_right', label: 'Rata kanan' },
+  { mode: 'top', icon: 'align_vertical_top', label: 'Rata atas' },
+  { mode: 'vcenter', icon: 'align_vertical_center', label: 'Tengah vertikal' },
+  { mode: 'bottom', icon: 'align_vertical_bottom', label: 'Rata bawah' }
+];
 import { useDebouncedValue } from '../../utils/hooks';
+import { alignOffsets, distributeOffsets, snapMove, unionBox, type AlignMode } from '../../engine/composition/layerAlign';
 import { getProjectDuration } from '../../utils/projectDuration';
 
 const formatClock = (sec: number) => {
@@ -56,6 +67,9 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const setSelectedLayerId = useMooStore((s) => s.setSelectedLayerId);
   const activeSceneId = useMooStore((s) => s.activeSceneId);
   const updateLayerOverride = useMooStore((s) => s.updateLayerOverride);
+  const updateLayerOverrides = useMooStore((s) => s.updateLayerOverrides);
+  const extraSelectedLayerIds = useMooStore((s) => s.extraSelectedLayerIds);
+  const toggleLayerSelection = useMooStore((s) => s.toggleLayerSelection);
   const resetLayerOverride = useMooStore((s) => s.resetLayerOverride);
   const togglePlay = useMooStore((s) => s.togglePlay);
   const seekFrame = useMooStore((s) => s.seekFrame);
@@ -73,7 +87,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const [isInteractiveEdit, setIsInteractiveEdit] = useState(true);
   const [isFit, setIsFit] = useState(true);
   const [layerRects, setLayerRects] = useState<LayerRect[]>([]);
-  const [snapGuide, setSnapGuide] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  // Stage-pixel lines a dragged layer snapped to (canvas edges/centre or other layers).
+  const [snapGuide, setSnapGuide] = useState<{ xs: number[]; ys: number[] }>({ xs: [], ys: [] });
   const dragCleanupRef = useRef<(() => void) | null>(null);
   // A drag that ends outside the layer box fires a click on the canvas; don't let it deselect.
   const suppressCanvasClickRef = useRef(false);
@@ -118,6 +133,8 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
   const theme = useMooStore((s) => s.project.theme);
   const styleBrief = useMooStore((s) => s.project.styleBrief);
+  const customFonts = useMooStore((s) => s.project.customFonts);
+  const assetData = useMooStore((s) => s.project.assetData);
 
   // Layer overrides are kept out of the document and pushed live to the runtime, so moving,
   // scaling or recoloring a layer restyles the stage in place instead of reloading the iframe.
@@ -131,10 +148,12 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       scenes,
       composition,
       theme,
-      styleBrief
+      styleBrief,
+      customFonts,
+      assetData
     } as any;
     return buildCompositionDocument(minimalProject, { omitOverrides: true });
-  }, [composition, scenes, width, height, fps, projectId, theme, styleBrief]);
+  }, [composition, scenes, width, height, fps, projectId, theme, styleBrief, customFonts, assetData]);
 
   // !important: must win over inline translate/scale/rotate a scene's own code may write.
   const overridesCss = React.useMemo(
@@ -331,32 +350,43 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     if (!currentSceneId || e.button !== 0) return;
     const sceneId = currentSceneId;
     const layerId = rect.id;
-    setSelectedLayerId(layerId);
+    // Shift+click adds or removes a layer from the selection instead of dragging.
+    if (mode === 'move' && e.shiftKey) {
+      toggleLayerSelection(layerId);
+      suppressCanvasClickRef.current = true;
+      setTimeout(() => {
+        suppressCanvasClickRef.current = false;
+      }, 0);
+      return;
+    }
+    const state = useMooStore.getState();
+    const selection = [state.selectedLayerId, ...state.extraSelectedLayerIds].filter(Boolean) as string[];
+    // Dragging a layer of a group moves the whole group; any other layer becomes the selection.
+    const group = mode === 'move' && selection.length > 1 && selection.includes(layerId) ? selection : [layerId];
+    if (group.length === 1) setSelectedLayerId(layerId);
     dragCleanupRef.current?.();
 
-    const existing = currentCompScene?.overrides?.[layerId] || {};
+    const overridesAtStart = currentCompScene?.overrides || {};
+    const existing = overridesAtStart[layerId] || {};
     const startX = e.clientX;
     const startY = e.clientY;
-    const initX = existing.x ?? 0;
-    const initY = existing.y ?? 0;
     const initScale = existing.scale ?? 1;
     const initRot = existing.rotation ?? 0;
     const safeScale = Math.max(0.05, scale);
     // Snap distance stays ~8 screen px regardless of stage zoom.
     const snapThreshold = 8 / safeScale;
-    const startCenterX = rect.x + rect.width / 2;
-    const startCenterY = rect.y + rect.height / 2;
+    const groupRects = layerRects.filter((r) => group.includes(r.id));
+    const movingBox = unionBox(groupRects.length ? groupRects : [rect]);
+    const otherBoxes = layerRects.filter((r) => !group.includes(r.id) && r.id !== 'camera');
 
-    let draft: Partial<LayerOverride> | null = null;
+    let drafts: Record<string, Partial<LayerOverride>> | null = null;
     let frameRequest = 0;
 
     const flushDraft = () => {
       frameRequest = 0;
       const comp = useMooStore.getState().project.composition;
-      if (!comp || !draft) return;
-      postOverridesCss(
-        compileCompositionOverridesCss(withDraftOverride(comp, sceneId, layerId, draft), { important: true })
-      );
+      if (!comp || !drafts) return;
+      postOverridesCss(compileCompositionOverridesCss(withDraftOverrides(comp, sceneId, drafts), { important: true }));
       requestLayerRects();
     };
 
@@ -365,22 +395,22 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       const dy = (moveEv.clientY - startY) / safeScale;
 
       if (mode === 'move') {
-        let nextX = initX + dx;
-        let nextY = initY + dy;
-        // Snap the layer's center onto the canvas center lines (what the guides draw).
-        const offCenterX = startCenterX + (nextX - initX) - width / 2;
-        const offCenterY = startCenterY + (nextY - initY) - height / 2;
-        const snapX = Math.abs(offCenterX) <= snapThreshold;
-        const snapY = Math.abs(offCenterY) <= snapThreshold;
-        if (snapX) nextX -= offCenterX;
-        if (snapY) nextY -= offCenterY;
-        setSnapGuide((prev) => (prev.x === snapX && prev.y === snapY ? prev : { x: snapX, y: snapY }));
-        draft = { x: Math.round(nextX), y: Math.round(nextY) };
+        // Alt turns snapping off for fine placement.
+        const snapped = moveEv.altKey
+          ? { dx, dy, guidesX: [] as number[], guidesY: [] as number[] }
+          : snapMove(movingBox, otherBoxes, { width, height }, dx, dy, snapThreshold);
+        setSnapGuide({ xs: snapped.guidesX, ys: snapped.guidesY });
+        drafts = {};
+        for (const id of group) {
+          const o = overridesAtStart[id] || {};
+          const k = layerRects.find((r) => r.id === id)?.k || 1;
+          drafts[id] = { x: Math.round((o.x ?? 0) + snapped.dx / k), y: Math.round((o.y ?? 0) + snapped.dy / k) };
+        }
       } else if (mode === 'scale') {
         const deltaScale = (dx + dy) / 300;
-        draft = { scale: Math.max(0.2, Math.min(3.0, Math.round((initScale + deltaScale) * 100) / 100)) };
+        drafts = { [layerId]: { scale: Math.max(0.2, Math.min(3.0, Math.round((initScale + deltaScale) * 100) / 100)) } };
       } else {
-        draft = { rotation: Math.max(-180, Math.min(180, Math.round(initRot + dx * 0.4))) };
+        drafts = { [layerId]: { rotation: Math.max(-180, Math.min(180, Math.round(initRot + dx * 0.4))) } };
       }
 
       if (!frameRequest) frameRequest = requestAnimationFrame(flushDraft);
@@ -397,13 +427,14 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
 
     function handlePointerUp() {
       cleanup();
-      setSnapGuide({ x: false, y: false });
-      if (draft) {
+      setSnapGuide({ xs: [], ys: [] });
+      if (drafts) {
         suppressCanvasClickRef.current = true;
         setTimeout(() => {
           suppressCanvasClickRef.current = false;
         }, 0);
-        updateLayerOverride(sceneId, layerId, draft);
+        if (Object.keys(drafts).length === 1) updateLayerOverride(sceneId, layerId, drafts[layerId]);
+        else updateLayerOverrides(sceneId, drafts);
       }
       setTimeout(requestLayerRects, 50);
     }
@@ -413,6 +444,53 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
   };
+
+  // Align / distribute the selected layers by moving their overrides.
+  const selectedIds = [selectedLayerId, ...extraSelectedLayerIds].filter(Boolean) as string[];
+  const selectedBoxes = layerRects.filter((r) => selectedIds.includes(r.id));
+  // Ancestors that rotate or zoom (a rolling camera) make the first move land a few px off, so the
+  // stage measures again and corrects once, inside the same undo step.
+  const pendingAlignRef = useRef<{ compute: (boxes: LayerRect[]) => Record<string, { dx: number; dy: number }>; key: string; tries: number } | null>(null);
+  const applyOffsets = (
+    offsets: Record<string, { dx: number; dy: number }>,
+    compute?: (boxes: LayerRect[]) => Record<string, { dx: number; dy: number }>
+  ) => {
+    if (!currentSceneId) return;
+    const key = `align:${Date.now()}`;
+    if (compute) pendingAlignRef.current = { compute, key, tries: 0 };
+    const overrides = currentCompScene?.overrides || {};
+    const patches: Record<string, Partial<LayerOverride>> = {};
+    for (const [id, { dx, dy }] of Object.entries(offsets)) {
+      if (!dx && !dy) continue;
+      const k = layerRects.find((r) => r.id === id)?.k || 1;
+      patches[id] = { x: Math.round((overrides[id]?.x ?? 0) + dx / k), y: Math.round((overrides[id]?.y ?? 0) + dy / k) };
+    }
+    if (Object.keys(patches).length) updateLayerOverrides(currentSceneId, patches, key);
+    setTimeout(requestLayerRects, 60);
+  };
+
+  useEffect(() => {
+    const pending = pendingAlignRef.current;
+    if (!pending || !currentSceneId) return;
+    const ids = [selectedLayerId, ...extraSelectedLayerIds].filter(Boolean) as string[];
+    const boxes = layerRects.filter((r) => ids.includes(r.id));
+    const offsets = pending.compute(boxes);
+    const residual = Object.values(offsets).some((o) => Math.abs(o.dx) >= 1 || Math.abs(o.dy) >= 1);
+    if (!residual || pending.tries >= 2) {
+      pendingAlignRef.current = null;
+      return;
+    }
+    pending.tries += 1;
+    const overrides = useMooStore.getState().project.composition?.scenes.find((m) => m.beatId === currentSceneId)?.overrides || {};
+    const patches: Record<string, Partial<LayerOverride>> = {};
+    for (const [id, { dx, dy }] of Object.entries(offsets)) {
+      const k = layerRects.find((r) => r.id === id)?.k || 1;
+      patches[id] = { x: Math.round((overrides[id]?.x ?? 0) + dx / k), y: Math.round((overrides[id]?.y ?? 0) + dy / k) };
+    }
+    updateLayerOverrides(currentSceneId, patches, pending.key);
+    setTimeout(requestLayerRects, 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the stage reports new layer boxes
+  }, [layerRects]);
 
   return (
     <div className={`relative w-full h-full flex flex-col overflow-hidden select-none ${className}`}>
@@ -506,6 +584,57 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         </div>
       </div>
 
+      {/* Align bar for the selected layer(s) */}
+      {isInteractiveEdit && selectedBoxes.length > 0 && (
+        <div className="shrink-0 w-full z-30 flex justify-center px-2 pb-1">
+          <div className="flex flex-wrap items-center justify-center gap-0.5 p-0.5 rounded-lg bg-black/80 border border-white/10">
+            <span className="px-1.5 text-[10px] text-zinc-400">
+              {selectedBoxes.length > 1 ? `${selectedBoxes.length} layer` : 'Ke kanvas'}
+            </span>
+            {ALIGN_BUTTONS.map((b) => (
+              <button
+                key={b.mode}
+                type="button"
+                onClick={() =>
+                  applyOffsets(alignOffsets(selectedBoxes, b.mode, { width, height }), (boxes) =>
+                    alignOffsets(boxes, b.mode, { width, height })
+                  )
+                }
+                title={`${b.label}${selectedBoxes.length > 1 ? '' : ' (terhadap kanvas)'}`}
+                aria-label={b.label}
+                className="h-7 w-7 rounded text-zinc-300 hover:text-white hover:bg-white/10 flex items-center justify-center"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{b.icon}</span>
+              </button>
+            ))}
+            {selectedBoxes.length >= 3 && (
+              <>
+                <span className="w-px h-4 bg-white/10 mx-0.5" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => applyOffsets(distributeOffsets(selectedBoxes, 'x'), (boxes) => distributeOffsets(boxes, 'x'))}
+                  title="Jarak horizontal sama rata"
+                  aria-label="Sebar horizontal"
+                  className="h-7 w-7 rounded text-zinc-300 hover:text-white hover:bg-white/10 flex items-center justify-center"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">horizontal_distribute</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyOffsets(distributeOffsets(selectedBoxes, 'y'), (boxes) => distributeOffsets(boxes, 'y'))}
+                  title="Jarak vertikal sama rata"
+                  aria-label="Sebar vertikal"
+                  className="h-7 w-7 rounded text-zinc-300 hover:text-white hover:bg-white/10 flex items-center justify-center"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[16px]">vertical_distribute</span>
+                </button>
+              </>
+            )}
+            <span className="hidden md:inline px-1.5 text-[10px] text-zinc-500">Shift+klik: pilih banyak · Alt: tanpa snap</span>
+          </div>
+        </div>
+      )}
+
       {/* Dedicated Canvas Area (Never overlapped by controls) */}
       <div
         ref={containerRef}
@@ -550,14 +679,14 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
         />
 
         {/* Center Snap Alignment Guides during Drag */}
-        {(snapGuide.x || snapGuide.y) && (
+        {(snapGuide.xs.length > 0 || snapGuide.ys.length > 0) && (
           <div className="absolute inset-0 pointer-events-none z-30">
-            {snapGuide.x && (
-              <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#84cc16] shadow-[0_0_12px_#84cc16]" />
-            )}
-            {snapGuide.y && (
-              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#84cc16] shadow-[0_0_12px_#84cc16]" />
-            )}
+            {snapGuide.xs.map((x) => (
+              <div key={`x${x}`} className="absolute top-0 bottom-0 -ml-px w-[2px] bg-[#84cc16] shadow-[0_0_12px_#84cc16]" style={{ left: x }} />
+            ))}
+            {snapGuide.ys.map((y) => (
+              <div key={`y${y}`} className="absolute left-0 right-0 -mt-px h-[2px] bg-[#84cc16] shadow-[0_0_12px_#84cc16]" style={{ top: y }} />
+            ))}
           </div>
         )}
 
@@ -566,6 +695,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
           <div className="absolute inset-0 z-[25] pointer-events-none">
             {layerRects.map((rect) => {
               const isSelected = selectedLayerId === rect.id;
+              const isAlsoSelected = extraSelectedLayerIds.includes(rect.id);
               return (
                 <div
                   key={rect.id}
@@ -579,12 +709,14 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
                   onPointerDown={(e) => startLayerDrag(e, rect, 'move')}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedLayerId(rect.id);
+                    if (!e.shiftKey && !isAlsoSelected) setSelectedLayerId(rect.id);
                   }}
                   className={`absolute pointer-events-auto cursor-move transition-colors ${
                     isSelected
                       ? 'border-[3px] border-[#84cc16] bg-lime-500/[0.04] shadow-[0_0_24px_rgba(132,204,22,0.25)] z-30'
-                      : 'border-2 border-transparent hover:border-white/40 hover:bg-white/[0.02] z-20'
+                      : isAlsoSelected
+                        ? 'border-[3px] border-dashed border-[#84cc16]/80 bg-lime-500/[0.03] z-30'
+                        : 'border-2 border-transparent hover:border-white/40 hover:bg-white/[0.02] z-20'
                   }`}
                 >
                   {isSelected && currentSceneId && (

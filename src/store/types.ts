@@ -5,6 +5,7 @@ import type {
   EngineSettings,
   MotionPreset,
   SceneTransition,
+  TransitionCurve,
   CaptionStyle,
   CaptionPosition,
   SubtitleCustomization,
@@ -18,7 +19,10 @@ import type {
   LayerOverride,
   ScenePalette,
   SceneAssetAttachment,
-  ProjectExportSettings
+  ProjectExportSettings,
+  CreativeBrief,
+  TimelineMarker,
+  LayerMotion
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
@@ -26,6 +30,9 @@ import type { AssetRecord } from '../db/mooDb';
 import type { ProceduralArchetype } from '../engine/composition/proceduralCompiler';
 
 export type DeckTab = 'storyboard' | 'audio' | 'style' | 'export';
+
+/** Layers the editor can add from scratch. */
+export type InsertElementKind = 'text' | 'rect' | 'circle' | 'line' | 'pill';
 
 export type PreviewMode = 'compact' | 'theater' | 'ticker';
 
@@ -49,8 +56,12 @@ export interface UiSlice {
   removeToast: (id: string) => void;
   isCompilingMograph: boolean;
   setIsCompilingMograph: (isCompiling: boolean) => void;
+  /** The layer the inspector edits; selecting it alone drops the other selected layers. */
   selectedLayerId: string | null;
   setSelectedLayerId: (id: string | null) => void;
+  /** Layers selected together with selectedLayerId (Shift+click), moved and aligned as a group. */
+  extraSelectedLayerIds: string[];
+  toggleLayerSelection: (layerId: string) => void;
 }
 
 export interface ProjectSlice {
@@ -74,6 +85,12 @@ export interface ProjectSlice {
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
+  /** Adds a marker at a time in seconds and returns its id. */
+  addMarker: (time: number, label?: string) => string;
+  updateMarker: (id: string, update: Partial<Omit<TimelineMarker, 'id'>>) => void;
+  removeMarker: (id: string) => void;
+  /** Merges into the creative brief; a platform also sets the frame and, if unset, the length. */
+  updateBrief: (brief: Partial<CreativeBrief>) => void;
   updateExportSettings: (settings: Partial<ProjectExportSettings>) => void;
   toggleGlobalSubtitles: () => void;
   updateThemeFont: (font: 'Jakarta' | 'Mono' | 'Impact') => void;
@@ -88,6 +105,16 @@ export interface ProjectSlice {
   updateSceneVisualIntent: (sceneId: string, visualIntent: string) => void;
   updateSceneVisualConcept: (sceneId: string, visualConcept: string) => void;
   updateLayerOverride: (sceneId: string, layerId: string, override: Partial<LayerOverride>) => void;
+  /** Embeds an uploaded font in the project; resolves to its family name, or null when refused. */
+  addCustomFont: (file: File) => Promise<string | null>;
+  removeCustomFont: (id: string) => void;
+  /** Adds a new text or shape layer to a shot and selects it; returns the layer id. */
+  insertElementIntoScene: (sceneId: string, kind: InsertElementKind) => string | null;
+  /** Applies tweaks to several layers of one shot as one undo step. */
+  /** coalesceKey merges follow-up calls with the same key into the same undo step. */
+  updateLayerOverrides: (sceneId: string, patches: Record<string, Partial<LayerOverride>>, coalesceKey?: string) => void;
+  /** Sets a layer's entrance / move / exit; null (or an empty motion) removes it. */
+  updateLayerMotion: (sceneId: string, layerId: string, motion: LayerMotion | null) => void;
   resetLayerOverride: (sceneId: string, layerId?: string) => void;
   updateScenePalette: (sceneId: string, palette: Partial<ScenePalette>) => void;
   compileSceneProcedural: (sceneId: string, archetype?: ProceduralArchetype) => void;
@@ -97,9 +124,22 @@ export interface ProjectSlice {
   toggleWordFocus: (sceneId: string, word: string) => void;
   setSceneMotionPreset: (sceneId: string, preset: MotionPreset) => void;
   setSceneTransition: (sceneId: string, transition: SceneTransition) => void;
+  /** null returns the duration or curve to automatic. */
+  setSceneTransitionTiming: (
+    sceneId: string,
+    timing: { duration?: number | null; curve?: TransitionCurve | null }
+  ) => void;
   setSceneIcon: (sceneId: string, icon: string) => void;
   setSceneDuration: (sceneId: string, duration: number, allowWithAudio?: boolean) => void;
   addScene: () => void;
+  /**
+   * Cuts a shot in two at a film time. The second piece keeps playing the same visual from the cut
+   * on, narration words follow their timing. Returns the new shot's id, or null when the cut is too
+   * close to an edge.
+   */
+  splitSceneAt: (sceneId: string, timeSec: number) => string | null;
+  /** Moves the cut between a shot and the one before it to a film time; the film length stays the same. */
+  setSceneBoundary: (sceneId: string, timeSec: number) => void;
   duplicateScene: (id: string) => void;
   removeScene: (id: string) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
@@ -153,6 +193,11 @@ export interface PlaybackSlice {
   isPlaying: boolean;
   isLooping: boolean;
   toggleLoop: () => void;
+  /** Part of the film that playback loops over while looping is on, in seconds; null = whole film. */
+  loopRange: { start: number; end: number } | null;
+  /** Sets the range start (or end) at a time, keeping start before end. */
+  setLoopPoint: (edge: 'start' | 'end', timeSec: number) => void;
+  clearLoopRange: () => void;
   seekFrame: (frame: number) => void;
   seekTime: (timeSec: number) => void;
   togglePlay: () => void;

@@ -1,3 +1,4 @@
+import { externalizeEmbeddedAssets } from '../engine/composition/assetRefs';
 import Dexie, { type Table } from 'dexie';
 import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp } from '../types';
 import { CURRENT_SCHEMA_VERSION, migrateLegacyScene, resolveTheme } from '../types';
@@ -178,7 +179,9 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
   }
 }
 
-export function normalizeProject(project: MooProject): MooProject {
+export function normalizeProject(loaded: MooProject): MooProject {
+  // Inline images of older projects move to the asset table (one copy per image).
+  const project = externalizeEmbeddedAssets(loaded);
   if (!project.aspectRatio) {
     project.aspectRatio = '9:16';
   }

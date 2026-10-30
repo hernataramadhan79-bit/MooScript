@@ -20,12 +20,33 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { CommitNumberInput } from '../ui/CommitNumberInput';
 import { AssetManagerPanel } from './AssetManagerPanel';
 import { ExportPanel } from './ExportPanel';
+import { LayerMotionPanel } from './LayerMotionPanel';
+import { TypographyControls } from './TypographyControls';
+import { getSceneStartSeconds } from '../../utils/projectDuration';
 import {
   PROCEDURAL_ARCHETYPES,
   type ProceduralArchetype
 } from '../../engine/composition/proceduralCompiler';
 
-export type InspectorTab = 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
+export type InspectorTab = 'mograph' | 'style' | 'asset' | 'audio' | 'subtitle' | 'ekspor';
+
+/** What each visual state means to the person editing, not to the engine. */
+const SCENE_STATUS_LABEL: Record<string, string> = {
+  ok: 'siap',
+  pending: 'belum dibuat',
+  generating: 'sedang dibuat',
+  error: 'gagal',
+  'needs-repair': 'perlu perbaikan'
+};
+
+export const INSPECTOR_TABS: { id: InspectorTab; label: string; icon: string }[] = [
+  { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
+  { id: 'style', label: 'Gaya', icon: 'tune' },
+  { id: 'asset', label: 'Aset', icon: 'perm_media' },
+  { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
+  { id: 'subtitle', label: 'Subtitel', icon: 'subtitles' },
+  { id: 'ekspor', label: 'Ekspor', icon: 'download' }
+];
 
 const DebouncedSlider: React.FC<{
   value: number;
@@ -199,6 +220,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     activeSceneId,
     focusScene,
     updateLayerOverride,
+    updateLayerMotion,
+    addCustomFont,
+    insertElementIntoScene,
     resetLayerOverride,
     removeAssetFromScene,
     updateScenePalette,
@@ -243,6 +267,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       activeSceneId: s.activeSceneId,
       focusScene: s.focusScene,
       updateLayerOverride: s.updateLayerOverride,
+      updateLayerMotion: s.updateLayerMotion,
+      addCustomFont: s.addCustomFont,
+      insertElementIntoScene: s.insertElementIntoScene,
       resetLayerOverride: s.resetLayerOverride,
       removeAssetFromScene: s.removeAssetFromScene,
       updateScenePalette: s.updateScenePalette,
@@ -608,73 +635,25 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     <div
       className={`w-full flex flex-col bg-surface-1 border border-border rounded-2xl overflow-hidden select-none ${className}`}
     >
-      {/* 1. Header Tab Studio Minimalis (5 Tab) */}
+      {/* 1. Tab header (desktop; on mobile the bottom navigation switches tabs) */}
       <div className="hidden lg:block p-2 border-b border-border bg-surface-1/90 backdrop-blur-sm shrink-0">
-        <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
-          <button
-            type="button"
-            onClick={() => setActiveTab('mograph')}
-            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
-              activeTab === 'mograph'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">movie_filter</span>
-            <span className="tracking-tight">Mograph</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('style')}
-            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
-              activeTab === 'style'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">tune</span>
-            <span className="tracking-tight">Gaya</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('asset')}
-            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
-              activeTab === 'asset'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">perm_media</span>
-            <span className="tracking-tight">Aset</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('audio')}
-            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
-              activeTab === 'audio'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">graphic_eq</span>
-            <span className="tracking-tight">Audio</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('ekspor')}
-            className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
-              activeTab === 'ekspor'
-                ? 'bg-surface-3 text-accent shadow-sm'
-                : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">download</span>
-            <span className="tracking-tight">Ekspor</span>
-          </button>
+        <div className="grid grid-cols-6 gap-1 p-1 rounded-xl bg-surface-2 border border-border">
+          {INSPECTOR_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+              className={`py-1.5 px-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
+                activeTab === tab.id
+                  ? 'bg-surface-3 text-accent shadow-sm'
+                  : 'text-text-muted hover:text-on-surface hover:bg-surface-2'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
+              <span className="tracking-tight truncate max-w-full">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -717,7 +696,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   : 'bg-zinc-500/15 text-zinc-400'
                           }`}
                         >
-                          {activeCompScene.status === 'needs-repair' ? 'perlu perbaikan' : activeCompScene.status}
+                          {SCENE_STATUS_LABEL[activeCompScene.status] || activeCompScene.status}
                         </span>
                       )}
                     </div>
@@ -883,6 +862,31 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </span>
                   </div>
 
+                  {/* New layers from scratch */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-[10px] text-text-muted mr-0.5">Tambah:</span>
+                    {(
+                      [
+                        { kind: 'text', icon: 'title', label: 'Teks' },
+                        { kind: 'rect', icon: 'crop_square', label: 'Kotak' },
+                        { kind: 'circle', icon: 'circle', label: 'Lingkaran' },
+                        { kind: 'pill', icon: 'rounded_corner', label: 'Pil' },
+                        { kind: 'line', icon: 'horizontal_rule', label: 'Garis' }
+                      ] as const
+                    ).map((item) => (
+                      <button
+                        key={item.kind}
+                        type="button"
+                        onClick={() => insertElementIntoScene(activeScene.id, item.kind)}
+                        title={`Tambah ${item.label.toLowerCase()} ke adegan ini`}
+                        className="h-7 px-2 rounded-lg bg-surface-1 border border-border text-[10px] font-semibold text-text-muted hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{item.icon}</span>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {availableLayers.length === 0 ? (
                     <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed flex flex-col items-center gap-2">
                       <span>
@@ -1014,7 +1018,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             <div className="space-y-2 p-2.5 rounded-xl bg-surface-2/50 border border-border/70">
                               <div className="space-y-1">
                                 <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                                  Konten Teks (Debounced)
+                                  Isi teks
                                 </span>
                                 <input
                                   type="text"
@@ -1082,6 +1086,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   })}
                                 </div>
                               </div>
+
+                              <TypographyControls
+                                override={activeLayerOverride}
+                                customFonts={project.customFonts || []}
+                                onChange={handleOverridesChange}
+                                onUploadFont={addCustomFont}
+                              />
                             </div>
                           )}
 
@@ -1382,6 +1393,18 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               ))}
                             </div>
                           </div>
+
+                          <LayerMotionPanel
+                            key={`${activeScene.id}:${activeLayer.id}`}
+                            motion={activeCompScene?.layerMotions?.[activeLayer.id]}
+                            sceneDuration={activeScene.durationInSeconds}
+                            getPlayheadInShot={() => {
+                              const { currentFrame, project: p } = useMooStore.getState();
+                              const start = getSceneStartSeconds(p.scenes, activeScene.id) ?? 0;
+                              return currentFrame / (p.fps || 30) - start;
+                            }}
+                            onChange={(motion) => updateLayerMotion(activeScene.id, activeLayer.id, motion)}
+                          />
                         </div>
                       )}
                     </>
@@ -1508,7 +1531,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   Visual & Widget Instan
                 </span>
                 <span className="text-[10px] font-mono text-accent px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25">
-                  Zero-API • Siap Edit
+                  Tanpa API key
                 </span>
               </div>
 
@@ -1707,6 +1730,67 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </button>
             )}
 
+            {/* Advanced: how long an AI answer may be (max output tokens) */}
+            <details className="group p-3.5 rounded-2xl bg-surface-2/60 border border-border">
+              <summary className="flex items-center justify-between cursor-pointer list-none text-[12px] font-semibold text-on-surface">
+                <span className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-text-muted">settings</span>
+                  Lanjutan
+                </span>
+                <span className="material-symbols-outlined text-[16px] text-text-muted transition-transform group-open:rotate-180">
+                  expand_more
+                </span>
+              </summary>
+              <div className="flex flex-col gap-2.5 pt-3">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-on-surface">Panjang jawaban AI</span>
+                  <span className="font-mono text-accent font-semibold">
+                    {settings.maxOutputTokens || 2048} token
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  Naikkan kalau visual adegan sering terpotong atau gagal. Angka lebih besar memakai kuota API lebih banyak.
+                </p>
+  
+                <input
+                  type="range"
+                  min={512}
+                  max={8192}
+                  step={256}
+                  disabled={isCompilingMograph}
+                  value={settings.maxOutputTokens || 2048}
+                  onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
+                  className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
+                />
+  
+                <div className="flex gap-1 pt-0.5">
+                  {[1024, 2048, 4096, 8192].map((tok) => {
+                    const isActive = (settings.maxOutputTokens || 2048) === tok;
+                    return (
+                      <button
+                        key={tok}
+                        type="button"
+                        disabled={isCompilingMograph}
+                        onClick={() => updateSettings({ maxOutputTokens: tok })}
+                        className={`flex-1 py-1 rounded text-[10px] font-mono border transition-colors ${
+                          isActive
+                            ? 'bg-surface-3 border-accent text-accent font-bold'
+                            : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
+                        }`}
+                      >
+                        {tok}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+
+        {/* ================= TAB SUBTITEL ================= */}
+        {activeTab === 'subtitle' && (
+          <div className="flex flex-col gap-5">
             {/* ================= PENGATURAN SUBTITEL VIDEO ================= */}
             <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-3">
               {/* Header & Toggle Utama */}
@@ -1989,50 +2073,6 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               )}
             </div>
 
-            {/* Alokasi Token Output (Max Tokens) */}
-            <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border flex flex-col gap-2.5">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-semibold text-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-accent">token</span>
-                  Alokasi Token AI
-                </span>
-                <span className="font-mono text-accent font-semibold">
-                  {settings.maxOutputTokens || 2048} tok
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min={512}
-                max={8192}
-                step={256}
-                disabled={isCompilingMograph}
-                value={settings.maxOutputTokens || 2048}
-                onChange={(e) => updateSettings({ maxOutputTokens: parseInt(e.target.value, 10) })}
-                className="w-full h-1.5 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-accent"
-              />
-
-              <div className="flex gap-1 pt-0.5">
-                {[1024, 2048, 4096, 8192].map((tok) => {
-                  const isActive = (settings.maxOutputTokens || 2048) === tok;
-                  return (
-                    <button
-                      key={tok}
-                      type="button"
-                      disabled={isCompilingMograph}
-                      onClick={() => updateSettings({ maxOutputTokens: tok })}
-                      className={`flex-1 py-1 rounded text-[10px] font-mono border transition-colors ${
-                        isActive
-                          ? 'bg-surface-3 border-accent text-accent font-bold'
-                          : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
-                      }`}
-                    >
-                      {tok}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         )}
 

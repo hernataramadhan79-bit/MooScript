@@ -30,14 +30,39 @@ export function stopPlaybackAudio(): void {
   }
 }
 
+/** The loop range in frames, clamped to the film; null when there is no usable range. */
+function loopFrames(
+  range: { start: number; end: number } | null,
+  fps: number,
+  maxFrames: number
+): { start: number; end: number } | null {
+  if (!range) return null;
+  const start = Math.max(0, Math.min(maxFrames, Math.round(range.start * fps)));
+  const end = Math.max(0, Math.min(maxFrames, Math.round(range.end * fps)));
+  return end - start >= 1 ? { start, end } : null;
+}
+
 export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSlice> = (set, get) => ({
   currentFrame: 0,
   isPlaying: false,
   isLooping: false,
+  loopRange: null,
 
   toggleLoop: () => {
     set((state) => ({ isLooping: !state.isLooping }));
   },
+
+  setLoopPoint: (edge, timeSec) => {
+    const total = getProjectDuration(get().project);
+    const t = Math.max(0, Math.min(total, timeSec));
+    const prev = get().loopRange || { start: 0, end: total };
+    let next = edge === 'start' ? { start: t, end: prev.end } : { start: prev.start, end: t };
+    // Setting one edge past the other starts a fresh range from that point to the film's end/start.
+    if (next.end <= next.start) next = edge === 'start' ? { start: t, end: total } : { start: 0, end: t };
+    set({ loopRange: next.end - next.start >= 0.1 ? next : null, isLooping: true });
+  },
+
+  clearLoopRange: () => set({ loopRange: null }),
 
   seekFrame: (currentFrame) => {
     const fps = get().project.fps || 30;
@@ -79,6 +104,12 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
     const maxFrames = Math.max(1, Math.round(totalDuration * fps));
 
     let startFrame = state.currentFrame;
+    // Looping over a range always plays inside it.
+    const range = state.isLooping ? loopFrames(state.loopRange, fps, maxFrames) : null;
+    if (range && (startFrame < range.start || startFrame >= range.end)) {
+      startFrame = range.start;
+      set({ currentFrame: startFrame });
+    }
     // If playback reached the end, restart from frame 0
     if (startFrame >= maxFrames) {
       startFrame = 0;
@@ -163,15 +194,18 @@ export const createPlaybackSlice: StateCreator<MooStoreState, [], [], PlaybackSl
         targetFrame = playbackStartFrame + Math.floor(elapsedSec * currentFps);
       }
 
-      // Check if finished
-      if (targetFrame >= currentMaxFrames) {
+      // Check if finished (or past the end of the loop range)
+      const loopRange = get().isLooping ? loopFrames(get().loopRange, currentFps, currentMaxFrames) : null;
+      const endFrame = loopRange ? loopRange.end : currentMaxFrames;
+      if (targetFrame >= endFrame) {
         if (get().isLooping) {
+          const restart = loopRange ? loopRange.start : 0;
           playbackStartTime = performance.now();
-          playbackStartFrame = 0;
-          set({ currentFrame: 0 });
+          playbackStartFrame = restart;
+          set({ currentFrame: restart });
           if (playbackAudioElement) {
             try {
-              playbackAudioElement.currentTime = 0;
+              playbackAudioElement.currentTime = restart / currentFps;
               playbackAudioElement.play().catch(() => {});
             } catch (err) {
               console.warn('Loop audio rewind failed:', err);

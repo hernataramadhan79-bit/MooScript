@@ -1,4 +1,4 @@
-import type { EditableLayer, EditableLayerType, LayerOverride, ScenePalette } from '../../types';
+import type { EditableLayer, EditableLayerType, LayerMotion, LayerMotionPreset, LayerOverride, ScenePalette } from '../../types';
 
 /**
  * Editable-layer helpers.
@@ -241,14 +241,18 @@ function num(n: unknown): number | undefined {
 export function compileOverridesCss(
   sceneDomId: string,
   overrides?: Record<string, LayerOverride>,
-  options?: { important?: boolean }
+  options?: { important?: boolean },
+  motions?: Record<string, LayerMotion>
 ): string {
-  if (!overrides) return '';
+  if (!overrides && !motions) return '';
   const imp = options?.important ? ' !important' : '';
   const safeDomId = String(sceneDomId).trim().replace(/[^a-zA-Z0-9_-]/g, '-');
   const rules: string[] = [];
-  for (const [rawId, o] of Object.entries(overrides)) {
-    if (!o) continue;
+  const ids = new Set([...Object.keys(overrides || {}), ...Object.keys(motions || {})]);
+  for (const rawId of ids) {
+    const o: LayerOverride = overrides?.[rawId] || {};
+    const motion = motions?.[rawId];
+    const animated = Boolean(motion && (motion.enter || motion.move || motion.exit));
     const selectorVal = escapeLayerAttrSelector(rawId);
     const sanitized = sanitizeLayerId(rawId);
     const selector = selectorVal !== sanitized
@@ -262,12 +266,27 @@ export function compileOverridesCss(
 
     const x = num(o.x);
     const y = num(o.y);
-    if ((x !== undefined && x !== 0) || (y !== undefined && y !== 0)) {
+    if (animated) {
+      // The layer's own animation runs on --moo-m* variables; the resting tweak is added to them.
+      const scale = num(o.scale) ?? 1;
+      const sx = o.flipX ? -scale : scale;
+      const sy = o.flipY ? -scale : scale;
+      const op = Math.min(1, Math.max(0, num(o.opacity) ?? 1));
+      const blur = usesBlur(motion!) ? ' blur(calc(var(--moo-mb, 0) * 1px))' : '';
+      decls.push(
+        `translate: calc(var(--moo-mx, 0) * 1px + ${x ?? 0}px) calc(var(--moo-my, 0) * 1px + ${y ?? 0}px)${imp}`,
+        `scale: calc(var(--moo-ms, 1) * ${sx}) calc(var(--moo-ms, 1) * ${sy})${imp}`,
+        `rotate: calc(var(--moo-mr, 0) * 1deg + ${num(o.rotation) ?? 0}deg)${imp}`,
+        `filter: opacity(calc(var(--moo-mo, 1) * ${op}))${blur}`
+      );
+    } else if ((x !== undefined && x !== 0) || (y !== undefined && y !== 0)) {
       decls.push(`translate: ${x ?? 0}px ${y ?? 0}px${imp}`);
     }
 
     const sc = num(o.scale);
-    if (sc !== undefined && sc !== 1) {
+    if (animated) {
+      // scale is part of the animated declarations above
+    } else if (sc !== undefined && sc !== 1) {
       const sx = o.flipX ? -sc : sc;
       const sy = o.flipY ? -sc : sc;
       if (sx === sy) {
@@ -287,12 +306,12 @@ export function compileOverridesCss(
     }
 
     const rot = num(o.rotation);
-    if (rot !== undefined && rot !== 0) {
+    if (!animated && rot !== undefined && rot !== 0) {
       decls.push(`rotate: ${rot}deg${imp}`);
     }
 
     const op = num(o.opacity);
-    if (op !== undefined && op !== 1) {
+    if (!animated && op !== undefined && op !== 1) {
       decls.push(`filter: opacity(${Math.min(1, Math.max(0, op))})`);
     }
 
@@ -309,6 +328,21 @@ export function compileOverridesCss(
     if (o.textAlign && ['left', 'center', 'right'].includes(o.textAlign)) {
       decls.push(`text-align: ${o.textAlign} !important`);
     }
+
+    // Typography applies to the layer and the spans inside it (kinetic words are often split).
+    const typo: string[] = [];
+    const family = typeof o.fontFamily === 'string' ? o.fontFamily.replace(/[^\w\- ]/g, '').trim().slice(0, 60) : '';
+    if (family) typo.push(`font-family: '${family}', var(--moo-font-display, sans-serif) !important`);
+    const weight = num(o.fontWeight);
+    if (weight !== undefined && weight >= 100 && weight <= 900) typo.push(`font-weight: ${Math.round(weight / 100) * 100} !important`);
+    const tracking = num(o.letterSpacing);
+    if (tracking !== undefined) typo.push(`letter-spacing: ${Math.max(-0.2, Math.min(1, tracking))}em !important`);
+    const leading = num(o.lineHeight);
+    if (leading !== undefined && leading > 0) typo.push(`line-height: ${Math.max(0.6, Math.min(3, leading))} !important`);
+    if (o.textTransform && ['none', 'uppercase', 'lowercase'].includes(o.textTransform)) {
+      typo.push(`text-transform: ${o.textTransform} !important`);
+    }
+    decls.push(...typo);
 
     const br = num(o.borderRadius);
     if (br !== undefined) {
@@ -328,6 +362,13 @@ export function compileOverridesCss(
 
     if (decls.length) {
       rules.push(`${selector} { ${decls.join('; ')}; }`);
+    }
+    if (typo.length) {
+      const inner = selector
+        .split(', ')
+        .map((sel) => `${sel} *`)
+        .join(', ');
+      rules.push(`${inner} { ${typo.join('; ')}; }`);
     }
 
     if (col) {
@@ -356,6 +397,126 @@ export function compileOverridesCss(
     }
   }
   return rules.join('\n');
+}
+
+function usesBlur(motion: LayerMotion): boolean {
+  return motion.enter?.preset === 'blur' || motion.exit?.preset === 'blur';
+}
+
+/** Animation state of a layer on the --moo-m* variables. */
+interface MotionState {
+  mx: number;
+  my: number;
+  ms: number;
+  mr: number;
+  mo: number;
+  mb: number;
+}
+
+const REST: MotionState = { mx: 0, my: 0, ms: 1, mr: 0, mo: 1, mb: 0 };
+
+/**
+ * The hidden side of an entrance or exit, taken from a resting state. A slide names the direction
+ * of travel, so an exit leaves the opposite way an entrance arrives from.
+ */
+function presetState(preset: LayerMotionPreset, base: MotionState, exit = false): MotionState {
+  const s = { ...base, mo: 0 };
+  const d = exit ? -1 : 1;
+  switch (preset) {
+    case 'pop':
+      return { ...s, ms: base.ms * 0.4 };
+    case 'slide-up':
+      return { ...s, my: base.my + 140 * d };
+    case 'slide-down':
+      return { ...s, my: base.my - 140 * d };
+    case 'slide-left':
+      return { ...s, mx: base.mx + 180 * d };
+    case 'slide-right':
+      return { ...s, mx: base.mx - 180 * d };
+    case 'zoom':
+      return { ...s, ms: base.ms * 1.6 };
+    case 'spin':
+      return { ...s, mr: base.mr - 120, ms: base.ms * 0.6 };
+    case 'blur':
+      return { ...s, mb: 24 };
+    default:
+      return s;
+  }
+}
+
+const roundMotion = (n: number): number => Math.round(n * 1000) / 1000;
+
+function stateVars(s: MotionState): string {
+  return [
+    `'--moo-mx': ${roundMotion(s.mx)}`,
+    `'--moo-my': ${roundMotion(s.my)}`,
+    `'--moo-ms': ${roundMotion(s.ms)}`,
+    `'--moo-mr': ${roundMotion(s.mr)}`,
+    `'--moo-mo': ${roundMotion(s.mo)}`,
+    `'--moo-mb': ${roundMotion(s.mb)}`
+  ].join(', ');
+}
+
+function seconds(value: unknown, fallback: number): number {
+  const v = Number(value);
+  return Number.isFinite(v) && v >= 0 ? roundMotion(v) : fallback;
+}
+
+function motionCurve(curve: string | undefined, dir: 'in' | 'out' | 'inout'): string {
+  return `'${curve && /^[a-z]+$/.test(curve) ? curve : 'smooth'}-${dir}'`;
+}
+
+/**
+ * Shot code for the editor-made layer animations, appended to the shot's own code. `offset` shifts
+ * every time (a split piece's in-point), so times stay relative to what the viewer sees.
+ */
+export function compileLayerMotionJs(motions: Record<string, LayerMotion> | undefined, offset = 0): string {
+  if (!motions) return '';
+  const blocks: string[] = [];
+  for (const [rawId, motion] of Object.entries(motions)) {
+    if (!motion || !(motion.enter || motion.move || motion.exit)) continue;
+    const selector = JSON.stringify(`[data-moo-layer="${escapeLayerAttrSelector(rawId)}"]`);
+    const lines: string[] = [];
+    let state: MotionState = { ...REST };
+    if (motion.enter) {
+      const at = roundMotion(seconds(motion.enter.at, 0) + offset);
+      const dur = Math.max(0.05, seconds(motion.enter.dur, 0.5));
+      const from = presetState(motion.enter.preset, state);
+      lines.push(
+        `shot.travel(el, { ${stateVars(from)} }, { ${stateVars(state)}, dur: ${dur}, curve: ${motionCurve(motion.enter.curve, 'out')} }, ${at});`
+      );
+    }
+    if (motion.move) {
+      const to = motion.move.to || {};
+      const next: MotionState = {
+        ...state,
+        mx: num(to.x) ?? 0,
+        my: num(to.y) ?? 0,
+        ms: num(to.scale) ?? 1,
+        mr: num(to.rotation) ?? 0,
+        mo: Math.min(1, Math.max(0, num(to.opacity) ?? 1))
+      };
+      const at = roundMotion(seconds(motion.move.at, 0) + offset);
+      const dur = Math.max(0.05, seconds(motion.move.dur, 0.8));
+      lines.push(
+        `shot.travel(el, { ${stateVars(state)} }, { ${stateVars(next)}, dur: ${dur}, curve: ${motionCurve(motion.move.curve, 'inout')}, showStart: false }, ${at});`
+      );
+      state = next;
+    }
+    if (motion.exit) {
+      const at = roundMotion(seconds(motion.exit.at, 0) + offset);
+      const dur = Math.max(0.05, seconds(motion.exit.dur, 0.4));
+      const to = presetState(motion.exit.preset, state, true);
+      lines.push(
+        `shot.travel(el, { ${stateVars(state)} }, { ${stateVars(to)}, dur: ${dur}, curve: ${motionCurve(motion.exit.curve, 'in')}, showStart: false }, ${at});`
+      );
+    }
+    blocks.push(
+      ['  (function () {', `    const el = root.querySelector(${selector});`, '    if (!el) return;', ...lines.map((l) => `    ${l}`), '  })();'].join('\n')
+    );
+  }
+  if (!blocks.length) return '';
+  return ['', '// Layer animation added in the editor', 'try {', ...blocks, '} catch (err) {', "  console.warn('Layer animation failed', err);", '}'].join('\n');
 }
 
 function sanitizePaletteColor(v?: string): string | undefined {

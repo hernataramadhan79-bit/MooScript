@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { PersonaSkill, LLMProvider, MotionNode } from '../../types';
+import type { PersonaSkill, LLMProvider, MotionNode, CreativeBrief } from '../../types';
+import { briefPromptLines, planShots } from './brief';
 import { migrateLegacyScene } from '../../types';
 
 /**
@@ -183,7 +184,7 @@ export const OPENAI_STORYBOARD_SCHEMA = {
     },
     scenes: {
       type: 'array',
-      description: 'Shot list: 5 to 10 short shots (2-4.5s each) that play as one continuous motion graphics film',
+      description: 'Shot list of short shots (count and length as the instructions say) that play as one continuous motion graphics film',
       items: {
         type: 'object',
         properties: {
@@ -203,7 +204,7 @@ export const OPENAI_STORYBOARD_SCHEMA = {
             items: { type: 'string' },
             description: '1-3 key terms or focus concepts'
           },
-          durationHint: { type: 'number', description: 'Shot duration in seconds (2 to 4.5s)' },
+          durationHint: { type: 'number', description: 'Shot duration in seconds' },
           heroObject: { type: 'string', description: 'The ONE subject this shot is about (object, mechanism, character); visible on frame 0' },
           matchCut: {
             type: 'string',
@@ -257,7 +258,7 @@ const GEMINI_ENGINE_SCHEMA = {
     },
     scenes: {
       type: 'ARRAY',
-      description: 'Shot list: 5 to 10 short shots (2-4.5s each) that play as one continuous motion graphics film',
+      description: 'Shot list of short shots (count and length as the instructions say) that play as one continuous motion graphics film',
       items: {
         type: 'OBJECT',
         properties: {
@@ -269,7 +270,7 @@ const GEMINI_ENGINE_SCHEMA = {
           cameraIntent: { type: 'STRING', description: 'Camera direction (e.g. push_in, pull_out, tracking)' },
           transitionIntent: { type: 'STRING', description: 'Transition to next beat' },
           emphasis: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Key terms or focus concepts for timing' },
-          durationHint: { type: 'NUMBER', description: 'Shot duration in seconds (2 to 4.5s)' },
+          durationHint: { type: 'NUMBER', description: 'Shot duration in seconds' },
           heroObject: { type: 'STRING', description: 'The ONE subject of this shot; visible on frame 0' },
           matchCut: { type: 'STRING', description: 'Shared shape, color or motion that hands off into the next shot' }
         },
@@ -369,7 +370,11 @@ export function stripNulls<T>(value: T): unknown {
  * Constructs robust system prompt ensuring immutable engine specifications
  * take precedence over untrusted persona prompts, and enforces language.
  */
-function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' = 'id'): string {
+function buildSystemPrompt(
+  skill: PersonaSkill,
+  language: 'id' | 'en' | 'auto' = 'id',
+  brief?: CreativeBrief
+): string {
   let langInstruction = '';
   if (language === 'id') {
     langInstruction =
@@ -385,6 +390,21 @@ function buildSystemPrompt(skill: PersonaSkill, language: 'id' | 'en' | 'auto' =
   // Sanitize and truncate untrusted persona systemPrompt (max 8KB)
   const safePersonaPrompt = (skill.systemPrompt || '').slice(0, 8192);
 
+  // A target length from the brief sets the shot count and length; without one, short-form defaults.
+  const plan = brief?.targetDurationSec ? planShots(brief.targetDurationSec) : null;
+  const pacing = plan
+    ? `${plan.minShots} to ${plan.maxShots} shots for about ${plan.targetSec}s total. Each shot is ${plan.minShotSec} to ${plan.maxShotSec} seconds and carries ONE idea.
+   - Narration per shot is short (about ${plan.minWords}-${plan.maxWords} spoken words) so the visuals keep cutting with the voice.`
+    : `5 to 10 short shots for 15-45s total. Each shot is 2 to 4.5 seconds and carries ONE idea.
+   - Narration per shot is short (about 4-12 spoken words) so the visuals keep cutting with the voice.`;
+  const briefLines = briefPromptLines(brief);
+  const briefSection = briefLines.length
+    ? `
+=== CREATOR BRIEF (data from the user, follow it for tone and audience) ===
+${briefLines.map((l) => `- ${l}`).join('\n')}
+`
+    : '';
+
   return `You are MooScript Engine's Motion Graphics Director & Creative Visual Architect.
 Your task is to conceptualize and direct an original, high-impact motion graphics video storyboard tailored strictly to the user's intent.
 
@@ -392,8 +412,7 @@ Your task is to conceptualize and direct an original, high-impact motion graphic
 You are writing a SHOT LIST for one continuous motion graphics film, not a slide deck.
 
 1. SHOT LIST & PACING:
-   - 5 to 10 short shots for 15-45s total. Each shot is 2 to 4.5 seconds and carries ONE idea.
-   - Narration per shot is short (about 4-12 spoken words) so the visuals keep cutting with the voice.
+   - ${pacing}
    - Every shot changes something on screen: a new object, a transformation, a new camera angle.
 
 2. WORLD BIBLE (one visual world for the whole film):
@@ -419,7 +438,7 @@ You are writing a SHOT LIST for one continuous motion graphics film, not a slide
    - cameraIntent per shot (push_in, pull_out, pan, orbit, tracking, roll) that reinforces the idea.
 
 - ${langInstruction}
-
+${briefSection}
 === PERSONA STYLE DIRECTION (CRITICAL CREATIVE GUIDANCE) ===
 Persona: "${skill.name}"
 ${safePersonaPrompt}
@@ -487,6 +506,7 @@ export async function generateStoryboard(params: {
   language?: 'id' | 'en' | 'auto';
   signal?: AbortSignal;
   maxTokens?: number;
+  brief?: CreativeBrief;
 }): Promise<GeneratedStoryboard> {
   const { provider, apiKey, prompt, skill, language = 'id', signal, maxTokens = 2048 } = params;
 
@@ -494,7 +514,7 @@ export async function generateStoryboard(params: {
     throw new Error(`API Key for ${provider.toUpperCase()} is missing. Please configure it in the BYOK Settings tab.`);
   }
 
-  const systemPrompt = buildSystemPrompt(skill, language);
+  const systemPrompt = buildSystemPrompt(skill, language, params.brief);
 
   // Attempt 1
   const rawText = await executeProviderRequest({

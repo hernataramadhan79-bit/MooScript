@@ -1,7 +1,14 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment } from '../../types';
-import { CURRENT_SCHEMA_VERSION, BUILTIN_THEMES, migrateLegacyScene } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment, CreativeBrief, CustomFont } from '../../types';
+import {
+  CURRENT_SCHEMA_VERSION,
+  BUILTIN_THEMES,
+  TRANSITION_CURVES,
+  TRANSITION_DURATION_RANGE,
+  migrateLegacyScene
+} from '../../types';
 import { cleanWord } from '../../utils/textUtils';
+import { getBriefPlatform } from '../../engine/ai/brief';
 import {
   saveProjectToDb,
   loadProjectFromDb,
@@ -19,17 +26,48 @@ import { syncCustomBgmForProject } from '../../db/customBgm';
 import { loadProjectVoice, NO_VOICE } from '../../db/voiceTrack';
 import { getProjectTemplate } from '../../engine/templates/projectTemplates';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
-import { DEFAULT_SCENE_SECONDS } from '../../utils/projectDuration';
+import { DEFAULT_SCENE_SECONDS, MAX_SCENE_SECONDS, getSceneStartSeconds, sceneSeconds } from '../../utils/projectDuration';
 import { stopPlaybackAudio } from './playbackSlice';
 import { applySize, syncComposition } from '../../engine/composition/sync';
 import {
   compileProceduralScene,
   compileProceduralProject,
+  resolveProceduralArchetype,
+  PROCEDURAL_ARCHETYPES,
   type ProceduralArchetype
 } from '../../engine/composition/proceduralCompiler';
-import type { MooStoreState, ProjectSlice } from '../types';
+import type { InsertElementKind, MooStoreState, ProjectSlice } from '../types';
+import { extractLayersFromHtml } from '../../engine/composition/layers';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
+const MAX_FONT_BYTES = 2 * 1024 * 1024;
+const FONT_FORMATS: Record<string, CustomFont['format']> = {
+  woff2: 'woff2',
+  woff: 'woff',
+  ttf: 'truetype',
+  otf: 'opentype'
+};
+
+/**
+ * Markup of a layer added from the editor. It sits above the shot, centred; the inspector moves,
+ * styles and animates it like any generated layer.
+ */
+function newElementHtml(kind: InsertElementKind, layerId: string): string {
+  const base = 'position:absolute;left:50%;top:50%;z-index:30;';
+  if (kind === 'text') {
+    return `<p data-moo-layer="${layerId}" class="moo-added-text" style="${base}transform:translate(-50%,-50%);margin:0;max-width:86%;width:max-content;text-align:center;white-space:pre-wrap;font-family:var(--moo-font-display, sans-serif);font-weight:800;font-size:72px;line-height:1.1;color:var(--moo-text, #ffffff);">Teks baru</p>`;
+  }
+  const shape: Record<Exclude<InsertElementKind, 'text'>, string> = {
+    rect: 'width:320px;height:320px;margin:-160px 0 0 -160px;border-radius:24px;',
+    circle: 'width:280px;height:280px;margin:-140px 0 0 -140px;border-radius:9999px;',
+    line: 'width:520px;height:12px;margin:-6px 0 0 -260px;border-radius:9999px;',
+    pill: 'width:420px;height:120px;margin:-60px 0 0 -210px;border-radius:9999px;'
+  };
+  return `<div data-moo-layer="${layerId}" class="moo-added-shape" style="${base}${shape[kind]}background:var(--moo-accent, #84cc16);"></div>`;
+}
+
+/** Shortest piece a split or a moved cut may leave. */
+const MIN_PIECE_SECONDS = 0.3;
 
 export const DEFAULT_COMPOSITION: Composition = {
   id: 'comp-default',
@@ -150,9 +188,14 @@ let historyPast: MooProject[] = [];
 let historyFuture: MooProject[] = [];
 const MAX_HISTORY = 30;
 
+/**
+ * An undo step. Every store update replaces the objects it changes instead of editing them, so a
+ * step can share everything it did not change with the steps around it; a deep copy here used to
+ * duplicate every scene (and every embedded image) on each edit.
+ */
 function snapshotProject(project: MooProject): MooProject {
   const { audioBlob: _blob, ...rest } = project;
-  return JSON.parse(JSON.stringify(rest));
+  return rest as MooProject;
 }
 
 /** Editor state that only makes sense for the project it was created in. */
@@ -164,7 +207,9 @@ const PROJECT_SCOPED_RESET = {
   previousScenesSnapshot: null,
   activeSceneId: null,
   selectedLayerId: null,
-  waveformPeaks: null
+  extraSelectedLayerIds: [],
+  waveformPeaks: null,
+  loopRange: null
 };
 
 export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlice> = (set, get) => {
@@ -697,6 +742,54 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
     },
 
+    addMarker: (time, label) => {
+      const current = get().project;
+      pushSnapshot(current);
+      const id = `mk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const markers = [...(current.markers || []), { id, time: Math.max(0, Math.round(time * 100) / 100), label: label || '' }]
+        .sort((a, b) => a.time - b.time);
+      const updated = { ...current, markers };
+      set({ project: updated });
+      triggerSave(updated);
+      return id;
+    },
+
+    updateMarker: (id, update) => {
+      const current = get().project;
+      pushSnapshot(current, `marker:${id}`);
+      const markers = (current.markers || [])
+        .map((m) => (m.id === id ? { ...m, ...update, time: Math.max(0, update.time ?? m.time) } : m))
+        .sort((a, b) => a.time - b.time);
+      const updated = { ...current, markers };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    removeMarker: (id) => {
+      const current = get().project;
+      if (!(current.markers || []).some((m) => m.id === id)) return;
+      pushSnapshot(current);
+      const updated = { ...current, markers: (current.markers || []).filter((m) => m.id !== id) };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    updateBrief: (brief) => {
+      const current = get().project;
+      const nextBrief: CreativeBrief = { ...current.brief, ...brief };
+      // Picking a platform also picks its frame and, when no length is set yet, its usual length.
+      const platform = brief.platform ? getBriefPlatform(brief.platform) : undefined;
+      if (platform && !current.brief?.targetDurationSec && brief.targetDurationSec === undefined) {
+        nextBrief.targetDurationSec = platform.defaultDuration;
+      }
+      set({ project: { ...current, brief: nextBrief } });
+      if (platform?.aspectRatio && platform.aspectRatio !== current.aspectRatio) {
+        get().updateProjectAspectRatio(platform.aspectRatio);
+        set({ project: { ...get().project, brief: nextBrief } });
+      }
+      triggerSave(get().project);
+    },
+
     updateExportSettings: (settings) => {
       const current = get().project;
       const updated: MooProject = {
@@ -805,6 +898,131 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updatedProject);
     },
 
+    updateLayerOverrides: (sceneId, patches, coalesceKey) => {
+      const currentProj = get().project;
+      const comp = currentProj.composition || syncComposition(currentProj).composition;
+      if (!comp || Object.keys(patches).length === 0) return;
+      pushSnapshot(currentProj, coalesceKey);
+      const scenes = comp.scenes.map((mod) => {
+        if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+        const overrides = { ...(mod.overrides || {}) };
+        for (const [layerId, patch] of Object.entries(patches)) {
+          overrides[layerId] = { ...overrides[layerId], ...patch };
+        }
+        return { ...mod, userEdited: true, overrides };
+      });
+      const updatedProject: MooProject = { ...currentProj, composition: { ...comp, scenes, updatedAt: Date.now() } };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+    },
+
+    addCustomFont: async (file) => {
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      const format = FONT_FORMATS[ext];
+      if (!format) {
+        get().addToast('Format font belum didukung. Pakai .woff2, .woff, .ttf atau .otf.', 'error');
+        return null;
+      }
+      if (file.size > MAX_FONT_BYTES) {
+        get().addToast('Ukuran font melebihi 2 MB.', 'error');
+        return null;
+      }
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const current = get().project;
+      const base = file.name.replace(/\.[^.]+$/, '').replace(/[^\w\- ]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) || 'Font';
+      const taken = new Set((current.customFonts || []).map((f) => f.family));
+      let family = base;
+      for (let n = 2; taken.has(family); n++) family = `${base} ${n}`;
+      pushSnapshot(current);
+      const font: CustomFont = {
+        id: `font-${Date.now().toString(36)}`,
+        family,
+        // The MIME type is set from the extension; browsers often leave it empty for font files.
+        dataUrl: `data:font/${ext === 'otf' ? 'otf' : ext === 'ttf' ? 'ttf' : ext};base64,${base64}`,
+        format
+      };
+      const updated = { ...current, customFonts: [...(current.customFonts || []), font] };
+      set({ project: updated });
+      triggerSave(updated);
+      get().addToast(`Font "${family}" siap dipakai.`, 'success');
+      return family;
+    },
+
+    removeCustomFont: (id) => {
+      const current = get().project;
+      if (!(current.customFonts || []).some((f) => f.id === id)) return;
+      pushSnapshot(current);
+      const updated = { ...current, customFonts: (current.customFonts || []).filter((f) => f.id !== id) };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    insertElementIntoScene: (sceneId, kind) => {
+      const current = get().project;
+      const idx = current.scenes.findIndex((s) => s.id === sceneId);
+      if (idx === -1) return null;
+      const synced = current.composition ? current : syncComposition(current);
+      const comp = synced.composition!;
+      let mod = comp.scenes.find((m) => m.beatId === sceneId);
+      if (!mod) return null;
+      // A shot without a visual of its own first gets the instant one, so the new layer sits on a real picture.
+      if (!mod.html.trim()) {
+        mod = compileProceduralScene(current.scenes[idx], idx, current.scenes.length, mod.palette, 'auto');
+      }
+      pushSnapshot(current);
+      const prefix = kind === 'text' ? 'text' : 'shape';
+      const taken = new Set((mod.html.match(/data-moo-layer="([^"]+)"/g) || []).map((m) => m.slice(16, -1)));
+      let n = 1;
+      while (taken.has(`${prefix}-${n}`)) n++;
+      const layerId = `${prefix}-${n}`;
+      const html = `${mod.html}\n${newElementHtml(kind, layerId)}`;
+      const updatedMod: SceneModule = {
+        ...mod,
+        html,
+        editableLayers: extractLayersFromHtml(html),
+        status: 'ok',
+        userEdited: true,
+        version: (mod.version || 1) + 1,
+        layerMotions: {
+          ...(mod.layerMotions || {}),
+          [layerId]: { enter: { preset: kind === 'text' ? 'slide-up' : 'pop', at: 0.15, dur: 0.5 } }
+        }
+      };
+      const updated = syncComposition({
+        ...synced,
+        composition: { ...comp, scenes: comp.scenes.map((m) => (m.beatId === sceneId ? updatedMod : m)) }
+      });
+      set({ project: updated, selectedLayerId: layerId });
+      triggerSave(updated);
+      return layerId;
+    },
+
+    updateLayerMotion: (sceneId, layerId, motion) => {
+      const currentProj = get().project;
+      const comp = currentProj.composition || syncComposition(currentProj).composition;
+      if (!comp) return;
+      pushSnapshot(currentProj, `motion:${sceneId}:${layerId}`);
+      const empty = !motion || !(motion.enter || motion.move || motion.exit);
+      const updatedScenes = comp.scenes.map((mod) => {
+        if (mod.beatId !== sceneId && mod.id !== sceneId) return mod;
+        const motions = { ...(mod.layerMotions || {}) };
+        if (empty) delete motions[layerId];
+        else motions[layerId] = motion!;
+        return { ...mod, userEdited: true, layerMotions: Object.keys(motions).length ? motions : undefined };
+      });
+      const updatedProject: MooProject = {
+        ...currentProj,
+        composition: { ...comp, scenes: updatedScenes, updatedAt: Date.now() }
+      };
+      set({ project: updatedProject });
+      triggerSave(updatedProject);
+    },
+
     resetLayerOverride: (sceneId: string, layerId?: string) => {
       const currentProj = get().project;
       const comp = currentProj.composition;
@@ -872,12 +1090,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const synced = current.composition ? current : syncComposition(current);
       const comp = synced.composition!;
       const existingMod = comp.scenes.find((m) => m.beatId === sceneId);
+      const chosen = resolveProceduralArchetype(current.scenes[idx], idx, archetype);
       const generated = compileProceduralScene(
         current.scenes[idx],
         idx,
         current.scenes.length,
         existingMod?.palette,
-        archetype
+        chosen
       );
       const nextScenes = comp.scenes.map((m) => (m.beatId === sceneId ? generated : m));
       if (!nextScenes.some((m) => m.beatId === sceneId)) {
@@ -897,13 +1116,22 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updatedProject);
       const replacedCustomWork =
         existingMod?.userEdited || existingMod?.generatorVersion?.startsWith('generative');
+      const fellBack = archetype !== 'auto' && chosen !== archetype;
+      if (fellBack) {
+        const label = (id: ProceduralArchetype) => PROCEDURAL_ARCHETYPES.find((a) => a.id === id)?.label || id;
+        get().addToast(
+          `Naskah adegan #${idx + 1} belum punya data untuk ${label(archetype)} (angka, poin, atau tren), jadi dipakai ${label(chosen)}.`,
+          'info',
+          6000
+        );
+      }
       if (replacedCustomWork) {
         get().addToast(
           `Visual AI/editan adegan #${idx + 1} diganti visual instan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`,
           'warning',
           6000
         );
-      } else {
+      } else if (!fellBack) {
         get().addToast(`Visual adegan #${idx + 1} berhasil dibangun secara instan!`, 'success');
       }
     },
@@ -978,6 +1206,30 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updated);
     },
 
+    setSceneTransitionTiming: (sceneId, timing) => {
+      pushSnapshot(get().project, `transition:${sceneId}`);
+      const updatedScenes = get().project.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        const next = { ...s };
+        if (timing.duration !== undefined) {
+          if (timing.duration === null || !Number.isFinite(timing.duration)) delete next.transitionDuration;
+          else
+            next.transitionDuration = Math.min(
+              TRANSITION_DURATION_RANGE.max,
+              Math.max(TRANSITION_DURATION_RANGE.min, Math.round(timing.duration * 100) / 100)
+            );
+        }
+        if (timing.curve !== undefined) {
+          if (timing.curve === null || !TRANSITION_CURVES.includes(timing.curve)) delete next.transitionCurve;
+          else next.transitionCurve = timing.curve;
+        }
+        return next;
+      });
+      const updated = { ...get().project, scenes: updatedScenes };
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
     setSceneIcon: (sceneId, icon) => {
       const updatedScenes = get().project.scenes.map((s) => (s.id === sceneId ? { ...s, icon } : s));
       const updated = syncComposition({ ...get().project, scenes: updatedScenes });
@@ -1012,6 +1264,137 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         project: updated,
         audioStale: hasAudio ? true : get().audioStale
       });
+      triggerSave(updated);
+    },
+
+    splitSceneAt: (sceneId, timeSec) => {
+      const current = get().project;
+      const idx = current.scenes.findIndex((s) => s.id === sceneId);
+      const start = getSceneStartSeconds(current.scenes, sceneId);
+      if (idx === -1 || start === null) return null;
+      const scene = current.scenes[idx];
+      const dur = sceneSeconds(scene);
+      const cut = Math.round((timeSec - start) * 100) / 100;
+      if (cut < MIN_PIECE_SECONDS || dur - cut < MIN_PIECE_SECONDS) {
+        get().addToast('Playhead terlalu dekat dengan tepi shot untuk dipotong.', 'warning');
+        return null;
+      }
+      pushSnapshot(current);
+
+      // Narration follows its word timing; without timing, words are shared by length.
+      const words = scene.wordTimestamps || [];
+      // A word that starts right at the playhead belongs to the second piece.
+      const local = timeSec - start;
+      let firstWords = words.filter((w) => w.start < local - 1e-6);
+      let secondWords = words
+        .filter((w) => w.start >= local - 1e-6)
+        .map((w) => ({ word: w.word, start: Math.max(0, w.start - cut), end: Math.max(0, w.end - cut) }));
+      const narration = (scene.narrationText ?? scene.text ?? '').trim();
+      let firstText = firstWords.map((w) => w.word).join(' ');
+      let secondText = secondWords.map((w) => w.word).join(' ');
+      if (!words.length && narration) {
+        const all = narration.split(/\s+/);
+        const n = Math.round(all.length * (cut / dur));
+        firstText = all.slice(0, n).join(' ');
+        secondText = all.slice(n).join(' ');
+        firstWords = computeDeterministicWordAlignment(firstText, cut);
+        secondWords = computeDeterministicWordAlignment(secondText, dur - cut);
+      }
+
+      const newId = `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const { transitionDuration: _d, transitionCurve: _c, ...withoutTiming } = scene;
+      const first: Scene = {
+        ...withoutTiming,
+        durationInSeconds: cut,
+        durationLocked: true,
+        narrationText: firstText,
+        text: firstText,
+        wordTimestamps: firstWords,
+        // The two pieces are one continuous animation, so nothing should happen at the cut.
+        transition: 'cut'
+      };
+      const second: Scene = {
+        ...scene,
+        id: newId,
+        durationInSeconds: Math.round((dur - cut) * 100) / 100,
+        durationLocked: true,
+        narrationText: secondText,
+        text: secondText,
+        wordTimestamps: secondWords,
+        visualElements: scene.visualElements ? [...scene.visualElements] : undefined,
+        focusWords: [...(scene.focusWords || [])]
+      };
+      const scenes = [...current.scenes];
+      scenes.splice(idx, 1, first, second);
+
+      const synced = current.composition ? current : syncComposition(current);
+      let modules = synced.composition!.scenes;
+      const mod = modules.find((m) => m.beatId === sceneId);
+      if (mod && (mod.html.trim() || mod.buildJs.trim())) {
+        const inPoint = mod.inPoint || 0;
+        const sourceDuration = mod.sourceDuration || dur + inPoint;
+        const seed = mod.seed || idx + 1;
+        const firstMod: SceneModule = { ...mod, duration: cut, sourceDuration, seed };
+        const secondMod: SceneModule = {
+          ...mod,
+          id: newId,
+          beatId: newId,
+          duration: dur - cut,
+          inPoint: Math.round((inPoint + cut) * 100) / 100,
+          sourceDuration,
+          seed,
+          version: 1
+        };
+        modules = modules.flatMap((m) => (m.beatId === sceneId ? [firstMod, secondMod] : [m]));
+      }
+      const updated = syncComposition({
+        ...synced,
+        scenes,
+        composition: { ...synced.composition!, scenes: modules }
+      });
+      set({ project: updated, activeSceneId: newId });
+      triggerSave(updated);
+      return newId;
+    },
+
+    setSceneBoundary: (sceneId, timeSec) => {
+      const current = get().project;
+      const idx = current.scenes.findIndex((s) => s.id === sceneId);
+      if (idx <= 0) return;
+      const prev = current.scenes[idx - 1];
+      const scene = current.scenes[idx];
+      const prevStart = getSceneStartSeconds(current.scenes, prev.id) || 0;
+      const end = prevStart + sceneSeconds(prev) + sceneSeconds(scene);
+      const lo = prevStart + MIN_PIECE_SECONDS;
+      const hi = end - MIN_PIECE_SECONDS;
+      const cut = Math.round(Math.min(hi, Math.max(lo, timeSec)) * 100) / 100;
+      const prevDur = Math.min(MAX_SCENE_SECONDS, Math.round((cut - prevStart) * 100) / 100);
+      const sceneDur = Math.min(MAX_SCENE_SECONDS, Math.round((end - cut) * 100) / 100);
+      const shift = Math.round((prevDur - sceneSeconds(prev)) * 100) / 100;
+      if (Math.abs(shift) < 0.01) return;
+      pushSnapshot(current, `boundary:${sceneId}`);
+      const hasAudio = !!current.audioBlob;
+      // Without a voice-over the word timing follows the new lengths; with one, the words keep the
+      // timing they were spoken at.
+      const retime = (s: Scene, d: number): Scene => ({
+        ...s,
+        durationInSeconds: d,
+        durationLocked: true,
+        wordTimestamps: hasAudio ? s.wordTimestamps : computeDeterministicWordAlignment(s.narrationText || s.text || '', d)
+      });
+      const scenes = current.scenes.map((s) => (s.id === prev.id ? retime(s, prevDur) : s.id === sceneId ? retime(s, sceneDur) : s));
+      // A split piece keeps its picture in place: its code starts further in (or earlier) by the shift.
+      const modules = (current.composition?.scenes || []).map((m) =>
+        m.beatId === sceneId && m.sourceDuration
+          ? { ...m, inPoint: Math.max(0, Math.round(((m.inPoint || 0) + shift) * 100) / 100) }
+          : m
+      );
+      const updated = syncComposition({
+        ...current,
+        scenes,
+        composition: current.composition ? { ...current.composition, scenes: modules } : current.composition
+      });
+      set({ project: updated });
       triggerSave(updated);
     },
 

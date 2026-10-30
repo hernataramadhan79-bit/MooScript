@@ -109,7 +109,8 @@ describe('Asset Management (IndexedDB & Store Slice)', () => {
 
     expect(sceneMod).toBeDefined();
     expect(sceneMod!.html).toContain('data-moo-layer="asset"');
-    expect(sceneMod!.html).toContain('data:image/png;base64,mock');
+    expect(sceneMod!.html).toContain(`moo-asset:${asset.id}`);
+    expect(useMooStore.getState().project.assetData?.[asset.id]).toBe('data:image/png;base64,mock');
     expect(sceneMod!.userEdited).toBe(true);
   });
 
@@ -200,7 +201,7 @@ describe('Asset Management (IndexedDB & Store Slice)', () => {
 
     store.insertAssetIntoScene(asset, 'sc-asset-1');
     let sceneMod = useMooStore.getState().project.composition?.scenes.find((s) => s.beatId === 'sc-asset-1');
-    expect(sceneMod?.html).toContain('data:image/png;base64,banner-data');
+    expect(sceneMod?.html).toContain(`moo-asset:${asset.id}`);
 
     store.removeAssetFromScene(asset.dataUrl, 'sc-asset-1');
     sceneMod = useMooStore.getState().project.composition?.scenes.find((s) => s.beatId === 'sc-asset-1');
@@ -223,5 +224,23 @@ describe('Asset Management (IndexedDB & Store Slice)', () => {
     const sceneMod = useMooStore.getState().project.composition?.scenes.find((s) => s.beatId === 'sc-asset-1');
     expect(sceneMod?.html).toContain('alt="hero&quot; onerror=&quot;alert(1)&quot;&gt;&lt;script&gt;"');
     expect(sceneMod?.html).not.toContain('onerror="alert(1)"');
+  });
+});
+
+describe('asset references', () => {
+  it('stores each image once and resolves it in the stage document', async () => {
+    const { buildCompositionDocument } = await import('../src/engine/composition/buildDocument');
+    const { externalizeEmbeddedAssets } = await import('../src/engine/composition/assetRefs');
+    const asset = { id: 'ast-ref', projectId: 'proj-asset-test', name: 'a.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,QUJD', createdAt: 0 };
+    useMooStore.getState().insertAssetIntoScene(asset, 'sc-asset-1');
+    const project = useMooStore.getState().project;
+    expect(JSON.stringify(project.composition).includes('QUJD')).toBe(false);
+    expect(buildCompositionDocument(project)).toContain('data:image/png;base64,QUJD');
+
+    // Older projects with the image inline in the markup move it to the table on load.
+    const inline = { ...project, assetData: undefined, composition: { ...project.composition!, scenes: project.composition!.scenes.map((m) => ({ ...m, html: m.html.replace('moo-asset:ast-ref', 'data:image/png;base64,QUJD') })) } };
+    const moved = externalizeEmbeddedAssets(inline);
+    expect(JSON.stringify(moved.composition).includes('QUJD')).toBe(false);
+    expect(Object.values(moved.assetData || {})).toContain('data:image/png;base64,QUJD');
   });
 });

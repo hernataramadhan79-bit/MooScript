@@ -45,6 +45,9 @@ export function getRuntimeScript(): string {
     window.performance.now = function() { return virtualTimeSeconds * 1000; };
   }
 
+  // Curve families a shot may pick for its transition (TRANSITION_CURVES in types).
+  const TRANSITION_CURVE_FAMILIES = ['smooth', 'soft', 'strong', 'sharp', 'linear', 'rush'];
+
   // 3. MOO global API for scene modules
   window.MOO = {
     scene: function(id, definition) {
@@ -149,20 +152,28 @@ export function getRuntimeScript(): string {
         clipPath: 'none'
       }, accumulatedTime);
 
+      // A split piece plays its code from inPoint on, at the length the code was built for, so its
+      // moves and word beats keep their original timing.
+      const inPoint = Math.max(0, Number(def.inPoint) || 0);
+      const sourceDuration = Number(def.sourceDuration) > 0 ? Number(def.sourceDuration) : duration + inPoint;
+      const shotWords = (meta.wordTimestamps || []).map(function(w) {
+        return { word: w.word, start: w.start + inPoint, end: w.end + inPoint };
+      });
+
       // Context passed to build(shot, root, ctx)
-      const scenePrng = createPrng(i + 1);
+      const scenePrng = createPrng(Number(def.seed) > 0 ? Number(def.seed) : i + 1);
       const ctx = {
-        dur: duration,
-        words: meta.wordTimestamps || [],
+        dur: sourceDuration,
+        words: shotWords,
         at: function(word, occurrence) {
-          if (!meta.wordTimestamps) return 0;
+          if (!shotWords.length) return 0;
           // Exact word first, then prefix, then substring: 'ide' must not land on 'inside'.
           const norm = function(s) { return String(s).toLowerCase().replace(/[^\\p{L}\\p{N}%]/gu, ''); };
           const clean = norm(word);
           if (!clean) return 0;
-          let matches = meta.wordTimestamps.filter(w => norm(w.word) === clean);
-          if (matches.length === 0) matches = meta.wordTimestamps.filter(w => norm(w.word).startsWith(clean));
-          if (matches.length === 0) matches = meta.wordTimestamps.filter(w => norm(w.word).includes(clean));
+          let matches = shotWords.filter(w => norm(w.word) === clean);
+          if (matches.length === 0) matches = shotWords.filter(w => norm(w.word).startsWith(clean));
+          if (matches.length === 0) matches = shotWords.filter(w => norm(w.word).includes(clean));
           const idx = typeof occurrence === 'number' && occurrence > 0 ? Math.min(occurrence, matches.length - 1) : 0;
           const match = matches[idx];
           return match ? Math.max(0, match.start) : 0;
@@ -173,7 +184,7 @@ export function getRuntimeScript(): string {
 
       // The shot's track: selectors resolve inside this shot only, and loop: true covers this shot.
       // Sub-tracks made with MooTween.track() while it builds inherit that scope.
-      const shotTrack = engine.track({ scope: sceneWrapper, loopSpan: duration });
+      const shotTrack = engine.track({ scope: sceneWrapper, loopSpan: sourceDuration });
       engine.activeTrack = shotTrack;
       try {
         installMographKit(shotTrack, sceneWrapper, ctx);
@@ -192,12 +203,19 @@ export function getRuntimeScript(): string {
       }
       engine.activeTrack = null;
 
-      // Place the shot track at accumulatedTime
-      masterTrack.nest(shotTrack, accumulatedTime);
+      // Place the shot track at accumulatedTime (earlier by inPoint, while the shot is still hidden)
+      masterTrack.nest(shotTrack, accumulatedTime - inPoint);
 
       // Inter-scene transitions
       if (next) {
-        const transDur = Math.min(0.4, Math.max(0.2, duration * 0.25));
+        // A duration set on the shot wins (kept inside the shot); otherwise 0.2-0.4 s from its length.
+        const setDur = Number(def.transitionDuration);
+        const transDur = setDur > 0
+          ? Math.min(Math.max(0.1, setDur), Math.max(0.1, duration * 0.8))
+          : Math.min(0.4, Math.max(0.2, duration * 0.25));
+        // A curve family set on the shot replaces each transition's own family but keeps its direction.
+        const curveFamily = TRANSITION_CURVE_FAMILIES.indexOf(def.transitionCurve) !== -1 ? def.transitionCurve : null;
+        const curve = function(own) { return curveFamily ? curveFamily + own.slice(own.indexOf('-')) : own; };
         const transStart = accumulatedTime + duration - transDur;
         const transEnd = accumulatedTime + duration;
 
@@ -208,14 +226,14 @@ export function getRuntimeScript(): string {
           // way, stopped, and set off again from where the push began.
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
-          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: 'smooth-in' }, transStart);
+          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: curve('smooth-in') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'fade') {
           // Crossfade: Next scene appears underneath at transStart, current scene fades out
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
-          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: 'smooth-inout' }, transStart);
+          masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: curve('smooth-inout') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'slide') {
@@ -224,10 +242,10 @@ export function getRuntimeScript(): string {
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' }, transStart);
           masterTrack.travel(next.wrapper,
             { x: '100%' },
-            { x: '0%', dur: transDur, curve: 'smooth-inout', showStart: false },
+            { x: '0%', dur: transDur, curve: curve('smooth-inout'), showStart: false },
             transStart
           );
-          masterTrack.go(sceneWrapper, { x: '-100%', dur: transDur, curve: 'smooth-inout' }, transStart);
+          masterTrack.go(sceneWrapper, { x: '-100%', dur: transDur, curve: curve('smooth-inout') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
@@ -235,10 +253,10 @@ export function getRuntimeScript(): string {
           masterTrack.pin(next.wrapper, { visibility: 'visible', zIndex: 2, x: '0%', clipPath: 'none' }, transStart);
           masterTrack.travel(next.wrapper,
             { scale: 0.92, opacity: 0 },
-            { scale: 1, opacity: 1, dur: transDur, curve: 'smooth-out', showStart: false },
+            { scale: 1, opacity: 1, dur: transDur, curve: curve('smooth-out'), showStart: false },
             transStart
           );
-          masterTrack.go(sceneWrapper, { scale: 1.15, opacity: 0, dur: transDur, curve: 'smooth-in' }, transStart);
+          masterTrack.go(sceneWrapper, { scale: 1.15, opacity: 0, dur: transDur, curve: curve('smooth-in') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', scale: 1, opacity: 0, zIndex: 1 }, transEnd);
           masterTrack.pin(next.wrapper, { visibility: 'visible', scale: 1, opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'wipe') {
@@ -247,7 +265,7 @@ export function getRuntimeScript(): string {
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
           masterTrack.travel(sceneWrapper,
             { clipPath: 'inset(0% 0% 0% 0%)' },
-            { clipPath: 'inset(0% 0% 100% 0%)', dur: transDur, curve: 'smooth-inout', showStart: false },
+            { clipPath: 'inset(0% 0% 100% 0%)', dur: transDur, curve: curve('smooth-inout'), showStart: false },
             transStart
           );
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', clipPath: 'none', opacity: 0, zIndex: 1 }, transEnd);
@@ -316,8 +334,17 @@ export function getRuntimeScript(): string {
       const id = el.getAttribute('data-moo-layer');
       if (!id) continue;
       const r = el.getBoundingClientRect();
+      // How much the layer's ancestors (a zooming camera, a scaled card) scale its moves: a translate
+      // of 1px on the layer moves it k stage px.
+      const parent = el.parentElement;
+      let k = 1;
+      if (parent && parent.offsetWidth > 0) {
+        const pr = parent.getBoundingClientRect();
+        k = Math.max(0.05, (pr.width * scaleX) / parent.offsetWidth);
+      }
       rects.push({
         id: id,
+        k: Math.round(k * 1000) / 1000,
         tagName: (el.tagName || 'div').toLowerCase(),
         x: Math.round((r.left - stageRect.left) * scaleX),
         y: Math.round((r.top - stageRect.top) * scaleY),

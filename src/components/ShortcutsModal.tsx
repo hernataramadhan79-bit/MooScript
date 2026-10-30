@@ -13,7 +13,18 @@ const GROUPS: { title: string; items: { keys: string[][]; label: string }[] }[] 
       { keys: [['J'], ['L']], label: 'Mundur / maju 1 detik' },
       { keys: [['K']], label: 'Jeda' },
       { keys: [['←'], ['→']], label: 'Mundur / maju 1 frame' },
+      { keys: [['Home'], ['End']], label: 'Ke awal / akhir video' },
       { keys: [['Esc']], label: 'Tutup layar penuh / lepas pilihan adegan' }
+    ]
+  },
+  {
+    title: 'Timeline',
+    items: [
+      { keys: [['I'], ['O']], label: 'Awal / akhir rentang putar ulang di playhead' },
+      { keys: [['X']], label: 'Hapus rentang putar ulang' },
+      { keys: [['M']], label: 'Tambah marker di playhead' },
+      { keys: [['S']], label: 'Potong shot di playhead' },
+      { keys: [[MOD, 'Scroll']], label: 'Perbesar / perkecil timeline' }
     ]
   },
   {

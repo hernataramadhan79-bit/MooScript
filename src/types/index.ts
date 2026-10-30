@@ -1,5 +1,10 @@
 /** 'flow' overlaps shots: the next shot is already underneath while the current one hands off. */
 export type SceneTransition = 'flow' | 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom';
+/** MooTween curve family for a transition; the runtime keeps each transition's own in/out direction. */
+export type TransitionCurve = 'smooth' | 'soft' | 'strong' | 'sharp' | 'linear' | 'rush';
+export const TRANSITION_CURVES: TransitionCurve[] = ['smooth', 'soft', 'strong', 'sharp', 'linear', 'rush'];
+/** Seconds a transition may last; the runtime also keeps it inside the outgoing shot. */
+export const TRANSITION_DURATION_RANGE = { min: 0.1, max: 2 } as const;
 export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal' | 'outline';
 export type CaptionPosition = 'top' | 'center' | 'bottom';
 
@@ -37,12 +42,18 @@ export type RenderMode = 'composition' | 'legacy-canvas';
 /* ------------------------------------------------------------------ *
  * A. CREATIVE PLAN — what we want to make
  * ------------------------------------------------------------------ */
+/** Where the video will be posted; it decides the frame and a sensible length. */
+export type BriefPlatform = 'tiktok' | 'reels' | 'shorts' | 'youtube' | 'feed' | 'other';
+
+/** What the creator wants before any shot exists. Every field is optional; the AI fills the gaps. */
 export interface CreativeBrief {
-  topic: string;
+  platform?: BriefPlatform;
+  targetDurationSec?: number;
+  tone?: string;
   audience?: string;
   goal?: string;
-  aspectRatio: AspectRatio;
-  targetDurationSec: number;
+  topic?: string;
+  aspectRatio?: AspectRatio;
   visualDirection?: string;
   references?: string;
 }
@@ -286,8 +297,12 @@ export interface Scene {
   motionPreset?: MotionPreset;
   /** @deprecated legacy — migration only */
   camera?: CameraMovement;
-  /** @deprecated legacy — migration only */
+  /** How this shot hands over to the next one ('flow' when unset). */
   transition?: SceneTransition;
+  /** Seconds the transition into the next shot takes; unset picks 0.2-0.4 s from the shot length. */
+  transitionDuration?: number;
+  /** Curve family of that transition; unset uses each transition's own curve. */
+  transitionCurve?: TransitionCurve;
   /** @deprecated legacy — migration only */
   text?: string;
   /** @deprecated legacy — migration only */
@@ -613,6 +628,72 @@ export interface LayerOverride {
   textAlign?: 'left' | 'center' | 'right';
   borderRadius?: number;
   layerType?: EditableLayerType;
+  /** Typeface name: a built-in family or one of the project's uploaded fonts. */
+  fontFamily?: string;
+  fontWeight?: number;
+  /** Extra space between letters, in em. */
+  letterSpacing?: number;
+  lineHeight?: number;
+  textTransform?: 'none' | 'uppercase' | 'lowercase';
+}
+
+/** A font file the creator uploaded, embedded in the project so stage and export match. */
+export interface CustomFont {
+  id: string;
+  family: string;
+  dataUrl: string;
+  format: 'woff2' | 'woff' | 'truetype' | 'opentype';
+}
+
+/** How a layer enters or leaves the shot. */
+export type LayerMotionPreset =
+  | 'fade'
+  | 'pop'
+  | 'slide-up'
+  | 'slide-down'
+  | 'slide-left'
+  | 'slide-right'
+  | 'zoom'
+  | 'spin'
+  | 'blur';
+
+export const LAYER_MOTION_PRESETS: LayerMotionPreset[] = [
+  'fade',
+  'pop',
+  'slide-up',
+  'slide-down',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  'spin',
+  'blur'
+];
+
+/** One timed move of a layer; at/dur in seconds from the start of the shot. */
+export interface LayerMotionStep {
+  at: number;
+  dur: number;
+  curve?: TransitionCurve;
+}
+
+/** Where a layer moves to (relative to its resting place) in the A→B move. */
+export interface LayerMoveTarget {
+  x?: number;
+  y?: number;
+  scale?: number;
+  rotation?: number;
+  opacity?: number;
+}
+
+/**
+ * Animation the editor adds to a layer on top of the shot's own code: an entrance, a move from its
+ * place (A) to a new one (B), and an exit. It runs on separate CSS variables, so it never fights the
+ * moves the code makes on the same element.
+ */
+export interface LayerMotion {
+  enter?: LayerMotionStep & { preset: LayerMotionPreset };
+  move?: LayerMotionStep & { to: LayerMoveTarget };
+  exit?: LayerMotionStep & { preset: LayerMotionPreset };
 }
 
 export interface SceneAssetAttachment {
@@ -650,9 +731,21 @@ export interface GeneratedScene {
 
   /** Per-layer non-destructive tweaks (position / scale / rotation / opacity / color). */
   overrides?: Record<string, LayerOverride>;
+  /** Per-layer entrance / move / exit added in the editor. */
+  layerMotions?: Record<string, LayerMotion>;
   /** Per-scene palette tweaks, exposed to generated CSS as --moo-* variables. */
   palette?: Partial<ScenePalette>;
   transitionOut?: string;
+
+  /**
+   * Seconds of this code's own animation skipped before the shot shows (the second half of a split
+   * shot starts where the first half was cut). Regenerated code drops it, since it is built fresh.
+   */
+  inPoint?: number;
+  /** Length the code was built for; set on split pieces so their animation keeps its original timing. */
+  sourceDuration?: number;
+  /** Seed of ctx.rand(); split pieces share their original's so particles carry across the cut. */
+  seed?: number;
 }
 
 /** Alias kept for readability in the engine; a SceneModule IS a GeneratedScene. */
@@ -715,8 +808,20 @@ export interface MooProject {
     customName?: string;
   };
   exportSettings?: Partial<ProjectExportSettings>;
+  /** Named points on the timeline (beats, cue notes), in seconds. */
+  markers?: TimelineMarker[];
+  /** Fonts uploaded for this project. */
+  customFonts?: CustomFont[];
+  /** Image data by asset id; scene markup refers to it as moo-asset:<id>. */
+  assetData?: Record<string, string>;
   createdAt?: number;
   updatedAt?: number;
+}
+
+export interface TimelineMarker {
+  id: string;
+  time: number;
+  label: string;
 }
 
 export const CURRENT_SCHEMA_VERSION = 2;

@@ -1,10 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { SceneTransition } from '../../types';
+import type { SceneTransition, TransitionCurve } from '../../types';
+
+const TRANSITION_DURATIONS = [0.2, 0.3, 0.5, 0.8, 1, 1.5];
+
+/** Curve families in words an editor uses; the runtime keeps each transition's in/out direction. */
+const TRANSITION_CURVE_LABELS: { id: TransitionCurve; label: string }[] = [
+  { id: 'smooth', label: 'Halus' },
+  { id: 'soft', label: 'Lembut' },
+  { id: 'strong', label: 'Tegas' },
+  { id: 'sharp', label: 'Tajam' },
+  { id: 'rush', label: 'Melesat' },
+  { id: 'linear', label: 'Rata' }
+];
 import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { Button } from '../ui/Button';
 import { MAX_SCENE_SECONDS, sceneSeconds } from '../../utils/projectDuration';
+import { briefSummary } from '../../engine/ai/brief';
+import { BriefPanel } from './BriefPanel';
 
 interface AutoExpandTextareaProps {
   value: string;
@@ -136,6 +150,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     toggleSceneSubtitles,
     setSceneDuration,
     setSceneTransition,
+    setSceneTransitionTiming,
     reorderScenes,
     scriptPrompt,
     setScriptPrompt,
@@ -170,6 +185,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
       toggleSceneSubtitles: s.toggleSceneSubtitles,
       setSceneDuration: s.setSceneDuration,
       setSceneTransition: s.setSceneTransition,
+      setSceneTransitionTiming: s.setSceneTransitionTiming,
       reorderScenes: s.reorderScenes,
       scriptPrompt: s.scriptPrompt,
       setScriptPrompt: s.setScriptPrompt,
@@ -204,6 +220,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
   const scenes = project.scenes || [];
   const subtitlesOn = Boolean(project.theme?.showSubtitles);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
+  const [isBriefOpen, setIsBriefOpen] = useState(false);
   const [openAssetPickerForScene, setOpenAssetPickerForScene] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevActiveSceneIdRef = useRef<string | null>(activeSceneId);
@@ -322,21 +339,28 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
             className="w-full bg-surface-2/70 border border-border/70 focus:border-accent rounded-lg px-2.5 py-2 text-[13px] text-text placeholder:text-text-faint resize-y min-h-[64px] focus:outline-none transition-colors leading-relaxed max-h-48 overflow-y-auto"
           />
 
+          {isBriefOpen && <BriefPanel />}
+
           <div className="flex items-center justify-between gap-2">
             {(() => {
               const activeSkill = skills.find((s) => s.id === activeSkillId) || skills[0];
+              const summary = briefSummary(project.brief) || `Gaya: ${activeSkill?.name || 'Creative'}`;
               return (
                 <button
                   type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-2/60 hover:bg-surface-3 text-[11px] text-text-muted hover:text-text border border-border/60 transition-all truncate max-w-[170px]"
-                  title="Ganti atau sesuaikan Persona Sutradara di Pengaturan"
+                  onClick={() => setIsBriefOpen((open) => !open)}
+                  aria-expanded={isBriefOpen}
+                  className="min-w-0 flex items-center gap-1.5 px-2 py-1 min-h-[32px] rounded-md bg-surface-2/60 hover:bg-surface-3 text-[11px] text-text-muted hover:text-text border border-border/60 transition-all max-w-[190px]"
+                  title="Atur platform, durasi, nada, audiens dan gaya sutradara"
                 >
                   <span className="material-symbols-outlined text-[14px] text-text-muted shrink-0">
-                    {activeSkill ? resolveSkillIcon(activeSkill.icon) : 'palette'}
+                    {activeSkill ? resolveSkillIcon(activeSkill.icon) : 'tune'}
                   </span>
                   <span className="truncate">
-                    Gaya: <strong className="text-text font-medium">{activeSkill?.name || 'Creative'}</strong>
+                    Brief: <strong className="text-text font-medium">{summary}</strong>
+                  </span>
+                  <span className="material-symbols-outlined text-[14px] shrink-0">
+                    {isBriefOpen ? 'expand_less' : 'expand_more'}
                   </span>
                 </button>
               );
@@ -952,7 +976,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 <div className="absolute inset-0 flex items-center" aria-hidden="true">
                   <div className="w-full border-t border-border/40" />
                 </div>
-                <div className="relative flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-1 border border-border/70 text-[10px] text-text-muted hover:border-border transition-colors">
+                <div className="relative flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 px-2 py-0.5 rounded-full bg-surface-1 border border-border/70 text-[10px] text-text-muted hover:border-border transition-colors">
                   <span className="material-symbols-outlined text-[12px] text-text-faint">swap_horiz</span>
                   <span className="text-[10px] text-text-muted">Transisi:</span>
                   <select
@@ -968,6 +992,53 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     <option value="zoom" className="bg-surface-1 text-text">Zoom (Perbesar)</option>
                     <option value="wipe" className="bg-surface-1 text-text">Wipe (Sapuan)</option>
                   </select>
+                  {(scene.transition || 'flow') !== 'cut' && (
+                    <>
+                      <span aria-hidden="true" className="text-text-faint">·</span>
+                      <select
+                        value={scene.transitionDuration ?? ''}
+                        onChange={(e) =>
+                          setSceneTransitionTiming(scene.id, {
+                            duration: e.target.value === '' ? null : parseFloat(e.target.value)
+                          })
+                        }
+                        className="bg-transparent text-text text-[10px] font-medium font-mono focus:outline-none cursor-pointer"
+                        aria-label={`Durasi transisi dari adegan ${index + 1}`}
+                        title="Lama transisi ke adegan berikutnya"
+                      >
+                        <option value="" className="bg-surface-1 text-text">Otomatis</option>
+                        {TRANSITION_DURATIONS.map((d) => (
+                          <option key={d} value={d} className="bg-surface-1 text-text">
+                            {String(d).replace('.', ',')} dtk
+                          </option>
+                        ))}
+                        {scene.transitionDuration !== undefined && !TRANSITION_DURATIONS.includes(scene.transitionDuration) && (
+                          <option value={scene.transitionDuration} className="bg-surface-1 text-text">
+                            {String(scene.transitionDuration).replace('.', ',')} dtk
+                          </option>
+                        )}
+                      </select>
+                      <span aria-hidden="true" className="text-text-faint">·</span>
+                      <select
+                        value={scene.transitionCurve ?? ''}
+                        onChange={(e) =>
+                          setSceneTransitionTiming(scene.id, {
+                            curve: e.target.value === '' ? null : (e.target.value as TransitionCurve)
+                          })
+                        }
+                        className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer"
+                        aria-label={`Gaya gerak transisi dari adegan ${index + 1}`}
+                        title="Percepatan transisi: halus, tegas, tajam, dan seterusnya"
+                      >
+                        <option value="" className="bg-surface-1 text-text">Gerak otomatis</option>
+                        {TRANSITION_CURVE_LABELS.map((c) => (
+                          <option key={c.id} value={c.id} className="bg-surface-1 text-text">
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                 </div>
               </div>
             )}

@@ -1,3 +1,4 @@
+import { assetRef } from '../../engine/composition/assetRefs';
 import React, { useEffect, useRef } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import type { AssetRecord } from '../../db/mooDb';
@@ -188,7 +189,8 @@ export const AssetManagerPanel: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
           {assets.map((asset) => {
-            const isInserted = Boolean(asset.dataUrl && targetCompScene?.html?.includes(asset.dataUrl));
+            const html = targetCompScene?.html || '';
+            const isInserted = html.includes(assetRef(asset.id)) || Boolean(asset.dataUrl && html.includes(asset.dataUrl));
             return (
               <div
                 key={asset.id}

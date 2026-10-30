@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { Scene, MooProject, StyleBrief } from '../../types';
 import type { WorldBible } from '../../engine/ai/llm';
 import { generateStoryboard } from '../../engine/ai/llm';
+import { planShots } from '../../engine/ai/brief';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
@@ -17,8 +18,13 @@ let scriptAbortController: AbortController | null = null;
  */
 let projectBeforeStoryboard: { project: MooProject; rawVoiceBlob: Blob | null; bgmOnlyAudio: boolean } | null = null;
 
-/** A shot list with a world bible needs more room than the old 3-6 scene storyboard. */
+/** A shot list with a world bible needs more room than the old 3-6 scene storyboard; longer films more still. */
 const STORYBOARD_MIN_TOKENS = 4096;
+
+function storyboardMinTokens(targetSec: number | undefined): number {
+  if (!targetSec) return STORYBOARD_MIN_TOKENS;
+  return Math.min(16384, Math.max(STORYBOARD_MIN_TOKENS, planShots(targetSec).maxShots * 400 + 1200));
+}
 
 /**
  * Applies the storyboard's world bible: it becomes the project's style brief (motif, visual and
@@ -155,7 +161,8 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         skill: activeSkill,
         language: settings.outputLanguage || 'id',
         signal: controller.signal,
-        maxTokens: Math.max(settings.maxOutputTokens || 2048, STORYBOARD_MIN_TOKENS)
+        maxTokens: Math.max(settings.maxOutputTokens || 2048, storyboardMinTokens(get().project.brief?.targetDurationSec)),
+        brief: get().project.brief
       });
 
       if (controller.signal.aborted) throw new DOMException('User cancelled script generation', 'AbortError');

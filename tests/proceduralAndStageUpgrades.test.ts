@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   PROCEDURAL_ARCHETYPES,
   detectBestArchetype,
-  compileProceduralScene
+  compileProceduralScene,
+  compileProceduralProject
 } from '../src/engine/composition/proceduralCompiler';
 import { validateSceneCode } from '../src/engine/composition/validator';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
@@ -262,5 +263,65 @@ describe('Store Upgrades: Undo/Redo Integrity, Procedural Compilation, Multi-Ass
     const doc = buildCompositionDocument(proj);
     expect(doc).not.toContain('"hideSubtitles":true');
     expect(doc).toContain('if (!sc.hideSubtitles)');
+  });
+});
+
+describe('Instant visuals never invent content', () => {
+  const scene = (id: string, narrationText: string, visualIntent?: string) => ({
+    id,
+    narrationText,
+    visualIntent,
+    durationInSeconds: 4,
+    wordTimestamps: []
+  });
+
+  it('does not show a number the narration never said', () => {
+    const s = scene('n1', 'Tiga fakta yang jarang orang tahu tentang topik ini.', 'Metrik utama');
+    expect(detectBestArchetype(s, 0)).not.toBe('stat-counter');
+    const mod = compileProceduralScene(s, 0, 3, undefined, 'stat-counter');
+    expect(mod.html).not.toContain('340');
+    expect(mod.html).not.toContain('Stat Number');
+  });
+
+  it('uses the narration number and only draws a share bar for a percentage', () => {
+    const pct = compileProceduralScene(scene('n2', 'Penjualan naik 87% dalam tiga bulan'), 0, 1, undefined, 'stat-counter');
+    expect(pct.html).toContain('87%');
+    expect(pct.css).toContain('width: 87%;');
+    const count = compileProceduralScene(scene('n3', 'Kami punya 1200 pengguna aktif'), 0, 1, undefined, 'stat-counter');
+    expect(count.html).toContain('1200');
+    expect(count.html).not.toContain('Progress Track');
+  });
+
+  it('never fills lists or comparisons with filler words', () => {
+    const s = scene('n4', 'Satu ide kecil bisa mengubah segalanya');
+    for (const arch of ['bento-list', 'split-versus', 'glass-spotlight', 'code-terminal'] as const) {
+      const html = compileProceduralScene(s, 0, 1, undefined, arch).html;
+      expect(html).not.toMatch(/PRESISI VISUAL|GERAK DINAMIS|SINKRONISASI|CARA LAMA|SOLUSI BARU/);
+    }
+    expect(detectBestArchetype(scene('n5', 'Cara lama vs cara baru yang lebih cepat'), 0)).toBe('split-versus');
+    const vs = compileProceduralScene(scene('n5', 'Cara lama vs cara baru yang lebih cepat'), 0, 1, undefined, 'split-versus');
+    expect(vs.html).toContain('Cara lama');
+    expect(vs.html).toContain('cara baru yang lebih cepat');
+  });
+
+  it('charts the narration numbers and turns a falling trend downward', () => {
+    const data = compileProceduralScene(scene('n6', 'Dari 20 pengguna menjadi 80 pengguna'), 0, 1, undefined, 'chart-data');
+    expect(data.html).toContain('>20<');
+    expect(data.html).toContain('>80<');
+    const falling = compileProceduralScene(scene('n7', 'Penjualan turun tajam tahun ini'), 0, 1, undefined, 'chart-data');
+    const heights = Array.from(falling.html.matchAll(/height="(\d+)"/g), (m) => Number(m[1]));
+    expect(heights[0]).toBeGreaterThan(heights[heights.length - 1]);
+  });
+
+  it('does not repeat the same layout on consecutive shots in auto mode', () => {
+    const lines = ['Halo semua', 'Ini topik penting', 'Simak sampai habis', 'Jangan lupa ikuti'];
+    const project = {
+      ...INITIAL_PROJECT,
+      scenes: lines.map((l, i) => scene(`r${i}`, l))
+    } as MooProject;
+    const layouts = compileProceduralProject(project, 'auto', true).composition!.scenes.map((m) =>
+      m.html.match(/class="p_r\d+-(slam|glass|quote|stat|bento|vs|chart|term)/)?.[1]
+    );
+    for (let i = 1; i < layouts.length; i++) expect(layouts[i]).not.toBe(layouts[i - 1]);
   });
 });

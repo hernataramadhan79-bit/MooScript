@@ -20,7 +20,7 @@ const SettingsDrawer = lazy(() =>
   import('./components/SettingsDrawer').then((m) => ({ default: m.SettingsDrawer }))
 );
 
-export type MobileTab = 'naskah' | 'mograph' | 'style' | 'asset' | 'audio' | 'ekspor';
+export type MobileTab = 'naskah' | 'mograph' | 'style' | 'asset' | 'audio' | 'subtitle' | 'ekspor';
 export type { InspectorTab };
 
 export const App: React.FC = () => {
@@ -67,6 +67,7 @@ export const App: React.FC = () => {
     { id: 'style', label: 'Gaya', icon: 'tune' },
     { id: 'asset', label: 'Aset', icon: 'perm_media' },
     { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
+    { id: 'subtitle', label: 'Subtitel', icon: 'subtitles' },
     { id: 'ekspor', label: 'Ekspor', icon: 'download' }
   ];
 
@@ -219,7 +220,7 @@ export const App: React.FC = () => {
               {/* Mobile bottom navigation (swipe the panel above to move between tabs) */}
               <nav
                 aria-label="Panel studio"
-                className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-6 gap-1 select-none"
+                className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-7 gap-0.5 select-none"
               >
                 {mobileTabs.map((tab) => {
                   const isActive = mobileTab === tab.id;
@@ -229,7 +230,7 @@ export const App: React.FC = () => {
                       type="button"
                       onClick={() => setMobileTab(tab.id)}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`min-h-[48px] py-1 px-0.5 rounded-xl text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
+                      className={`min-h-[48px] py-1 px-0 rounded-xl text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
                         isActive ? 'bg-surface-3 text-accent' : 'text-text-muted hover:text-on-surface'
                       }`}
                     >

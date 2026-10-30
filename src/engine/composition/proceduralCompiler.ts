@@ -132,81 +132,153 @@ const STOP_WORDS = new Set([
   'have', 'has', 'had', 'not', 'but', 'what', 'all', 'when', 'can', 'there', 'into'
 ]);
 
-function extractKeyPhrases(text: string): {
+type ConcreteArchetype = Exclude<ProceduralArchetype, 'auto'>;
+
+interface KeyPhrases {
   headline: string;
   accentWord: string;
   subtext: string;
+  /** Up to 22 words of the narration, for layouts that show the whole line. */
+  fullText: string;
+  /** Clauses of the narration; empty when it has fewer than two. Never invented. */
   chips: string[];
+  /** The two things a comparison compares; empty when the narration does not name two. */
+  sides: string[];
   detectedNumber: string | null;
-} {
-  const clean = (text || 'MooScript Studio Motion').trim();
+  /** Every number written in the narration, in order. */
+  numbers: string[];
+}
+
+const NUMBER_RE = /\+?\d+(?:[.,]\d+)?(?:\s*%|\s*x|\s*X|\s*kali|\s*jt|\s*M|\s*K|\+)?/g;
+const FALLING_RE = /(turun|menurun|anjlok|merosot|berkurang|menyusut|\bdrop|declin|fall|decreas)/i;
+const TREND_RE = /(grafik|chart|tren|pertumbuhan|tumbuh|statistik|kurva|naik|lonjakan|turun|menurun|anjlok|merosot|growth|trend)/i;
+
+function extractKeyPhrases(text: string): KeyPhrases {
+  const clean = (text || '').trim();
   const words = clean.split(/\s+/).filter(Boolean);
 
-  // Check for numbers / percentages / multipliers
-  const numberMatch = clean.match(/(\+?\d+(?:[.,]\d+)?(?:\s*%|\s*x|\s*X|\s*kali|\s*jt|\s*M|\s*K|\+)?)/);
-  const detectedNumber = numberMatch ? numberMatch[1].trim() : null;
+  // Numbers / percentages / multipliers exactly as the narration writes them
+  const numbers = Array.from(clean.matchAll(NUMBER_RE), (m) => m[0].trim());
+  const detectedNumber = numbers[0] ?? null;
 
   // Pick strongest accent word
   const candidates = words
     .map((w) => w.replace(/[^a-zA-Z0-9%+]/g, ''))
     .filter((w) => w.length >= 4 && !STOP_WORDS.has(w.toLowerCase()));
-  const accentWord = candidates[0] || words[Math.min(1, words.length - 1)] || 'UTAMA';
+  const accentWord = candidates[0] || words[0] || '';
 
-  // Split headline (first 6 words) and subtext (remaining)
-  const headlineWords = words.slice(0, 6);
-  const headline = headlineWords.join(' ');
-  const subtext = words.length > 6 ? words.slice(6, 22).join(' ') : clean;
+  // Split headline (first 6 words) and subtext (remaining). A short line is all headline,
+  // so the same words never show twice.
+  const headline = words.slice(0, 6).join(' ');
+  const subtext = words.length > 6 ? words.slice(6, 22).join(' ') : '';
+  const fullText = words.slice(0, 22).join(' ');
 
-  // Build 3 short chips from candidate words or segments
+  // Up to 3 short chips from the narration's own clauses
   const clauses = clean
     .split(/[,.;:!?—-]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 2);
+  const chips = clauses.length >= 2 ? clauses.slice(0, 3).map((c) => c.split(/\s+/).slice(0, 5).join(' ')) : [];
 
-  let chips: string[] = [];
-  if (clauses.length >= 2) {
-    chips = clauses.slice(0, 3).map((c) => c.split(/\s+/).slice(0, 5).join(' '));
-  } else {
-    const uniqueCandidates = Array.from(new Set(candidates)).slice(0, 3);
-    chips = uniqueCandidates.length >= 2
-      ? uniqueCandidates.map((c) => c.toUpperCase())
-      : ['PRESISI VISUAL', 'GERAK DINAMIS', 'SINKRONISASI'];
-  }
+  // The two sides of a comparison: "A vs B" / "A dibanding B", else the first two clauses.
+  const versusParts = clean
+    .split(/\s+(?:vs\.?|versus|dibanding(?:kan)?|lawan)\s+/i)
+    .map((s) => s.replace(/[.,;:!?]+$/, '').trim())
+    .filter(Boolean);
+  const sides = (versusParts.length === 2 ? versusParts : chips.slice(0, 2)).map((s) =>
+    s.split(/\s+/).slice(0, 5).join(' ')
+  );
 
-  return { headline, accentWord, subtext, chips, detectedNumber };
+  return { headline, accentWord, subtext, fullText, chips, sides, detectedNumber, numbers };
 }
 
-export function detectBestArchetype(scene: Scene, index: number): Exclude<ProceduralArchetype, 'auto'> {
+/**
+ * What each layout needs from the narration before it may be used. A layout without its data
+ * would have to show numbers, trends or list items the script never said.
+ */
+function archetypeHasData(archetype: ConcreteArchetype, phrases: KeyPhrases, narration: string): boolean {
+  switch (archetype) {
+    case 'stat-counter':
+      return phrases.detectedNumber !== null;
+    case 'chart-data':
+      return phrases.numbers.length >= 2 || TREND_RE.test(narration);
+    case 'split-versus':
+      return phrases.sides.length === 2;
+    case 'bento-list':
+      return phrases.chips.length >= 2;
+    default:
+      return Boolean(phrases.headline);
+  }
+}
+
+/** Layouts that work with any line of narration, used when nothing more specific fits. */
+const ROTATION: ConcreteArchetype[] = ['kinetic-impact', 'glass-spotlight', 'social-quote'];
+
+/** Layouts in order of fit for this scene: content matches first, then the rotation. */
+function rankArchetypes(scene: Scene, index: number): ConcreteArchetype[] {
   const combined = `${scene.narrationText || ''} ${scene.text || ''} ${scene.visualIntent || ''} ${scene.visualConcept || ''}`.toLowerCase();
+  const ranked: ConcreteArchetype[] = [];
 
   if (/(\bvs\b|versus|banding|lama\s+vs|baru\s+vs|sebelum|sesudah|kontras)/i.test(combined)) {
-    return 'split-versus';
+    ranked.push('split-versus');
   }
   if (/(kode|code|terminal|script|function|const\s|api|algoritma|developer|program)/i.test(combined)) {
-    return 'code-terminal';
+    ranked.push('code-terminal');
   }
-  if (/(grafik|chart|tren|pertumbuhan|statistik|kurva|naik|lonjakan)/i.test(combined)) {
-    return 'chart-data';
+  if (TREND_RE.test(combined)) {
+    ranked.push('chart-data');
   }
   if (/(\d+\s*%|\d+x\b|\$\d+|\bRp\s*\d+|\bangka\b|\bmetrik\b|\bpersen\b|\bkecepatan\b)/i.test(combined)) {
-    return 'stat-counter';
+    ranked.push('stat-counter');
   }
   if (/(1\.|2\.|\bpertama\b|\bkedua\b|\bketiga\b|\blangkah\b|\bdaftar\b|\bpoin\b|\btips\b|\bcara\b)/i.test(combined)) {
-    return 'bento-list';
+    ranked.push('bento-list');
   }
   if (/("|“|kutipan|quote|kata\s+mereka|filosofi|cerita|kisah|ingatlah)/i.test(combined)) {
-    return 'social-quote';
+    ranked.push('social-quote');
   }
+  for (let i = 0; i < ROTATION.length; i++) {
+    ranked.push(ROTATION[(index + i) % ROTATION.length]);
+  }
+  return Array.from(new Set(ranked));
+}
 
-  const rotation: Array<Exclude<ProceduralArchetype, 'auto'>> = [
-    'kinetic-impact',
-    'glass-spotlight',
-    'bento-list',
-    'stat-counter',
-    'social-quote',
-    'chart-data'
-  ];
-  return rotation[index % rotation.length];
+/**
+ * Picks the layout for a scene. 'auto' takes the best fit that has its data and differs from the
+ * previous shot's layout; an explicit choice is kept unless the narration lacks its data.
+ */
+export function resolveProceduralArchetype(
+  scene: Scene,
+  index: number,
+  archetype: ProceduralArchetype = 'auto',
+  previous?: ConcreteArchetype
+): ConcreteArchetype {
+  const narration = scene.narrationText || scene.text || '';
+  const phrases = extractKeyPhrases(narration);
+  const usable = (a: ConcreteArchetype) => archetypeHasData(a, phrases, narration);
+
+  if (archetype !== 'auto' && usable(archetype)) return archetype;
+
+  const ranked = rankArchetypes(scene, index).filter(usable);
+  return ranked.find((a) => a !== previous) || ranked[0] || 'kinetic-impact';
+}
+
+export function detectBestArchetype(scene: Scene, index: number, previous?: ConcreteArchetype): ConcreteArchetype {
+  return resolveProceduralArchetype(scene, index, 'auto', previous);
+}
+
+/** Bar heights for the chart: the narration's own numbers, or an unlabeled rise/fall when it only names a trend. */
+function chartBars(phrases: KeyPhrases, narration: string): { height: number; label: string }[] {
+  const values = phrases.numbers
+    .map((n) => ({ label: n, value: Math.abs(parseFloat(n.replace(/^\+/, '').replace(',', '.'))) }))
+    .filter((v) => Number.isFinite(v.value))
+    .slice(0, 4);
+  if (values.length >= 2) {
+    const max = Math.max(...values.map((v) => v.value)) || 1;
+    return values.map((v) => ({ height: Math.max(12, Math.round((v.value / max) * 200)), label: v.label }));
+  }
+  const rising = [100, 140, 185, 235];
+  return (FALLING_RE.test(narration) ? [...rising].reverse() : rising).map((height) => ({ height, label: '' }));
 }
 
 export function compileProceduralScene(
@@ -214,13 +286,15 @@ export function compileProceduralScene(
   index: number,
   total: number,
   palette?: Partial<ScenePalette>,
-  archetype: ProceduralArchetype = 'auto'
+  archetype: ProceduralArchetype = 'auto',
+  previous?: ConcreteArchetype
 ): GeneratedScene {
-  const chosen = archetype === 'auto' ? detectBestArchetype(scene, index) : archetype;
+  const chosen = resolveProceduralArchetype(scene, index, archetype, previous);
   const narration = scene.narrationText || scene.text || `Adegan ${index + 1}`;
   const intent = scene.visualIntent || scene.visualConcept || `Shot ${index + 1} / ${total}`;
   const duration = Math.max(1.5, scene.durationInSeconds || 3.5);
-  const { headline, accentWord, subtext, chips, detectedNumber } = extractKeyPhrases(narration);
+  const phrases = extractKeyPhrases(narration);
+  const { headline, accentWord, subtext, fullText, chips, detectedNumber } = phrases;
 
   const safeIntent = escapeHtml(intent.slice(0, 48).toUpperCase());
   const safeHeadline = escapeHtml(headline);
@@ -300,7 +374,10 @@ export function compileProceduralScene(
 `;
 
   if (chosen === 'stat-counter') {
-    const statValue = escapeHtml(detectedNumber || '+340%');
+    const statValue = escapeHtml(detectedNumber || '');
+    // The bar only shows a share when the narration gives one; any other number gets no bar.
+    const pct = /%$/.test(detectedNumber || '') ? parseFloat((detectedNumber || '').replace(',', '.')) : NaN;
+    const barPct = Number.isFinite(pct) && pct > 0 && pct <= 100 ? Math.round(pct) : null;
     html = `
 <div class="${sid}-stage">
   <div class="${sid}-grid-bg"></div>
@@ -312,10 +389,14 @@ export function compileProceduralScene(
   <div data-moo-layer="Main Card" class="${sid}-stat-card">
     <div data-moo-layer="Stat Number" class="${sid}-stat-num accent">${statValue}</div>
     <h1 data-moo-layer="Headline" class="${sid}-stat-title">${safeHeadline}</h1>
-    <p data-moo-layer="Subtext" class="${sid}-stat-desc">${safeSubtext}</p>
+    <p data-moo-layer="Subtext" class="${sid}-stat-desc">${safeSubtext}</p>${
+      barPct !== null
+        ? `
     <div data-moo-layer="Progress Track" class="${sid}-bar-wrap">
       <div class="${sid}-bar-fill"></div>
-    </div>
+    </div>`
+        : ''
+    }
   </div>
 </div>`.trim();
 
@@ -362,7 +443,7 @@ export function compileProceduralScene(
   overflow: hidden;
 }
 .${sid}-bar-fill {
-  width: 88%;
+  width: ${barPct ?? 0}%;
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--moo-accent, #84cc16), #38bdf8);
@@ -381,12 +462,19 @@ shot.travel(badge, { y: -30, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve:
   .travel(card, { y: 60, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, dur: 0.6, curve: 'strong-out' }, 0.1)
   .travel(statNum, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, dur: 0.65, curve: 'overshoot-out(2)' }, 0.22)
   .travel(headline, { y: 24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve: 'smooth-out' }, 0.35)
-  .travel(subtext, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.45)
-  .travel(barFill, { scaleX: 0, pivot: 'left center' }, { scaleX: 1, dur: 0.9, curve: 'strong-out' }, 0.35)
+  .travel(subtext, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.45)${
+    barPct !== null
+      ? `
+  .travel(barFill, { scaleX: 0, pivot: 'left center' }, { scaleX: 1, dur: 0.9, curve: 'strong-out' }, 0.35)`
+      : ''
+  }
   .go(orb, { x: -40, y: 40, scale: 1.15, dur: ${Math.max(1.5, duration - 0.2).toFixed(2)}, curve: 'gentle-inout' }, 0);
 `.trim();
   } else if (chosen === 'code-terminal') {
-    const codeLines = chips.map((c, i) => `const step_${i + 1} = "${escapeHtml(c)}";`).join('\n');
+    // The window only shows the narration's own words, as steps or as one comment line.
+    const codeLines = chips.length
+      ? chips.map((c, i) => `const step_${i + 1} = "${escapeHtml(c)}";`).join('\n')
+      : `// ${escapeHtml(fullText)}`;
     html = `
 <div class="${sid}-stage">
   <div class="${sid}-grid-bg"></div>
@@ -403,7 +491,7 @@ shot.travel(badge, { y: -30, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve:
       <span class="${sid}-tl-dot" style="background:#22c55e"></span>
       <span class="${sid}-term-title">mooscript-engine.ts</span>
     </div>
-    <pre data-moo-layer="Code Block" class="${sid}-code"><code>${codeLines}\n// ${safeAccent}</code></pre>
+    <pre data-moo-layer="Code Block" class="${sid}-code"><code>${codeLines}${chips.length ? `\n// ${safeAccent}` : ''}</code></pre>
   </div>
   <p data-moo-layer="Subtext" class="${sid}-term-sub">${safeSubtext}</p>
 </div>`.trim();
@@ -479,8 +567,14 @@ shot.travel(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   .travel(sub, { y: 20, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.45, curve: 'smooth-out' }, 0.5);
 `.trim();
   } else if (chosen === 'split-versus') {
-    const leftText = escapeHtml(chips[0] || 'CARA LAMA');
-    const rightText = escapeHtml(chips[1] || safeAccent);
+    const leftText = escapeHtml(phrases.sides[0] || '');
+    const rightText = escapeHtml(phrases.sides[1] || '');
+    // Side labels only claim "before/after" or "old/new" when the narration says so.
+    const [leftTag, rightTag] = /(sebelum|sesudah|before|after)/i.test(narration)
+      ? ['SEBELUM', 'SESUDAH']
+      : /(lama|baru|\bold\b|\bnew\b)/i.test(narration)
+        ? ['LAMA', 'BARU']
+        : ['A', 'B'];
     html = `
 <div class="${sid}-stage">
   <div class="${sid}-grid-bg"></div>
@@ -492,12 +586,12 @@ shot.travel(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   <h1 data-moo-layer="Headline" class="${sid}-vs-title">${safeHeadline}</h1>
   <div class="${sid}-vs-grid">
     <div data-moo-layer="Left Card" class="${sid}-vs-card ${sid}-vs-left">
-      <div class="${sid}-vs-tag">SEBELUM</div>
+      <div class="${sid}-vs-tag">${leftTag}</div>
       <div class="${sid}-vs-val">${leftText}</div>
     </div>
     <div data-moo-layer="VS Badge" class="${sid}-vs-pill">VS</div>
     <div data-moo-layer="Right Card" class="${sid}-vs-card ${sid}-vs-right">
-      <div class="${sid}-vs-tag accent">SOLUSI BARU</div>
+      <div class="${sid}-vs-tag accent">${rightTag}</div>
       <div class="${sid}-vs-val">${rightText}</div>
     </div>
   </div>
@@ -665,6 +759,20 @@ shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   .travel(sub, { y: 18, opacity: 0 }, { y: 0, opacity: 0.9, dur: 0.4, curve: 'smooth-out' }, 0.55);
 `.trim();
   } else if (chosen === 'chart-data') {
+    const bars = chartBars(phrases, narration);
+    const slot = 600 / bars.length;
+    const barWidth = Math.min(110, Math.round(slot * 0.6));
+    const barsSvg = bars
+      .map((bar, i) => {
+        const x = Math.round(slot * i + (slot - barWidth) / 2);
+        const y = 260 - bar.height;
+        const fill = i === bars.length - 1 ? 'var(--moo-accent, #84cc16)' : `rgba(255,255,255,${(0.18 + i * 0.1).toFixed(2)})`;
+        const label = bar.label
+          ? `\n      <text x="${x + barWidth / 2}" y="${Math.max(18, y - 10)}" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">${escapeHtml(bar.label)}</text>`
+          : '';
+        return `      <rect class="${sid}-bar" x="${x}" y="${y}" width="${barWidth}" height="${bar.height}" rx="12" fill="${fill}" />${label}`;
+      })
+      .join('\n');
     html = `
 <div class="${sid}-stage">
   <div class="${sid}-grid-bg"></div>
@@ -676,10 +784,7 @@ shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   <h1 data-moo-layer="Headline" class="${sid}-chart-title">${safeHeadline}</h1>
   <div data-moo-layer="Main Card" class="${sid}-chart-card">
     <svg data-moo-layer="Chart Graphic" viewBox="0 0 600 280" class="${sid}-chart-svg">
-      <rect class="${sid}-bar" x="60" y="160" width="75" height="100" rx="12" fill="rgba(255,255,255,0.18)" />
-      <rect class="${sid}-bar" x="185" y="120" width="75" height="140" rx="12" fill="rgba(255,255,255,0.28)" />
-      <rect class="${sid}-bar" x="310" y="75" width="75" height="185" rx="12" fill="rgba(132,204,22,0.55)" />
-      <rect class="${sid}-bar" x="435" y="25" width="75" height="235" rx="12" fill="var(--moo-accent, #84cc16)" />
+${barsSvg}
     </svg>
     <div data-moo-layer="Accent Tag" class="${sid}-chart-caption accent">${safeAccent}</div>
   </div>
@@ -747,7 +852,7 @@ shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Main Card" class="${sid}-quote-card">
     <div data-moo-layer="Quote Mark" class="${sid}-quote-mark accent">“</div>
-    <h1 data-moo-layer="Headline" class="${sid}-quote-text">${safeSubtext}</h1>
+    <h1 data-moo-layer="Headline" class="${sid}-quote-text">${escapeHtml(fullText)}</h1>
     <div data-moo-layer="Badge" class="${sid}-quote-footer">
       <span class="${sid}-dot"></span>
       <span>${safeIntent}</span>
@@ -982,12 +1087,17 @@ export function compileProceduralProject(
     existingMap.set(mod.beatId, mod);
   }
 
+  // 'auto' never gives two shots in a row the same layout.
+  let previous: ConcreteArchetype | undefined;
   const compiledScenes: GeneratedScene[] = scenes.map((scene, idx) => {
     const existing = existingMap.get(scene.id);
     if (existing && existing.status === 'ok' && existing.html.trim() && !overwriteExisting) {
+      previous = undefined;
       return existing;
     }
-    return compileProceduralScene(scene, idx, total, existing?.palette, archetype);
+    const chosen = resolveProceduralArchetype(scene, idx, archetype, previous);
+    previous = chosen;
+    return compileProceduralScene(scene, idx, total, existing?.palette, chosen);
   });
 
   const totalDuration = compiledScenes.reduce((sum, s) => sum + (s.duration || 3), 0);

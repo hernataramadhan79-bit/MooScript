@@ -33,7 +33,21 @@ export const createUiSlice: StateCreator<MooStoreState, [], [], UiSlice> = (set,
   selectedNodeId: null,
   setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),
   selectedLayerId: null,
-  setSelectedLayerId: (selectedLayerId) => set({ selectedLayerId }),
+  setSelectedLayerId: (selectedLayerId) => set({ selectedLayerId, extraSelectedLayerIds: [] }),
+  extraSelectedLayerIds: [],
+  toggleLayerSelection: (layerId) => {
+    const { selectedLayerId, extraSelectedLayerIds } = get();
+    if (!selectedLayerId) {
+      set({ selectedLayerId: layerId, extraSelectedLayerIds: [] });
+    } else if (selectedLayerId === layerId) {
+      // The next selected layer becomes the one the inspector edits.
+      set({ selectedLayerId: extraSelectedLayerIds[0] ?? null, extraSelectedLayerIds: extraSelectedLayerIds.slice(1) });
+    } else if (extraSelectedLayerIds.includes(layerId)) {
+      set({ extraSelectedLayerIds: extraSelectedLayerIds.filter((id) => id !== layerId) });
+    } else {
+      set({ extraSelectedLayerIds: [...extraSelectedLayerIds, layerId] });
+    }
+  },
 
   setActiveTab: (tab) => {
     if (tab === 'settings') {
