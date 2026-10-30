@@ -5,28 +5,24 @@ import { HOME_COPY } from '../../data/homeCopy';
 
 interface Props {
   locale: Locale;
+  tone?: 'quiet' | 'dark';
 }
 
-export default function CopyPromptButton({ locale }: Props) {
-  const copy = HOME_COPY[locale].aiWorkflow;
+export default function CopyPromptButton({ locale, tone = 'quiet' }: Props) {
+  const copy = HOME_COPY[locale].how;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    const promptText = getOfficialMooScriptPrompt(locale);
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(promptText);
+      await navigator.clipboard.writeText(getOfficialMooScriptPrompt(locale));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2600);
     }
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-md bg-[#84cc16] px-4 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
-    >
-      {copied ? copy.copiedPromptBtn : copy.copyPromptBtn}
+    <button type="button" onClick={handleCopy} className={`btn ${tone === 'dark' ? 'btn-dark' : 'btn-quiet'}`}>
+      {copied ? copy.copiedPrompt : copy.copyPrompt}
     </button>
   );
 }

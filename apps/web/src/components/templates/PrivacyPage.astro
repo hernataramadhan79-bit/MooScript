@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import { localizePath, type Locale } from '../../config/site';
 
 interface Props {
@@ -7,46 +8,41 @@ interface Props {
 }
 
 const { locale } = Astro.props;
+const id = locale === 'id';
 const pathname = localizePath('/privacy', locale);
+const trail = [{ name: 'MooScript', href: localizePath('/', locale) }, { name: id ? 'Privasi' : 'Privacy' }];
+
+const paragraphs = id
+  ? [
+      'MooScript Studio dirancang dengan arsitektur local-first. Seluruh proyek, naskah, aset gambar, video B-roll hingga 300 MB, serta hasil rekaman suara disimpan langsung di IndexedDB pada perangkat Anda sendiri.',
+      'Apabila Anda memasukkan kunci API pihak ketiga (seperti Gemini, OpenAI, Anthropic, DeepSeek, Groq, ElevenLabs, atau OpenRouter), kunci tersebut disimpan di penyimpanan lokal browser Anda dan dikirim langsung ke penyedia model resmi tanpa melewati server MooScript.',
+      'Penyandian MP4, WebM Alpha, GIF animasi, dan TTS saraf Piper ONNX dieksekusi di memori lokal menggunakan WebCodecs dan WebAssembly.'
+    ]
+  : [
+      'MooScript Studio is engineered with a strict local-first architecture. All projects, scripts, SVG scenes, B-roll video files up to 300 MB, and voice recordings stay inside IndexedDB on your own machine.',
+      'When you connect optional third-party API keys (Gemini, OpenAI, Anthropic, DeepSeek, Groq, ElevenLabs, or OpenRouter), keys live in your local browser storage and communicate directly with the respective provider over HTTPS without touching any MooScript server.',
+      'MP4, transparent WebM, animated GIF encoding, and Piper ONNX neural voice synthesis execute locally in WebAssembly and GPU WebCodecs pipelines.'
+    ];
 ---
 
 <BaseLayout
-  title={locale === 'id' ? 'Kebijakan Privasi | MooScript' : 'Privacy Architecture | MooScript'}
+  title={id ? 'Kebijakan Privasi | MooScript' : 'Privacy Architecture | MooScript'}
   description={
-    locale === 'id'
+    id
       ? 'MooScript memproses naskah, B-roll, suara, dan ekspor MP4 100% di dalam browser lokal Anda tanpa server penyimpan data.'
       : 'MooScript renders scripts, B-roll footage, voiceovers, and MP4 exports 100% locally in your browser with zero cloud uploads.'
   }
   locale={locale}
   pathname={pathname}
 >
-  <section class="w-full bg-[#09090b] py-16 md:py-24">
-    <div class="mx-auto max-w-[760px] px-5 md:px-10">
-      <h1 class="text-[34px] font-extrabold text-[#f4f4f6] md:text-[42px]">
-        {locale === 'id' ? 'Privasi sisi klien' : 'Client-side privacy'}
+  <section class="field-ground w-full pb-28 pt-4 md:pb-44">
+    <div class="frame">
+      <Breadcrumbs trail={trail} />
+      <h1 class="t-poster arrive mt-10 max-w-[11ch]" style="--d: 60ms;">
+        {id ? 'Privasi sisi klien' : 'Client-side privacy'}
       </h1>
-      <div class="mt-6 flex flex-col gap-5 text-[17px] leading-[1.65] text-[#d4d4d8]">
-        <p>
-          {
-            locale === 'id'
-              ? 'MooScript Studio dirancang dengan arsitektur local-first. Seluruh proyek, naskah, aset gambar, video B-roll hingga 300 MB, serta hasil rekaman suara disimpan langsung di IndexedDB pada perangkat Anda sendiri.'
-              : 'MooScript Studio is engineered with a strict local-first architecture. All projects, scripts, SVG scenes, B-roll video files up to 300 MB, and voice recordings stay inside IndexedDB on your own machine.'
-          }
-        </p>
-        <p>
-          {
-            locale === 'id'
-              ? 'Apabila Anda memasukkan kunci API pihak ketiga (seperti Gemini, OpenAI, Anthropic, DeepSeek, Groq, ElevenLabs, atau OpenRouter), kunci tersebut disimpan di penyimpanan lokal browser Anda dan dikirim langsung ke penyedia model resmi tanpa melewati server MooScript.'
-              : 'When you connect optional third-party API keys (Gemini, OpenAI, Anthropic, DeepSeek, Groq, ElevenLabs, or OpenRouter), keys live in your local browser storage and communicate directly with the respective provider over HTTPS without touching any MooScript server.'
-          }
-        </p>
-        <p>
-          {
-            locale === 'id'
-              ? 'Penyandian MP4, WebM Alpha, GIF animasi, dan TTS saraf Piper ONNX dieksekusi di memori lokal menggunakan WebCodecs dan WebAssembly.'
-              : 'MP4, transparent WebM, animated GIF encoding, and Piper ONNX neural voice synthesis execute locally in WebAssembly and GPU WebCodecs pipelines.'
-          }
-        </p>
+      <div class="mt-14 flex flex-col gap-6 text-[21px] leading-[1.55] text-soft md:ml-[33.3%] md:max-w-[52ch]">
+        {paragraphs.map((p) => <p>{p}</p>)}
       </div>
     </div>
   </section>

@@ -1,8 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import SinglePresetStage from '../islands/SinglePresetStage';
 import CopyPromptButton from '../islands/CopyPromptButton';
-import FaqIndex from '../islands/FaqIndex';
+import FaqDetails from '../sections/FaqDetails.astro';
 import ActionTileCta from '../sections/ActionTileCta.astro';
 import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
 import { USE_CASE_PILLARS, type UseCasePillar } from '../../data/useCases';
@@ -13,17 +14,29 @@ interface Props {
 }
 
 const { pillar, locale } = Astro.props;
+const id = locale === 'id';
 const pathname = localizePath(`/use-cases/${pillar.slug}`, locale);
+const hubPath = localizePath('/use-cases', locale);
 const otherPillars = USE_CASE_PILLARS.filter((p) => p.slug !== pillar.slug);
 
 const breadcrumbs = [
   { name: 'MooScript', url: new URL(localizePath('/', locale), SITE_URL).toString() },
-  {
-    name: locale === 'id' ? 'Kegunaan' : 'Use Cases',
-    url: new URL(pathname, SITE_URL).toString()
-  },
+  { name: id ? 'Kegunaan' : 'Use cases', url: new URL(hubPath, SITE_URL).toString() },
   { name: pillar.shortTitle[locale], url: new URL(pathname, SITE_URL).toString() }
 ];
+
+const trail = [
+  { name: 'MooScript', href: localizePath('/', locale) },
+  { name: id ? 'Kegunaan' : 'Use cases', href: hubPath },
+  { name: pillar.shortTitle[locale] }
+];
+
+const L = {
+  open: id ? 'Buka template di Studio' : 'Open preset in Studio',
+  pipeline: 'WebCodecs Render Pipeline',
+  related: id ? 'Alur produksi lainnya' : 'Related workflows',
+  faq: id ? 'Pertanyaan umum' : 'Common questions'
+};
 ---
 
 <BaseLayout
@@ -36,48 +49,34 @@ const breadcrumbs = [
   faqs={pillar.faqs[locale]}
   breadcrumbs={breadcrumbs}
 >
-  <section class="w-full bg-[#09090b] py-14 md:py-20">
-    <div class="mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-10 px-5 md:px-10 lg:grid-cols-12 lg:items-center">
-      <div class="lg:col-span-6">
-        <h1 class="hero-arrive-1 text-[32px] font-extrabold tracking-tight text-[#f4f4f6] md:text-[42px]">
-          {pillar.headline[locale]}
-        </h1>
-        <p class="hero-arrive-2 mt-5 max-w-[52ch] text-[17px] leading-[1.6] text-[#d4d4d8]">
-          {pillar.lead[locale]}
-        </p>
-
-        <div class="hero-arrive-3 mt-7 flex flex-wrap items-center gap-3.5">
-          <a
-            href={buildStudioUrl(pillar.presetSlug)}
-            class="inline-flex min-h-[48px] items-center justify-center rounded-md bg-[#84cc16] px-5 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
-          >
-            {locale === 'id' ? 'Buka Template di Studio' : 'Open Preset in Studio'} &rarr;
-          </a>
-          <CopyPromptButton client:visible locale={locale} />
+  <section class="field-lime w-full pb-20 pt-4 md:pb-28">
+    <div class="frame">
+      <Breadcrumbs trail={trail} />
+      <h1 class="t-poster arrive mt-10" style="--d: 60ms;">{pillar.headline[locale]}</h1>
+      <div class="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center lg:gap-14">
+        <div class="lg:col-span-5">
+          <p class="t-lead arrive max-w-[44ch]" style="--d: 180ms;">{pillar.lead[locale]}</p>
+          <div class="arrive mt-8 flex flex-wrap items-center gap-3" style="--d: 300ms;">
+            <a href={buildStudioUrl(pillar.presetSlug)} class="btn btn-dark">{L.open} &rarr;</a>
+            <CopyPromptButton client:visible locale={locale} tone="dark" />
+          </div>
         </div>
-      </div>
-
-      <div class="lg:col-span-6">
-        <SinglePresetStage client:load slug={pillar.presetSlug} locale={locale} />
+        <div data-ui class="lg:col-span-7">
+          <SinglePresetStage client:load slug={pillar.presetSlug} locale={locale} tone="lime" />
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="w-full bg-[#111116] py-20 md:py-24">
-    <div class="mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-10 px-5 md:px-10 lg:grid-cols-12 lg:items-start">
-      <div class="lg:col-span-5" data-reveal style="--reveal-delay: 0ms;">
-        <h2 class="text-[28px] font-bold text-[#f4f4f6] md:text-[32px]">
-          {pillar.architectureTitle[locale]}
-        </h2>
-        <div class="mt-5 flex flex-col gap-4">
-          {
-            pillar.architectureParagraphs[locale].map((para) => (
-              <p class="max-w-[52ch] text-[17px] leading-[1.6] text-[#d4d4d8]">{para}</p>
-            ))
-          }
+  <section class="field-ground w-full py-24 md:py-40">
+    <div class="frame grid grid-cols-1 gap-14 lg:grid-cols-12 lg:gap-10">
+      <div class="lg:col-span-5">
+        <h2 class="t-sub" data-reveal>{pillar.architectureTitle[locale]}</h2>
+        <div class="mt-8 flex flex-col gap-5" data-reveal style="--reveal-delay: 80ms;">
+          {pillar.architectureParagraphs[locale].map((para) => <p class="max-w-[52ch] text-soft">{para}</p>)}
         </div>
 
-        <figure class="mt-7 overflow-hidden rounded-xl bg-[#09090b]" data-reveal style="--reveal-delay: 80ms;">
+        <figure class="mt-10 overflow-hidden bg-surface" data-reveal>
           <video
             data-ambient-video
             autoplay
@@ -89,44 +88,44 @@ const breadcrumbs = [
             width="854"
             height="480"
             aria-hidden="true"
-            class="h-[210px] w-full object-cover"
+            class="aspect-video w-full object-cover"
           >
             <source src="/media/stars-rise-over-la-silla.webm" type="video/webm" />
           </video>
         </figure>
       </div>
 
-      <div class="flex flex-col gap-6 lg:col-span-7" data-reveal style="--reveal-delay: 120ms;">
-        <div class="rounded-xl bg-[#09090b] p-6">
-          <div class="mb-3 flex items-center justify-between text-[15px] text-[#a1a1aa]">
-            <span>{pillar.codeTitle[locale]}</span>
-            <code>MooTween API</code>
+      <div class="flex flex-col gap-5 lg:col-span-7" data-reveal style="--reveal-delay: 100ms;">
+        <div class="bg-surface p-6">
+          <div class="mb-3 flex items-center justify-between text-[15px] text-muted">
+            <span class="font-semibold text-ink">{pillar.codeTitle[locale]}</span>
+            <span>MooTween API</span>
           </div>
-          <pre class="overflow-x-auto text-[13px] leading-[1.6] text-[#e4e4e7]"><code>{pillar.codeSnippet}</code></pre>
+          <pre class="overflow-x-auto text-[15px] leading-[1.6] text-soft"><code>{pillar.codeSnippet}</code></pre>
         </div>
 
-        <div data-ui class="ui-panel bg-[#09090b] p-4 text-[13px]">
-          <div class="mb-3 flex items-center justify-between">
-            <strong class="font-semibold text-[#f4f4f6]">WebCodecs Render Pipeline</strong>
-            <code class="text-[12px] text-[#84cc16]">MP4 + VP9 Alpha + GIF</code>
+        <div data-ui class="ui-panel p-5 text-[15px]">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <strong class="font-semibold">{L.pipeline}</strong>
+            <span class="text-lime">MP4 + VP9 Alpha + GIF</span>
           </div>
           <div class="grid grid-cols-3 gap-2">
-            <div class="ui-well p-2.5">
-              <div class="text-[12px] text-[#a1a1aa]">9:16 Vertical</div>
-              <code class="text-[12px] text-[#f4f4f6]">1080x1920</code>
+            <div class="ui-well p-3">
+              <div class="text-muted">9:16</div>
+              <div class="tabular font-semibold">1080x1920</div>
             </div>
-            <div class="ui-well p-2.5">
-              <div class="text-[12px] text-[#a1a1aa]">16:9 Landscape</div>
-              <code class="text-[12px] text-[#f4f4f6]">1920x1080</code>
+            <div class="ui-well p-3">
+              <div class="text-muted">16:9</div>
+              <div class="tabular font-semibold">1920x1080</div>
             </div>
-            <div class="ui-well p-2.5">
-              <div class="text-[12px] text-[#a1a1aa]">1:1 Square</div>
-              <code class="text-[12px] text-[#f4f4f6]">1080x1080</code>
+            <div class="ui-well p-3">
+              <div class="text-muted">1:1</div>
+              <div class="tabular font-semibold">1080x1080</div>
             </div>
           </div>
         </div>
 
-        <figure class="overflow-hidden rounded-xl bg-[#09090b]">
+        <figure class="overflow-hidden bg-surface">
           <img
             src="/media/a-colorful-aurora-paints-the-night-sky.jpg"
             width="1280"
@@ -134,28 +133,26 @@ const breadcrumbs = [
             loading="lazy"
             decoding="async"
             alt="Satellite view of orbital aurora ribbons and night city lights"
-            class="h-[180px] w-full object-cover"
+            class="aspect-[16/9] w-full object-cover"
           />
         </figure>
       </div>
     </div>
   </section>
 
-  <section class="w-full bg-[#09090b] py-20 md:py-24">
-    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
-      <h2 class="text-[28px] font-bold text-[#f4f4f6] md:text-[32px]" data-reveal style="--reveal-delay: 0ms;">
-        {pillar.highlightsTitle[locale]}
-      </h2>
-      <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+  <section class="field-surface w-full py-24 md:py-40">
+    <div class="frame">
+      <h2 class="t-title max-w-[16ch]" data-reveal>{pillar.highlightsTitle[locale]}</h2>
+      <div class="mt-14 grid grid-cols-1 gap-3 md:mt-20 md:grid-cols-3">
         {
           pillar.highlights[locale].map((item, idx) => (
             <div
-              class="rounded-xl bg-[#111116] p-6"
+              class:list={['p-7 md:p-9', ['field-lime', 'field-paper', 'field-ground'][idx % 3]]}
               data-reveal
               style={`--reveal-delay: ${idx * 70}ms;`}
             >
-              <h3 class="text-[20px] font-bold text-[#f4f4f6]">{item.title}</h3>
-              <p class="mt-3 text-[17px] leading-[1.6] text-[#d4d4d8]">{item.detail}</p>
+              <h3 class="font-display text-[21px] font-extrabold leading-[1.1] tracking-[-0.02em]">{item.title}</h3>
+              <p class="mt-5 text-[17px] leading-[1.6]">{item.detail}</p>
             </div>
           ))
         }
@@ -163,40 +160,29 @@ const breadcrumbs = [
     </div>
   </section>
 
-  <section class="w-full bg-[#111116] py-20 md:py-24">
-    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10" data-reveal style="--reveal-delay: 0ms;">
-      <FaqIndex
-        client:visible
-        heading={locale === 'id' ? 'Pertanyaan umum' : 'Common questions'}
-        items={pillar.faqs[locale]}
-      />
-    </div>
-  </section>
+  <FaqDetails heading={L.faq} items={pillar.faqs[locale]} />
 
-  <section class="w-full bg-[#09090b] pt-16">
-    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10" data-reveal style="--reveal-delay: 0ms;">
-      <h2 class="mb-6 text-[24px] font-bold text-[#f4f4f6]">
-        {locale === 'id' ? 'Alur produksi lainnya' : 'Related workflows'}
-      </h2>
-      <table class="spec-lineup text-left text-[17px]">
-        <tbody>
-          {
-            otherPillars.map((other) => (
-              <tr>
-                <td class="pr-4 font-bold text-[#f4f4f6]">
-                  <a href={localizePath(`/use-cases/${other.slug}`, locale)} class="hover:text-[#84cc16]">
-                    {other.shortTitle[locale]}
-                  </a>
-                </td>
-                <td class="hidden pr-4 text-[#a1a1aa] sm:table-cell">{other.cardSummary[locale]}</td>
-                <td class="text-right font-semibold text-[#84cc16]">
-                  <a href={localizePath(`/use-cases/${other.slug}`, locale)}>&rarr;</a>
-                </td>
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
+  <section class="field-paper w-full py-24 md:py-36">
+    <div class="frame">
+      <h2 class="t-title" data-reveal>{L.related}</h2>
+      <ol class="mt-12 flex flex-col md:mt-16">
+        {
+          otherPillars.map((other, idx) => (
+            <li data-reveal style={`--reveal-delay: ${idx * 70}ms;`}>
+              <a
+                href={localizePath(`/use-cases/${other.slug}`, locale)}
+                class="group grid min-h-[112px] grid-cols-1 items-center gap-2 py-5 transition-[background-color,padding] duration-300 hover:bg-lime md:grid-cols-12 md:gap-8 md:hover:px-6"
+              >
+                <span class="t-sub md:col-span-5">{other.shortTitle[locale]}</span>
+                <span class="text-[17px] leading-[1.5] text-paper-soft group-hover:text-on-lime md:col-span-6">
+                  {other.cardSummary[locale]}
+                </span>
+                <span aria-hidden="true" class="t-sub md:col-span-1 md:text-right">&rarr;</span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
     </div>
   </section>
 

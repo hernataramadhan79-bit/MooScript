@@ -1,0 +1,45 @@
+---
+import type { FaqItem } from '../../data/faqs';
+
+interface Props {
+  heading: string;
+  items: FaqItem[];
+  tone?: 'ground' | 'surface';
+}
+
+const { heading, items, tone = 'ground' } = Astro.props;
+---
+
+<section id="faq" class:list={['w-full py-28 md:py-44', tone === 'surface' ? 'field-surface' : 'field-ground']}>
+  <div class="frame">
+    <h2 class="t-title max-w-[16ch]" data-reveal>{heading}</h2>
+
+    <div class="mt-14 flex flex-col gap-2 md:mt-24 md:ml-[33.3%]">
+      {
+        items.map((item, idx) => (
+          <details
+            class="faq group -mx-5 px-5 transition-colors open:bg-surface-2 hover:bg-surface md:-mx-6 md:px-6"
+            data-reveal
+            style={`--reveal-delay: ${Math.min(idx, 5) * 50}ms;`}
+          >
+            <summary class="flex min-h-[72px] items-center justify-between gap-6 py-4 text-[21px] font-semibold leading-[1.35]">
+              <span>{item.question}</span>
+              <svg
+                class="chev h-5 w-5 shrink-0 text-lime transition-transform duration-300"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="square"
+                aria-hidden="true"
+              >
+                <path d="M3 7l7 7 7-7" />
+              </svg>
+            </summary>
+            <p class="max-w-[52ch] pb-7 text-[17px] leading-[1.6] text-soft">{item.answer}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

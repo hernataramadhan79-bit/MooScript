@@ -31,7 +31,8 @@ const props = Astro.props;
   <head>
     <SEOHead {...props} />
   </head>
-  <body class="min-h-svh bg-[#09090b] text-[#f4f4f6] antialiased">
+  <body class="min-h-svh bg-ground text-ink antialiased">
+    <noscript><style>[data-reveal]{opacity:1!important;transform:none!important}</style></noscript>
     <Navbar locale={props.locale} pathname={props.pathname} />
     <main id="main-content">
       <slot />

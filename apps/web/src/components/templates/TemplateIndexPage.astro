@@ -1,7 +1,9 @@
 ---
 import { SHOWCASE_PRESETS } from '@mooscript/presets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import ActionTileCta from '../sections/ActionTileCta.astro';
+import LiveStage from '../islands/LiveStage';
 import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
 
 interface Props {
@@ -10,23 +12,36 @@ interface Props {
 
 const { locale } = Astro.props;
 const pathname = localizePath('/templates', locale);
+const id = locale === 'id';
 
-const title =
-  locale === 'id'
-    ? 'Direktori Template Motion Graphics MooTween | MooScript'
-    : 'Motion Graphics Code Templates & Presets | MooScript';
-const description =
-  locale === 'id'
-    ? 'Koleksi starter template animasi SVG dan MooTween siap pakai untuk tipografi kinetik, grafik data, bedah kode AI, dan video Shorts.'
-    : 'Ready-to-render MooTween and SVG motion graphics templates for kinetic typography, animated data charts, code walkthroughs, and 9:16 Shorts.';
+const title = id
+  ? 'Direktori Template Motion Graphics MooTween | MooScript'
+  : 'Motion Graphics Code Templates & Presets | MooScript';
+const description = id
+  ? 'Koleksi starter template animasi SVG dan MooTween siap pakai untuk tipografi kinetik, grafik data, bedah kode AI, dan video Shorts.'
+  : 'Ready-to-render MooTween and SVG motion graphics templates for kinetic typography, animated data charts, code walkthroughs, and 9:16 Shorts.';
 
 const breadcrumbs = [
   { name: 'MooScript', url: new URL(localizePath('/', locale), SITE_URL).toString() },
-  {
-    name: locale === 'id' ? 'Template' : 'Templates',
-    url: new URL(pathname, SITE_URL).toString()
-  }
+  { name: id ? 'Template' : 'Templates', url: new URL(pathname, SITE_URL).toString() }
 ];
+
+const trail = [
+  { name: 'MooScript', href: localizePath('/', locale) },
+  { name: id ? 'Template' : 'Templates' }
+];
+
+const fields = ['field-lime', 'field-surface', 'field-paper', 'field-lime'];
+const L = {
+  heading: id ? 'Template siap render' : 'Shots ready to render',
+  lead: id
+    ? 'Setiap template ditulis murni dengan SVG dan mesin MooTween bebas GSAP. Putar langsung di sini, baca kodenya, atau buka di MooScript Studio.'
+    : 'Every template is pure SVG on the clean-room MooTween engine. Watch it play here, read the code, or open it in MooScript Studio.',
+  shots: id ? 'adegan' : 'shots',
+  footage: id ? 'Rekaman B-roll langit malam di bawah adegan MooTween' : 'Night sky B-roll footage that every template can sit on',
+  customize: id ? 'Kustomisasi di Studio' : 'Customize in Studio',
+  inspect: id ? 'Bedah kode' : 'Inspect the code'
+};
 ---
 
 <BaseLayout
@@ -37,61 +52,87 @@ const breadcrumbs = [
   includeSoftwareSchema={true}
   breadcrumbs={breadcrumbs}
 >
-  <section class="w-full bg-[#09090b] py-16 md:py-22">
-    <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
-      <h1 class="hero-arrive-1 text-[34px] font-extrabold tracking-tight text-[#f4f4f6] sm:text-[42px] lg:text-[46px]">
-        {locale === 'id' ? 'Template siap ekspor' : 'Ready-to-render shots'}
-      </h1>
-      <p class="hero-arrive-2 mt-4 max-w-[56ch] text-[17px] leading-[1.6] text-[#d4d4d8]">
-        {
-          locale === 'id'
-            ? 'Setiap template ditulis murni dengan SVG dan mesin MooTween bebas-GSAP. Buka detail kode atau luncurkan langsung ke MooScript Studio.'
-            : 'Every preset is authored in pure SVG and our clean-room MooTween engine. Inspect the shot code or open it directly inside MooScript Studio.'
-        }
-      </p>
+  <section class="field-ground w-full pb-24 pt-4 md:pb-36">
+    <div class="frame">
+      <Breadcrumbs trail={trail} />
+      <h1 class="t-poster arrive mt-10 max-w-[10ch]" style="--d: 60ms;">{L.heading}</h1>
+      <p class="t-lead arrive mt-8 max-w-[44ch] text-soft" style="--d: 180ms;">{L.lead}</p>
+    </div>
+  </section>
 
-      <div class="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2">
-        {
-          SHOWCASE_PRESETS.map((preset, idx) => (
-            <article
-              class="flex flex-col justify-between rounded-xl bg-[#111116] p-7"
+  <div class="field-ground w-full pb-24 md:pb-36">
+    <div class="frame">
+      <figure class="shutter overflow-hidden bg-surface" style="--d: 300ms;">
+        <video
+          data-ambient-video
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="metadata"
+          poster="/media/stars-rise-over-la-silla-poster.jpg"
+          width="854"
+          height="480"
+          aria-label={L.footage}
+          class="aspect-[16/9] w-full object-cover md:aspect-[21/8]"
+        >
+          <source src="/media/stars-rise-over-la-silla.webm" type="video/webm" />
+        </video>
+      </figure>
+    </div>
+  </div>
+
+  {
+    SHOWCASE_PRESETS.map((preset, idx) => {
+      const flip = idx % 2 === 1;
+      const onLime = fields[idx % fields.length] === 'field-lime';
+      return (
+        <section class:list={[fields[idx % fields.length], 'w-full py-20 md:py-28']}>
+          <div class="frame grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
+            <div
+              class:list={['lg:col-span-6', flip ? 'lg:order-2' : '']}
               data-reveal
-              style={`--reveal-delay: ${idx * 70}ms;`}
             >
-              <div>
-                <div class="flex items-center justify-between gap-3">
-                  <code class="rounded bg-[#181820] px-2.5 py-1 text-[13px] text-[#84cc16]">
-                    {preset.aspectRatio} &middot; {preset.width}x{preset.height}
-                  </code>
-                  <code class="text-[13px] text-[#a1a1aa]">
-                    {preset.shots.length} {preset.shots.length === 1 ? 'shot' : 'shots'}
-                  </code>
-                </div>
-
-                <h2 class="mt-4 text-[26px] font-bold text-[#f4f4f6]">{preset.title[locale]}</h2>
-                <p class="mt-3 text-[16px] leading-[1.6] text-[#d4d4d8]">{preset.summary[locale]}</p>
-              </div>
-
-              <div class="mt-7 flex flex-wrap items-center gap-3">
-                <a
-                  href={buildStudioUrl(preset.slug)}
-                  class="inline-flex min-h-[44px] items-center justify-center rounded-md bg-[#84cc16] px-4 text-[14px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022]"
+              <div data-ui class="flex h-[min(70svh,600px)] min-h-[360px] items-center justify-center bg-ground p-4 sm:p-6">
+                <div
+                  class="relative max-h-full max-w-full overflow-hidden bg-ground"
+                  style={`aspect-ratio: ${preset.width} / ${preset.height}; ${
+                    preset.height > preset.width ? 'height: 100%;' : 'width: 100%;'
+                  }`}
                 >
-                  {locale === 'id' ? 'Kustomisasi di Studio' : 'Customize in Studio'} &rarr;
+                  <LiveStage
+                    client:visible
+                    slug={preset.slug}
+                    title={preset.title[locale]}
+                    className="absolute inset-0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class:list={['lg:col-span-6', flip ? 'lg:order-1' : '']} data-reveal style="--reveal-delay: 100ms;">
+              <h2 class="t-sub lg:!text-[clamp(24px,2.1vw,32px)]">{preset.title[locale]}</h2>
+              <p class="mt-5 max-w-[44ch] text-[17px] leading-[1.6]">{preset.summary[locale]}</p>
+              <p class="tabular mt-4 text-[15px] font-bold">
+                {preset.aspectRatio} &middot; {preset.width}x{preset.height} &middot; {preset.shots.length} {L.shots}
+              </p>
+              <div class="mt-8 flex flex-wrap items-center gap-3">
+                <a href={buildStudioUrl(preset.slug)} class:list={['btn', onLime ? 'btn-dark' : 'btn-lime']}>
+                  {L.customize} &rarr;
                 </a>
                 <a
                   href={localizePath(`/templates/${preset.slug}`, locale)}
-                  class="inline-flex min-h-[44px] items-center justify-center rounded-md bg-[#181820] px-4 text-[14px] font-semibold text-[#f4f4f6] transition-colors hover:bg-[#22222d]"
+                  class="inline-flex min-h-[52px] items-center text-[17px] font-bold underline decoration-2 underline-offset-4"
                 >
-                  {locale === 'id' ? 'Bedah Kode' : 'Inspect Code'}
+                  {L.inspect}
                 </a>
               </div>
-            </article>
-          ))
-        }
-      </div>
-    </div>
-  </section>
+            </div>
+          </div>
+        </section>
+      );
+    })
+  }
 
   <ActionTileCta locale={locale} />
 </BaseLayout>

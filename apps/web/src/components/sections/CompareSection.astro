@@ -1,0 +1,99 @@
+---
+import { HOME_COPY } from '../../data/homeCopy';
+import type { Locale } from '../../config/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = HOME_COPY[locale].compare;
+---
+
+<section id="compare" class="field-ground w-full py-28 md:py-44">
+  <div class="frame">
+    <h2 class="t-title max-w-[18ch]" data-reveal>{copy.heading}</h2>
+
+    <div class="mt-16 grid grid-cols-1 gap-14 md:mt-24 lg:grid-cols-12 lg:gap-10">
+      <div class="lg:col-span-4" data-reveal style="--reveal-delay: 60ms;">
+        <p class="t-lead max-w-[34ch] text-soft">{copy.lead}</p>
+
+        <dl class="mt-10 grid grid-cols-2 gap-3 max-[639px]:[&>*:first-child]:col-span-2 max-[639px]:[&>*:last-child]:col-span-2">
+          {
+            copy.stats.map((s) => (
+              <div class="field-lime p-5">
+                <dt class="t-sub">
+                  {s.figure}
+                </dt>
+                <dd class="mt-2 text-[15px] font-semibold leading-snug">{s.label}</dd>
+              </div>
+            ))
+          }
+        </dl>
+
+        <figure class="mt-3 hidden lg:block">
+          <div class="overflow-hidden bg-surface">
+            <img
+              src="/media/a-colorful-aurora-paints-the-night-sky.jpg"
+              width="1280"
+              height="1600"
+              loading="lazy"
+              decoding="async"
+              alt={copy.photoAlt}
+              class="aspect-[4/3] w-full object-cover"
+            />
+          </div>
+          <figcaption class="mt-3 text-[15px] text-muted">{copy.photoCaption}</figcaption>
+        </figure>
+      </div>
+
+      <div class="lg:col-span-8" data-reveal style="--reveal-delay: 120ms;">
+        <div class="hidden sm:block">
+          <table class="w-full border-separate border-spacing-0 text-left text-[17px]">
+            <thead>
+              <tr>
+                <th scope="col" class="w-[20%] px-5 py-4 text-[15px] font-semibold text-muted">{copy.colMetric}</th>
+                <th scope="col" class="field-lime w-[30%] px-5 py-4 text-[17px] font-extrabold">{copy.colMoo}</th>
+                <th scope="col" class="w-[25%] px-5 py-4 text-[15px] font-semibold text-muted">{copy.colAe}</th>
+                <th scope="col" class="w-[25%] px-5 py-4 text-[15px] font-semibold text-muted">{copy.colRemotion}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                copy.rows.map((row) => (
+                  <tr class="group">
+                    <th scope="row" class="px-5 py-5 align-top text-[15px] font-semibold text-muted">
+                      {row.criterion}
+                    </th>
+                    <td class="bg-surface-2 px-5 py-5 align-top font-bold text-ink transition-colors group-hover:bg-surface-3">
+                      {row.mooscript}
+                    </td>
+                    <td class="px-5 py-5 align-top text-muted">{row.afterEffects}</td>
+                    <td class="px-5 py-5 align-top text-muted">{row.remotion}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <ul class="flex flex-col gap-8 sm:hidden">
+          {
+            copy.rows.map((row) => (
+              <li class="py-3">
+                <p class="text-[15px] font-semibold text-muted">{row.criterion}</p>
+                <p class="mt-2 text-[17px] font-bold text-lime">{row.mooscript}</p>
+                <p class="mt-3 text-[15px] text-muted">
+                  {copy.colAe}: {row.afterEffects}
+                </p>
+                <p class="mt-1 text-[15px] text-muted">
+                  {copy.colRemotion}: {row.remotion}
+                </p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>

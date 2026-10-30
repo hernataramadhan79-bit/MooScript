@@ -1,5 +1,6 @@
 ---
-import { STUDIO_URL, type Locale } from '../../config/site';
+import LiveStage from '../islands/LiveStage';
+import { STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
 
 interface Props {
@@ -10,68 +11,41 @@ const { locale } = Astro.props;
 const copy = HOME_COPY[locale].cta;
 ---
 
-<section class="w-full bg-[#09090b] py-16 md:py-24">
-  <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-12">
-      <div
-        class="hidden overflow-hidden rounded-xl bg-[#111116] md:col-span-3 md:block md:h-[300px]"
-        data-reveal
-        style="--reveal-delay: 0ms;"
-      >
+<section class="field-lime w-full py-20 md:py-32">
+  <div class="frame">
+    <h2 class="t-poster" data-reveal>{copy.heading}</h2>
+
+    <div class="mt-14 grid grid-cols-1 gap-12 lg:mt-20 lg:grid-cols-12 lg:items-end lg:gap-10">
+      <div class="lg:col-span-5" data-reveal style="--reveal-delay: 120ms;">
+        <p class="t-lead max-w-[38ch]">{copy.body}</p>
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a href={STUDIO_URL} class="btn btn-dark">{copy.primary} &rarr;</a>
+          <a href={localizePath('/templates', locale)} class="btn bg-on-lime/15 text-on-lime hover:bg-on-lime/25">
+            {copy.secondary}
+          </a>
+        </div>
+        <p class="mt-5 text-[15px] font-semibold">{copy.after}</p>
+      </div>
+
+      <div data-ui class="relative aspect-[16/10] overflow-hidden bg-ground lg:col-span-7" data-reveal style="--reveal-delay: 200ms;">
         <img
           src="/media/glacier-bay-entrance-night-sky-with-aurora.jpg"
           width="1280"
           height="720"
           loading="lazy"
           decoding="async"
-          alt="Emerald green aurora sweeping across the night sky over Glacier Bay mountains"
-          class="h-full w-full object-cover"
+          alt={copy.photoAlt}
+          class="absolute inset-0 h-full w-full object-cover"
         />
-      </div>
-
-      <div
-        class="flex min-h-[260px] flex-col justify-center rounded-xl bg-[#84cc16] p-8 md:col-span-7 md:h-[300px] md:p-10"
-        data-reveal
-        style="--reveal-delay: 70ms;"
-      >
-        <h2 class="text-[28px] font-extrabold tracking-tight text-[#0e1e00] md:text-[32px]">
-          {copy.heading}
-        </h2>
-        <p class="mt-3 max-w-[46ch] text-[17px] leading-[1.55] font-medium text-[#162d02]">
-          {copy.body}
-        </p>
-        <div class="mt-6">
-          <a
-            href={STUDIO_URL}
-            class="inline-flex min-h-[48px] items-center justify-center rounded-md bg-[#09090b] px-6 text-[15px] font-bold text-[#f4f4f6] transition-colors hover:bg-[#181820]"
-          >
-            {copy.button} &rarr;
-          </a>
-        </div>
-      </div>
-
-      <div
-        class="grid grid-cols-2 gap-3 md:col-span-2 md:grid-cols-1"
-        data-reveal
-        style="--reveal-delay: 140ms;"
-      >
-        <div class="overflow-hidden rounded-xl bg-[#111116] h-[120px] md:hidden">
-          <img
-            src="/media/glacier-bay-entrance-night-sky-with-aurora.jpg"
-            width="1280"
-            height="720"
-            loading="lazy"
-            decoding="async"
-            alt="Aurora borealis night sky"
-            class="h-full w-full object-cover"
-          />
-        </div>
-        <div class="flex h-[120px] flex-col justify-between rounded-xl bg-[#181820] p-5 md:h-[300px]">
-          <code class="text-[13px] text-[#84cc16]">WebCodecs</code>
-          <div class="text-[15px] font-semibold text-[#f4f4f6]">
-            MP4 &middot; VP9 Alpha &middot; GIF
-          </div>
-        </div>
+        <LiveStage
+          client:visible
+          slug="kinetic-typography"
+          clear
+          fit="cover"
+          anchorY={0.45}
+          title="Transparent MooTween shot over aurora footage"
+          className="absolute inset-0"
+        />
       </div>
     </div>
   </div>

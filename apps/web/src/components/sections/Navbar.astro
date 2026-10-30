@@ -1,5 +1,5 @@
 ---
-import { GITHUB_URL, RELEASE_VERSION, STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { GITHUB_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
 
 interface Props {
@@ -10,81 +10,157 @@ interface Props {
 const { locale, pathname } = Astro.props;
 const copy = HOME_COPY[locale].nav;
 const homeHref = localizePath('/', locale);
-const useCaseHref = localizePath('/use-cases/code-to-video', locale);
 const templatesHref = localizePath('/templates', locale);
+const useCasesHref = localizePath('/use-cases', locale);
 const enHref = localizePath(pathname, 'en');
 const idHref = localizePath(pathname, 'id');
+
+const norm = (p: string) => p.replace(/\/+$/, '') || '/';
+const here = norm(pathname);
+const inSection = (base: string) => here === norm(base) || here.startsWith(`${norm(base)}/`);
+
+// Every top-level link is a real page, except "How it works", which scrolls the home page.
+const links = [
+  { label: copy.how, href: `${homeHref}#how`, current: false },
+  { label: copy.templates, href: templatesHref, current: inSection(templatesHref) },
+  { label: copy.useCases, href: useCasesHref, current: inSection(useCasesHref) }
+];
 ---
 
-<header class="w-full bg-[#09090b]">
-  <div class="mx-auto flex min-h-[68px] w-full max-w-[1320px] items-center justify-between gap-3 px-5 md:px-10">
-    <div class="flex items-center gap-3">
-      <a href={homeHref} class="flex min-h-[44px] items-center gap-2.5 text-[#f4f4f6]">
-        <img src="/logo.svg" alt="MooScript logo" width="28" height="28" class="h-7 w-7 shrink-0" />
-        <span class="text-[17px] font-bold tracking-tight">MooScript</span>
-      </a>
-      <code class="hidden rounded bg-[#181820] px-2 py-0.5 text-[13px] text-[#a1a1aa] sm:inline-block">
-        {RELEASE_VERSION}
-      </code>
-    </div>
+<header class="sticky top-0 z-50 w-full bg-ground" data-site-header>
+  <div class="frame flex min-h-[72px] items-center justify-between gap-4">
+    <a href={homeHref} aria-label={copy.home} class="flex min-h-[44px] items-center gap-3">
+      <img src="/logo.svg" alt="" width="34" height="34" class="h-[34px] w-[34px] shrink-0" />
+      <span class="font-display text-[21px] font-extrabold tracking-tight">MooScript</span>
+    </a>
 
-    <nav aria-label="Main navigation" class="hidden items-center gap-7 lg:flex">
-      <a href={`${homeHref}#engine`} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
-        {copy.features}
-      </a>
-      <a href={`${homeHref}#ai-workflow`} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
-        {copy.aiWorkflow}
-      </a>
-      <a href={useCaseHref} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
-        {copy.useCases}
-      </a>
-      <a href={templatesHref} class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]">
-        {copy.templates}
-      </a>
+    <nav aria-label="Main navigation" class="hidden items-center gap-9 lg:flex">
+      {
+        links.map((link) => (
+          <a
+            href={link.href}
+            aria-current={link.current ? 'page' : undefined}
+            class:list={[
+              'inline-flex min-h-[44px] items-center text-[17px] font-semibold transition-colors',
+              link.current ? 'text-lime' : 'text-soft hover:text-ink'
+            ]}
+          >
+            {link.label}
+          </a>
+        ))
+      }
       <a
         href={GITHUB_URL}
         target="_blank"
         rel="noopener noreferrer"
-        class="text-[15px] text-[#a1a1aa] transition-colors hover:text-[#f4f4f6]"
+        class="inline-flex min-h-[44px] items-center text-[17px] font-semibold text-soft transition-colors hover:text-ink"
       >
         {copy.github}
       </a>
     </nav>
 
-    <div class="flex items-center gap-2 sm:gap-3">
-      <div
-        role="group"
-        aria-label="Language switcher"
-        class="flex items-center rounded-md bg-[#111116] p-1 text-[15px]"
-      >
+    <div class="flex items-center gap-3 sm:gap-5">
+      <div role="group" aria-label="Language" class="flex items-center gap-1 text-[15px] font-bold">
         <a
           href={enHref}
-          aria-current={locale === 'en' ? 'page' : undefined}
+          hreflang="en"
+          aria-current={locale === 'en' ? 'true' : undefined}
           class:list={[
-            'flex min-h-[36px] min-w-[34px] items-center justify-center rounded px-2 font-medium transition-colors',
-            locale === 'en' ? 'bg-[#22222d] text-[#f4f4f6]' : 'text-[#a1a1aa] hover:text-[#f4f4f6]'
-          ]}
+            'flex min-h-[44px] min-w-[36px] items-center justify-center transition-colors',
+            locale === 'en' ? 'text-lime' : 'text-muted hover:text-ink'
+          ]}>EN</a
         >
-          EN
-        </a>
         <a
           href={idHref}
-          aria-current={locale === 'id' ? 'page' : undefined}
+          hreflang="id"
+          aria-current={locale === 'id' ? 'true' : undefined}
           class:list={[
-            'flex min-h-[36px] min-w-[34px] items-center justify-center rounded px-2 font-medium transition-colors',
-            locale === 'id' ? 'bg-[#22222d] text-[#f4f4f6]' : 'text-[#a1a1aa] hover:text-[#f4f4f6]'
-          ]}
+            'flex min-h-[44px] min-w-[36px] items-center justify-center transition-colors',
+            locale === 'id' ? 'text-lime' : 'text-muted hover:text-ink'
+          ]}>ID</a
         >
-          ID
-        </a>
       </div>
 
-      <a
-        href={STUDIO_URL}
-        class="inline-flex min-h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-[#84cc16] px-3.5 text-[15px] font-bold text-[#0e1e00] transition-colors hover:bg-[#9be022] sm:px-4"
+      <a href={STUDIO_URL} class="btn btn-lime hidden sm:inline-flex">{copy.launchStudio} &rarr;</a>
+
+      <button
+        type="button"
+        class="btn btn-quiet px-4 lg:hidden"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        data-menu-button
+        data-open-label={copy.close}
+        data-closed-label={copy.menu}
       >
-        {copy.launchStudio} &rarr;
-      </a>
+        <span data-menu-label>{copy.menu}</span>
+      </button>
     </div>
   </div>
+
+  <div id="mobile-menu" data-menu-panel hidden class="fixed inset-x-0 bottom-0 top-[72px] z-40 overflow-y-auto bg-ground lg:hidden">
+    <nav aria-label="Mobile navigation" class="frame flex min-h-full flex-col justify-between gap-10 pb-10 pt-6">
+      <ul class="flex flex-col">
+        {
+          links.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                aria-current={link.current ? 'page' : undefined}
+                data-menu-link
+                class:list={[
+                  't-title flex min-h-[64px] items-center justify-between',
+                  link.current ? 'text-lime' : 'text-ink'
+                ]}
+              >
+                {link.label}
+                <span aria-hidden="true" class="text-[21px]">&rarr;</span>
+              </a>
+            </li>
+          ))
+        }
+        <li>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex min-h-[64px] items-center justify-between t-title text-ink"
+          >
+            {copy.github}
+            <span aria-hidden="true" class="text-[21px]">&nearr;</span>
+          </a>
+        </li>
+      </ul>
+      <a href={STUDIO_URL} class="btn btn-lime w-full">{copy.launchStudio} &rarr;</a>
+    </nav>
+  </div>
 </header>
+
+<script is:inline>
+  (function () {
+    var btn = document.querySelector('[data-menu-button]');
+    var panel = document.querySelector('[data-menu-panel]');
+    if (!btn || !panel) return;
+    var label = btn.querySelector('[data-menu-label]');
+    function setOpen(open) {
+      panel.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      label.textContent = open ? btn.getAttribute('data-open-label') : btn.getAttribute('data-closed-label');
+      document.documentElement.style.overflow = open ? 'hidden' : '';
+    }
+    btn.addEventListener('click', function () {
+      setOpen(panel.hidden);
+    });
+    panel.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest('a')) setOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) {
+        setOpen(false);
+        btn.focus();
+      }
+    });
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', function (m) {
+      if (m.matches) setOpen(false);
+    });
+  })();
+</script>

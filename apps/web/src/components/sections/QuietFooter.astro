@@ -1,6 +1,7 @@
 ---
-import { GITHUB_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { GITHUB_URL, STUDIO_URL, RELEASE_VERSION, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { USE_CASE_PILLARS } from '../../data/useCases';
 
 interface Props {
   locale: Locale;
@@ -9,40 +10,71 @@ interface Props {
 const { locale } = Astro.props;
 const copy = HOME_COPY[locale].footer;
 const nav = HOME_COPY[locale].nav;
+
+const linkClass = 'inline-flex min-h-[36px] items-center text-[17px] text-soft transition-colors hover:text-lime';
 ---
 
-<footer class="w-full bg-[#09090b] pt-24 pb-8 md:pt-36">
-  <div class="mx-auto w-full max-w-[1320px] px-5 md:px-10">
-    <div class="grid grid-cols-1 gap-3 text-[15px] md:grid-cols-[1fr_auto_1fr] md:items-baseline">
-      <div class="text-[#a1a1aa]">{copy.tagline}</div>
-
-      <div class="flex flex-wrap items-center gap-6 text-[#f4f4f6]">
-        <a href={STUDIO_URL} class="transition-colors hover:text-[#84cc16]">Studio</a>
-        <a href={localizePath('/templates', locale)} class="transition-colors hover:text-[#84cc16]">
-          {nav.templates}
-        </a>
-        <a href={localizePath('/use-cases/code-to-video', locale)} class="transition-colors hover:text-[#84cc16]">
-          {nav.useCases}
-        </a>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="transition-colors hover:text-[#84cc16]"
-        >
-          {nav.github}
-        </a>
+<footer class="relative w-full overflow-hidden bg-ground">
+  <div class="frame pt-28 md:pt-40">
+    <div class="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-8">
+      <div class="md:col-span-6">
+        <p class="t-title max-w-[16ch]">
+          {copy.invite}
+        </p>
+        <a href={STUDIO_URL} class="btn btn-lime mt-9">{nav.launchStudio} &rarr;</a>
       </div>
 
-      <div class="text-[#a1a1aa] md:text-right">
-        <span class="tabular">2026</span>
-        <span class="mx-2">&middot;</span>
-        <a href={localizePath('/privacy', locale)} class="text-[#f4f4f6] transition-colors hover:text-[#84cc16]">
-          {copy.privacy}
-        </a>
-      </div>
+      <nav aria-label="Footer" class="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 md:col-span-6">
+        <div>
+          <p class="text-[17px] font-bold text-ink">{copy.product}</p>
+          <ul class="mt-3 flex flex-col">
+            <li><a href={STUDIO_URL} class={linkClass}>{copy.studio}</a></li>
+            <li><a href={`${localizePath('/', locale)}#how`} class={linkClass}>{nav.how}</a></li>
+            <li><a href={localizePath('/templates', locale)} class={linkClass}>{nav.templates}</a></li>
+            <li><a href={localizePath('/use-cases', locale)} class={linkClass}>{nav.useCases}</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="text-[17px] font-bold text-ink">{copy.guides}</p>
+          <ul class="mt-3 flex flex-col">
+            {
+              USE_CASE_PILLARS.map((pillar) => (
+                <li>
+                  <a href={localizePath(`/use-cases/${pillar.slug}`, locale)} class={linkClass}>
+                    {pillar.shortTitle[locale]}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div>
+          <p class="text-[17px] font-bold text-ink">{copy.project}</p>
+          <ul class="mt-3 flex flex-col">
+            <li>
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" class={linkClass}>{nav.github}</a>
+            </li>
+            <li><a href={localizePath('/privacy', locale)} class={linkClass}>{copy.privacy}</a></li>
+          </ul>
+        </div>
+      </nav>
     </div>
 
-    <p class="mt-4 text-[15px] text-[#a1a1aa]">{copy.mediaCredits}</p>
+    <div class="mt-20 flex flex-col gap-2 text-[15px] text-muted md:mt-28 md:flex-row md:items-baseline md:justify-between">
+      <p>
+        {copy.madeIn} <span aria-hidden="true">&middot;</span>
+        <span class="tabular">{RELEASE_VERSION}</span>
+      </p>
+      <p class="max-w-[62ch] md:text-right">{copy.mediaCredits}</p>
+    </div>
+  </div>
+
+  <div aria-hidden="true" class="pointer-events-none mt-6 select-none whitespace-nowrap px-[var(--page-x)]">
+    <div
+      class="translate-y-[24%] font-display font-extrabold leading-[0.8] tracking-[-0.05em] text-lime"
+      style="font-size: min(11.4vw, 200px);"
+    >
+      MooScript
+    </div>
   </div>
 </footer>

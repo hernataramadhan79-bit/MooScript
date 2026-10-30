@@ -1,0 +1,102 @@
+---
+import LiveStage from '../islands/LiveStage';
+import { localizePath, type Locale } from '../../config/site';
+import { HOME_COPY } from '../../data/homeCopy';
+import { USE_CASE_PILLARS } from '../../data/useCases';
+import { getShowcasePreset } from '@mooscript/presets';
+
+interface Props {
+  locale: Locale;
+  /** On the use-cases hub the heading is the page title (h1) and every row carries a live thumbnail. */
+  asPage?: boolean;
+}
+
+const { locale, asPage = false } = Astro.props;
+const copy = HOME_COPY[locale].guides;
+const Heading = asPage ? 'h1' : 'h2';
+---
+
+<section id="guides" class:list={['field-paper w-full', asPage ? 'pb-28 md:pb-44' : 'py-28 md:py-44']}>
+  <div class="frame">
+    <div class="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+      <div>
+        <Heading class:list={['t-title', asPage ? 'arrive max-w-[22em]' : 'max-w-[16ch]']} style={asPage ? '--d: 60ms;' : undefined}>
+          {copy.heading}
+        </Heading>
+        <p class="t-lead mt-6 max-w-[40ch] text-paper-soft">{copy.lead}</p>
+      </div>
+      {
+        !asPage && (
+          <a href={localizePath('/use-cases', locale)} class="btn btn-dark self-start md:self-auto">
+            {copy.all} &rarr;
+          </a>
+        )
+      }
+    </div>
+
+    {
+      asPage && (
+        <figure class="shutter mt-14 overflow-hidden bg-ground md:mt-20">
+          <video
+            data-ambient-video
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            poster="/media/stars-rise-over-la-silla-poster.jpg"
+            width="854"
+            height="480"
+            aria-hidden="true"
+            class="aspect-[16/9] w-full object-cover md:aspect-[21/8]"
+          >
+            <source src="/media/stars-rise-over-la-silla.webm" type="video/webm" />
+          </video>
+        </figure>
+      )
+    }
+
+    <ol class:list={['flex flex-col', asPage ? 'mt-14 md:mt-20' : 'mt-16 md:mt-24']}>
+      {
+        USE_CASE_PILLARS.map((pillar, idx) => {
+          const preset = getShowcasePreset(pillar.presetSlug);
+          return (
+            <li data-reveal style={`--reveal-delay: ${idx * 70}ms;`}>
+              <a
+                href={localizePath(`/use-cases/${pillar.slug}`, locale)}
+                class:list={[
+                  'group grid min-h-[132px] grid-cols-1 items-center gap-3 py-6 transition-[background-color,padding] duration-300 hover:bg-lime md:gap-8 md:hover:px-6',
+                  asPage ? 'md:grid-cols-12' : 'md:grid-cols-12'
+                ]}
+              >
+                {asPage && preset && (
+                  <span data-ui class="relative block aspect-video overflow-hidden bg-ground md:col-span-4">
+                    <LiveStage client:visible slug={preset.slug} title={preset.title[locale]} className="absolute inset-0" />
+                  </span>
+                )}
+                <span class:list={[asPage ? 't-sub md:col-span-3' : 't-title md:col-span-7']}>
+                  {pillar.shortTitle[locale]}
+                </span>
+                <span
+                  class:list={[
+                    'text-[17px] leading-[1.5] text-paper-soft group-hover:text-on-lime',
+                    'md:col-span-4'
+                  ]}
+                >
+                  {pillar.cardSummary[locale]}
+                </span>
+                <span
+                  aria-hidden="true"
+                  class:list={[asPage ? 't-sub' : 't-title', 'hidden transition-transform duration-300 group-hover:translate-x-2 md:col-span-1 md:block md:text-right']}
+                >
+                  &rarr;
+                </span>
+                <span class="sr-only">{copy.open}</span>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ol>
+  </div>
+</section>

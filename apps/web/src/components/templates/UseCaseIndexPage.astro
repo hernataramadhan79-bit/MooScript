@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../sections/Breadcrumbs.astro';
+import GuidesList from '../sections/GuidesList.astro';
+import ActionTileCta from '../sections/ActionTileCta.astro';
+import { SITE_URL, localizePath, type Locale } from '../../config/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const id = locale === 'id';
+const pathname = localizePath('/use-cases', locale);
+
+const title = id
+  ? 'Kegunaan MooScript: Video dari Kode, Motion AI, Shorts & Grafik Data'
+  : 'MooScript Use Cases: Code to Video, AI Motion, Faceless Shorts & Data Charts';
+const description = id
+  ? 'Empat alur produksi motion graphics berbasis kode dan AI di browser: kode ke video, skrip motion AI, Shorts tanpa wajah, dan animasi grafik data.'
+  : 'Four code-driven motion graphics workflows in your browser: code to video, AI motion scripts, faceless Shorts, and animated data charts.';
+
+const breadcrumbs = [
+  { name: 'MooScript', url: new URL(localizePath('/', locale), SITE_URL).toString() },
+  { name: id ? 'Kegunaan' : 'Use cases', url: new URL(pathname, SITE_URL).toString() }
+];
+
+const trail = [{ name: 'MooScript', href: localizePath('/', locale) }, { name: id ? 'Kegunaan' : 'Use cases' }];
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  locale={locale}
+  pathname={pathname}
+  includeSoftwareSchema={true}
+  breadcrumbs={breadcrumbs}
+>
+  <section class="field-paper w-full pt-4">
+    <div class="frame">
+      <Breadcrumbs trail={trail} />
+    </div>
+  </section>
+  <GuidesList locale={locale} asPage={true} />
+  <ActionTileCta locale={locale} />
+</BaseLayout>

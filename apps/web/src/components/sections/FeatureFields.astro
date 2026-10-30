@@ -1,0 +1,52 @@
+---
+import { HOME_COPY } from '../../data/homeCopy';
+import type { Locale } from '../../config/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const fields = HOME_COPY[locale].features;
+
+// Whole-field colour changes, never gradients. Mirrored fields swap sides.
+const tones = [
+  { cls: 'field-lime', mirror: false },
+  { cls: 'field-surface', mirror: true },
+  { cls: 'field-paper', mirror: false },
+  { cls: 'field-lime', mirror: true }
+];
+---
+
+<section id="engine" aria-label="MooScript engine">
+  {
+    fields.map((field, i) => {
+      const tone = tones[i % tones.length];
+      return (
+        <div class:list={[tone.cls, 'w-full']}>
+          <div class="frame relative flex min-h-[44svh] flex-col justify-between gap-12 py-10 md:min-h-[64svh] md:py-14">
+            <p
+              data-reveal
+              class:list={[
+                'max-w-[34ch] text-[17px] leading-[1.55]',
+                tone.mirror ? 'md:ml-[16.6%]' : 'md:ml-[58%]'
+              ]}
+            >
+              {field.body}
+            </p>
+            <h2
+              data-reveal
+              style="--reveal-delay: 90ms;"
+              class:list={[
+                't-poster max-w-[12ch]',
+                tone.mirror ? 'md:self-end md:text-right' : ''
+              ]}
+            >
+              {field.phrase}
+            </h2>
+          </div>
+        </div>
+      );
+    })
+  }
+</section>
