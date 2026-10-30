@@ -1,6 +1,38 @@
-# MooScript Studio
+# MooScript
 
 > Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + a MooTween track, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
+
+[![CI](https://github.com/hernataramadhan79-bit/MooScript/actions/workflows/ci.yml/badge.svg)](https://github.com/hernataramadhan79-bit/MooScript/actions/workflows/ci.yml)
+[![License: AGPL v3+](https://img.shields.io/badge/license-AGPL--3.0--or--later-84cc16)](LICENSE)
+
+**Studio:** [app.mooscript.web.id](https://app.mooscript.web.id) · **Website:** [mooscript.web.id](https://mooscript.web.id) · **Languages:** English and Bahasa Indonesia
+
+![MooScript landing page: a live MooTween shot playing inside the headline, three live masters driven by one playhead](docs/preview/landing-hero.jpg)
+
+---
+
+## Preview
+
+### MooScript Studio
+
+The workstation: storyboard on the left, the stage and master timeline in the middle, and the inspector rack (Mograph, Style, Assets, Audio, Subtitles, Export) on the right. The interface is in Bahasa Indonesia.
+
+![MooScript Studio with the Kinetic Signal Slam template loaded](docs/preview/studio.jpg)
+
+### Website (`apps/web`)
+
+The landing site is built to look like the product: poster typography, whole fields of colour, and stages that run the real MooTween code the Studio renders.
+
+| | |
+| :-- | :-- |
+| ![Showcase: four live shots, with a B-roll underlay toggle](docs/preview/landing-showcase.jpg) | ![How it works: prompt, lint, beat-sync, render](docs/preview/landing-how.jpg) |
+| **Showcase.** Pick a shot and it plays live. Switch the B-roll underlay to see the SVG layer stay transparent over footage. | **How it works.** One slider walks through prompt, linter, beat-sync and the export queue. |
+| ![Template gallery with live stages](docs/preview/templates.jpg) | ![Comparison with After Effects and Remotion](docs/preview/landing-compare.jpg) |
+| **Templates.** Every preset plays live next to its code and a deep link into the Studio. | **Comparison.** MooScript against After Effects and Remotion. |
+
+<p align="center">
+  <img src="docs/preview/landing-mobile.jpg" alt="Landing page on a phone" width="260">
+</p>
 
 ---
 
@@ -19,16 +51,16 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ### AI motion director
 
-- **Shot-list storyboard + world bible** (`src/engine/ai/llm.ts`): structured output for Gemini, OpenAI, Groq, Anthropic and OpenRouter. The world bible palette becomes the project theme.
-- **Stage contract & motion grammar** (`src/engine/ai/director/motionLaws.ts`): each shot is a fixed film frame (1080×1920, 1920×1080 or 1080×1080) composed in absolute coordinates inside a `.moo-camera` layer. Frame 0 must already show the subject, nothing holds still for long, accents land on spoken words, and every shot ends with a hand-off.
+- **Shot-list storyboard + world bible** (`apps/studio/src/engine/ai/llm.ts`): structured output for Gemini, OpenAI, Groq, Anthropic and OpenRouter. The world bible palette becomes the project theme.
+- **Stage contract & motion grammar** (`apps/studio/src/engine/ai/director/motionLaws.ts`): each shot is a fixed film frame (1080×1920, 1920×1080 or 1080×1080) composed in absolute coordinates inside a `.moo-camera` layer. Frame 0 must already show the subject, nothing holds still for long, accents land on spoken words, and every shot ends with a hand-off.
 - **Shot continuity**: every shot prompt carries the world bible, its neighbouring shots and the incoming/outgoing match cut.
-- **Anti-PPT linter** (`src/engine/composition/mographLint.ts`): scores generated code for slide/web-page patterns (no camera, card layouts, pasted narration, fade-up-only motion, empty first frame, …) and requests one rewrite when needed. The rewrite is kept only if it is valid and scores better.
-- **Mograph kit** (`src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
-- **Instant visuals without AI** (`src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs.
+- **Anti-PPT linter** (`apps/studio/src/engine/composition/mographLint.ts`): scores generated code for slide/web-page patterns (no camera, card layouts, pasted narration, fade-up-only motion, empty first frame, …) and requests one rewrite when needed. The rewrite is kept only if it is valid and scores better.
+- **Mograph kit** (`apps/studio/src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
+- **Instant visuals without AI** (`apps/studio/src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs.
 
 ### Composition runtime
 
-- Sandboxed iframe stage (`src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master track scrubbed by frame, so preview and export are identical.
+- Sandboxed iframe stage (`apps/studio/src/engine/composition/buildDocument.ts`, `runtime/mooRuntime.ts`) with a single MooTween master track scrubbed by frame, so preview and export are identical.
 - Each shot's selectors only match inside that shot, and `loop: true` repeats for the length of the shot.
 - **Flow transition** (default): the next shot already waits underneath, held at its first frame, while the current one hands off and dissolves; its own camera move is the first motion it makes, so shot starts never stutter. Cut, fade, slide, zoom and wipe are also available.
 - Per-scene CSS is scoped to its wrapper (`scopeCss.ts`), so shots never leak styles into each other.
@@ -37,15 +69,15 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ### MooTween, the animation engine
 
-MooTween (`src/engine/composition/runtime/mooTween.ts`) is MooScript's own animation engine. It is seek-only: nothing runs on a real-time ticker, and every frame is produced by `seek(t)`, so the same time always renders the same picture in the editor, the MP4 and the HTML export.
+MooTween (`apps/studio/src/engine/composition/runtime/mooTween.ts`) is MooScript's own animation engine. It is seek-only: nothing runs on a real-time ticker, and every frame is produced by `seek(t)`, so the same time always renders the same picture in the editor, the MP4 and the HTML export.
 
 - Scenes use MooScript's own API (see [Writing scene code](#writing-scene-code) below). The AI director is taught the same guide, and the scene code editor has it in the **Panduan API** tab.
 - Code in another API (`tl.to`, `gsap.*`, `duration:`, `ease: 'power2.out'`, plugins, …) is rejected for new scenes with the MooScript replacement. Saved scenes that use it are marked **perlu perbaikan** and can be fixed with **Perbaiki dengan AI** in the scene inspector; their code is never rewritten without asking.
-- A golden-frame suite (`tests/golden/`) renders 46 reference shots in Chromium and compares every frame with snapshots recorded from the previous engine.
+- A golden-frame suite (`apps/studio/tests/golden/`) renders 46 reference shots in Chromium and compares every frame with snapshots recorded from the previous engine.
 
 ### Writing scene code
 
-A scene is three blocks: HTML, CSS and JavaScript. The JavaScript runs once, as a function of `(shot, root, ctx, MooTween)`, and only places moves on the shot; MooTween plays them by seeking. Do not redeclare those four names. The guide lives in [`runtime/mooApiGuide.ts`](src/engine/composition/runtime/mooApiGuide.ts), which feeds the AI prompt, the **Panduan API** tab and a test that checks this section lists every name.
+A scene is three blocks: HTML, CSS and JavaScript. The JavaScript runs once, as a function of `(shot, root, ctx, MooTween)`, and only places moves on the shot; MooTween plays them by seeking. Do not redeclare those four names. The guide lives in [`runtime/mooApiGuide.ts`](apps/studio/src/engine/composition/runtime/mooApiGuide.ts), which feeds the AI prompt, the **Panduan API** tab and a test that checks this section lists every name.
 
 | Name | What it is |
 | --- | --- |
@@ -164,58 +196,112 @@ shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
 
 ## Getting started
 
-Requires Node.js 20 or newer.
+This is a pnpm workspace. It needs Node.js 20 or newer and pnpm 12 (`corepack enable` picks the pinned version).
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev          # MooScript Studio on http://localhost:3000
+pnpm dev:web      # landing site on http://localhost:4321
 ```
 
-Open the app, add an API key under **Settings** (or use offline voices and instant visuals without one), type an idea and press **Susun Adegan**.
+Open the Studio, add an API key under **Settings** (or use offline voices and instant visuals without one), type an idea and press **Susun Adegan**. To start from a ready shot, open `/?template=kinetic-typography` (any slug from [`packages/presets`](packages/presets/src/showcasePresets.ts)).
+
+| Script | Does |
+| :-- | :-- |
+| `pnpm dev` / `pnpm dev:studio` | Studio dev server (Vite). |
+| `pnpm dev:web` | Landing site dev server (Astro). |
+| `pnpm build` | Builds the Studio and the landing site. |
+| `pnpm preview:studio` / `pnpm preview:web` | Serves a production build locally. |
+| `pnpm test` | Studio unit, browser and golden-frame suites. |
+| `pnpm lint` | ESLint on the Studio, zero warnings. |
+| `pnpm typecheck` | Types for presets, Studio and the landing site (`astro check`). |
 
 ### Quality gates
 
-CI runs all of these on every push and pull request to `main`:
+CI runs these on every push and pull request to `main`, on Node 20 and 22:
 
 ```bash
-npx tsc -b        # type check
-npm run lint      # ESLint, zero warnings
-npm test          # Vitest: unit suites in Node, MooTween and golden frames in Chromium
-npm run build     # production build
+pnpm --filter @mooscript/presets typecheck
+pnpm --filter @mooscript/studio exec tsc -b       # type check
+pnpm --filter @mooscript/studio lint              # ESLint, zero warnings
+pnpm --filter @mooscript/studio test              # Vitest: unit suites in Node, MooTween and golden frames in Chromium
+pnpm --filter @mooscript/studio build             # production build
+pnpm --filter @mooscript/web check && pnpm --filter @mooscript/web build
 ```
 
-The browser suites run in Vitest browser mode on Playwright's Chromium. Install it once with `npx playwright install chromium`. `npm run test:unit` and `npm run test:browser` run each half; `npm run test:golden` runs only the golden frames, and `GOLDEN_REPORT=1` writes every mismatch to `tests/golden/.report/`.
+The browser suites run in Vitest browser mode on Playwright's Chromium. Install it once with `pnpm --filter @mooscript/studio exec playwright install chromium`. Inside `apps/studio`, `pnpm test:unit` and `pnpm test:browser` run each half, `pnpm test:golden` runs only the golden frames (`GOLDEN_REPORT=1` writes every mismatch to `tests/golden/.report/`), `pnpm test:coverage` writes a v8 coverage report and `pnpm format` runs Prettier.
 
-`npm run test:coverage` writes a v8 coverage report; `npm run format` runs Prettier.
+---
+
+## The website
+
+`apps/web` is the public site that explains the product and is meant to be found by search. It is Astro 5 with React islands and Tailwind 4, statically built, with every page in English and Bahasa Indonesia (`/id/...`).
+
+| Route | Page |
+| :-- | :-- |
+| `/` | Landing: live hero, showcase, how it works, features, comparison, guides, FAQ. |
+| `/templates` and `/templates/<slug>` | The preset gallery and one page per preset, with the shot code. |
+| `/use-cases` and `/use-cases/<slug>` | The hub and the four workflow guides (code to video, AI motion graphics, faceless Shorts, data charts). |
+| `/privacy` | Privacy architecture. |
+
+How it works:
+
+- **Live stages.** `LiveStage` renders a preset in a sandboxed iframe through the same MooTween runtime the Studio uses and drives it with `seek(t)`. The stage document is built after hydration, so it never bloats the static HTML.
+- **One playhead.** `src/lib/playhead.ts` is a shared clock; the hero rail scrubs every stage on the page at once.
+- **Design tokens.** Flat fields (black, lime, paper), Syne for display type from 640 px up and Plus Jakarta Sans for text; no gradients, shadows or icon cards. Tokens live in `src/styles/global.css`.
+- **SEO.** Per-page titles, canonical and `hreflang` links, JSON-LD (`SoftwareApplication`, FAQ, breadcrumbs) and a generated sitemap.
+- **Media.** The night-sky footage and photographs in `public/media` are public domain or CC BY 4.0; `credits.json` lists the source of each.
+
+```
+apps/web/src/
+├── components/
+│   ├── islands/           # React: LiveStage, HeroRail, ShowcaseStudio, HowSlider, SinglePresetStage, CopyPromptButton
+│   ├── sections/          # Astro: Navbar, HeroSection, FormatTicker, FeatureFields, CompareSection, GuidesList, FaqDetails, ActionTileCta, QuietFooter, Breadcrumbs
+│   ├── templates/         # Page templates shared by the EN and ID routes
+│   └── seo/               # Head, canonical, hreflang, JSON-LD
+├── data/                  # Copy (homeCopy.ts), FAQs, use-case guides
+├── lib/                   # stageDocBuilder.ts, playhead.ts
+├── pages/                 # Routes; pages/id mirrors them in Bahasa Indonesia
+└── styles/global.css      # Tokens, type steps, buttons, fields, motion
+```
 
 ---
 
 ## Repository structure
 
 ```
-src/
-├── components/            # Workstation UI: SceneDeck, CompositionStage, TimelineBar, InspectorRack, settings, modals
-├── db/                    # Dexie (IndexedDB) persistence, asset and BGM storage, legacy demo cleanup
-├── engine/
-│   ├── ai/
-│   │   ├── llm.ts         # BYOK LLM providers, shot-list storyboard + world bible schemas
-│   │   ├── director/      # Motion director prompts, scene generation, lint-driven rewrites
-│   │   ├── tts.ts         # Cloud TTS and word alignment
-│   │   ├── localTts.ts    # Offline Piper TTS (Web Worker)
-│   │   └── voiceAlign.ts  # Whisper word-level alignment
-│   ├── audio/             # BGM mixer and waveform peaks
-│   ├── composition/       # Document builder, MooTween + runtime, mograph kit, linter, CSS scoping, procedural archetypes
-│   ├── export/            # MP4 exporter, export options, subtitle export
-│   └── renderer/          # Legacy canvas renderer (old projects only)
-├── features/scene/        # Per-shot code editor
-├── store/                 # Zustand slices (project, script, audio, bgm, playback, export, settings, ui)
-└── types/                 # Shared data contracts
-tests/                     # Vitest suites (Node) and fixtures
-├── browser/               # MooTween feature tests (Chromium)
-└── golden/                # Golden-frame corpus, harness, comparator and snapshots (Chromium)
-docs/design/               # Early design mockups
-public/                    # PWA icons, icon font, privacy page
+apps/
+├── studio/                # MooScript Studio (React, Vite, PWA)
+│   ├── src/
+│   │   ├── components/            # Workstation UI: SceneDeck, CompositionStage, TimelineBar, InspectorRack, settings, modals
+│   │   ├── db/                    # Dexie (IndexedDB) persistence, asset and BGM storage, legacy demo cleanup
+│   │   ├── engine/
+│   │   │   ├── ai/
+│   │   │   │   ├── llm.ts         # BYOK LLM providers, shot-list storyboard + world bible schemas
+│   │   │   │   ├── director/      # Motion director prompts, scene generation, lint-driven rewrites
+│   │   │   │   ├── tts.ts         # Cloud TTS and word alignment
+│   │   │   │   ├── localTts.ts    # Offline Piper TTS (Web Worker)
+│   │   │   │   └── voiceAlign.ts  # Whisper word-level alignment
+│   │   │   ├── audio/             # BGM mixer and waveform peaks
+│   │   │   ├── composition/       # Document builder, MooTween + runtime, mograph kit, linter, CSS scoping, procedural archetypes
+│   │   │   ├── export/            # MP4 exporter, export options, subtitle export
+│   │   │   └── renderer/          # Legacy canvas renderer (old projects only)
+│   │   ├── features/scene/        # Per-shot code editor
+│   │   ├── store/                 # Zustand slices (project, script, audio, bgm, playback, export, settings, ui)
+│   │   └── types/                 # Shared data contracts
+│   ├── tests/                     # Vitest suites (Node) and fixtures
+│   │   ├── browser/               # MooTween feature tests (Chromium)
+│   │   └── golden/                # Golden-frame corpus, harness, comparator and snapshots (Chromium)
+│   └── public/                    # PWA icons, icon font, privacy page
+└── web/                   # Landing site (Astro), see "The website"
+packages/
+└── presets/               # @mooscript/presets: showcase presets, starter templates and the official AI system prompt, shared by both apps
+docs/
+├── design/                # Early design mockups
+└── preview/               # Screenshots used in this README
 ```
+
+Both apps import from `@mooscript/presets`, so a template written once appears in the Studio's template picker, on the website's gallery, and in the hero stages.
 
 ---
 
