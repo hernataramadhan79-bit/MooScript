@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment, CreativeBrief, CustomFont, SfxCue, VoiceEdit } from '../../types';
+import type { MooProject, Scene, CaptionStyle, CaptionPosition, SubtitleCustomization, CameraMovement, AspectRatio, Composition, SceneModule, LayerOverride, ScenePalette, ThemeTokens, MotionNode, SceneAssetAttachment, CreativeBrief, CustomFont, SfxCue, VoiceEdit, ShotTemplate } from '../../types';
 import {
   CURRENT_SCHEMA_VERSION,
   BUILTIN_THEMES,
@@ -13,6 +13,7 @@ import { autoSfxCues } from '../../engine/audio/sfx';
 import { detectBeats, nearestBeat, presetBeats } from '../../engine/audio/beats';
 import { getCustomBgmBuffer } from '../../engine/audio/bgmMixer';
 import { queueMixRefresh } from './audioSlice';
+import { applyBrandKit, removeBrand } from '../../engine/brand/brandKit';
 import {
   saveProjectToDb,
   loadProjectFromDb,
@@ -24,7 +25,10 @@ import {
   saveBgmToDb,
   loadVoiceTrackFromDb,
   saveVoiceTrackToDb,
-  db
+  db,
+  listShotTemplates,
+  saveShotTemplate as saveShotTemplateToDb,
+  deleteShotTemplate as deleteShotTemplateFromDb
 } from '../../db/mooDb';
 import { syncCustomBgmForProject } from '../../db/customBgm';
 import { loadProjectVoice, NO_VOICE } from '../../db/voiceTrack';
@@ -254,6 +258,22 @@ const PROJECT_SCOPED_RESET = {
 export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlice> = (set, get) => {
   const triggerSave = (project: MooProject) => {
     scheduleSave(project, (msg) => get().addToast(msg, 'error'));
+  };
+
+  /**
+   * Brand cards move every shot after them: automatic sound effects follow, a voice-over has to be
+   * made again (its scenes start later), and music / effects without a voice are mixed again.
+   */
+  const afterBrandCardsChanged = (before: MooProject, after: MooProject): MooProject => {
+    if (getProjectDuration(before) === getProjectDuration(after) && before.scenes.length === after.scenes.length) return after;
+    const updated = (after.sfxCues || []).some((c) => c.auto) ? withAutoSfx(after, get().stageAccents) : after;
+    if (get().rawVoiceBlob) {
+      set({ audioStale: true });
+      get().addToast('Kartu brand menggeser adegan. Buat ulang suara supaya sinkron (adegan lain diambil dari cache).', 'info', 6000);
+    } else {
+      queueMixRefresh(() => get().refreshMix(), 0);
+    }
+    return updated;
   };
   // Edits sent in a quick burst to the same field (typing, dragging a slider or a trim handle)
   // share one undo step instead of filling the history with one step per keystroke.
@@ -781,6 +801,126 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
       get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
+    },
+
+    applyBrandToProject: () => {
+      const kit = get().settings.brandKit;
+      if (!kit) {
+        get().addToast('Isi Brand Kit dulu (nama, warna atau logo).', 'info');
+        return;
+      }
+      const current = get().project;
+      pushSnapshot(current);
+      const updated = afterBrandCardsChanged(current, applyBrandKit(current, kit));
+      set({ project: updated });
+      triggerSave(updated);
+      get().addToast(`Brand "${kit.name || 'tanpa nama'}" diterapkan ke proyek.`, 'success');
+    },
+
+    removeBrandFromProject: () => {
+      const current = get().project;
+      if (!current.brand) return;
+      pushSnapshot(current);
+      const updated = afterBrandCardsChanged(current, removeBrand(current));
+      set({ project: updated });
+      triggerSave(updated);
+    },
+
+    shotTemplates: [],
+
+    loadShotTemplates: async () => {
+      set({ shotTemplates: await listShotTemplates() });
+    },
+
+    saveShotAsTemplate: async (sceneId, name) => {
+      const current = get().project;
+      const scene = current.scenes.find((s) => s.id === sceneId);
+      const mod = current.composition?.scenes.find((m) => m.beatId === sceneId);
+      if (!scene || !mod || !mod.html.trim()) {
+        get().addToast('Shot ini belum punya visual untuk disimpan.', 'info');
+        return null;
+      }
+      const ids = new Set(Array.from(mod.html.matchAll(/moo-asset:([A-Za-z0-9_-]+)/g), (m) => m[1]));
+      const assetData = Object.fromEntries(
+        Object.entries(current.assetData || {}).filter(([id]) => ids.has(id))
+      );
+      const template: ShotTemplate = {
+        id: `tpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        name: name.trim() || scene.visualIntent || scene.narrationText.slice(0, 40) || 'Shot',
+        createdAt: Date.now(),
+        aspectRatio: current.aspectRatio,
+        durationInSeconds: sceneSeconds(scene),
+        narrationText: scene.narrationText || '',
+        html: mod.html,
+        css: mod.css,
+        // A split piece keeps playing from its cut, so the template carries the code's own timing.
+        buildJs: mod.buildJs,
+        overrides: mod.overrides,
+        layerMotions: mod.layerMotions,
+        palette: mod.palette,
+        assetData
+      };
+      await saveShotTemplateToDb(template);
+      set({ shotTemplates: [template, ...get().shotTemplates] });
+      get().addToast(`Shot disimpan sebagai template "${template.name}".`, 'success');
+      return template.id;
+    },
+
+    insertShotTemplate: (templateId, afterSceneId) => {
+      const template = get().shotTemplates.find((t) => t.id === templateId);
+      if (!template) return null;
+      const current = get().project;
+      pushSnapshot(current);
+      const id = `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const scene: Scene = {
+        id,
+        narrationText: template.narrationText,
+        text: template.narrationText,
+        visualIntent: template.name,
+        durationInSeconds: template.durationInSeconds,
+        durationLocked: true,
+        wordTimestamps: computeDeterministicWordAlignment(template.narrationText, template.durationInSeconds)
+      };
+      const mod: SceneModule = {
+        id,
+        beatId: id,
+        duration: template.durationInSeconds,
+        html: template.html,
+        css: template.css,
+        buildJs: template.buildJs,
+        editableLayers: extractLayersFromHtml(template.html),
+        overrides: template.overrides,
+        layerMotions: template.layerMotions,
+        palette: template.palette,
+        generatorVersion: 'shot-template',
+        status: 'ok',
+        version: 1,
+        userEdited: true
+      };
+      const scenes = [...current.scenes];
+      const at = afterSceneId ? scenes.findIndex((s) => s.id === afterSceneId) + 1 : 0;
+      // Brand cards stay first and last.
+      const outroAt = scenes.findIndex((s) => s.brandCard === 'outro');
+      const insertAt = at > 0 ? at : outroAt >= 0 ? outroAt : scenes.length;
+      scenes.splice(insertAt, 0, scene);
+      const synced = current.composition ? current : syncComposition(current);
+      const updated = syncComposition({
+        ...synced,
+        scenes,
+        assetData: { ...(current.assetData || {}), ...template.assetData },
+        composition: { ...synced.composition!, scenes: [...synced.composition!.scenes, mod] }
+      });
+      set({ project: updated, activeSceneId: id });
+      triggerSave(updated);
+      if (template.aspectRatio !== current.aspectRatio) {
+        get().addToast(`Template ini dibuat untuk ${template.aspectRatio}; cek tata letaknya di ${current.aspectRatio}.`, 'warning', 6000);
+      }
+      return id;
+    },
+
+    deleteShotTemplate: async (templateId) => {
+      await deleteShotTemplateFromDb(templateId);
+      set({ shotTemplates: get().shotTemplates.filter((t) => t.id !== templateId) });
     },
 
     addSfxCue: (time, kind) => {

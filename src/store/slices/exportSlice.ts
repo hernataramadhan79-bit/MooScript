@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ExportOptions } from '../../engine/export/mp4Exporter';
-import type { MooStoreState, ExportSlice } from '../types';
+import type { MooStoreState, ExportSlice, ExportQueueItem } from '../types';
 
 let exportAbortController: AbortController | null = null;
 
@@ -102,6 +102,65 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     }
     get().addToast('Ekspor dibatalkan.', 'info');
     set({ isExporting: false, exportProgress: null });
+  },
+
+  exportQueue: [],
+
+  startExportQueue: async (aspects, mode, opts) => {
+    if (get().isExporting || aspects.length === 0) return;
+    get().pause();
+    if (get().project.scenes.length === 0) {
+      get().addToast('Gagal mengekspor: proyek belum memiliki adegan.', 'warning');
+      return;
+    }
+    get().clearExportQueue();
+    set({ exportQueue: aspects.map((aspect) => ({ aspect, status: 'waiting' })) });
+
+    exportAbortController = new AbortController();
+    const localController = exportAbortController;
+    set({ isExporting: true, exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Memulai ekspor...' } });
+    const releaseGuard = await guardExportSession(() =>
+      get().addToast('Tab dipindah ke latar belakang. Kembali ke tab ini agar ekspor tidak terhenti.', 'warning', 6000)
+    );
+    const patchItem = (i: number, patch: Partial<ExportQueueItem>) =>
+      set({ exportQueue: get().exportQueue.map((item, j) => (j === i ? { ...item, ...patch } : item)) });
+
+    try {
+      const { exportMooProjectToMP4 } = await import('../../engine/export/mp4Exporter');
+      for (let i = 0; i < aspects.length; i++) {
+        if (localController.signal.aborted) {
+          patchItem(i, { status: 'cancelled' });
+          continue;
+        }
+        patchItem(i, { status: 'rendering' });
+        try {
+          const result = await exportMooProjectToMP4(
+            get().project,
+            (progress) =>
+              set({ exportProgress: { ...progress, statusText: `${aspects[i]} (${i + 1}/${aspects.length}): ${progress.statusText}` } }),
+            localController.signal,
+            { ...opts, reframe: { aspect: aspects[i], mode } }
+          );
+          patchItem(i, { status: 'done', result });
+        } catch (err: unknown) {
+          const aborted = localController.signal.aborted || (err instanceof DOMException && err.name === 'AbortError');
+          patchItem(i, aborted ? { status: 'cancelled' } : { status: 'error', error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      const done = get().exportQueue.filter((q) => q.status === 'done').length;
+      if (done > 0) get().addToast(`${done} video selesai dirender.`, 'success');
+    } finally {
+      set({ isExporting: false });
+      releaseGuard();
+      if (exportAbortController === localController) exportAbortController = null;
+    }
+  },
+
+  clearExportQueue: () => {
+    for (const item of get().exportQueue) {
+      if (item.result?.objectUrl) URL.revokeObjectURL(item.result.objectUrl);
+    }
+    set({ exportQueue: [] });
   },
 
   revokeExportResult: () => {

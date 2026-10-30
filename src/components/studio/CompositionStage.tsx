@@ -136,6 +136,7 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
   const customFonts = useMooStore((s) => s.project.customFonts);
   const assetData = useMooStore((s) => s.project.assetData);
   const voiceEdit = useMooStore((s) => s.project.voiceEdit);
+  const brand = useMooStore((s) => s.project.brand);
 
   // Layer overrides are kept out of the document and pushed live to the runtime, so moving,
   // scaling or recoloring a layer restyles the stage in place instead of reloading the iframe.
@@ -152,10 +153,11 @@ export const CompositionStage: React.FC<CompositionStageProps> = ({ className = 
       styleBrief,
       customFonts,
       assetData,
-      voiceEdit
+      voiceEdit,
+      brand
     } as any;
     return buildCompositionDocument(minimalProject, { omitOverrides: true });
-  }, [composition, scenes, width, height, fps, projectId, theme, styleBrief, customFonts, assetData, voiceEdit]);
+  }, [composition, scenes, width, height, fps, projectId, theme, styleBrief, customFonts, assetData, voiceEdit, brand]);
 
   // !important: must win over inline translate/scale/rotate a scene's own code may write.
   const overridesCss = React.useMemo(

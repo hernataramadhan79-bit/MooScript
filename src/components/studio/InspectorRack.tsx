@@ -22,6 +22,8 @@ import { AssetManagerPanel } from './AssetManagerPanel';
 import { ExportPanel } from './ExportPanel';
 import { LayerMotionPanel } from './LayerMotionPanel';
 import { TypographyControls } from './TypographyControls';
+import { BrandKitPanel } from './BrandKitPanel';
+import { ShotTemplatesPanel } from './ShotTemplatesPanel';
 import { getSceneStartSeconds } from '../../utils/projectDuration';
 import {
   PROCEDURAL_ARCHETYPES,
@@ -1525,7 +1527,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         {/* ================= TAB ASET MEDIA (UPLOAD & SISIPKAN ASET) ================= */}
         {activeTab === 'asset' && (
           <div className="flex flex-col gap-4">
+            <BrandKitPanel />
             <AssetManagerPanel />
+            <ShotTemplatesPanel />
           </div>
         )}
 

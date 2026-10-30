@@ -1,6 +1,6 @@
 import { externalizeEmbeddedAssets } from '../engine/composition/assetRefs';
 import Dexie, { type Table } from 'dexie';
-import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp } from '../types';
+import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp, ShotTemplate } from '../types';
 import { CURRENT_SCHEMA_VERSION, migrateLegacyScene, resolveTheme } from '../types';
 import { migrateLegacyProject } from '../engine/composition/migrate';
 import { flagScenesNeedingRepair } from '../engine/composition/legacyScenes';
@@ -56,6 +56,7 @@ export class MooDatabase extends Dexie {
   assets!: Table<AssetRecord, string>;
   bgmBlobs!: Table<StoredBgm, string>;
   voiceTracks!: Table<StoredVoiceTrack, string>;
+  shotTemplates!: Table<ShotTemplate, string>;
 
   constructor() {
     super('MooScriptDB');
@@ -135,6 +136,19 @@ export class MooDatabase extends Dexie {
       assets: 'id, projectId, name, mimeType, createdAt',
       bgmBlobs: 'projectId, updatedAt',
       voiceTracks: 'projectId, updatedAt'
+    });
+
+    // Version 7: shots saved as templates, shared by every project
+    this.version(7).stores({
+      projects: 'id, title, renderMode, updatedAt',
+      audioBlobs: 'projectId, updatedAt',
+      skills: 'id, name, isBuiltin',
+      settings: 'id',
+      sceneAudioCache: 'cacheKey, updatedAt',
+      assets: 'id, projectId, name, mimeType, createdAt',
+      bgmBlobs: 'projectId, updatedAt',
+      voiceTracks: 'projectId, updatedAt',
+      shotTemplates: 'id, name, createdAt'
     });
   }
 }
@@ -274,6 +288,23 @@ export async function getCachedSceneAudio(cacheKey: string): Promise<CachedScene
     console.warn('Failed to read sceneAudioCache:', err);
     return undefined;
   }
+}
+
+export async function listShotTemplates(): Promise<ShotTemplate[]> {
+  try {
+    return (await db.shotTemplates.toArray()).sort((a, b) => b.createdAt - a.createdAt);
+  } catch (err) {
+    console.warn('Failed to read shotTemplates:', err);
+    return [];
+  }
+}
+
+export async function saveShotTemplate(template: ShotTemplate): Promise<void> {
+  await db.shotTemplates.put(template);
+}
+
+export async function deleteShotTemplate(id: string): Promise<void> {
+  await db.shotTemplates.delete(id);
 }
 
 export async function deleteCachedSceneAudio(cacheKey: string): Promise<void> {

@@ -3,6 +3,7 @@ import type { Scene, MooProject, StyleBrief } from '../../types';
 import type { WorldBible } from '../../engine/ai/llm';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { planShots } from '../../engine/ai/brief';
+import { withBrandCards } from '../../engine/brand/brandKit';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
 import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
@@ -32,7 +33,8 @@ function storyboardMinTokens(targetSec: number | undefined): number {
  */
 export function applyWorldBible(project: MooProject, world: WorldBible | undefined): MooProject {
   if (!world) return project;
-  const palette = world.palette || {};
+  // A brand's palette wins over the one the AI picks for the topic.
+  const palette = project.brand ? {} : world.palette || {};
   const theme = { ...project.theme };
   if (palette.bg) theme.bg = palette.bg;
   if (palette.accent) theme.textHighlight = palette.accent;
@@ -45,13 +47,15 @@ export function applyWorldBible(project: MooProject, world: WorldBible | undefin
       backgroundLanguage: '',
       motionSignature: ''
     }),
-    palette: {
-      bg: palette.bg || theme.bg,
-      primary: palette.primary || palette.accent || theme.textHighlight,
-      accent: palette.accent || theme.textHighlight,
-      text: palette.text || theme.textPrimary,
-      source: 'world-bible'
-    },
+    palette: project.brand
+      ? { ...project.brand.palette, source: 'brand-kit' }
+      : {
+          bg: palette.bg || theme.bg,
+          primary: palette.primary || palette.accent || theme.textHighlight,
+          accent: palette.accent || theme.textHighlight,
+          text: palette.text || theme.textPrimary,
+          source: 'world-bible'
+        },
     motif: world.motif || undefined,
     backgroundLanguage: world.visualLanguage || project.styleBrief?.backgroundLanguage || '',
     motionSignature: world.cameraStyle || project.styleBrief?.motionSignature || ''
@@ -219,7 +223,8 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         },
         storyboard.worldBible
       );
-      const syncedProject = syncComposition(updatedProject);
+      // A branded project keeps its intro / outro cards around the new shots.
+      const syncedProject = withBrandCards(syncComposition(updatedProject));
 
       // One undo step for the whole storyboard.
       get().setProject(syncedProject, { preserveHistory: true });

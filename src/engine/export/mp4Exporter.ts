@@ -10,7 +10,8 @@ import {
   canEncodeAudio,
   canEncodeVideo
 } from 'mediabunny';
-import type { MooProject, ThemeTokens } from '../../types';
+import type { AspectRatio, MooProject, ThemeTokens } from '../../types';
+import { drawReframed, frameSize, type ReframeOptions } from './reframe';
 import { resolveTheme } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
@@ -31,6 +32,10 @@ export interface ExportResult {
   durationSeconds: number;
   hasAudio: boolean;
   warnings: string[];
+  /** Shape of the video file. */
+  aspectRatio: AspectRatio;
+  width: number;
+  height: number;
 }
 
 export type ExportContainerFormat = 'mp4' | 'webm';
@@ -44,6 +49,8 @@ export interface ExportOptions {
   watermark?: boolean;
   useAudioDuration?: boolean;
   useWorker?: boolean;
+  /** Renders into another frame shape (crop or fit) instead of the project's own. */
+  reframe?: ReframeOptions;
 }
 
 export async function runWorkerRenderPipeline(
@@ -191,6 +198,10 @@ export async function exportMooProjectToMP4(
   const height = project.height || 1920;
   const warnings: string[] = [];
   let hasAudio = false;
+  // The stage always renders the project's own frame; a reframe redraws it into the target shape.
+  const reframe = opts?.reframe && opts.reframe.aspect !== project.aspectRatio ? opts.reframe : null;
+  const outSize = reframe ? frameSize(reframe.aspect, project.resolution || '1080p') : { width, height };
+  const outAspect: AspectRatio = reframe ? reframe.aspect : project.aspectRatio;
 
   // 1. Verify WebCodecs VideoEncoder availability via mediabunny for the requested container.
   // Browsers without an H.264 encoder (e.g. Firefox, some Linux builds) fall back to WebM/VP9.
@@ -215,7 +226,7 @@ export async function exportMooProjectToMP4(
 
   // Calculate adaptive bitrate based on resolution and fps
   const basePixels = 1080 * 1920 * 30;
-  const currentPixels = width * height * fps;
+  const currentPixels = outSize.width * outSize.height * fps;
   const calculatedBitrate = Math.round((currentPixels / basePixels) * 6_000_000);
   const qualityFactor = EXPORT_QUALITY_FACTOR[opts?.quality ?? 'standard'] ?? 1;
   const bitrate = Math.round(
@@ -356,6 +367,7 @@ export async function exportMooProjectToMP4(
 
   // The worker only emits H.264 packets, so WebM always renders on the main thread.
   const canAttemptWorker =
+    !reframe &&
     opts?.useWorker !== false &&
     !isWebm &&
     !isCompositionMode &&
@@ -499,7 +511,10 @@ export async function exportMooProjectToMP4(
           fileSizeBytes: blob.size,
           durationSeconds: totalDuration,
           hasAudio,
-          warnings
+          warnings,
+          aspectRatio: outAspect,
+          width: outSize.width,
+          height: outSize.height
         };
       } catch (err: unknown) {
         if (objectUrl) {
@@ -535,7 +550,14 @@ export async function exportMooProjectToMP4(
     }
   }
 
-  const videoSource = new CanvasSource(rawCanvas as HTMLCanvasElement, {
+  // With a reframe, frames are drawn at the project's size and redrawn into this canvas.
+  let outputCanvas = rawCanvas as HTMLCanvasElement;
+  if (reframe) {
+    outputCanvas = document.createElement('canvas');
+    outputCanvas.width = outSize.width;
+    outputCanvas.height = outSize.height;
+  }
+  const videoSource = new CanvasSource(outputCanvas, {
     codec: isWebm ? 'vp9' : 'avc',
     bitrate
   });
@@ -600,6 +622,8 @@ export async function exportMooProjectToMP4(
         });
       }
 
+      if (reframe) drawReframed(rawCanvas as HTMLCanvasElement, outputCanvas, reframe.mode);
+
       // 2. Add canvas frame to Mediabunny (auto-encodes, respects dequeue backpressure, and closes frame)
       await videoSource.add(frame / fps, 1 / fps);
 
@@ -644,7 +668,10 @@ export async function exportMooProjectToMP4(
         fileSizeBytes: blob.size,
         durationSeconds: totalDuration,
         hasAudio,
-        warnings
+        warnings,
+        aspectRatio: outAspect,
+        width: outSize.width,
+        height: outSize.height
       };
     } catch (err: unknown) {
       if (objectUrl) {

@@ -7,6 +7,7 @@ import { createPendingSceneModule } from './sync';
 import { compileProceduralScene } from './proceduralCompiler';
 import { scopeCss } from './scopeCss';
 import { resolveAssetRefs } from './assetRefs';
+import { watermarkHtml } from '../brand/brandKit';
 import { voiceShift } from '../audio/voiceEdit';
 import { sceneHasRenderableCode } from './legacyScenes';
 import type { Scene } from '../../types';
@@ -204,7 +205,10 @@ export function buildCompositionDocument(project: MooProject, options?: BuildDoc
   });
 
   const palette = getProjectPalette(project);
-  const fontDisplay = FONT_BY_THEME[project.theme?.fontFamily || 'Jakarta'] || FONT_BY_THEME.Jakarta;
+  const brandFont = project.brand?.fontFamily?.replace(/[^\w\- ]/g, '').trim();
+  const fontDisplay = brandFont
+    ? `'${brandFont}', ${FONT_BY_THEME.Jakarta}`
+    : FONT_BY_THEME[project.theme?.fontFamily || 'Jakarta'] || FONT_BY_THEME.Jakarta;
 
   // Assemble scene CSS (+ per-scene palette variables and non-destructive layer overrides)
   const scenesCss = resolved
@@ -466,7 +470,7 @@ MOO.scene(${jsString(mod.beatId)}, {
 </head>
 <body>
   <div id="moo-viewport">
-    <div id="moo-stage"></div>
+    <div id="moo-stage">${resolveAssetRefs(watermarkHtml(project), project.assetData)}</div>
   </div>
 
   <!-- Runtime Injected Controller -->

@@ -23,12 +23,14 @@ import type {
   CreativeBrief,
   SfxCue,
   SfxKind,
+  ShotTemplate,
   VoiceEdit,
   TimelineMarker,
   LayerMotion
 } from '../types';
 import type { AudioProgressInfo } from '../engine/ai/tts';
 import type { ExportProgress, ExportResult, ExportOptions } from '../engine/export/mp4Exporter';
+import type { ReframeMode } from '../engine/export/reframe';
 import type { AssetRecord } from '../db/mooDb';
 import type { ProceduralArchetype } from '../engine/composition/proceduralCompiler';
 
@@ -91,6 +93,16 @@ export interface ProjectSlice {
   updateTitle: (title: string) => void;
   renameProject: (id: string, newTitle: string) => Promise<void>;
   updateResolution: (res: '1080p' | '720p') => void;
+  /** Applies the brand kit from the settings to this project (palette, logo, font, cards). */
+  applyBrandToProject: () => void;
+  removeBrandFromProject: () => void;
+  shotTemplates: ShotTemplate[];
+  loadShotTemplates: () => Promise<void>;
+  /** Saves a shot (code, tweaks, animations, images) as a template; resolves to its id. */
+  saveShotAsTemplate: (sceneId: string, name: string) => Promise<string | null>;
+  /** Adds a template as a new shot after `afterSceneId` (or at the end); returns the new shot id. */
+  insertShotTemplate: (templateId: string, afterSceneId?: string | null) => string | null;
+  deleteShotTemplate: (templateId: string) => Promise<void>;
   /** Adds a sound effect at a film time and returns its id. */
   addSfxCue: (time: number, kind: SfxKind) => string;
   updateSfxCue: (id: string, update: Partial<Omit<SfxCue, 'id'>>) => void;
@@ -231,6 +243,13 @@ export interface PlaybackSlice {
   play: () => void;
 }
 
+export interface ExportQueueItem {
+  aspect: AspectRatio;
+  status: 'waiting' | 'rendering' | 'done' | 'error' | 'cancelled';
+  result?: ExportResult;
+  error?: string;
+}
+
 export interface ExportSlice {
   isExporting: boolean;
   exportProgress: ExportProgress | null;
@@ -238,6 +257,10 @@ export interface ExportSlice {
   startExport: (opts?: ExportOptions) => Promise<void>;
   cancelExport: () => void;
   revokeExportResult: () => void;
+  /** Videos of the same film in several frame shapes, rendered one after another. */
+  exportQueue: ExportQueueItem[];
+  startExportQueue: (aspects: AspectRatio[], mode: ReframeMode, opts?: ExportOptions) => Promise<void>;
+  clearExportQueue: () => void;
 }
 
 export interface SettingsSlice {

@@ -8,6 +8,7 @@ import { buildCompositionDocument } from '../../engine/composition/buildDocument
 import { syncComposition } from '../../engine/composition/sync';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { DEFAULT_EXPORT_SETTINGS } from '../../types';
+import { MultiFormatExport } from './MultiFormatExport';
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -420,6 +421,8 @@ export const ExportPanel: React.FC = () => {
           </div>
         )}
       </div>
+
+      <MultiFormatExport />
 
       {/* Unduh Bundle Mograph Web HTML */}
       <div className="flex flex-col gap-2 pt-1 border-t border-border">

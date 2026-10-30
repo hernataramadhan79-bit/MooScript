@@ -267,6 +267,8 @@ export interface Scene {
   wordTimestamps: WordTimestamp[];
   /** Leaves this scene without captions while project subtitles are on. */
   hideSubtitles?: boolean;
+  /** Set on the intro / outro card scenes the brand kit adds; they are replaced when it is applied again. */
+  brandCard?: 'intro' | 'outro';
   /** @deprecated legacy canvas renderer only; captions follow the project setting and `hideSubtitles`. */
   showSubtitles?: boolean;
 
@@ -820,6 +822,8 @@ export interface MooProject {
   sfxLevel?: number;
   voiceEdit?: VoiceEdit;
   musicBeats?: MusicBeats;
+  /** Brand applied to this project: palette, logo watermark, typeface, intro / outro cards. */
+  brand?: ProjectBrand;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -855,6 +859,60 @@ export interface MusicBeats {
   key: string;
   times: number[];
   bpm: number | null;
+}
+
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+export interface BrandWatermark {
+  enabled: boolean;
+  position: WatermarkPosition;
+  /** 0.1-1 */
+  opacity: number;
+  /** Logo width as a percentage of the frame width. */
+  size: number;
+}
+
+/** The creator's look, kept in the settings and applied to any project. */
+export interface BrandKit {
+  name: string;
+  palette: ScenePalette;
+  logoDataUrl?: string;
+  font?: CustomFont;
+  watermark: BrandWatermark;
+  /** Opens the film with a logo / name card. */
+  intro: boolean;
+  /** Closes the film with a card that carries this text (a call to action). */
+  outro: { enabled: boolean; text: string };
+}
+
+/** The brand as applied to one project (a copy, so the project stands on its own). */
+export interface ProjectBrand {
+  name: string;
+  palette: ScenePalette;
+  /** Key of the logo in the project's asset table. */
+  logoAssetId?: string;
+  fontFamily?: string;
+  watermark: BrandWatermark;
+  intro: boolean;
+  outro: { enabled: boolean; text: string };
+}
+
+/** A shot saved to reuse in any project: its code, layer tweaks and animations, and its images. */
+export interface ShotTemplate {
+  id: string;
+  name: string;
+  createdAt: number;
+  aspectRatio: AspectRatio;
+  durationInSeconds: number;
+  narrationText: string;
+  html: string;
+  css: string;
+  buildJs: string;
+  overrides?: Record<string, LayerOverride>;
+  layerMotions?: Record<string, LayerMotion>;
+  palette?: Partial<ScenePalette>;
+  /** Images the markup refers to (moo-asset:<id>). */
+  assetData: Record<string, string>;
 }
 
 export interface TimelineMarker {
@@ -928,6 +986,8 @@ export interface EngineSettings {
   piperNoiseW?: number;
   duckingDb: number;
   fps: number;
+  /** The creator's brand, applied to projects from the Brand tab. */
+  brandKit?: BrandKit;
 }
 
 export interface ToastNotification {
