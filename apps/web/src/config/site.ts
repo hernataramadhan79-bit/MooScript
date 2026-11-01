@@ -13,10 +13,9 @@ export function buildStudioUrl(templateSlug?: string): string {
 export function localizePath(path: string, locale: Locale): string {
   const clean = path.startsWith('/') ? path : `/${path}`;
   const stripped = clean === '/id' ? '/' : clean.startsWith('/id/') ? clean.slice(3) : clean;
-  if (locale === 'en') {
-    return stripped || '/';
-  }
-  return stripped === '/' ? '/id/' : `/id${stripped}`;
+  // Pages are built as directories, so every URL ends in a slash, matching the sitemap.
+  const slashed = stripped.endsWith('/') ? stripped : `${stripped}/`;
+  return locale === 'en' ? slashed : `/id${slashed}`;
 }
 
 export function alternatePaths(pathname: string): { en: string; id: string } {

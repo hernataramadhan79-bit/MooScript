@@ -71,6 +71,9 @@ export function normalizeMotionNode(raw: any, index = 0): MotionNode {
   };
 }
 
+/** Sent to OpenRouter as the app's attribution URL. */
+const OPENROUTER_REFERER = 'https://app.mooscript.web.id';
+
 export const MotionPresetEnum = z.enum(['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake']);
 export const IconEnum = z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']);
 
@@ -944,7 +947,7 @@ export async function fetchAvailableModels(
       const res = await fetch('https://openrouter.ai/api/v1/models', {
         headers: {
           Authorization: `Bearer ${trimmed}`,
-          'HTTP-Referer': 'https://mooscript.app',
+          'HTTP-Referer': OPENROUTER_REFERER,
           'X-Title': 'MooScript Studio'
         },
         signal
@@ -1244,7 +1247,7 @@ async function generateWithOpenRouter(
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://mooscript.app',
+          'HTTP-Referer': OPENROUTER_REFERER,
           'X-Title': 'MooScript Studio'
         },
         body: JSON.stringify({
@@ -1517,7 +1520,7 @@ export async function callRawLLM(opts: {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${cleanKey}`,
-          'HTTP-Referer': 'https://mooscript.app',
+          'HTTP-Referer': OPENROUTER_REFERER,
           'X-Title': 'MooScript Studio'
         },
         body: JSON.stringify({

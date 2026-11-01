@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   site: 'https://mooscript.web.id',
-  trailingSlash: 'ignore',
+  trailingSlash: 'always',
   integrations: [
     react(),
     sitemap({

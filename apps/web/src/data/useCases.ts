@@ -83,14 +83,11 @@ export const USE_CASE_PILLARS: UseCasePillar[] = [
       id: 'Contoh modul shot MooTween'
     },
     codeSnippet: `// Runs inside (shot, root, ctx, MooTween) - zero GSAP needed
-ctx.cameraMove('.moo-camera', {
-  fromScale: 1.08, toScale: 1.0,
-  fromY: 28, toY: 0, start: 0, dur: 3.4
-});
+ctx.camera({ move: 'push', handoff: 'zoom' });
 
-ctx.drawPath('#trace-wire', { start: 0.1, dur: 0.85 });
-shot.arrive('#node-badge', { scale: [0.7, 1], y: [32, 0], ease: 'spring(1.1, 0.7)' }, 0.25);
-ctx.counter('#fps-metric', 0, 60, { start: 0.4, dur: 1.1, suffix: ' fps' });`,
+ctx.draw('#trace-wire', { at: 0.1, dur: 0.85 });
+shot.arrive('#node-badge', { scale: 0.7, y: 32, opacity: 0, dur: 0.6, curve: 'spring-out(1.1, 0.7)' }, 0.25);
+ctx.count('#fps-metric', { from: 0, to: 60, at: 0.4, dur: 1.1, suffix: ' fps' });`,
     highlightsTitle: {
       en: 'Built for technical creators',
       id: 'Dirancang untuk kreator teknis'
@@ -214,14 +211,12 @@ ctx.counter('#fps-metric', 0, 60, { start: 0.4, dur: 1.1, suffix: ' fps' });`,
       id: 'Adegan kinetik tersinkron suara'
     },
     codeSnippet: `// Word-level timing synced to voiceover timestamps
-ctx.cameraMove('.moo-camera', {
-  fromScale: 1.06, toScale: 1.0,
-  fromX: -18, toX: 0, start: 0, dur: 3.2
-});
+ctx.camera({ move: 'pan-right', handoff: 'zoom' });
 
-ctx.wordBeat('#headline-key', 'WebCodecs', { scale: 1.14, accent: true });
-ctx.pop('#metric-pill', { at: 0.45, scale: 1.08 });
-ctx.flash({ at: 1.15, opacity: 0.16 });`,
+const hit = ctx.beat('WebCodecs', 0.9);
+ctx.punch('#headline-key', { at: hit, scale: 1.14 });
+ctx.pop('#metric-pill', { at: 0.45 });
+ctx.flash({ at: 1.15, intensity: 0.16 });`,
     highlightsTitle: {
       en: 'Two ways to prompt',
       id: 'Dua cara memakai AI'
@@ -345,10 +340,10 @@ ctx.flash({ at: 1.15, opacity: 0.16 });`,
       id: 'Kait visual detik pertama'
     },
     codeSnippet: `// Painted immediately at t = 0 so frame 000 hooks the viewer
-shot.set('#hook-banner', { opacity: 1, scale: 1 });
+shot.pin('#hook-banner', { opacity: 1, scale: 1 }, 0);
 ctx.punch('#hook-number', { at: 0.18, scale: 1.18 });
-ctx.drawPath('#progress-arc', { start: 0.1, dur: 1.2 });
-ctx.wordBeat('#cta-chip', '3Detik', { scale: 1.12, accent: true });`,
+ctx.draw('#progress-arc', { at: 0.1, dur: 1.2 });
+ctx.punch('#cta-chip', { at: ctx.beat('3Detik', 1.4), scale: 1.12 });`,
     highlightsTitle: {
       en: 'Publish everywhere in one pass',
       id: 'Siap unggah ke semua platform'
@@ -472,13 +467,13 @@ ctx.wordBeat('#cta-chip', '3Detik', { scale: 1.12, accent: true });`,
       id: 'Kurva telemetri & angka KPI'
     },
     codeSnippet: `// Staggered bar growth + stroke reveal + tabular counter
-shot.stagger('.rev-bar', {
-  scaleY: [0, 1], opacity: [0.2, 1],
-  dur: 0.65, stagger: 0.1, ease: 'outExpo'
+shot.arrive('.rev-bar', {
+  scaleY: 0, opacity: 0.2, pivot: '50% 100%',
+  dur: 0.65, cascade: 0.1, curve: 'sharp-out'
 }, 0.15);
 
-ctx.drawPath('#trend-curve', { start: 0.35, dur: 1.1 });
-ctx.counter('#arr-total', 12, 94, { start: 0.3, dur: 1.25, prefix: '$', suffix: 'M' });`,
+ctx.draw('#trend-curve', { at: 0.35, dur: 1.1 });
+ctx.count('#arr-total', { from: 12, to: 94, at: 0.3, dur: 1.25, prefix: '$', suffix: 'M' });`,
     highlightsTitle: {
       en: 'Designed for analysts & storytellers',
       id: 'Untuk analis, jurnalis & kreator'
@@ -486,7 +481,7 @@ ctx.counter('#arr-total', 12, 94, { start: 0.3, dur: 1.25, prefix: '$', suffix: 
     highlights: {
       en: [
         {
-          title: 'Live ctx.counter() & ctx.drawPath()',
+          title: 'Live ctx.count() & ctx.draw()',
           detail: 'Built-in helpers animate numeric readouts, currencies, percentages, and SVG trend lines in two lines of code.'
         },
         {
@@ -500,7 +495,7 @@ ctx.counter('#arr-total', 12, 94, { start: 0.3, dur: 1.25, prefix: '$', suffix: 
       ],
       id: [
         {
-          title: 'Helper ctx.counter() & ctx.drawPath()',
+          title: 'Helper ctx.count() & ctx.draw()',
           detail: 'Fungsi bawaan untuk menganimasikan mata uang, persentase, dan garis tren SVG cukup dalam dua baris kode.'
         },
         {

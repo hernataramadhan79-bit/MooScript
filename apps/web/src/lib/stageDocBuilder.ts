@@ -1,4 +1,5 @@
 import type { MooShowcasePreset } from '@mooscript/presets';
+// These Studio sources are listed in vercel.json's ignoreCommand, so editing them redeploys the site.
 import { installMooTween } from '../../../studio/src/engine/composition/runtime/mooTween';
 import { getRuntimeScript } from '../../../studio/src/engine/composition/runtime/mooRuntime';
 import { scopeCss } from '../../../studio/src/engine/composition/scopeCss';

@@ -13,7 +13,7 @@ const PROMPT_LINES = [
   'RULES:',
   '- Paint the primary subject at t = 0',
   "- Drive camera via ctx.camera({ move: 'push' })",
-  '- Sync spoken beats via ctx.wordBeat(sel, word)'
+  '- Land accents on spoken words via ctx.beat(word)'
 ];
 
 function PromptFragment({ locale }: { locale: Locale }) {
