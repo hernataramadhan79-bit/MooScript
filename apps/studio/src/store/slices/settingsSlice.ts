@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   outputLanguage: 'id',
   selectedLLMProvider: 'gemini',
   selectedTTSProvider: 'fallback',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-3.6-flash',
   openaiModel: 'gpt-4o-mini',
   groqModel: 'llama-3.3-70b-versatile',
   anthropicModel: 'claude-sonnet-4-6',

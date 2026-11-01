@@ -74,6 +74,10 @@ export function normalizeMotionNode(raw: any, index = 0): MotionNode {
 /** Sent to OpenRouter as the app's attribution URL. */
 const OPENROUTER_REFERER = 'https://app.mooscript.web.id';
 
+/** Gemini's recommended model (gemini-2.0-flash was shut down on 2026-06-01), and a stable one to fall back to. */
+const GEMINI_FALLBACK_MODEL = 'gemini-3.6-flash';
+const GEMINI_STABLE_MODEL = 'gemini-2.5-flash';
+
 export const MotionPresetEnum = z.enum(['punch_zoom', 'slide_split', 'fade_float', 'kinetic_shake']);
 export const IconEnum = z.enum(['mascot', 'zap', 'brain', 'sparkles', 'flame', 'code']);
 
@@ -620,9 +624,10 @@ export interface ProviderModelInfo {
 
 export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> = {
   gemini: [
-    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Recommended • Fast & Smart (GA)', isRecommended: true },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Newer & Smarter' },
-    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite', description: 'Cost Efficient' },
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', description: 'Recommended • Fast & Smart (GA)', isRecommended: true },
+    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: 'Newest Flash' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Stable Fallback' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Cost Efficient' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Deep Reasoning' }
   ],
   openai: [
@@ -645,16 +650,16 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
   ],
   openrouter: [
     { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Router)', description: 'Recommended', isRecommended: true },
-    { id: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet (Router)', description: 'Legacy' },
-    { id: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash (Router)', description: 'Fast' },
-    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (Router)', description: 'Reasoning' }
+    { id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5 (Router)', description: 'Latest Generation' },
+    { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash (Router)', description: 'Fast' },
+    { id: 'deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro (Router)', description: 'Reasoning' }
   ]
 };
 
 export function sanitizeModelName(provider: LLMProvider, model?: string): string {
   if (!model || model.trim() === '') {
     return provider === 'gemini'
-      ? 'gemini-2.0-flash'
+      ? GEMINI_FALLBACK_MODEL
       : provider === 'openai'
         ? 'gpt-4o-mini'
         : provider === 'anthropic'
@@ -687,7 +692,7 @@ export function parseGeminiModelsList(
   const models: ProviderModelInfo[] = filtered.map((m) => {
     const cleanId = (m.name || '').replace(/^models\//, '');
     const displayName = m.displayName || cleanId;
-    const isRecommended = cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-2.5-flash';
+    const isRecommended = cleanId === GEMINI_FALLBACK_MODEL || cleanId === GEMINI_STABLE_MODEL;
     return {
       id: cleanId,
       label: displayName.replace(/^models\//, ''),
@@ -796,7 +801,7 @@ export function parseAnthropicModelsList(
   const models: ProviderModelInfo[] = filtered.map((m) => {
     const id = m.id || '';
     const label = m.display_name || id;
-    const isRecommended = id.includes('claude-3-7-sonnet') || id.includes('claude-3-5-sonnet');
+    const isRecommended = id.includes('claude-sonnet-4-6') || id.includes('claude-sonnet-5-5');
     return {
       id,
       label,
@@ -825,9 +830,9 @@ export function parseOpenRouterModelsList(
     const id = m.id || '';
     const name = m.name || id;
     const isRecommended =
-      id === 'anthropic/claude-3.7-sonnet' ||
-      id === 'google/gemini-2.0-flash-001' ||
-      id === 'deepseek/deepseek-r1';
+      id === 'anthropic/claude-sonnet-4.6' ||
+      id === 'google/gemini-3.6-flash' ||
+      id === 'deepseek/deepseek-v4-pro';
     return {
       id,
       label: name,
@@ -1038,16 +1043,16 @@ async function generateWithGemini(
 
   let res = await fetchGemini(activeModel);
 
-  // If 404, 400, or 503 (unknown or unsupported/overloaded model e.g. gemini-3.7-flash), fallback to gemini-2.0-flash
+  // If 404, 400, or 503 (unknown, retired or overloaded model), fall back to the recommended model, then the stable one
   const isFallbackCandidate = (status: number) => status === 404 || status === 400 || status === 503;
-  if (isFallbackCandidate(res.status) && activeModel !== 'gemini-2.0-flash') {
-    console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to 'gemini-2.0-flash'.`);
-    activeModel = 'gemini-2.0-flash';
+  if (isFallbackCandidate(res.status) && activeModel !== GEMINI_FALLBACK_MODEL) {
+    console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to '${GEMINI_FALLBACK_MODEL}'.`);
+    activeModel = GEMINI_FALLBACK_MODEL;
     const fallbackRes = await fetchGemini(activeModel);
     if (fallbackRes.ok) {
       res = fallbackRes;
     } else if (isFallbackCandidate(fallbackRes.status)) {
-      activeModel = 'gemini-2.5-flash';
+      activeModel = GEMINI_STABLE_MODEL;
       const legacyRes = await fetchGemini(activeModel);
       if (legacyRes.ok) {
         res = legacyRes;
@@ -1232,11 +1237,6 @@ async function generateWithOpenRouter(
 ): Promise<string> {
   const cleanModel = sanitizeModelName('openrouter', model);
   let activeModel = cleanModel;
-  if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
-    activeModel = 'anthropic/claude-3.7-sonnet';
-  } else if (activeModel === 'google/gemini-2.0-flash') {
-    activeModel = 'google/gemini-2.0-flash-001';
-  }
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   let maxTokensToUse = maxTokens;
@@ -1265,7 +1265,7 @@ async function generateWithOpenRouter(
 
     let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
     if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
-      activeModel = 'anthropic/claude-3.7-sonnet';
+      activeModel = 'anthropic/claude-sonnet-5.5';
       const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
       if (fallbackRes.ok) {
         res = fallbackRes;
@@ -1359,16 +1359,16 @@ export async function callRawLLM(opts: {
 
     let res = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
 
-    // If 404, 400, or 503 (unknown or unsupported/overloaded model e.g. gemini-3.7-flash), fallback to gemini-2.0-flash
+    // If 404, 400, or 503 (unknown, retired or overloaded model), fall back to the recommended model, then the stable one
     const isFallbackCandidate = (status: number) => status === 404 || status === 400 || status === 503;
-    if (isFallbackCandidate(res.status) && activeModel !== 'gemini-2.0-flash') {
-      console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to 'gemini-2.0-flash'.`);
-      activeModel = 'gemini-2.0-flash';
+    if (isFallbackCandidate(res.status) && activeModel !== GEMINI_FALLBACK_MODEL) {
+      console.warn(`[MooScript LLM] Model '${activeModel}' returned HTTP ${res.status}. Falling back to '${GEMINI_FALLBACK_MODEL}'.`);
+      activeModel = GEMINI_FALLBACK_MODEL;
       const fallbackRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
       if (fallbackRes.ok) {
         res = fallbackRes;
       } else if (isFallbackCandidate(fallbackRes.status)) {
-        activeModel = 'gemini-2.5-flash';
+        activeModel = GEMINI_STABLE_MODEL;
         const legacyRes = await fetchWithBackoff(() => fetchGemini(activeModel), 2, signal);
         if (legacyRes.ok) {
           res = legacyRes;
@@ -1467,10 +1467,7 @@ export async function callRawLLM(opts: {
 
   if (provider === 'anthropic') {
     const url = 'https://api.anthropic.com/v1/messages';
-    let activeModel = cleanModel;
-    if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
-      activeModel = 'claude-3-7-sonnet-20250219';
-    }
+    const activeModel = cleanModel;
     const res = await fetchWithBackoff(
       () =>
         fetch(url, {
@@ -1485,8 +1482,8 @@ export async function callRawLLM(opts: {
             model: activeModel,
             max_tokens: maxTokens,
             system: systemPrompt,
-            messages: [{ role: 'user', content: userPrompt }],
-            temperature
+            // No temperature: Claude 4.7 and later reject non-default sampling parameters.
+            messages: [{ role: 'user', content: userPrompt }]
           }),
           signal
         }),
@@ -1506,11 +1503,6 @@ export async function callRawLLM(opts: {
   if (provider === 'openrouter') {
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     let activeModel = cleanModel;
-    if (activeModel.includes('claude-sonnet-4.6') || activeModel.includes('claude-sonnet-4-6')) {
-      activeModel = 'anthropic/claude-3.7-sonnet';
-    } else if (activeModel === 'google/gemini-2.0-flash') {
-      activeModel = 'google/gemini-2.0-flash-001';
-    }
 
     let maxTokensToUse = maxTokens;
 
@@ -1540,7 +1532,7 @@ export async function callRawLLM(opts: {
     let res = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
 
     if (res.status === 404 && activeModel.includes('claude-sonnet-4.6')) {
-      activeModel = 'anthropic/claude-3.7-sonnet';
+      activeModel = 'anthropic/claude-sonnet-5.5';
       const fallbackRes = await fetchWithBackoff(() => fetchOpenRouter(activeModel, maxTokensToUse), 2, signal);
       if (fallbackRes.ok) {
         res = fallbackRes;

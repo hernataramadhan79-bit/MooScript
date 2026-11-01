@@ -185,11 +185,18 @@ describe('Anthropic & OpenRouter Model Configurations (Phase 1b)', () => {
     expect(anthropicModels[1].id).toBe('claude-haiku-4-5-20251001');
   });
 
-  it('sets openrouter default to anthropic/claude-sonnet-4.6 while keeping legacy selectable', () => {
+  it('sets openrouter default to anthropic/claude-sonnet-4.6 and lists no retired routes', () => {
     const openrouterModels = DEFAULT_PROVIDER_MODELS.openrouter;
     expect(openrouterModels[0].id).toBe('anthropic/claude-sonnet-4.6');
     expect(openrouterModels[0].isRecommended).toBe(true);
-    expect(openrouterModels.some((m) => m.id === 'anthropic/claude-3.7-sonnet')).toBe(true);
+    const retired = ['anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash', 'deepseek/deepseek-r1'];
+    expect(openrouterModels.filter((m) => retired.includes(m.id))).toEqual([]);
+  });
+
+  it('defaults Gemini to a model that is still served (gemini-2.0-flash shut down 2026-06-01)', () => {
+    expect(DEFAULT_SETTINGS.geminiModel).toBe('gemini-3.6-flash');
+    expect(sanitizeModelName('gemini', '')).toBe('gemini-3.6-flash');
+    expect(DEFAULT_PROVIDER_MODELS.gemini.some((m) => m.id.startsWith('gemini-2.0'))).toBe(false);
   });
 
   it('sanitizes empty model names to new defaults', () => {
@@ -258,14 +265,14 @@ describe('Dynamic Model Resolution & BYOK Independence', () => {
 
   it('dynamically parses Anthropic models directly from API format', () => {
     const rawAnthropic = [
-      { id: 'claude-3-7-sonnet-20250219', display_name: 'Claude 3.7 Sonnet', type: 'model' },
-      { id: 'claude-3-5-haiku-20241022', display_name: 'Claude 3.5 Haiku', type: 'model' }
+      { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6', type: 'model' },
+      { id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5', type: 'model' }
     ];
 
     const parsed = parseAnthropicModelsList(rawAnthropic);
     expect(parsed.length).toBe(2);
-    expect(parsed[0].id).toBe('claude-3-7-sonnet-20250219');
-    expect(parsed[0].label).toBe('Claude 3.7 Sonnet');
+    expect(parsed[0].id).toBe('claude-sonnet-4-6');
+    expect(parsed[0].label).toBe('Claude Sonnet 4.6');
     expect(parsed[0].isRecommended).toBe(true);
   });
 
@@ -328,7 +335,7 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
     ).rejects.toThrow(/401 Unauthorized/);
   });
 
-  it('callRawLLM automatically falls back to gemini-2.0-flash if configured model returns 404', async () => {
+  it('callRawLLM automatically falls back to gemini-3.6-flash if configured model returns 404', async () => {
     const urlsCalled: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
       urlsCalled.push(String(url));
@@ -356,7 +363,7 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
     });
 
     expect(res).toBe('<div class="airflow"></div>');
-    expect(urlsCalled.some((u) => u.includes('gemini-2.0-flash:generateContent'))).toBe(true);
+    expect(urlsCalled.some((u) => u.includes('gemini-3.6-flash:generateContent'))).toBe(true);
   });
 
   it('passes configured maxTokens to Gemini payload in generateStoryboard', async () => {
@@ -464,7 +471,7 @@ describe('generateStoryboard Error Handling (Phase 1d)', () => {
     const result = await callRawLLM({
       provider: 'openrouter',
       apiKey: 'sk-or-test',
-      model: 'google/gemini-2.0-flash-001',
+      model: 'google/gemini-3.6-flash',
       systemPrompt: 'System',
       userPrompt: 'User prompt',
       maxTokens: 8192
