@@ -225,7 +225,7 @@ ctx.flash({ at: 1.15, intensity: 0.16 });`,
       en: [
         {
           title: 'Direct BYOK inside Studio',
-          detail: 'Connect Gemini, OpenAI, Anthropic, DeepSeek, Groq, or OpenRouter keys stored locally in your browser.'
+          detail: 'Connect Gemini, OpenAI, Anthropic, Groq, or OpenRouter keys stored locally in your browser.'
         },
         {
           title: 'Copy-paste chatbot workflow',
@@ -239,7 +239,7 @@ ctx.flash({ at: 1.15, intensity: 0.16 });`,
       id: [
         {
           title: 'Integrasi API langsung (BYOK)',
-          detail: 'Hubungkan kunci API Gemini, OpenAI, Claude, DeepSeek, Groq, atau OpenRouter yang tersimpan aman di perangkat lokal.'
+          detail: 'Hubungkan kunci API Gemini, OpenAI, Claude, Groq, atau OpenRouter yang tersimpan aman di perangkat lokal.'
         },
         {
           title: 'Salin-tempel dari chatbot gratis',

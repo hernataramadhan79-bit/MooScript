@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SHOWCASE_PRESETS } from '@mooscript/presets';
 import { buildStudioUrl, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
@@ -15,6 +15,12 @@ export default function ShowcaseStudio({ locale }: Props) {
 
   const preset = useMemo(() => SHOWCASE_PRESETS.find((p) => p.slug === slug) || SHOWCASE_PRESETS[0], [slug]);
   const portrait = preset.height > preset.width;
+
+  // The layout's reduced-motion pass runs before this island mounts, so the footage is held here.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) videoRef.current?.pause();
+  }, [slug, broll]);
 
   return (
     <div>
@@ -61,6 +67,7 @@ export default function ShowcaseStudio({ locale }: Props) {
           >
             {broll && (
               <video
+                ref={videoRef}
                 autoPlay
                 muted
                 loop

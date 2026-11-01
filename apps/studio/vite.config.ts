@@ -84,9 +84,19 @@ export default defineConfig({
       workbox: {
         // woff2 only: every supported browser takes it, and the legacy .woff copies doubled the precache.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Offline TTS is opt-in: its 1.7 MB worker is cached on first use instead of on every install.
+        globIgnores: ['**/localTtsWorker-*.js'],
         navigateFallbackDenylist: [/^\/privacy\.html$/],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/localTtsWorker-[\w-]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mooscript-tts-worker-cache',
+              expiration: { maxEntries: 2 }
+            }
+          },
           {
             urlPattern: /\.(?:wasm)$/i,
             handler: 'CacheFirst',

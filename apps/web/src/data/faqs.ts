@@ -25,7 +25,7 @@ export const FAQS: Record<Locale, FaqItem[]> = {
     {
       question: 'Which AI models work best with MooScript Studio?',
       answer:
-        'Inside Studio you can connect Gemini, OpenAI, Anthropic Claude, DeepSeek, Groq, or OpenRouter with your own API key, or copy our official AI System Prompt into any chat assistant and paste the generated MooTween code back.'
+        'Inside Studio you can connect Gemini, OpenAI, Anthropic Claude, Groq, or OpenRouter (for models such as DeepSeek) with your own API key, or copy our official AI System Prompt into any chat assistant and paste the generated MooTween code back.'
     },
     {
       question: 'Can I generate voice-overs and sound effects completely offline?',
@@ -57,7 +57,7 @@ export const FAQS: Record<Locale, FaqItem[]> = {
     {
       question: 'Model AI apa saja yang didukung oleh MooScript Studio?',
       answer:
-        'Anda dapat menghubungkan API key pribadi untuk Gemini, OpenAI, Claude, DeepSeek, Groq, atau OpenRouter langsung di Studio, atau menyalin System Prompt resmi kami ke chatbot AI favorit lalu menempelkan kodenya.'
+        'Anda dapat menghubungkan API key pribadi untuk Gemini, OpenAI, Claude, Groq, atau OpenRouter (untuk model seperti DeepSeek) langsung di Studio, atau menyalin System Prompt resmi kami ke chatbot AI favorit lalu menempelkan kodenya.'
     },
     {
       question: 'Apakah pengisi suara dan efek suara otomatis bisa berjalan tanpa internet?',
