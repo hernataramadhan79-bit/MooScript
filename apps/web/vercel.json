@@ -2,7 +2,7 @@
   "framework": "astro",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm run build",
-  "ignoreCommand": "sh -c '[ -z \"$VERCEL_GIT_PREVIOUS_SHA\" ] || [ \"$VERCEL_GIT_PREVIOUS_SHA\" = \"$VERCEL_GIT_COMMIT_SHA\" ] && exit 1; git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" \"$VERCEL_GIT_COMMIT_SHA\" -- . ../../packages/presets ../studio/src/engine/composition/runtime ../studio/src/engine/composition/scopeCss.ts ../../pnpm-lock.yaml'",
+  "ignoreCommand": "sh ../../tools/vercel-ignore.sh . ../../packages/presets ../studio/src/engine/composition/runtime ../studio/src/engine/composition/scopeCss.ts ../../pnpm-lock.yaml",
   "outputDirectory": "dist",
   "headers": [
     {
