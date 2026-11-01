@@ -16,6 +16,17 @@ export function resetDeepLinkGuard(): void {
   handledDeepLinkSlug = null;
 }
 
+/** Session-mode keys live in sessionStorage; a blocked or full storage must not break saving settings. */
+function writeSessionKeys(keys: EngineSettings['apiKeys'] | null): void {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    if (keys) sessionStorage.setItem('mooscript_session_keys', JSON.stringify(keys));
+    else sessionStorage.removeItem('mooscript_session_keys');
+  } catch {
+    // ignore sessionStorage errors in private browsing or sandboxed frames
+  }
+}
+
 function readStoredSkillId(): string | null {
   try {
     return typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_SKILL_KEY) : null;
@@ -65,15 +76,7 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
     const isSession = merged.apiKeyStorage === 'session';
     const settingsToPersist = isSession ? { ...merged, apiKeys: {} } : merged;
 
-    if (isSession) {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('mooscript_session_keys', JSON.stringify(merged.apiKeys));
-      }
-    } else {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.removeItem('mooscript_session_keys');
-      }
-    }
+    writeSessionKeys(isSession ? merged.apiKeys : null);
     await db.settings.put({ id: 'current', data: settingsToPersist });
   },
 
@@ -83,14 +86,10 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
     set({ settings: merged });
 
     if (merged.apiKeyStorage === 'session') {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('mooscript_session_keys', JSON.stringify(updatedKeys));
-      }
+      writeSessionKeys(updatedKeys);
       await db.settings.put({ id: 'current', data: { ...merged, apiKeys: {} } });
     } else {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.removeItem('mooscript_session_keys');
-      }
+      writeSessionKeys(null);
       await db.settings.put({ id: 'current', data: merged });
     }
   },

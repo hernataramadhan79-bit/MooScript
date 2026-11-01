@@ -1,6 +1,7 @@
 ---
 import { GITHUB_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -9,6 +10,7 @@ interface Props {
 
 const { locale, pathname } = Astro.props;
 const copy = HOME_COPY[locale].nav;
+const ui = UI_COPY[locale];
 const homeHref = localizePath('/', locale);
 const templatesHref = localizePath('/templates', locale);
 const useCasesHref = localizePath('/use-cases', locale);
@@ -34,7 +36,7 @@ const links = [
       <span class="font-display text-[21px] font-extrabold tracking-tight">MooScript</span>
     </a>
 
-    <nav aria-label="Main navigation" class="hidden items-center gap-9 lg:flex">
+    <nav aria-label={ui.mainNav} class="hidden items-center gap-9 lg:flex">
       {
         links.map((link) => (
           <a
@@ -60,7 +62,7 @@ const links = [
     </nav>
 
     <div class="flex items-center gap-3 sm:gap-5">
-      <div role="group" aria-label="Language" class="flex items-center gap-1 text-[15px] font-bold">
+      <div role="group" aria-label={ui.language} class="flex items-center gap-1 text-[15px] font-bold">
         <a
           href={enHref}
           hreflang="en"
@@ -98,7 +100,7 @@ const links = [
   </div>
 
   <div id="mobile-menu" data-menu-panel hidden class="fixed inset-x-0 bottom-0 top-[72px] z-40 overflow-y-auto bg-ground lg:hidden">
-    <nav aria-label="Mobile navigation" class="frame flex min-h-full flex-col justify-between gap-10 pb-10 pt-6">
+    <nav aria-label={ui.mobileNav} class="frame flex min-h-full flex-col justify-between gap-10 pb-10 pt-6">
       <ul class="flex flex-col">
         {
           links.map((link) => (
@@ -154,9 +156,17 @@ const links = [
       if (e.target && e.target.closest && e.target.closest('a')) setOpen(false);
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !panel.hidden) {
+      if (panel.hidden) return;
+      if (e.key === 'Escape') {
         setOpen(false);
         btn.focus();
+      } else if (e.key === 'Tab') {
+        // Keep focus on the menu button and the open panel; the page behind it is covered.
+        var stops = [btn].concat(Array.prototype.slice.call(panel.querySelectorAll('a[href]')));
+        var at = stops.indexOf(document.activeElement);
+        var next = e.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : at === stops.length - 1 ? 0 : at + 1;
+        e.preventDefault();
+        stops[next].focus();
       }
     });
     window.matchMedia('(min-width: 1024px)').addEventListener('change', function (m) {

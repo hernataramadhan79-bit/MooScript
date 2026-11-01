@@ -4,6 +4,7 @@ import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import GuidesList from '../sections/GuidesList.astro';
 import ActionTileCta from '../sections/ActionTileCta.astro';
 import { SITE_URL, localizePath, type Locale } from '../../config/site';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -38,7 +39,7 @@ const trail = [{ name: 'MooScript', href: localizePath('/', locale) }, { name: i
 >
   <section class="field-paper w-full pt-4">
     <div class="frame">
-      <Breadcrumbs trail={trail} />
+      <Breadcrumbs trail={trail} label={UI_COPY[locale].breadcrumb} />
     </div>
   </section>
   <GuidesList locale={locale} asPage={true} />

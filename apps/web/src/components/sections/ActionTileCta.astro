@@ -2,6 +2,7 @@
 import LiveStage from '../islands/LiveStage';
 import { STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -43,7 +44,7 @@ const copy = HOME_COPY[locale].cta;
           clear
           fit="cover"
           anchorY={0.45}
-          title="Transparent MooTween shot over aurora footage"
+          title={UI_COPY[locale].auroraStage}
           className="absolute inset-0"
         />
       </div>

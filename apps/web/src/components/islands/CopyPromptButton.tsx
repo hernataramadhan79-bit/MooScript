@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getOfficialMooScriptPrompt } from '@mooscript/presets';
 import type { Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { copyText } from '../../lib/clipboard';
 
 interface Props {
   locale: Locale;
@@ -13,8 +14,7 @@ export default function CopyPromptButton({ locale, tone = 'quiet' }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(getOfficialMooScriptPrompt(locale));
+    if (await copyText(getOfficialMooScriptPrompt(locale))) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2600);
     }

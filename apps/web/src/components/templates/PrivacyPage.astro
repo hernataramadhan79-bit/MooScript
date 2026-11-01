@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import { localizePath, type Locale } from '../../config/site';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -37,7 +38,7 @@ const paragraphs = id
 >
   <section class="field-ground w-full pb-28 pt-4 md:pb-44">
     <div class="frame">
-      <Breadcrumbs trail={trail} />
+      <Breadcrumbs trail={trail} label={UI_COPY[locale].breadcrumb} />
       <h1 class="t-poster arrive mt-10 max-w-[11ch]" style="--d: 60ms;">
         {id ? 'Privasi sisi klien' : 'Client-side privacy'}
       </h1>

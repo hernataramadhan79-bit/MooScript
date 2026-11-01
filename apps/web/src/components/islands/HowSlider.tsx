@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { getOfficialMooScriptPrompt } from '@mooscript/presets';
 import type { Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { UI_COPY } from '../../data/uiCopy';
+import { copyText } from '../../lib/clipboard';
 
 interface Props {
   locale: Locale;
@@ -20,8 +22,7 @@ function PromptFragment({ locale }: { locale: Locale }) {
   const copy = HOME_COPY[locale].how;
   const [copied, setCopied] = useState(false);
   const copy_ = async () => {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(getOfficialMooScriptPrompt(locale));
+    if (await copyText(getOfficialMooScriptPrompt(locale))) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2600);
     }
@@ -29,7 +30,7 @@ function PromptFragment({ locale }: { locale: Locale }) {
   return (
     <div data-ui className="ui-panel w-full max-w-[470px] p-5 text-[15px] text-ink">
       <div className="flex items-center justify-between gap-3">
-        <strong className="font-semibold">System prompt</strong>
+        <strong className="font-semibold">{UI_COPY[locale].how.promptTitle}</strong>
         <span className="text-[15px] text-muted">Claude · ChatGPT · Gemini</span>
       </div>
       <pre className="ui-well mt-4 overflow-x-auto p-4 text-[15px] leading-[1.7] text-soft">
@@ -42,19 +43,14 @@ function PromptFragment({ locale }: { locale: Locale }) {
   );
 }
 
-function LintFragment() {
-  const rows: Array<[string, string, boolean]> = [
-    ['Static slide layout', 'rejected', false],
-    ['Frame 0 is a full poster', 'pass', true],
-    ['Camera travel', 'push 1.08x to 1.00x', true],
-    ['Word beats', '6 synced', true],
-    ['Editable layers', '7 extracted', true]
-  ];
+function LintFragment({ locale }: { locale: Locale }) {
+  const ui = UI_COPY[locale].how;
+  const rows = ui.lintRows;
   return (
     <div data-ui className="ui-panel w-full max-w-[470px] p-5 text-[15px] text-ink">
       <div className="flex items-center justify-between gap-3">
-        <strong className="font-semibold">Anti-Slide Linter</strong>
-        <span className="ui-chip-active px-2.5 py-0.5 text-[15px] font-bold">Score 0 · PASS</span>
+        <strong className="font-semibold">{ui.lintTitle}</strong>
+        <span className="ui-chip-active px-2.5 py-0.5 text-[15px] font-bold">{ui.lintScore}</span>
       </div>
       <ul className="mt-4 flex flex-col gap-2">
         {rows.map(([name, result, ok]) => (
@@ -68,14 +64,15 @@ function LintFragment() {
   );
 }
 
-function BeatFragment() {
+function BeatFragment({ locale }: { locale: Locale }) {
+  const ui = UI_COPY[locale].how;
   const heights = [34, 58, 26, 72, 40, 84, 30, 62, 44, 78, 28, 66, 38, 90, 32, 70, 46, 80, 30, 60];
   const snaps = new Set([0, 5, 9, 13, 17]);
   return (
     <div data-ui className="ui-panel w-full max-w-[470px] p-5 text-[15px] text-ink">
       <div className="flex items-center justify-between gap-3">
-        <strong className="font-semibold">Beat-sync timeline</strong>
-        <span className="tabular text-[15px] text-lime">Locked 124 BPM</span>
+        <strong className="font-semibold">{ui.beatTitle}</strong>
+        <span className="tabular text-[15px] text-lime">{ui.beatLocked}</span>
       </div>
       <div className="ui-well mt-4 p-4">
         <div className="flex h-[96px] items-end gap-[5px]">
@@ -88,18 +85,19 @@ function BeatFragment() {
           ))}
         </div>
         <div className="mt-3 flex h-[34px] gap-[5px]">
-          <span className="flex-[5] bg-[#2a3b0f] px-2.5 text-[15px] font-semibold leading-[34px] text-lime">Shot 1</span>
-          <span className="flex-[4] bg-lime px-2.5 text-[15px] font-bold leading-[34px] text-on-lime">Shot 2</span>
-          <span className="flex-[4] bg-[#2a3b0f] px-2.5 text-[15px] font-semibold leading-[34px] text-lime">Shot 3</span>
+          <span className="flex-[5] bg-[#2a3b0f] px-2.5 text-[15px] font-semibold leading-[34px] text-lime">{ui.shot} 1</span>
+          <span className="flex-[4] bg-lime px-2.5 text-[15px] font-bold leading-[34px] text-on-lime">{ui.shot} 2</span>
+          <span className="flex-[4] bg-[#2a3b0f] px-2.5 text-[15px] font-semibold leading-[34px] text-lime">{ui.shot} 3</span>
         </div>
       </div>
-      <p className="mt-3 text-[15px] text-muted">Auto-SFX on · whoosh at 0.00s · impact at 2.50s</p>
+      <p className="mt-3 text-[15px] text-muted">{ui.beatNote}</p>
     </div>
   );
 }
 
 function RenderFragment({ locale }: { locale: Locale }) {
   const formats = HOME_COPY[locale].how.formats;
+  const ui = UI_COPY[locale].how;
   const rows: Array<[string, string, number]> = [
     ['9:16', '1080 x 1920', 100],
     ['16:9', '1920 x 1080', 72],
@@ -108,8 +106,8 @@ function RenderFragment({ locale }: { locale: Locale }) {
   return (
     <div data-ui className="ui-panel w-full max-w-[470px] p-5 text-[15px] text-ink">
       <div className="flex items-center justify-between gap-3">
-        <strong className="font-semibold">WebCodecs export queue</strong>
-        <span className="text-[15px] text-muted">GPU · local</span>
+        <strong className="font-semibold">{ui.renderTitle}</strong>
+        <span className="text-[15px] text-muted">{ui.renderWhere}</span>
       </div>
       <ul className="mt-4 flex flex-col gap-3">
         {rows.map(([ratio, size, pct]) => (
@@ -117,7 +115,7 @@ function RenderFragment({ locale }: { locale: Locale }) {
             <div className="flex items-center justify-between">
               <span className="font-semibold">{ratio}</span>
               <span className="tabular text-[15px] text-muted">{size}</span>
-              <span className="tabular text-[15px] text-lime">{pct === 100 ? 'Done' : `${pct}%`}</span>
+              <span className="tabular text-[15px] text-lime">{pct === 100 ? ui.done : `${pct}%`}</span>
             </div>
             <div className="mt-2.5 h-[6px] bg-[#2a2a35]">
               <div className="h-full bg-lime" style={{ width: `${pct}%` }} />
@@ -196,8 +194,8 @@ export default function HowSlider({ locale }: Props) {
       <div className="field-ground order-1 flex min-h-[46svh] items-center justify-center px-[var(--page-x)] py-12 lg:order-2">
         <div key={stage} className="w-full max-w-[470px] animate-[rise_320ms_var(--ease-out-expo)_both]">
           {stage === 0 && <PromptFragment locale={locale} />}
-          {stage === 1 && <LintFragment />}
-          {stage === 2 && <BeatFragment />}
+          {stage === 1 && <LintFragment locale={locale} />}
+          {stage === 2 && <BeatFragment locale={locale} />}
           {stage === 3 && <RenderFragment locale={locale} />}
         </div>
       </div>

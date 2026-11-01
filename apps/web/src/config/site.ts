@@ -1,9 +1,12 @@
+import { version } from '../../package.json';
+
 export type Locale = 'en' | 'id';
 
 export const SITE_URL = 'https://mooscript.web.id';
 export const STUDIO_URL = 'https://app.mooscript.web.id';
 export const GITHUB_URL = 'https://github.com/hernataramadhan79-bit/MooScript';
-export const RELEASE_VERSION = 'v0.2.0';
+// The packages are versioned in lockstep; the site shows the same number.
+export const RELEASE_VERSION = `v${version}`;
 
 export function buildStudioUrl(templateSlug?: string): string {
   if (!templateSlug) return STUDIO_URL;

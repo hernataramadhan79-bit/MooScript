@@ -5,6 +5,7 @@ import Breadcrumbs from '../sections/Breadcrumbs.astro';
 import ActionTileCta from '../sections/ActionTileCta.astro';
 import LiveStage from '../islands/LiveStage';
 import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -54,7 +55,7 @@ const L = {
 >
   <section class="field-ground w-full pb-24 pt-4 md:pb-36">
     <div class="frame">
-      <Breadcrumbs trail={trail} />
+      <Breadcrumbs trail={trail} label={UI_COPY[locale].breadcrumb} />
       <h1 class="t-poster arrive mt-10 max-w-[10ch]" style="--d: 60ms;">{L.heading}</h1>
       <p class="t-lead arrive mt-8 max-w-[44ch] text-soft" style="--d: 180ms;">{L.lead}</p>
     </div>

@@ -1,7 +1,7 @@
 {
   "name": "@mooscript/studio",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -15,7 +15,8 @@
     "test:golden": "vitest run --project browser tests/golden",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "icons:subset": "node tools/subsetIconFont.mjs"
   },
   "dependencies": {
     "@mooscript/presets": "workspace:*",

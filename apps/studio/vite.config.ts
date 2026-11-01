@@ -44,7 +44,8 @@ function onnxWasmPlugin(): Plugin {
       for (const file of wasmFiles) {
         const src = path.join(onnxDist, file);
         const dest = path.join(publicOnnx, file);
-        if (fs.existsSync(src) && !fs.existsSync(dest)) {
+        // Refresh stale copies too, so an onnxruntime-web upgrade never ships the old wasm.
+        if (fs.existsSync(src) && (!fs.existsSync(dest) || !fs.readFileSync(src).equals(fs.readFileSync(dest)))) {
           fs.copyFileSync(src, dest);
         }
       }

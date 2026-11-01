@@ -6,12 +6,13 @@ interface Crumb {
 
 interface Props {
   trail: Crumb[];
+  label: string;
 }
 
-const { trail } = Astro.props;
+const { trail, label } = Astro.props;
 ---
 
-<nav aria-label="Breadcrumb" class="text-[15px] font-semibold">
+<nav aria-label={label} class="text-[15px] font-semibold">
   <ol class="flex flex-wrap items-center gap-x-3 gap-y-1">
     {
       trail.map((crumb, i) => (

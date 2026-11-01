@@ -22,6 +22,22 @@ export default function ShowcaseStudio({ locale }: Props) {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) videoRef.current?.pause();
   }, [slug, broll]);
 
+  // Arrow keys, Home and End move between presets (WAI-ARIA tabs pattern).
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onTabKey = (e: React.KeyboardEvent, index: number) => {
+    const last = SHOWCASE_PRESETS.length - 1;
+    const next =
+      e.key === 'ArrowDown' || e.key === 'ArrowRight' ? (index === last ? 0 : index + 1)
+      : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? (index === 0 ? last : index - 1)
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? last
+      : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    setSlug(SHOWCASE_PRESETS[next].slug);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
     <div>
       <h2 className="t-title max-w-[20ch]">{copy.heading}</h2>
@@ -29,16 +45,23 @@ export default function ShowcaseStudio({ locale }: Props) {
       <div className="lg:col-span-5">
         <p className="t-lead max-w-[40ch]">{copy.lead}</p>
 
-        <ul className="mt-10 flex flex-col" role="tablist" aria-label={copy.heading}>
-          {SHOWCASE_PRESETS.map((p) => {
+        <ul className="mt-10 flex flex-col" role="tablist" aria-label={copy.heading} aria-orientation="vertical">
+          {SHOWCASE_PRESETS.map((p, index) => {
             const selected = p.slug === slug;
             return (
-              <li key={p.slug}>
+              <li key={p.slug} role="presentation">
                 <button
+                  ref={(el) => {
+                    tabRefs.current[index] = el;
+                  }}
                   type="button"
                   role="tab"
+                  id={`showcase-tab-${p.slug}`}
                   aria-selected={selected}
+                  aria-controls="showcase-panel"
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setSlug(p.slug)}
+                  onKeyDown={(e) => onTabKey(e, index)}
                   className={`t-sub group flex min-h-[64px] w-full cursor-pointer items-baseline justify-between gap-4 py-2.5 text-left transition-[opacity,transform] duration-200 ${
                     selected ? 'opacity-100 lg:translate-x-3' : 'opacity-60 hover:translate-x-1.5 hover:opacity-100'
                   }`}
@@ -52,7 +75,12 @@ export default function ShowcaseStudio({ locale }: Props) {
         </ul>
       </div>
 
-      <div className="lg:col-span-7">
+      <div
+        className="lg:col-span-7"
+        role="tabpanel"
+        id="showcase-panel"
+        aria-labelledby={`showcase-tab-${slug}`}
+      >
         <div className="flex h-[min(76svh,720px)] min-h-[420px] w-full items-center justify-center bg-ground p-4 sm:p-6">
           <div
             key={`${slug}-${broll}`}

@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { STUDIO_URL } from '../config/site';
+---
+
+<BaseLayout
+  title="Page not found | MooScript"
+  description="This page does not exist. Halaman ini tidak ditemukan."
+  locale="en"
+  pathname="/404/"
+  noindex
+>
+  <section class="field-ground w-full pb-28 pt-12 md:pb-44">
+    <div class="frame">
+      <p class="tabular text-[17px] font-bold text-lime">404</p>
+      <h1 class="t-poster arrive mt-6 max-w-[12ch]" style="--d: 60ms;">Nothing on this frame</h1>
+      <p class="t-lead mt-8 max-w-[44ch] text-soft">
+        The page you asked for does not exist or has moved.
+        <span lang="id" class="mt-2 block">Halaman yang Anda cari tidak ada atau sudah dipindahkan.</span>
+      </p>
+      <div class="mt-10 flex flex-wrap items-center gap-3">
+        <a href="/" class="btn btn-lime">Home &rarr;</a>
+        <a href="/id/" class="btn btn-quiet" hreflang="id" lang="id">Beranda</a>
+        <a href={STUDIO_URL} class="btn btn-quiet">Launch Studio</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -3,6 +3,7 @@ import LiveStage from '../islands/LiveStage';
 import HeroRail from '../islands/HeroRail';
 import { STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -104,6 +105,7 @@ const masters = [
             playLabel={copy.railPlay}
             pauseLabel={copy.railPause}
             frameLabel={copy.railFrame}
+            scrubLabel={UI_COPY[locale].playhead}
           />
         </div>
         <p class="mt-3 text-[15px]">{copy.railLabel}</p>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getShowcasePreset, SHOWCASE_PRESETS } from '@mooscript/presets';
 import { buildStudioUrl, type Locale } from '../../config/site';
 import { buildPresetStageDoc } from '../../lib/stageDocBuilder';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   slug: string;
@@ -98,7 +99,7 @@ export default function SinglePresetStage({ slug, locale, tone = 'ground' }: Pro
         {srcDoc && (
         <iframe
           ref={iframeRef}
-          title={`MooScript template stage: ${preset.title[locale]}`}
+          title={`${UI_COPY[locale].templateStage}: ${preset.title[locale]}`}
           srcDoc={srcDoc}
           sandbox="allow-scripts"
           tabIndex={-1}
@@ -129,7 +130,6 @@ export default function SinglePresetStage({ slug, locale, tone = 'ground' }: Pro
         <button
           type="button"
           onClick={() => setIsPlaying((p) => !p)}
-          aria-pressed={isPlaying}
           className={`btn min-w-[104px] !min-h-[48px] !px-4 ${onLime ? 'btn-dark' : 'btn-ink'}`}
         >
           {isPlaying ? (locale === 'id' ? 'Jeda' : 'Pause') : locale === 'id' ? 'Putar' : 'Play'}
@@ -143,7 +143,7 @@ export default function SinglePresetStage({ slug, locale, tone = 'ground' }: Pro
           <input
             type="range"
             className="playhead"
-            aria-label="Template timeline scrubber"
+            aria-label={UI_COPY[locale].timelineScrubber}
             min={0}
             max={totalDuration}
             step={0.02}

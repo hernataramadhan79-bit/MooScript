@@ -1,6 +1,7 @@
 ---
 import { HOME_COPY } from '../../data/homeCopy';
 import type { Locale } from '../../config/site';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   locale: Locale;
@@ -18,7 +19,7 @@ const tones = [
 ];
 ---
 
-<section id="engine" aria-label="MooScript engine">
+<section id="engine" aria-label={UI_COPY[locale].engine}>
   {
     fields.map((field, i) => {
       const tone = tones[i % tones.length];

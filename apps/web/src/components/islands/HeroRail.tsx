@@ -5,6 +5,7 @@ interface Props {
   playLabel: string;
   pauseLabel: string;
   frameLabel: string;
+  scrubLabel: string;
   loopSeconds?: number;
   fps?: number;
   tone?: 'ground' | 'lime';
@@ -14,7 +15,7 @@ interface Props {
  * The page's playhead. It drives every live stage in the hero at once, so one
  * drag scrubs the slot in the headline and all three masters together.
  */
-export default function HeroRail({ playLabel, pauseLabel, frameLabel, loopSeconds = 7, fps = 30, tone = 'ground' }: Props) {
+export default function HeroRail({ playLabel, pauseLabel, frameLabel, scrubLabel, loopSeconds = 7, fps = 30, tone = 'ground' }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const rangeRef = useRef<HTMLInputElement | null>(null);
   const fillRef = useRef<HTMLSpanElement | null>(null);
@@ -64,7 +65,6 @@ export default function HeroRail({ playLabel, pauseLabel, frameLabel, loopSecond
       <button
         type="button"
         onClick={() => playhead.setPlaying(!playing)}
-        aria-pressed={playing}
         className={`btn min-w-[104px] !min-h-[48px] !px-4 ${tone === 'lime' ? 'btn-dark' : 'btn-ink'}`}
       >
         {playing ? pauseLabel : playLabel}
@@ -80,7 +80,7 @@ export default function HeroRail({ playLabel, pauseLabel, frameLabel, loopSecond
           ref={rangeRef}
           type="range"
           className="playhead"
-          aria-label="Playhead"
+          aria-label={scrubLabel}
           min={0}
           max={loopSeconds}
           step={1 / fps}

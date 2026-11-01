@@ -7,6 +7,7 @@ import FaqDetails from '../sections/FaqDetails.astro';
 import ActionTileCta from '../sections/ActionTileCta.astro';
 import { SITE_URL, buildStudioUrl, localizePath, type Locale } from '../../config/site';
 import { USE_CASE_PILLARS, type UseCasePillar } from '../../data/useCases';
+import { UI_COPY } from '../../data/uiCopy';
 
 interface Props {
   pillar: UseCasePillar;
@@ -51,7 +52,7 @@ const L = {
 >
   <section class="field-lime w-full pb-20 pt-4 md:pb-28">
     <div class="frame">
-      <Breadcrumbs trail={trail} />
+      <Breadcrumbs trail={trail} label={UI_COPY[locale].breadcrumb} />
       <h1 class="t-poster arrive mt-10" style="--d: 60ms;">{pillar.headline[locale]}</h1>
       <div class="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center lg:gap-14">
         <div class="lg:col-span-5">
@@ -132,7 +133,7 @@ const L = {
             height="1600"
             loading="lazy"
             decoding="async"
-            alt="Satellite view of orbital aurora ribbons and night city lights"
+            alt={UI_COPY[locale].auroraPhoto}
             class="aspect-[16/9] w-full object-cover"
           />
         </figure>
