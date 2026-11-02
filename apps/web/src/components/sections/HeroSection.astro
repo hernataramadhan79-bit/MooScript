@@ -1,7 +1,7 @@
 ---
 import LiveStage from '../islands/LiveStage';
 import HeroRail from '../islands/HeroRail';
-import { STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { INSTALL_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
 import { UI_COPY } from '../../data/uiCopy';
 
@@ -70,6 +70,10 @@ const masters = [
         <div class="mt-8 flex flex-wrap items-center gap-3">
           <a href={STUDIO_URL} class="btn btn-lime">{copy.primaryCta} &rarr;</a>
           <a href={localizePath('/templates', locale)} class="btn btn-quiet">{copy.secondaryCta}</a>
+          <a href={INSTALL_URL} class="btn btn-quiet">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14" /></svg>
+            {copy.installCta}
+          </a>
         </div>
         <p class="mt-5 text-[15px] text-muted">{copy.specLine}</p>
       </div>

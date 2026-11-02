@@ -1,5 +1,5 @@
 ---
-import { GITHUB_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
+import { GITHUB_URL, INSTALL_URL, STUDIO_URL, localizePath, type Locale } from '../../config/site';
 import { HOME_COPY } from '../../data/homeCopy';
 import { UI_COPY } from '../../data/uiCopy';
 
@@ -58,6 +58,13 @@ const links = [
         class="inline-flex min-h-[44px] items-center text-[17px] font-semibold text-soft transition-colors hover:text-ink"
       >
         {copy.github}
+      </a>
+      <a
+        href={INSTALL_URL}
+        class="hidden min-h-[44px] items-center text-[17px] font-semibold text-soft transition-colors hover:text-ink xl:inline-flex"
+       
+      >
+        {copy.installApp}
       </a>
     </nav>
 
@@ -129,6 +136,12 @@ const links = [
           >
             {copy.github}
             <span aria-hidden="true" class="text-[21px]">&nearr;</span>
+          </a>
+        </li>
+        <li>
+          <a href={INSTALL_URL} class="flex min-h-[64px] items-center justify-between t-title text-ink">
+            {copy.installApp}
+            <span aria-hidden="true" class="text-[21px]">&darr;</span>
           </a>
         </li>
       </ul>

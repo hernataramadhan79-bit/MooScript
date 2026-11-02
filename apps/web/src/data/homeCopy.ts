@@ -32,6 +32,7 @@ export interface HomeCopy {
     useCases: string;
     github: string;
     launchStudio: string;
+    installApp: string;
     menu: string;
     close: string;
     home: string;
@@ -43,6 +44,7 @@ export interface HomeCopy {
     subheadline: string;
     primaryCta: string;
     secondaryCta: string;
+    installCta: string;
     specLine: string;
     railPlay: string;
     railPause: string;
@@ -107,6 +109,7 @@ export interface HomeCopy {
     project: string;
     privacy: string;
     studio: string;
+    installApp: string;
     mediaCredits: string;
     madeIn: string;
   };
@@ -123,6 +126,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       useCases: 'Use cases',
       github: 'GitHub',
       launchStudio: 'Launch Studio',
+      installApp: 'Install app',
       menu: 'Menu',
       close: 'Close',
       home: 'MooScript home'
@@ -135,7 +139,8 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         'Write a shot or prompt it. MooScript plays SVG scenes over your B-roll, then encodes MP4, transparent WebM or GIF on your own GPU, in one browser tab.',
       primaryCta: 'Launch Studio',
       secondaryCta: 'Browse templates',
-      specLine: 'No install. No sign-up. Nothing leaves your device.',
+      installCta: 'Install as app',
+      specLine: 'No install required. No sign-up. Nothing leaves your device.',
       railPlay: 'Play',
       railPause: 'Pause',
       railLabel: 'Drag the playhead. All four stages above run live MooTween code.',
@@ -285,6 +290,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       project: 'Project',
       privacy: 'Privacy',
       studio: 'Studio',
+      installApp: 'Install app (PWA)',
       mediaCredits:
         'Night sky imagery: NPS, NASA EO (Public Domain), and ESO/B. Tafreshi (CC BY 4.0).',
       madeIn: 'Open source under AGPLv3'
@@ -300,6 +306,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       useCases: 'Kegunaan',
       github: 'GitHub',
       launchStudio: 'Buka Studio',
+      installApp: 'Pasang aplikasi',
       menu: 'Menu',
       close: 'Tutup',
       home: 'Beranda MooScript'
@@ -312,7 +319,8 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         'Tulis adegan atau minta AI membuatnya. MooScript memutar adegan SVG di atas B-roll, lalu mengekspor MP4, WebM transparan atau GIF lewat GPU Anda sendiri, cukup di satu tab browser.',
       primaryCta: 'Buka Studio',
       secondaryCta: 'Lihat template',
-      specLine: 'Tanpa instalasi. Tanpa daftar akun. Tidak ada yang keluar dari perangkat Anda.',
+      installCta: 'Pasang sebagai aplikasi',
+      specLine: 'Tanpa instalasi wajib. Tanpa daftar akun. Tidak ada yang keluar dari perangkat Anda.',
       railPlay: 'Putar',
       railPause: 'Jeda',
       railLabel: 'Geser playhead. Keempat panggung di atas menjalankan kode MooTween sungguhan.',
@@ -462,6 +470,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       project: 'Proyek',
       privacy: 'Privasi',
       studio: 'Studio',
+      installApp: 'Pasang aplikasi (PWA)',
       mediaCredits: 'Citra langit malam: NPS, NASA EO (Domain Publik), dan ESO/B. Tafreshi (CC BY 4.0).',
       madeIn: 'Open source di bawah AGPLv3'
     }
