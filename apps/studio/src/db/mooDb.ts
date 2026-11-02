@@ -4,6 +4,7 @@ import type { MooProject, PersonaSkill, EngineSettings, WordTimestamp, ShotTempl
 import { CURRENT_SCHEMA_VERSION, migrateLegacyScene, resolveTheme } from '../types';
 import { migrateLegacyProject } from '../engine/composition/migrate';
 import { flagScenesNeedingRepair } from '../engine/composition/legacyScenes';
+import { t } from '../i18n';
 
 export interface StoredAudio {
   projectId: string;
@@ -189,7 +190,7 @@ export async function saveProjectToDb(project: MooProject): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('IndexedDB saveProjectToDb error:', err);
-    throw new Error(`Gagal menyimpan project ke IndexedDB (${msg})`);
+    throw new Error(t('Gagal menyimpan project ke IndexedDB ({0})', msg));
   }
 }
 
@@ -400,7 +401,7 @@ export async function saveBgmToDb(projectId: string, blob: Blob, name: string): 
     await db.bgmBlobs.put({ projectId, blob, name, updatedAt: Date.now() });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Gagal menyimpan BGM ke IndexedDB (${msg})`);
+    throw new Error(t('Gagal menyimpan BGM ke IndexedDB ({0})', msg));
   }
 }
 
@@ -454,7 +455,7 @@ export async function saveAssetToDb(asset: AssetRecord): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('saveAssetToDb error:', err);
-    throw new Error(`Gagal menyimpan aset ke IndexedDB (${msg})`);
+    throw new Error(t('Gagal menyimpan aset ke IndexedDB ({0})', msg));
   }
 }
 

@@ -18,6 +18,7 @@ import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
 import { sceneHasRenderableCode } from '../composition/legacyScenes';
 import { EXPORT_QUALITY_FACTOR, type ExportQuality } from './exportOptions';
+import { t } from '../../i18n';
 
 export interface ExportProgress {
   percent: number;
@@ -214,22 +215,22 @@ export async function exportMooProjectToMP4(
   let isWebm = opts?.format === 'webm' || transparent;
   if (typeof VideoEncoder === 'undefined') {
     throw new Error(
-      'WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.'
+      t('WebCodecs VideoEncoder tidak didukung pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.')
     );
   }
   if (!isWebm && !(await canEncodeVideo('avc'))) {
     if (await canEncodeVideo('vp9')) {
       isWebm = true;
-      warnings.push('Browser tidak mendukung encoder H.264, jadi video diekspor sebagai WebM (VP9).');
+      warnings.push(t('Browser tidak mendukung encoder H.264, jadi video diekspor sebagai WebM (VP9).'));
     }
   }
   if (!(await canEncodeVideo(isWebm ? 'vp9' : 'avc'))) {
     throw new Error(
-      `WebCodecs tidak dapat meng-encode ${isWebm ? 'VP9 (WebM)' : 'H.264 (MP4)'} pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.`
+      t('WebCodecs tidak dapat meng-encode {0} pada browser ini. Silakan gunakan Google Chrome, Microsoft Edge, atau browser modern lainnya.', isWebm ? 'VP9 (WebM)' : 'H.264 (MP4)')
     );
   }
   if (transparent && !(await canEncodeVideo('vp9', { width: outSize.width, height: outSize.height, alpha: 'keep' }))) {
-    throw new Error('Browser ini belum bisa membuat video transparan (VP9 dengan alpha). Coba Google Chrome versi terbaru.');
+    throw new Error(t('Browser ini belum bisa membuat video transparan (VP9 dengan alpha). Coba Google Chrome versi terbaru.'));
   }
   const audioCodec = isWebm ? 'opus' : 'aac';
 
@@ -252,7 +253,7 @@ export async function exportMooProjectToMP4(
       ]);
       const hasJakarta = document.fonts.check('800 74px "Plus Jakarta Sans"');
       if (!hasJakarta) {
-        warnings.push('Font "Plus Jakarta Sans" tidak dapat dimuat; rendering menggunakan font fallback sistem.');
+        warnings.push(t('Font "Plus Jakarta Sans" tidak dapat dimuat; rendering menggunakan font fallback sistem.'));
       }
     } catch {
       warnings.push('Pemeriksaan kesiapan font sistem dilewati.');
@@ -294,11 +295,11 @@ export async function exportMooProjectToMP4(
 
       if (Math.abs(audioDuration - scenesDurationSum) > 0.5) {
         warnings.push(
-          `Durasi audio (${audioDuration.toFixed(2)}s) berbeda dari total durasi scene (${scenesDurationSum.toFixed(2)}s) lebih dari 0.5s.`
+          t('Durasi audio ({0}s) berbeda dari total durasi scene ({1}s) lebih dari 0.5s.', audioDuration.toFixed(2), scenesDurationSum.toFixed(2))
         );
       }
     } catch {
-      warnings.push('Audio file gagal didecode, durasi ditentukan berdasarkan durasi scene.');
+      warnings.push(t('Audio file gagal didecode, durasi ditentukan berdasarkan durasi scene.'));
     }
   }
 
@@ -323,7 +324,7 @@ export async function exportMooProjectToMP4(
   if (audioBuffer) {
     const isAudioSupported = await canEncodeAudio(audioCodec);
     if (!isAudioSupported || typeof AudioEncoder === 'undefined') {
-      warnings.push('AudioEncoder tidak didukung oleh browser Anda. Video diekspor tanpa audio.');
+      warnings.push(t('AudioEncoder tidak didukung oleh browser Anda. Video diekspor tanpa audio.'));
     } else {
       // Ensure 48kHz for broad compatibility
       if (audioBuffer.sampleRate !== 48000) {
@@ -452,7 +453,7 @@ export async function exportMooProjectToMP4(
             throw audioErr;
           }
           warnings.push(
-            `Encoding audio gagal (${audioErr instanceof Error ? audioErr.message : String(audioErr)}). Video diekspor tanpa audio.`
+            t('Encoding audio gagal ({0}). Video diekspor tanpa audio.', audioErr instanceof Error ? audioErr.message : String(audioErr))
           );
           hasAudio = false;
         }
@@ -547,7 +548,7 @@ export async function exportMooProjectToMP4(
   const rawCanvas = canvasRenderer.getCanvas();
 
   if (transparent && !isCompositionMode) {
-    throw new Error('Video transparan hanya tersedia untuk proyek komposisi.');
+    throw new Error(t('Video transparan hanya tersedia untuk proyek komposisi.'));
   }
   // The canvas renderer's canvas has no alpha; a transparent video renders into one that keeps it.
   let frameCanvas = rawCanvas as HTMLCanvasElement;
@@ -560,18 +561,18 @@ export async function exportMooProjectToMP4(
   let compRenderer: FrameRenderer | null = null;
   let brollReader: BrollReader | null = null;
   if (isCompositionMode) {
-    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Menyiapkan panggung render...' });
+    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: t('Menyiapkan panggung render...') });
     compRenderer = await createCompositionFrameRenderer(project, width, height, transparent ? { clearBackgrounds: true } : undefined);
     brollReader = await createBrollReader(project.scenes, opts?.brollSources);
     if (!brollReader && project.scenes.some((s) => s.broll)) {
-      warnings.push('Video B-roll tidak bisa dibaca; shot dengan B-roll dirender tanpa video.');
+      warnings.push(t('Video B-roll tidak bisa dibaca; shot dengan B-roll dirender tanpa video.'));
     }
     if (!compRenderer) {
       if (hasGeneratedCompositionScenes) {
-        throw new Error('Composition renderer gagal diinisialisasi untuk mode komposisi.');
+        throw new Error(t('Composition renderer gagal diinisialisasi untuk mode komposisi.'));
       }
       // Only instant visuals and no stage available: the canvas renderer still produces a video.
-      warnings.push('Panggung komposisi gagal dimuat; video dirender dengan renderer cadangan.');
+      warnings.push(t('Panggung komposisi gagal dimuat; video dirender dengan renderer cadangan.'));
     }
   }
 
@@ -611,7 +612,7 @@ export async function exportMooProjectToMP4(
           throw audioErr;
         }
         warnings.push(
-          `Encoding audio gagal (${audioErr instanceof Error ? audioErr.message : String(audioErr)}). Video diekspor tanpa audio.`
+          t('Encoding audio gagal ({0}). Video diekspor tanpa audio.', audioErr instanceof Error ? audioErr.message : String(audioErr))
         );
         hasAudio = false;
       }
@@ -641,7 +642,7 @@ export async function exportMooProjectToMP4(
           failedFrameCount++;
           if (consecutiveFrameFailures >= 3) {
             throw new Error(
-              `Ekspor komposisi gagal: 3 kegagalan frame berturut-turut pada frame ${frame + 1} (${frameErr instanceof Error ? frameErr.message : String(frameErr)})`
+              t('Ekspor komposisi gagal: 3 kegagalan frame berturut-turut pada frame {0} ({1})', frame + 1, frameErr instanceof Error ? frameErr.message : String(frameErr))
             );
           }
         }
@@ -673,7 +674,7 @@ export async function exportMooProjectToMP4(
     }
 
     if (failedFrameCount > 0) {
-      warnings.push(`Terdapat ${failedFrameCount} frame yang gagal dirender saat ekspor komposisi.`);
+      warnings.push(t('Terdapat {0} frame yang gagal dirender saat ekspor komposisi.', failedFrameCount));
     }
 
     onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: 'Finalizing MP4 container...' });

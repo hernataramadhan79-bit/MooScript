@@ -11,6 +11,7 @@ import {
 import { extractLayersFromHtml } from '../../engine/composition/layers';
 import type { SceneModule, Composition } from '../../types';
 import { MooApiGuidePanel } from './MooApiGuidePanel';
+import { t, tr } from '../../i18n';
 
 interface CodeInspectorModalProps {
   beatId: string | null;
@@ -51,13 +52,13 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
     const validation = validateSceneCode({ html: htmlCode, css: cssCode, buildJs: jsCode });
     if (!validation.valid) {
       setErrors(validation.errors);
-      addToast('Perubahan memiliki error validasi determinisme/keamanan', 'error');
+      addToast(t('Perubahan memiliki error validasi determinisme/keamanan'), 'error');
       return;
     }
     const unsupported = findForeignApis(jsCode);
     if (unsupported.length > 0) {
       setErrors(unsupported.map(foreignApiMessage));
-      addToast('Kode belum memakai API MooScript; lihat petunjuk di atas atau tab Panduan API', 'error');
+      addToast(t('Kode belum memakai API MooScript; lihat petunjuk di atas atau tab Panduan API'), 'error');
       return;
     }
 
@@ -77,7 +78,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
 
     const targetBeatId = beatId || 'default-beat';
     if (!project.scenes.some((s) => s.id === targetBeatId)) {
-      addToast('Adegan ini sudah dihapus, perubahan kode tidak diterapkan.', 'warning');
+      addToast(t('Adegan ini sudah dihapus, perubahan kode tidak diterapkan.'), 'warning');
       onClose();
       return;
     }
@@ -119,23 +120,23 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
 
     useMooStore.getState().setProject(updatedProject, { keepStale: true, preserveHistory: true });
 
-    addToast('Perubahan kode mograph berhasil diterapkan!', 'success');
+    addToast(t('Perubahan kode mograph berhasil diterapkan!'), 'success');
     onClose();
   };
 
   const tabs = [
-    { value: 'html' as const, label: 'HTML Markup', icon: 'code' },
-    { value: 'css' as const, label: 'CSS Styling', icon: 'css' },
-    { value: 'js' as const, label: 'Animasi (shot)', icon: 'javascript' },
-    { value: 'guide' as const, label: 'Panduan API', icon: 'menu_book' }
+    { value: 'html' as const, label: t('HTML Markup'), icon: 'code' },
+    { value: 'css' as const, label: t('CSS Styling'), icon: 'css' },
+    { value: 'js' as const, label: t('Animasi (shot)'), icon: 'javascript' },
+    { value: 'guide' as const, label: t('Panduan API'), icon: 'menu_book' }
   ];
 
   return (
     <Sheet
       isOpen={isOpen}
       onClose={onClose}
-      title="Code Inspector: Mograph Editor"
-      description="Edit langsung struktur DOM, style CSS, dan animasi scene ini. Animasi ditulis dengan API MooScript; lihat tab Panduan API."
+      title={t('Code Inspector: Mograph Editor')}
+      description={t('Edit langsung struktur DOM, style CSS, dan animasi scene ini. Animasi ditulis dengan API MooScript; lihat tab Panduan API.')}
       maxWidth="max-w-3xl"
     >
       <div className="flex flex-col gap-4">
@@ -149,7 +150,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
         {errors.length > 0 && (
           <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex flex-col gap-1">
             {errors.map((err, i) => (
-              <span key={i}>• {err}</span>
+              <span key={i}>• {tr(err)}</span>
             ))}
           </div>
         )}
@@ -162,7 +163,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
               value={htmlCode}
               onChange={(e) => setHtmlCode(e.target.value)}
               className="w-full h-72 bg-transparent p-3 text-emerald-400 focus:outline-none resize-none font-mono text-[13px] leading-relaxed"
-              placeholder="<!-- Masukkan HTML scene... -->"
+              placeholder={t('<!-- Masukkan HTML scene... -->')}
             />
           )}
           {activeTab === 'css' && (
@@ -171,7 +172,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
               value={cssCode}
               onChange={(e) => setCssCode(e.target.value)}
               className="w-full h-72 bg-transparent p-3 text-cyan-400 focus:outline-none resize-none font-mono text-[13px] leading-relaxed"
-              placeholder="/* Masukkan CSS ter-scope scene... */"
+              placeholder={t('/* Masukkan CSS ter-scope scene... */')}
             />
           )}
           {activeTab === 'js' && (
@@ -180,7 +181,7 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
               value={jsCode}
               onChange={(e) => setJsCode(e.target.value)}
               className="w-full h-72 bg-transparent p-3 text-amber-300 focus:outline-none resize-none font-mono text-[13px] leading-relaxed"
-              placeholder="// Gerak di shot: shot.go / shot.arrive / shot.travel / shot.pin, atau helper ctx.* (lihat Panduan API)"
+              placeholder={t('// Gerak di shot: shot.go / shot.arrive / shot.travel / shot.pin, atau helper ctx.* (lihat Panduan API)')}
             />
           )}
           {activeTab === 'guide' && <MooApiGuidePanel />}
@@ -188,10 +189,10 @@ export const CodeInspectorModal: React.FC<CodeInspectorModalProps> = ({ beatId, 
 
         <div className="flex items-center justify-between pt-2">
           <Button variant="ghost" onClick={onClose}>
-            Batal
+            {t('Batal')}
           </Button>
           <Button variant="primary" icon="check" onClick={handleApplyChanges}>
-            Terapkan Perubahan
+            {t('Terapkan Perubahan')}
           </Button>
         </div>
       </div>

@@ -52,6 +52,7 @@ import {
 } from '../../engine/composition/proceduralCompiler';
 import type { InsertElementKind, MooStoreState, ProjectSlice } from '../types';
 import { extractLayersFromHtml } from '../../engine/composition/layers';
+import { t } from '../../i18n';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
 const MAX_FONT_BYTES = 2 * 1024 * 1024;
@@ -126,7 +127,7 @@ export const DEFAULT_COMPOSITION: Composition = {
 /** A brand-new install starts with an empty project: no script, no scenes, no generated code. */
 export const INITIAL_PROJECT: MooProject = {
   id: DEFAULT_PROJECT_ID,
-  title: 'Proyek Tanpa Judul',
+  title: t('Proyek Tanpa Judul'),
   schemaVersion: CURRENT_SCHEMA_VERSION,
   aspectRatio: '9:16',
   resolution: '1080p',
@@ -269,7 +270,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     const updated = (after.sfxCues || []).some((c) => c.auto) ? withAutoSfx(after, get().stageAccents) : after;
     if (get().rawVoiceBlob) {
       set({ audioStale: true });
-      get().addToast('Kartu brand menggeser adegan. Buat ulang suara supaya sinkron (adegan lain diambil dari cache).', 'info', 6000);
+      get().addToast(t('Kartu brand menggeser adegan. Buat ulang suara supaya sinkron (adegan lain diambil dari cache).'), 'info', 6000);
     } else {
       queueMixRefresh(() => get().refreshMix(), 0);
     }
@@ -347,7 +348,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       });
       triggerSave(restored);
       if (audioMixChanged(current, restored)) queueMixRefresh(() => get().refreshMix(), 0);
-      get().addToast('Perubahan dibatalkan (Undo)', 'info');
+      get().addToast(t('Perubahan dibatalkan (Undo)'), 'info');
     },
 
     redo: () => {
@@ -367,7 +368,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       });
       triggerSave(restored);
       if (audioMixChanged(current, restored)) queueMixRefresh(() => get().refreshMix(), 0);
-      get().addToast('Perubahan dikembalikan (Redo)', 'info');
+      get().addToast(t('Perubahan dikembalikan (Redo)'), 'info');
     },
 
 
@@ -404,7 +405,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const existingCount = get().projectsList.length;
       const newProject: MooProject = {
         id: newId,
-        title: title || `Proyek Tanpa Judul #${existingCount + 1}`,
+        title: title || t('Proyek Tanpa Judul #{0}', existingCount + 1),
         schemaVersion: CURRENT_SCHEMA_VERSION,
         aspectRatio: '9:16',
         renderMode: 'composition',
@@ -458,7 +459,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
       await syncCustomBgmForProject(newId);
       await get().refreshProjectsList();
-      get().addToast(`Proyek "${syncedProject.title}" dibuat.`, 'success');
+      get().addToast(t('Proyek "{0}" dibuat.', syncedProject.title), 'success');
       return newId;
     },
 
@@ -533,7 +534,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
       const template = getProjectTemplate(templateId);
       if (!template) {
-        get().addToast('Template tidak ditemukan.', 'error');
+        get().addToast(t('Template tidak ditemukan.'), 'error');
         return '';
       }
       const newId = await get().createNewProject(template.title);
@@ -575,7 +576,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
 
       let target = await loadProjectFromDb(id);
       if (!target) {
-        get().addToast('Proyek tidak ditemukan di penyimpanan.', 'error');
+        get().addToast(t('Proyek tidak ditemukan di penyimpanan.'), 'error');
         return;
       }
       cancelProjectJobs();
@@ -625,13 +626,13 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       await get().refreshProjectsList();
       await get().loadAssets(target.id);
       await syncCustomBgmForProject(target.id);
-      get().addToast(`Membuka "${target.title}"`, 'info');
+      get().addToast(t('Membuka "{0}"', target.title), 'info');
     },
     duplicateProject: async (id: string) => {
       await flushPendingSave();
       const source = id === get().project.id ? get().project : await loadProjectFromDb(id);
       if (!source) {
-        get().addToast('Proyek yang akan diduplikat tidak ditemukan.', 'error');
+        get().addToast(t('Proyek yang akan diduplikat tidak ditemukan.'), 'error');
         return '';
       }
 
@@ -640,7 +641,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const duplicated: MooProject = {
         ...JSON.parse(JSON.stringify({ ...source, audioBlob: undefined })),
         id: dupId,
-        title: `${source.title} (Copy)`,
+        title: t('{0} (Copy)', source.title),
         createdAt: now,
         updatedAt: now
       };
@@ -675,7 +676,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         );
       }
       await get().refreshProjectsList();
-      get().addToast(`Diduplikat sebagai "${duplicated.title}"`, 'success');
+      get().addToast(t('Diduplikat sebagai "{0}"', duplicated.title), 'success');
       return dupId;
     },
 
@@ -692,9 +693,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
       await saveProjectToDb(imported);
       await get().refreshProjectsList();
-      get().addToast(`Diimpor sebagai "${imported.title}"`, 'success');
+      get().addToast(t('Diimpor sebagai "{0}"', imported.title), 'success');
       if (lostCustomBgm) {
-        get().addToast('Musik sendiri tidak ikut dalam cadangan. Unggah ulang di tab Audio.', 'info', 6000);
+        get().addToast(t('Musik sendiri tidak ikut dalam cadangan. Unggah ulang di tab Audio.'), 'info', 6000);
       }
       return id;
     },
@@ -705,7 +706,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       await flushPendingSave();
       const list = get().projectsList;
       if (list.length <= 1) {
-        get().addToast('Proyek terakhir tidak bisa dihapus.', 'warning');
+        get().addToast(t('Proyek terakhir tidak bisa dihapus.'), 'warning');
         return;
       }
       await deleteProjectFromDb(id);
@@ -723,7 +724,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         await get().refreshProjectsList();
       }
 
-      get().addToast('Proyek dihapus.', 'info');
+      get().addToast(t('Proyek dihapus.'), 'info');
     },
 
     updateTitle: (title) => {
@@ -868,7 +869,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       );
       set({ project: updated, projectsList: updatedList });
       triggerSave(updated);
-      get().addToast(`Resolusi ${res} (${updated.width}×${updated.height})`, 'info');
+      get().addToast(t('Resolusi {0} ({1}×{2})', res, updated.width, updated.height), 'info');
     },
 
     setSceneBroll: (sceneId, broll) => {
@@ -907,7 +908,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
     applyBrandToProject: () => {
       const kit = get().settings.brandKit;
       if (!kit) {
-        get().addToast('Isi Brand Kit dulu (nama, warna atau logo).', 'info');
+        get().addToast(t('Isi Brand Kit dulu (nama, warna atau logo).'), 'info');
         return;
       }
       const current = get().project;
@@ -915,7 +916,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updated = afterBrandCardsChanged(current, applyBrandKit(current, kit));
       set({ project: updated });
       triggerSave(updated);
-      get().addToast(`Brand "${kit.name || 'tanpa nama'}" diterapkan ke proyek.`, 'success');
+      get().addToast(t('Brand "{0}" diterapkan ke proyek.', kit.name || t('tanpa nama')), 'success');
     },
 
     removeBrandFromProject: () => {
@@ -938,7 +939,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const scene = current.scenes.find((s) => s.id === sceneId);
       const mod = current.composition?.scenes.find((m) => m.beatId === sceneId);
       if (!scene || !mod || !mod.html.trim()) {
-        get().addToast('Shot ini belum punya visual untuk disimpan.', 'info');
+        get().addToast(t('Shot ini belum punya visual untuk disimpan.'), 'info');
         return null;
       }
       const ids = new Set(Array.from(mod.html.matchAll(/moo-asset:([A-Za-z0-9_-]+)/g), (m) => m[1]));
@@ -963,7 +964,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       };
       await saveShotTemplateToDb(template);
       set({ shotTemplates: [template, ...get().shotTemplates] });
-      get().addToast(`Shot disimpan sebagai template "${template.name}".`, 'success');
+      get().addToast(t('Shot disimpan sebagai template "{0}".', template.name), 'success');
       return template.id;
     },
 
@@ -1014,7 +1015,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       set({ project: updated, activeSceneId: id });
       triggerSave(updated);
       if (template.aspectRatio !== current.aspectRatio) {
-        get().addToast(`Template ini dibuat untuk ${template.aspectRatio}; cek tata letaknya di ${current.aspectRatio}.`, 'warning', 6000);
+        get().addToast(t('Template ini dibuat untuk {0}; cek tata letaknya di {1}.', template.aspectRatio, current.aspectRatio), 'warning', 6000);
       }
       return id;
     },
@@ -1112,7 +1113,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (preset === 'custom') {
         const buffer = getCustomBgmBuffer();
         if (!buffer) {
-          get().addToast('Musik unggahan belum termuat. Unggah ulang musiknya.', 'warning');
+          get().addToast(t('Musik unggahan belum termuat. Unggah ulang musiknya.'), 'warning');
           return 0;
         }
         key = `custom:${current.bgm.customName || ''}:${Math.round(buffer.duration * 100)}`;
@@ -1132,7 +1133,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       }
       if (grid.times.length === 0) {
         get().addToast(
-          preset === 'none' ? 'Pilih musik latar dulu untuk mencari ketukan.' : 'Musik ini tidak punya ketukan yang jelas.',
+          preset === 'none' ? t('Pilih musik latar dulu untuk mencari ketukan.') : t('Musik ini tidak punya ketukan yang jelas.'),
           'info'
         );
       }
@@ -1263,7 +1264,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       };
       set({ project: updated });
       triggerSave(updated);
-      get().addToast(`Subtitel ${!currentVal ? 'diaktifkan' : 'dinonaktifkan'}`, 'info');
+      get().addToast(t('Subtitel {0}', !currentVal ? 'diaktifkan' : 'dinonaktifkan'), 'info');
     },
 
     updateSceneText: (id, text) => {
@@ -1374,11 +1375,11 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const ext = (file.name.split('.').pop() || '').toLowerCase();
       const format = FONT_FORMATS[ext];
       if (!format) {
-        get().addToast('Format font belum didukung. Pakai .woff2, .woff, .ttf atau .otf.', 'error');
+        get().addToast(t('Format font belum didukung. Pakai .woff2, .woff, .ttf atau .otf.'), 'error');
         return null;
       }
       if (file.size > MAX_FONT_BYTES) {
-        get().addToast('Ukuran font melebihi 2 MB.', 'error');
+        get().addToast(t('Ukuran font melebihi 2 MB.'), 'error');
         return null;
       }
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -1403,7 +1404,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const updated = { ...current, customFonts: [...(current.customFonts || []), font] };
       set({ project: updated });
       triggerSave(updated);
-      get().addToast(`Font "${family}" siap dipakai.`, 'success');
+      get().addToast(t('Font "{0}" siap dipakai.', family), 'success');
       return family;
     },
 
@@ -1574,19 +1575,19 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       if (fellBack) {
         const label = (id: ProceduralArchetype) => PROCEDURAL_ARCHETYPES.find((a) => a.id === id)?.label || id;
         get().addToast(
-          `Naskah adegan #${idx + 1} belum punya data untuk ${label(archetype)} (angka, poin, atau tren), jadi dipakai ${label(chosen)}.`,
+          t('Naskah adegan #{0} belum punya data untuk {1} (angka, poin, atau tren), jadi dipakai {2}.', idx + 1, label(archetype), label(chosen)),
           'info',
           6000
         );
       }
       if (replacedCustomWork) {
         get().addToast(
-          `Visual AI/editan adegan #${idx + 1} diganti visual instan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`,
+          t('Visual AI/editan adegan #{0} diganti visual instan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.', idx + 1),
           'warning',
           6000
         );
       } else if (!fellBack) {
-        get().addToast(`Visual adegan #${idx + 1} berhasil dibangun secara instan!`, 'success');
+        get().addToast(t('Visual adegan #{0} berhasil dibangun secara instan!', idx + 1), 'success');
       }
     },
 
@@ -1604,12 +1605,12 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       triggerSave(updatedProject);
       if (replacedCustomWork) {
         get().addToast(
-          `Seluruh ${current.scenes.length} adegan diganti visual instan, termasuk visual AI/editan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`,
+          t('Seluruh {0} adegan diganti visual instan, termasuk visual AI/editan. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.', current.scenes.length),
           'warning',
           6000
         );
       } else {
-        get().addToast(`Seluruh ${current.scenes.length} adegan berhasil dibangun secara instan!`, 'success');
+        get().addToast(t('Seluruh {0} adegan berhasil dibangun secara instan!', current.scenes.length), 'success');
       }
     },
 
@@ -1730,7 +1731,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
       const dur = sceneSeconds(scene);
       const cut = Math.round((timeSec - start) * 100) / 100;
       if (cut < MIN_PIECE_SECONDS || dur - cut < MIN_PIECE_SECONDS) {
-        get().addToast('Playhead terlalu dekat dengan tepi shot untuk dipotong.', 'warning');
+        get().addToast(t('Playhead terlalu dekat dengan tepi shot untuk dipotong.'), 'warning');
         return null;
       }
       pushSnapshot(current);

@@ -1,3 +1,5 @@
+import { L, lf } from '../../i18n';
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -5,29 +7,29 @@ export interface ValidationResult {
 }
 
 const FORBIDDEN_PATTERNS = [
-  { pattern: /\bfetch\s*\(/, message: 'Larangan keamanan: dilarang menggunakan fetch() di dalam scene' },
-  { pattern: /\bXMLHttpRequest\b/, message: 'Larangan keamanan: dilarang menggunakan XMLHttpRequest' },
-  { pattern: /\bWebSocket\b/, message: 'Larangan keamanan: dilarang menggunakan WebSocket' },
-  { pattern: /\bimport\s+/, message: 'Larangan modul: dilarang menggunakan import di dalam kode scene' },
-  { pattern: /\bimport\s*\(/, message: 'Larangan modul: dilarang menggunakan dynamic import() di dalam scene' },
-  { pattern: /\beval\s*\(/, message: 'Larangan keamanan: dilarang menggunakan eval()' },
-  { pattern: /\bFunction\s*\(/, message: 'Larangan keamanan: dilarang menggunakan Function constructor' },
-  { pattern: /(?:(?:window|globalThis|self)\s*\.\s*parent\b|\bparent\s*\.\s*(?:postMessage|location|document|window|frames|eval|focus|opener)\b|\bparent\s*\[\s*['"`](?:postMessage|location|document|window|frames|eval|focus|opener|href)['"`]\s*\])/, message: 'Larangan keamanan: dilarang mengakses parent window' },
-  { pattern: /(?:(?:window|globalThis|self)\s*\.\s*top\b|\btop\s*\.\s*(?:postMessage|location|document|window|frames|eval|focus|opener)\b|\btop\s*\[\s*['"`](?:postMessage|location|document|window|frames|eval|focus|opener|href)['"`]\s*\])/, message: 'Larangan keamanan: dilarang mengakses top window' },
-  { pattern: /\bwindow\s*\.\s*parent/, message: 'Larangan keamanan: dilarang mengakses window.parent' },
-  { pattern: /\bglobalThis\b/, message: 'Larangan keamanan: dilarang mengakses globalThis' },
-  { pattern: /\bdocument\s*\.\s*cookie/, message: 'Larangan keamanan: dilarang mengakses document.cookie' },
-  { pattern: /\blocalStorage\b/, message: 'Larangan keamanan: dilarang mengakses localStorage' },
-  { pattern: /\bsessionStorage\b/, message: 'Larangan keamanan: dilarang mengakses sessionStorage' },
-  { pattern: /\bindexedDB\b/, message: 'Larangan keamanan: dilarang mengakses indexedDB' },
-  { pattern: /\bsendBeacon\b/, message: 'Larangan keamanan: dilarang menggunakan sendBeacon' },
-  { pattern: /\bnew\s+Image\b/, message: 'Larangan keamanan: dilarang membuat Image dinamis' },
-  { pattern: /\bDate\.now\s*\(/, message: 'Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca Date.now()' },
-  { pattern: /\bperformance\s*\.\s*now/, message: 'Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca performance.now()' },
-  { pattern: /\bMath\.random\s*\(/, message: 'Larangan determinisme: gunakan ctx.rand() bukan Math.random()' },
-  { pattern: /\brequestAnimationFrame\s*\(/, message: 'Larangan determinisme: taruh animasi di shot (shot.go / shot.arrive / ...), bukan requestAnimationFrame' },
-  { pattern: /\[['"`]\s*(fetch|eval|parent|top)\s*['"`]\]/, message: 'Larangan keamanan: dilarang mengakses properti terlarang via bracket notation' },
-  { pattern: /<script\b[^>]*>/i, message: 'Larangan HTML: dilarang menyematkan tag <script> di dalam potongan HTML scene' }
+  { pattern: /\bfetch\s*\(/, message: L('Larangan keamanan: dilarang menggunakan fetch() di dalam scene') },
+  { pattern: /\bXMLHttpRequest\b/, message: L('Larangan keamanan: dilarang menggunakan XMLHttpRequest') },
+  { pattern: /\bWebSocket\b/, message: L('Larangan keamanan: dilarang menggunakan WebSocket') },
+  { pattern: /\bimport\s+/, message: L('Larangan modul: dilarang menggunakan import di dalam kode scene') },
+  { pattern: /\bimport\s*\(/, message: L('Larangan modul: dilarang menggunakan dynamic import() di dalam scene') },
+  { pattern: /\beval\s*\(/, message: L('Larangan keamanan: dilarang menggunakan eval()') },
+  { pattern: /\bFunction\s*\(/, message: L('Larangan keamanan: dilarang menggunakan Function constructor') },
+  { pattern: /(?:(?:window|globalThis|self)\s*\.\s*parent\b|\bparent\s*\.\s*(?:postMessage|location|document|window|frames|eval|focus|opener)\b|\bparent\s*\[\s*['"`](?:postMessage|location|document|window|frames|eval|focus|opener|href)['"`]\s*\])/, message: L('Larangan keamanan: dilarang mengakses parent window') },
+  { pattern: /(?:(?:window|globalThis|self)\s*\.\s*top\b|\btop\s*\.\s*(?:postMessage|location|document|window|frames|eval|focus|opener)\b|\btop\s*\[\s*['"`](?:postMessage|location|document|window|frames|eval|focus|opener|href)['"`]\s*\])/, message: L('Larangan keamanan: dilarang mengakses top window') },
+  { pattern: /\bwindow\s*\.\s*parent/, message: L('Larangan keamanan: dilarang mengakses window.parent') },
+  { pattern: /\bglobalThis\b/, message: L('Larangan keamanan: dilarang mengakses globalThis') },
+  { pattern: /\bdocument\s*\.\s*cookie/, message: L('Larangan keamanan: dilarang mengakses document.cookie') },
+  { pattern: /\blocalStorage\b/, message: L('Larangan keamanan: dilarang mengakses localStorage') },
+  { pattern: /\bsessionStorage\b/, message: L('Larangan keamanan: dilarang mengakses sessionStorage') },
+  { pattern: /\bindexedDB\b/, message: L('Larangan keamanan: dilarang mengakses indexedDB') },
+  { pattern: /\bsendBeacon\b/, message: L('Larangan keamanan: dilarang menggunakan sendBeacon') },
+  { pattern: /\bnew\s+Image\b/, message: L('Larangan keamanan: dilarang membuat Image dinamis') },
+  { pattern: /\bDate\.now\s*\(/, message: L('Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca Date.now()') },
+  { pattern: /\bperformance\s*\.\s*now/, message: L('Larangan determinisme: gunakan ctx.dur atau ctx.beat(), dilarang membaca performance.now()') },
+  { pattern: /\bMath\.random\s*\(/, message: L('Larangan determinisme: gunakan ctx.rand() bukan Math.random()') },
+  { pattern: /\brequestAnimationFrame\s*\(/, message: L('Larangan determinisme: taruh animasi di shot (shot.go / shot.arrive / ...), bukan requestAnimationFrame') },
+  { pattern: /\[['"`]\s*(fetch|eval|parent|top)\s*['"`]\]/, message: L('Larangan keamanan: dilarang mengakses properti terlarang via bracket notation') },
+  { pattern: /<script\b[^>]*>/i, message: L('Larangan HTML: dilarang menyematkan tag <script> di dalam potongan HTML scene') }
 ];
 
 /**
@@ -36,28 +38,28 @@ const FORBIDDEN_PATTERNS = [
  * replacement so the repair pass, and anyone pasting their own code, knows what to write.
  */
 const FOREIGN_API: Array<{ api: string; pattern: RegExp; fix: string }> = [
-  { api: 'tl', pattern: /\btl\s*\.\s*[A-Za-z]+\s*\(/, fix: 'tulis gerak di shot: tl.to → shot.go, tl.from → shot.arrive, tl.fromTo → shot.travel, tl.set → shot.pin, tl.add → shot.nest, tl.addLabel → shot.mark, tl.call → shot.cue' },
-  { api: '.to/.from/.fromTo/.set', pattern: /\)\s*\.\s*(?:to|fromTo|set)\s*\(|\)\s*\.\s*from\s*\((?!\s*\))/, fix: 'rantai gerak memakai .go / .arrive / .travel / .pin' },
-  { api: 'gsap', pattern: /\bgsap\b/, fix: 'mesinnya MooTween: gsap.timeline → MooTween.track, gsap.utils → MooTween.math, gsap.to → shot.go' },
-  { api: 'plugin', pattern: /\b(?:registerPlugin|ScrollTrigger|SplitText|MotionPathPlugin|MorphSVG\w*|DrawSVG\w*|Draggable|TextPlugin)\b/, fix: 'MooTween tidak memakai plugin: teks pakai ctx.kinetic / ctx.split, garis pakai ctx.draw, putaran pakai ctx.orbit, morph pakai attrs: { d } dengan jumlah titik sama' },
-  { api: 'duration', pattern: /[{,]\s*duration\s*:/, fix: 'ganti duration → dur' },
-  { api: 'delay', pattern: /[{,]\s*delay\s*:/, fix: 'ganti delay → wait' },
-  { api: 'ease', pattern: /[{,]\s*ease\s*:/, fix: "ganti ease → curve, mis. curve: 'rush-out'" },
-  { api: 'stagger', pattern: /[{,]\s*stagger\s*:/, fix: "ganti stagger → cascade (each → gap, amount → total, from 'center' → 'middle', 'edges' → 'ends', 'end' → 'last')" },
-  { api: 'repeat', pattern: /[{,]\s*repeat(?:Delay)?\s*:/, fix: 'ganti repeat → loop (-1 → true), repeatDelay → loopGap' },
-  { api: 'yoyo', pattern: /[{,]\s*yoyo\s*:/, fix: 'ganti yoyo → pingpong' },
-  { api: 'keyframes', pattern: /[{,]\s*keyframes\s*:/, fix: 'ganti keyframes → sequence' },
-  { api: 'immediateRender', pattern: /[{,]\s*immediateRender\s*:/, fix: 'ganti immediateRender → showStart' },
-  { api: 'onStart/onUpdate/onComplete', pattern: /[{,]\s*on(?:Start|Update|Complete|Repeat|ReverseComplete)\s*:/, fix: 'ganti onStart → onBegin, onUpdate → onFrame, onComplete → onEnd' },
-  { api: 'rotation', pattern: /[{,]\s*rotation[XYZ]?\s*:/, fix: 'ganti rotation → spin, rotationX → tiltX, rotationY → tiltY' },
-  { api: 'xPercent/yPercent', pattern: /[{,]\s*[xy]Percent\s*:/, fix: 'ganti xPercent → shiftX, yPercent → shiftY' },
-  { api: 'transformOrigin', pattern: /[{,]\s*(?:transformOrigin|svgOrigin)\s*:/, fix: 'ganti transformOrigin → pivot, svgOrigin → pivotPoint' },
-  { api: 'transformPerspective', pattern: /[{,]\s*transformPerspective\s*:/, fix: 'ganti transformPerspective → depth' },
-  { api: 'autoAlpha', pattern: /[{,]\s*autoAlpha\s*:/, fix: 'ganti autoAlpha → fade' },
-  { api: 'attr', pattern: /[{,]\s*attr\s*:/, fix: 'ganti attr → attrs' },
-  { api: "'+=' / '-='", pattern: /:\s*(['"`])[+-]=/, fix: "nilai relatif ditulis 'by(40)' atau 'by(-0.5)'" },
-  { api: "posisi '<' / '>' / '+='", pattern: /,\s*(['"`])(?:[<>][^'"`]*|[+-]=[\d.]+|[A-Za-z_][\w-]*[+-]=[\d.]+)\1\s*\)/, fix: "waktu ditulis 'with' / 'after' / 'end+0.3' / 'end-0.3' / 'mark+0.2'" },
-  { api: 'curve lama', pattern: /(['"`])(?:power[0-4]|sine|expo|circ|back|elastic|quad|cubic|quart|quint|bounce)\.(?:in|out|inOut)\b/, fix: "curve ditulis nama-arah: power1/2/3/4 → soft/smooth/strong/sharp, sine → gentle, expo → rush, circ → arc, back → overshoot, elastic → spring; .inOut → -inout (mis. 'smooth-inout')" }
+  { api: 'tl', pattern: /\btl\s*\.\s*[A-Za-z]+\s*\(/, fix: L('tulis gerak di shot: tl.to → shot.go, tl.from → shot.arrive, tl.fromTo → shot.travel, tl.set → shot.pin, tl.add → shot.nest, tl.addLabel → shot.mark, tl.call → shot.cue') },
+  { api: '.to/.from/.fromTo/.set', pattern: /\)\s*\.\s*(?:to|fromTo|set)\s*\(|\)\s*\.\s*from\s*\((?!\s*\))/, fix: L('rantai gerak memakai .go / .arrive / .travel / .pin') },
+  { api: 'gsap', pattern: /\bgsap\b/, fix: L('mesinnya MooTween: gsap.timeline → MooTween.track, gsap.utils → MooTween.math, gsap.to → shot.go') },
+  { api: 'plugin', pattern: /\b(?:registerPlugin|ScrollTrigger|SplitText|MotionPathPlugin|MorphSVG\w*|DrawSVG\w*|Draggable|TextPlugin)\b/, fix: L('MooTween tidak memakai plugin: teks pakai ctx.kinetic / ctx.split, garis pakai ctx.draw, putaran pakai ctx.orbit, morph pakai attrs: { d } dengan jumlah titik sama') },
+  { api: 'duration', pattern: /[{,]\s*duration\s*:/, fix: L('ganti duration → dur') },
+  { api: 'delay', pattern: /[{,]\s*delay\s*:/, fix: L('ganti delay → wait') },
+  { api: 'ease', pattern: /[{,]\s*ease\s*:/, fix: L('ganti ease → curve, mis. curve: \'rush-out\'') },
+  { api: 'stagger', pattern: /[{,]\s*stagger\s*:/, fix: L('ganti stagger → cascade (each → gap, amount → total, from \'center\' → \'middle\', \'edges\' → \'ends\', \'end\' → \'last\')') },
+  { api: 'repeat', pattern: /[{,]\s*repeat(?:Delay)?\s*:/, fix: L('ganti repeat → loop (-1 → true), repeatDelay → loopGap') },
+  { api: 'yoyo', pattern: /[{,]\s*yoyo\s*:/, fix: L('ganti yoyo → pingpong') },
+  { api: 'keyframes', pattern: /[{,]\s*keyframes\s*:/, fix: L('ganti keyframes → sequence') },
+  { api: 'immediateRender', pattern: /[{,]\s*immediateRender\s*:/, fix: L('ganti immediateRender → showStart') },
+  { api: 'onStart/onUpdate/onComplete', pattern: /[{,]\s*on(?:Start|Update|Complete|Repeat|ReverseComplete)\s*:/, fix: L('ganti onStart → onBegin, onUpdate → onFrame, onComplete → onEnd') },
+  { api: 'rotation', pattern: /[{,]\s*rotation[XYZ]?\s*:/, fix: L('ganti rotation → spin, rotationX → tiltX, rotationY → tiltY') },
+  { api: 'xPercent/yPercent', pattern: /[{,]\s*[xy]Percent\s*:/, fix: L('ganti xPercent → shiftX, yPercent → shiftY') },
+  { api: 'transformOrigin', pattern: /[{,]\s*(?:transformOrigin|svgOrigin)\s*:/, fix: L('ganti transformOrigin → pivot, svgOrigin → pivotPoint') },
+  { api: 'transformPerspective', pattern: /[{,]\s*transformPerspective\s*:/, fix: L('ganti transformPerspective → depth') },
+  { api: 'autoAlpha', pattern: /[{,]\s*autoAlpha\s*:/, fix: L('ganti autoAlpha → fade') },
+  { api: 'attr', pattern: /[{,]\s*attr\s*:/, fix: L('ganti attr → attrs') },
+  { api: "'+=' / '-='", pattern: /:\s*(['"`])[+-]=/, fix: L('nilai relatif ditulis \'by(40)\' atau \'by(-0.5)\'') },
+  { api: "posisi '<' / '>' / '+='", pattern: /,\s*(['"`])(?:[<>][^'"`]*|[+-]=[\d.]+|[A-Za-z_][\w-]*[+-]=[\d.]+)\1\s*\)/, fix: L('waktu ditulis \'with\' / \'after\' / \'end+0.3\' / \'end-0.3\' / \'mark+0.2\'') },
+  { api: 'curve lama', pattern: /(['"`])(?:power[0-4]|sine|expo|circ|back|elastic|quad|cubic|quart|quint|bounce)\.(?:in|out|inOut)\b/, fix: L('curve ditulis nama-arah: power1/2/3/4 → soft/smooth/strong/sharp, sine → gentle, expo → rush, circ → arc, back → overshoot, elastic → spring; .inOut → -inout (mis. \'smooth-inout\')') }
 ];
 
 // A scene animates something when it calls a shot move or a ctx helper that adds one.
@@ -73,7 +75,7 @@ export function findForeignApis(buildJs: string): string[] {
 /** Repair instruction for one foreign API, as used in validation errors. */
 export function foreignApiMessage(api: string): string {
   const entry = FOREIGN_API.find((e) => e.api === api);
-  return `Bukan API MooScript: ${api} — ${entry ? entry.fix : 'pakai shot.* atau ctx.*'}`;
+  return lf('Bukan API MooScript: {0} — {1}', api, entry ? entry.fix : L('pakai shot.* atau ctx.*'));
 }
 export function validateSceneCode(code: { html?: string; css?: string; buildJs?: string }): ValidationResult {
   const errors: string[] = [];
@@ -94,33 +96,33 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
 
   // Check forbidden patterns in HTML
   if (/<script\b[^>]*>/i.test(combinedHtml)) {
-    errors.push('Larangan HTML: dilarang menyematkan tag <script> di dalam potongan HTML');
+    errors.push(L('Larangan HTML: dilarang menyematkan tag <script> di dalam potongan HTML'));
   }
 
   // Dangerous / non-self-contained HTML constructs
   if (/<(iframe|object|embed|link|meta|base|form)\b/i.test(combinedHtml)) {
-    errors.push('Larangan HTML: dilarang iframe/object/embed/link/meta/base/form di dalam scene');
+    errors.push(L('Larangan HTML: dilarang iframe/object/embed/link/meta/base/form di dalam scene'));
   }
   if (/\son[a-z]+\s*=/i.test(combinedHtml)) {
-    errors.push('Larangan HTML: dilarang atribut event handler inline (onclick=, onload=, ...)');
+    errors.push(L('Larangan HTML: dilarang atribut event handler inline (onclick=, onload=, ...)'));
   }
   if (/(href|src|xlink:href)\s*=\s*["']?\s*(javascript:|https?:|\/\/)/i.test(combinedHtml)) {
-    errors.push('Larangan HTML: dilarang javascript: atau URL eksternal pada href/src (gunakan SVG/CSS inline atau data: URI)');
+    errors.push(L('Larangan HTML: dilarang javascript: atau URL eksternal pada href/src (gunakan SVG/CSS inline atau data: URI)'));
   }
 
   // CSS must be self-contained
   const css = code.css || '';
   if (/@import\b/i.test(css)) {
-    errors.push('Larangan CSS: dilarang @import');
+    errors.push(L('Larangan CSS: dilarang @import'));
   }
   if (/url\(\s*["']?\s*(https?:|\/\/)/i.test(css)) {
-    errors.push('Larangan CSS: dilarang url() eksternal (gunakan gradient/SVG inline atau data: URI)');
+    errors.push(L('Larangan CSS: dilarang url() eksternal (gunakan gradient/SVG inline atau data: URI)'));
   }
 
   // Check structure of build function. Old tl/gsap code still passes here so saved projects and
   // backups load; findForeignApis flags it as needs-repair instead.
   if (combinedJs && !/\b(?:shot|ctx|MooTween|tl|gsap)\b/.test(combinedJs) && !combinedJs.includes('build')) {
-    errors.push('Format tidak lengkap: buildJs harus menggerakkan sesuatu lewat shot atau helper ctx.*');
+    errors.push(L('Format tidak lengkap: buildJs harus menggerakkan sesuatu lewat shot atau helper ctx.*'));
   }
 
   // Syntax check (compile only — never executed on the host)
@@ -144,7 +146,7 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
         (err instanceof Error && err.name === 'EvalError');
 
       if (!isCspViolation) {
-        errors.push(`Sintaks JavaScript tidak valid: ${msg}`);
+        errors.push(lf('Sintaks JavaScript tidak valid: {0}', msg));
       }
     }
   }
@@ -153,7 +155,7 @@ export function validateSceneCode(code: { html?: string; css?: string; buildJs?:
   const warnings: string[] = [];
   const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
   if (/(^|[}\s,])(html|body|\*)\s*[{,]/.test(stripped)) {
-    warnings.push('CSS menyentuh html/body/* — selector global akan bocor ke scene lain, gunakan prefix class unik per scene');
+    warnings.push(L('CSS menyentuh html/body/* — selector global akan bocor ke scene lain, gunakan prefix class unik per scene'));
   }
 
   return {
@@ -276,12 +278,12 @@ export function validateGeneratedScene(code: { html?: string; css?: string; buil
     errors.push(foreignApiMessage(api));
   }
   if (!(code.html || '').trim()) {
-    errors.push('Scene kosong: HTML tidak boleh kosong');
+    errors.push(L('Scene kosong: HTML tidak boleh kosong'));
   }
   if (!(code.buildJs || '').trim()) {
-    errors.push('Scene statis: buildJs wajib menganimasikan sesuatu lewat shot');
+    errors.push(L('Scene statis: buildJs wajib menganimasikan sesuatu lewat shot'));
   } else if (!MOVES.test(code.buildJs || '')) {
-    errors.push('Scene statis: buildJs harus memanggil shot.go / arrive / travel / pin atau helper ctx.*');
+    errors.push(L('Scene statis: buildJs harus memanggil shot.go / arrive / travel / pin atau helper ctx.*'));
   }
 
   return { valid: errors.length === 0, errors, warnings: base.warnings };

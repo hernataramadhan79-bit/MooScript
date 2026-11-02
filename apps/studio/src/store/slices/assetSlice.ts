@@ -6,6 +6,7 @@ import { syncComposition } from '../../engine/composition/sync';
 import { removeAssetFromHtml, extractLayersFromHtml } from '../../engine/composition/layers';
 import { escapeHtml } from '../../utils/textUtils';
 import { assetRef, pruneAssetData } from '../../engine/composition/assetRefs';
+import { t } from '../../i18n';
 export const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 /** Footage for B-roll is kept as a blob in IndexedDB, so it may be much larger than an image. */
 export const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
@@ -29,7 +30,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
   addAsset: async (file: File): Promise<AssetRecord | null> => {
     if (file.type.startsWith('video/')) {
       if (file.size > MAX_VIDEO_BYTES) {
-        get().addToast('Ukuran video melebihi batas 300 MB.', 'error');
+        get().addToast(t('Ukuran video melebihi batas 300 MB.'), 'error');
         return null;
       }
       const project = get().project;
@@ -43,17 +44,17 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
       };
       await saveAssetToDb(record);
       if (get().project.id === project.id) set({ assets: [...get().assets, record] });
-      get().addToast(`Video "${file.name}" siap dipakai sebagai B-roll.`, 'success');
+      get().addToast(t('Video "{0}" siap dipakai sebagai B-roll.', file.name), 'success');
       return record;
     }
     const allowedMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
     if (!allowedMimes.includes(file.type) && !file.type.startsWith('image/')) {
-      get().addToast('Format berkas tidak didukung. Harap unggah PNG, JPG, WebP, atau SVG.', 'error');
+      get().addToast(t('Format berkas tidak didukung. Harap unggah PNG, JPG, WebP, atau SVG.'), 'error');
       return null;
     }
 
     if (file.size > MAX_ASSET_BYTES) {
-      get().addToast('Ukuran berkas melebihi batas 5 MB.', 'error');
+      get().addToast(t('Ukuran berkas melebihi batas 5 MB.'), 'error');
       return null;
     }
 
@@ -83,7 +84,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     if (get().project.id === currentProject.id) {
       set({ assets: [...get().assets, record] });
     }
-    get().addToast(`Aset "${file.name}" berhasil diunggah!`, 'success');
+    get().addToast(t('Aset "{0}" berhasil diunggah!', file.name), 'success');
     return record;
   },
 
@@ -91,14 +92,14 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     await deleteAssetFromDb(id);
     const updated = get().assets.filter((a) => a.id !== id);
     set({ assets: updated });
-    get().addToast('Aset dihapus.', 'info');
+    get().addToast(t('Aset dihapus.'), 'info');
   },
 
   insertAssetIntoScene: (asset: AssetRecord, sceneId?: string, options?: InsertAssetOptions) => {
     const current = get().project;
     const targetId = sceneId || get().activeSceneId || current.scenes[0]?.id;
     if (!targetId) {
-      get().addToast('Pilih adegan terlebih dahulu.', 'warning');
+      get().addToast(t('Pilih adegan terlebih dahulu.'), 'warning');
       return;
     }
 
@@ -162,7 +163,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     });
 
     get().setProject(updatedProject, { preserveHistory: true, keepStale: true });
-    get().addToast(`Aset "${asset.name}" disisipkan ke adegan!`, 'success');
+    get().addToast(t('Aset "{0}" disisipkan ke adegan!', asset.name), 'success');
   },
 
   removeAssetFromScene: (assetDataUrlOrLayerId: string, sceneId?: string) => {
@@ -193,7 +194,7 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     });
 
     if (!changed) {
-      get().addToast('Aset tidak ditemukan di adegan ini.', 'warning');
+      get().addToast(t('Aset tidak ditemukan di adegan ini.'), 'warning');
       return;
     }
 
@@ -205,6 +206,6 @@ export const createAssetSlice: StateCreator<MooStoreState, [], [], AssetSlice> =
     );
 
     get().setProject(updatedProject, { preserveHistory: true, keepStale: true });
-    get().addToast('Aset berhasil dihapus dari adegan.', 'info');
+    get().addToast(t('Aset berhasil dihapus dari adegan.'), 'info');
   }
 });

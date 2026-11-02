@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { t } from '../i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export const WELCOME_KEY = 'mooscript_welcome_seen';
 
@@ -14,7 +16,18 @@ function hasTemplateDeepLink(): boolean {
   }
 }
 
+function hasInstallDeepLink(): boolean {
+  if (typeof window === 'undefined' || !window.location?.search) return false;
+  try {
+    return new URLSearchParams(window.location.search).has('install');
+  } catch {
+    return false;
+  }
+}
+
 function shouldShowWelcome(): boolean {
+  // Arriving from the website's install button: the install dialog is the only thing to show.
+  if (hasInstallDeepLink()) return false;
   if (!hasWebCodecs) return true;
   if (hasTemplateDeepLink()) {
     try {
@@ -72,30 +85,29 @@ export const WelcomeModal: React.FC = () => {
       >
         <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800/80 bg-zinc-900/50">
           <span className="material-symbols-outlined text-primary text-[22px]">movie_filter</span>
-          <h2 id="welcome-title" className="text-sm font-bold text-white">
-            Selamat datang di MooScript Studio
+          <h2 id="welcome-title" className="text-sm font-bold text-white flex-1">
+            {t('Selamat datang di MooScript Studio')}
           </h2>
+          <LanguageSwitcher />
         </div>
 
         <div className="p-5 space-y-3 overflow-y-auto text-[13px] text-zinc-300 leading-relaxed">
           <ul className="space-y-3">
             <li className="flex gap-2.5">
               <span className="material-symbols-outlined text-primary text-[18px] shrink-0">lock</span>
-              <span>Semua proyek tersimpan di browser Anda. Tidak ada server atau akun MooScript.</span>
+              <span>{t('Semua proyek tersimpan di browser Anda. Tidak ada server atau akun MooScript.')}</span>
             </li>
             <li className="flex gap-2.5">
               <span className="material-symbols-outlined text-primary text-[18px] shrink-0">key</span>
               <span>
-                API key Anda disimpan di perangkat ini dan hanya dikirim langsung ke provider yang Anda
-                pilih. Tanpa key pun Anda bisa menulis adegan sendiri, membangun visual instan, memakai
-                suara lokal, dan mengekspor.
+                {t('API key Anda disimpan di perangkat ini dan hanya dikirim langsung ke provider yang Anda pilih. Tanpa key pun Anda bisa menulis adegan sendiri, membangun visual instan, memakai suara lokal, dan mengekspor.')}
               </span>
             </li>
             <li className="flex gap-2.5">
               <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
                 videocam
               </span>
-              <span>Ekspor MP4 membutuhkan Chrome atau Edge terbaru.</span>
+              <span>{t('Ekspor MP4 membutuhkan Chrome atau Edge terbaru.')}</span>
             </li>
           </ul>
 
@@ -106,8 +118,7 @@ export const WelcomeModal: React.FC = () => {
             >
               <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
               <span>
-                Browser ini tidak mendukung WebCodecs: ekspor MP4 tidak akan berfungsi. Gunakan Chrome atau
-                Edge terbaru.
+                {t('Browser ini tidak mendukung WebCodecs: ekspor MP4 tidak akan berfungsi. Gunakan Chrome atau Edge terbaru.')}
               </span>
             </div>
           )}
@@ -118,7 +129,7 @@ export const WelcomeModal: React.FC = () => {
             rel="noopener noreferrer"
             className="inline-block text-xs underline text-zinc-400 hover:text-white"
           >
-            Kebijakan Privasi
+            {t('Kebijakan Privasi')}
           </a>
         </div>
 
@@ -131,14 +142,14 @@ export const WelcomeModal: React.FC = () => {
             }}
             className="px-3 h-8 rounded-lg border border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold transition-all"
           >
-            Buka Pengaturan API
+            {t('Buka Pengaturan API')}
           </button>
           <button
             type="button"
             onClick={close}
             className="px-3 h-8 rounded-lg bg-primary hover:bg-lime-300 text-black text-xs font-bold transition-all active:scale-95"
           >
-            Mulai
+            {t('Mulai')}
           </button>
         </div>
       </div>

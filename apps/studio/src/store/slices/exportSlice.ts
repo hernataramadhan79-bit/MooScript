@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { ExportOptions, ExportProgress } from '../../engine/export/mp4Exporter';
 import type { MooStoreState, ExportSlice, ExportQueueItem } from '../types';
 import { listAssetsFromDb } from '../../db/mooDb';
+import { t } from '../../i18n';
 
 let exportAbortController: AbortController | null = null;
 
@@ -55,7 +56,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
     const scenes = get().project.scenes;
     if (!scenes || scenes.length === 0) {
-      get().addToast('Gagal mengekspor: proyek belum memiliki adegan.', 'warning');
+      get().addToast(t('Gagal mengekspor: proyek belum memiliki adegan.'), 'warning');
       return;
     }
 
@@ -71,11 +72,11 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     const localController = exportAbortController;
     set({
       isExporting: true,
-      exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Memulai ekspor...' }
+      exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: t('Memulai ekspor...') }
     });
 
     const releaseGuard = await guardExportSession(() =>
-      get().addToast('Tab dipindah ke latar belakang. Kembali ke tab ini agar ekspor tidak terhenti.', 'warning', 6000)
+      get().addToast(t('Tab dipindah ke latar belakang. Kembali ke tab ini agar ekspor tidak terhenti.'), 'warning', 6000)
     );
 
     try {
@@ -103,7 +104,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
       if (!isAborted) {
         const message = err instanceof Error ? err.message : String(err);
-        get().addToast(`Ekspor MP4 gagal: ${message}`, 'error');
+        get().addToast(t('Ekspor MP4 gagal: {0}', message), 'error');
       }
     } finally {
       releaseGuard();
@@ -118,7 +119,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
       exportAbortController.abort();
       exportAbortController = null;
     }
-    get().addToast('Ekspor dibatalkan.', 'info');
+    get().addToast(t('Ekspor dibatalkan.'), 'info');
     set({ isExporting: false, exportProgress: null });
   },
 
@@ -128,7 +129,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
     if (get().isExporting || aspects.length === 0) return;
     get().pause();
     if (get().project.scenes.length === 0) {
-      get().addToast('Gagal mengekspor: proyek belum memiliki adegan.', 'warning');
+      get().addToast(t('Gagal mengekspor: proyek belum memiliki adegan.'), 'warning');
       return;
     }
     get().clearExportQueue();
@@ -136,9 +137,9 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
 
     exportAbortController = new AbortController();
     const localController = exportAbortController;
-    set({ isExporting: true, exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: 'Memulai ekspor...' } });
+    set({ isExporting: true, exportProgress: { percent: 0, currentFrame: 0, totalFrames: 0, statusText: t('Memulai ekspor...') } });
     const releaseGuard = await guardExportSession(() =>
-      get().addToast('Tab dipindah ke latar belakang. Kembali ke tab ini agar ekspor tidak terhenti.', 'warning', 6000)
+      get().addToast(t('Tab dipindah ke latar belakang. Kembali ke tab ini agar ekspor tidak terhenti.'), 'warning', 6000)
     );
     const patchItem = (i: number, patch: Partial<ExportQueueItem>) =>
       set({ exportQueue: get().exportQueue.map((item, j) => (j === i ? { ...item, ...patch } : item)) });
@@ -168,7 +169,7 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
         }
       }
       const done = get().exportQueue.filter((q) => q.status === 'done').length;
-      if (done > 0) get().addToast(`${done} video selesai dirender.`, 'success');
+      if (done > 0) get().addToast(t('{0} video selesai dirender.', done), 'success');
     } finally {
       set({ isExporting: false });
       releaseGuard();

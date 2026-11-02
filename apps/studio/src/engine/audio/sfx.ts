@@ -6,6 +6,7 @@
  */
 
 import type { SfxCue, SfxKind } from '../../types';
+import { L } from '../../i18n';
 
 export type { SfxCue, SfxKind };
 
@@ -14,9 +15,9 @@ export const SFX_KINDS: SfxKind[] = ['whoosh', 'pop', 'tick', 'riser', 'impact']
 export const SFX_LABEL: Record<SfxKind, string> = {
   whoosh: 'Whoosh',
   pop: 'Pop',
-  tick: 'Klik',
+  tick: L('Klik'),
   riser: 'Riser',
-  impact: 'Hentakan'
+  impact: L('Hentakan')
 };
 
 /** Length in seconds and how long before the hit each sound starts. */

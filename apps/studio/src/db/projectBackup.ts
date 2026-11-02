@@ -1,6 +1,7 @@
 import type { MooProject } from '../types';
 import { normalizeProject } from './mooDb';
 import { validateSceneCode } from '../engine/composition/validator';
+import { t } from '../i18n';
 
 export const BACKUP_FORMAT = 'mooscript-project';
 export const BACKUP_VERSION = 1;
@@ -22,26 +23,26 @@ export function serializeProjectBackup(project: MooProject): string {
 
 export function parseProjectBackup(text: string): MooProject {
   if (typeof text !== 'string' || text.length > MAX_BACKUP_BYTES) {
-    throw new Error('Berkas terlalu besar (maks 20 MB).');
+    throw new Error(t('Berkas terlalu besar (maks 20 MB).'));
   }
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error('File bukan JSON yang valid.');
+    throw new Error(t('File bukan JSON yang valid.'));
   }
 
   const envelope = data as { format?: unknown; version?: unknown; project?: unknown } | null;
   if (!envelope || typeof envelope !== 'object' || envelope.format !== BACKUP_FORMAT) {
-    throw new Error('Berkas ini bukan cadangan proyek MooScript.');
+    throw new Error(t('Berkas ini bukan cadangan proyek MooScript.'));
   }
   if (envelope.version !== BACKUP_VERSION) {
-    throw new Error('Versi cadangan tidak didukung.');
+    throw new Error(t('Versi cadangan tidak didukung.'));
   }
 
   const project = envelope.project as MooProject | null | undefined;
   if (!project || typeof project !== 'object' || !Array.isArray(project.scenes)) {
-    throw new Error('Data proyek rusak.');
+    throw new Error(t('Data proyek rusak.'));
   }
 
   const normalized = normalizeProject(project);
@@ -53,7 +54,7 @@ export function parseProjectBackup(text: string): MooProject {
         buildJs: scene.buildJs
       });
       if (!check.valid) {
-        throw new Error(`Kode adegan pada cadangan tidak lolos validasi keamanan: ${check.errors[0]}`);
+        throw new Error(t('Kode adegan pada cadangan tidak lolos validasi keamanan: {0}', check.errors[0]));
       }
     }
   }

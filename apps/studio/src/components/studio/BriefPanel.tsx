@@ -10,6 +10,7 @@ import {
   planShots
 } from '../../engine/ai/brief';
 import { CommitNumberInput } from '../ui/CommitNumberInput';
+import { t } from '../../i18n';
 
 const chipClass = (selected: boolean) =>
   `min-h-[32px] px-2.5 rounded-lg border text-[11px] font-medium transition-colors ${
@@ -44,7 +45,7 @@ export const BriefPanel: React.FC = () => {
   return (
     <div className="flex flex-col gap-3 p-2.5 rounded-lg bg-surface-2/40 border border-border/60">
       <div className="flex flex-col gap-1.5">
-        <SectionLabel>Platform</SectionLabel>
+        <SectionLabel>{t('Platform')}</SectionLabel>
         <div className="flex flex-wrap gap-1">
           {BRIEF_PLATFORMS.map((p) => (
             <button
@@ -54,7 +55,7 @@ export const BriefPanel: React.FC = () => {
               onClick={() => updateBrief({ platform: p.id })}
               className={chipClass(brief?.platform === p.id)}
             >
-              {p.label}
+              {t(p.label)}
               {p.aspectRatio && <span className="ml-1 font-mono opacity-60">{p.aspectRatio}</span>}
             </button>
           ))}
@@ -62,7 +63,7 @@ export const BriefPanel: React.FC = () => {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <SectionLabel htmlFor="brief-duration">Durasi target</SectionLabel>
+        <SectionLabel htmlFor="brief-duration">{t('Durasi target')}</SectionLabel>
         <div className="flex flex-wrap items-center gap-1">
           {durations.map((d) => (
             <button
@@ -72,7 +73,7 @@ export const BriefPanel: React.FC = () => {
               onClick={() => updateBrief({ targetDurationSec: d })}
               className={chipClass(target === d)}
             >
-              {d < 60 ? `${d} dtk` : `${Math.floor(d / 60)}${d % 60 ? `:${String(d % 60).padStart(2, '0')}` : ''} mnt`}
+              {d < 60 ? t('{0} dtk', d) : t('{0}{1} mnt', Math.floor(d / 60), d % 60 ? `:${String(d % 60).padStart(2, '0')}` : '')}
             </button>
           ))}
           <div className="flex items-center gap-1">
@@ -84,21 +85,21 @@ export const BriefPanel: React.FC = () => {
               step={5}
               fallbackValue={30}
               onCommit={(v) => updateBrief({ targetDurationSec: Math.round(v) })}
-              ariaLabel="Durasi target dalam detik"
+              ariaLabel={t('Durasi target dalam detik')}
               className="w-14 min-h-[32px] px-1.5 rounded-lg bg-surface-2/70 border border-border/70 focus:border-accent text-[11px] font-mono text-text text-center focus:outline-none"
             />
-            <span className="text-[11px] text-text-muted">dtk</span>
+            <span className="text-[11px] text-text-muted">{t('dtk')}</span>
           </div>
         </div>
         <p className="text-[11px] text-text-faint leading-snug">
           {plan
-            ? `Sekitar ${plan.minShots}–${plan.maxShots} shot, ${plan.minShotSec}–${plan.maxShotSec} detik per shot.`
-            : 'Kosongkan untuk video pendek 15–45 detik.'}
+            ? t('Sekitar {0}–{1} shot, {2}–{3} detik per shot.', plan.minShots, plan.maxShots, plan.minShotSec, plan.maxShotSec)
+            : t('Kosongkan untuk video pendek 15–45 detik.')}
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <SectionLabel>Nada</SectionLabel>
+        <SectionLabel>{t('Nada')}</SectionLabel>
         <div className="flex flex-wrap gap-1">
           {BRIEF_TONES.map((tone) => (
             <button
@@ -108,41 +109,41 @@ export const BriefPanel: React.FC = () => {
               onClick={() => updateBrief({ tone: brief?.tone === tone ? undefined : tone })}
               className={chipClass(brief?.tone === tone)}
             >
-              {tone}
+              {t(tone)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <SectionLabel htmlFor="brief-audience">Untuk siapa</SectionLabel>
+        <SectionLabel htmlFor="brief-audience">{t('Untuk siapa')}</SectionLabel>
         <input
           id="brief-audience"
           type="text"
           value={brief?.audience || ''}
           maxLength={200}
           onChange={(e) => updateBrief({ audience: e.target.value })}
-          placeholder="Misal: mahasiswa yang baru belajar investasi"
+          placeholder={t('Misal: mahasiswa yang baru belajar investasi')}
           className="w-full min-h-[36px] px-2.5 rounded-lg bg-surface-2/70 border border-border/70 focus:border-accent text-[12px] text-text placeholder:text-text-faint focus:outline-none"
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <SectionLabel htmlFor="brief-goal">Tujuan / ajakan</SectionLabel>
+        <SectionLabel htmlFor="brief-goal">{t('Tujuan / ajakan')}</SectionLabel>
         <input
           id="brief-goal"
           type="text"
           value={brief?.goal || ''}
           maxLength={200}
           onChange={(e) => updateBrief({ goal: e.target.value })}
-          placeholder="Misal: ajak penonton follow untuk tips berikutnya"
+          placeholder={t('Misal: ajak penonton follow untuk tips berikutnya')}
           className="w-full min-h-[36px] px-2.5 rounded-lg bg-surface-2/70 border border-border/70 focus:border-accent text-[12px] text-text placeholder:text-text-faint focus:outline-none"
         />
       </div>
 
       {skills.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel htmlFor="brief-persona">Gaya sutradara</SectionLabel>
+          <SectionLabel htmlFor="brief-persona">{t('Gaya sutradara')}</SectionLabel>
           <select
             id="brief-persona"
             value={activeSkillId}

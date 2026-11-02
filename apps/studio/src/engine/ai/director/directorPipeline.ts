@@ -9,6 +9,7 @@ import {
   buildSceneQualityRepairPrompt,
   stageSizeFor
 } from './motionLaws';
+import { t } from '../../../i18n';
 
 export function cleanGeneratedHtml(rawHtml: string): { html: string; embeddedCss: string; embeddedJs: string } {
   let html = rawHtml.trim();
@@ -570,7 +571,7 @@ export async function repairGeneratedScene(params: {
   onProgress?: (status: string) => void;
 }): Promise<{ html: string; css: string; buildJs: string; valid: boolean; errors: string[] }> {
   try {
-    params.onProgress?.('AI sedang menganalisis error dan mereparasi timeline MooTween...');
+    params.onProgress?.(t('AI sedang menganalisis error dan mereparasi timeline MooTween...'));
     const repairPrompt = buildSceneRepairPrompt({
       originalCode: params.originalCode,
       errors: params.errors,
@@ -626,7 +627,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
 
   const duration = beat.durationHint || 3.5;
 
-  onProgress?.('Menganalisis konsep visual & menyusun prompt mograph...');
+  onProgress?.(t('Menganalisis konsep visual & menyusun prompt mograph...'));
 
   let prompt = buildSceneCodegenPrompt({
     beatIndex: index,
@@ -661,7 +662,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
   }
 
   try {
-    onProgress?.('Menghubungi AI Motion Director untuk generasi kode...');
+    onProgress?.(t('Menghubungi AI Motion Director untuk generasi kode...'));
     const rawResponse = await executeLlm({
       systemPrompt: MOTION_DIRECTOR_SYSTEM_PROMPT,
       userPrompt: prompt
@@ -675,7 +676,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     // If validation fails, attempt 1-time automatic repair with validation errors
     if (!validation.valid) {
       console.warn(`[MooScript] Validation failed for scene #${index + 1}, attempting auto-repair:`, validation.errors.join(' | '));
-      onProgress?.('Validasi timeline MooTween: AI sedang mereparasi animasi...');
+      onProgress?.(t('Validasi timeline MooTween: AI sedang mereparasi animasi...'));
       const repaired = await repairGeneratedScene({
         originalCode: parsed,
         errors: validation.errors,
@@ -718,7 +719,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
       });
       if (lint.needsRepair) {
         console.warn(`[MooScript] Scene #${index + 1} reads like a slide (score ${lint.score}), requesting mograph rewrite:`, lint.issues.map((i) => i.id).join(', '));
-        onProgress?.('Hasil masih terasa seperti slide: AI sedang menulis ulang jadi mograph...');
+        onProgress?.(t('Hasil masih terasa seperti slide: AI sedang menulis ulang jadi mograph...'));
         const improved = await improveSceneMographQuality({
           code: parsed,
           issues: lint.issues.map((i) => i.message),
@@ -736,7 +737,7 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
     }
 
     const editableLayers = extractLayersFromHtml(parsed.html);
-    onProgress?.('Selesai merakit layer adegan');
+    onProgress?.(t('Selesai merakit layer adegan'));
 
     if (validation.valid) {
       return {

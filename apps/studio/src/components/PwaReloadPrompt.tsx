@@ -1,7 +1,9 @@
 import React from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { t, useLocale } from '../i18n';
 
 export const PwaReloadPrompt: React.FC = () => {
+  useLocale();
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -40,12 +42,12 @@ export const PwaReloadPrompt: React.FC = () => {
         </span>
         <div className="flex-1 text-xs">
           <h4 className="font-bold text-white mb-0.5">
-            {needRefresh ? 'Versi baru tersedia' : 'Siap dipakai offline'}
+            {needRefresh ? t('Versi baru tersedia') : t('Siap dipakai offline')}
           </h4>
           <p className="text-zinc-400 leading-relaxed text-[11px]">
             {needRefresh
-              ? 'MooScript Studio punya versi baru. Muat ulang untuk memperbarui; proyek Anda tetap tersimpan.'
-              : 'Aplikasi sudah tersimpan di perangkat dan bisa dibuka tanpa internet.'}
+              ? t('MooScript Studio punya versi baru. Muat ulang untuk memperbarui; proyek Anda tetap tersimpan.')
+              : t('Aplikasi sudah tersimpan di perangkat dan bisa dibuka tanpa internet.')}
           </p>
         </div>
       </div>
@@ -57,7 +59,7 @@ export const PwaReloadPrompt: React.FC = () => {
             onClick={() => updateServiceWorker(true)}
             className="px-3 py-1.5 rounded-lg bg-primary hover:bg-lime-300 text-black text-xs font-bold transition-all active:scale-95 shadow-sm"
           >
-            Muat Ulang
+            {t('Muat Ulang')}
           </button>
         )}
         <button
@@ -65,7 +67,7 @@ export const PwaReloadPrompt: React.FC = () => {
           onClick={close}
           className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
         >
-          Tutup
+          {t('Tutup')}
         </button>
       </div>
     </div>

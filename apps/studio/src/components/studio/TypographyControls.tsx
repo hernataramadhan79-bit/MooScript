@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import type { CustomFont, LayerOverride } from '../../types';
+import { L, t } from '../../i18n';
 
 const BUILTIN_FAMILIES = [
   { family: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans' },
@@ -8,15 +9,15 @@ const BUILTIN_FAMILIES = [
 ];
 
 const WEIGHTS = [
-  { value: 400, label: 'Reguler' },
-  { value: 700, label: 'Tebal' },
-  { value: 800, label: 'Ekstra' }
+  { value: 400, label: L('Reguler') },
+  { value: 700, label: L('Tebal') },
+  { value: 800, label: L('Ekstra') }
 ];
 
 const CASES: { value: NonNullable<LayerOverride['textTransform']>; label: string; title: string }[] = [
-  { value: 'none', label: 'Aa', title: 'Seperti ditulis' },
-  { value: 'uppercase', label: 'AA', title: 'Huruf besar semua' },
-  { value: 'lowercase', label: 'aa', title: 'Huruf kecil semua' }
+  { value: 'none', label: 'Aa', title: L('Seperti ditulis') },
+  { value: 'uppercase', label: 'AA', title: L('Huruf besar semua') },
+  { value: 'lowercase', label: 'aa', title: L('Huruf kecil semua') }
 ];
 
 interface TypographyControlsProps {
@@ -43,17 +44,17 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
         <select
           value={override.fontFamily || ''}
           onChange={(e) => onChange({ fontFamily: e.target.value || undefined })}
-          aria-label="Jenis huruf"
+          aria-label={t('Jenis huruf')}
           className="flex-1 min-w-0 h-7 px-1.5 rounded-lg bg-surface-1 border border-border text-[11px] text-on-surface focus:outline-none focus:border-accent"
         >
-          <option value="">Huruf bawaan adegan</option>
+          <option value="">{t('Huruf bawaan adegan')}</option>
           {BUILTIN_FAMILIES.map((f) => (
             <option key={f.family} value={f.family}>
               {f.label}
             </option>
           ))}
           {customFonts.length > 0 && (
-            <optgroup label="Font unggahan">
+            <optgroup label={t('Font unggahan')}>
               {customFonts.map((f) => (
                 <option key={f.id} value={f.family}>
                   {f.family}
@@ -65,11 +66,11 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          title="Unggah font (.woff2, .woff, .ttf, .otf, maks 2 MB)"
+          title={t('Unggah font (.woff2, .woff, .ttf, .otf, maks 2 MB)')}
           className="h-7 px-2 rounded-lg bg-surface-1 border border-border text-[10px] font-semibold text-text-muted hover:text-accent flex items-center gap-1 shrink-0"
         >
           <span className="material-symbols-outlined text-[14px]">upload</span>
-          Font
+          {t('Font')}
         </button>
         <input
           ref={fileRef}
@@ -87,7 +88,7 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
       </div>
 
       <div className="flex items-center gap-1.5">
-        <div className="flex flex-1 items-center gap-0.5 bg-surface-1 p-0.5 rounded-lg border border-border" role="group" aria-label="Ketebalan huruf">
+        <div className="flex flex-1 items-center gap-0.5 bg-surface-1 p-0.5 rounded-lg border border-border" role="group" aria-label={t('Ketebalan huruf')}>
           {WEIGHTS.map((w) => (
             <button
               key={w.value}
@@ -96,16 +97,16 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
               onClick={() => onChange({ fontWeight: override.fontWeight === w.value ? undefined : w.value })}
               className={segBtn(override.fontWeight === w.value)}
             >
-              {w.label}
+              {t(w.label)}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-0.5 bg-surface-1 p-0.5 rounded-lg border border-border" role="group" aria-label="Huruf besar kecil">
+        <div className="flex items-center gap-0.5 bg-surface-1 p-0.5 rounded-lg border border-border" role="group" aria-label={t('Huruf besar kecil')}>
           {CASES.map((c) => (
             <button
               key={c.value}
               type="button"
-              title={c.title}
+              title={t(c.title)}
               aria-pressed={(override.textTransform || 'none') === c.value}
               onClick={() => onChange({ textTransform: c.value === 'none' ? undefined : c.value })}
               className={`${segBtn((override.textTransform || 'none') === c.value)} px-1.5 font-mono`}
@@ -118,8 +119,8 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
 
       <label className="block space-y-1">
         <span className="flex items-center justify-between text-[10px] font-mono text-text-muted">
-          <span>Jarak huruf</span>
-          <span className="text-accent">{tracking.toFixed(2)} em</span>
+          <span>{t('Jarak huruf')}</span>
+          <span className="text-accent">{tracking.toFixed(2)} {t('em')}</span>
         </span>
         <input
           type="range"
@@ -134,7 +135,7 @@ export const TypographyControls: React.FC<TypographyControlsProps> = ({ override
 
       <label className="block space-y-1">
         <span className="flex items-center justify-between text-[10px] font-mono text-text-muted">
-          <span>Jarak baris</span>
+          <span>{t('Jarak baris')}</span>
           <span className="text-accent">{leading.toFixed(2)}</span>
         </span>
         <input

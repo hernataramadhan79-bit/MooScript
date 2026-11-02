@@ -1,4 +1,5 @@
 import type { AspectRatio, BriefPlatform, CreativeBrief } from '../../types';
+import { L, t } from '../../i18n';
 
 export interface BriefPlatformInfo {
   id: BriefPlatform;
@@ -15,10 +16,10 @@ export const BRIEF_PLATFORMS: BriefPlatformInfo[] = [
   { id: 'shorts', label: 'YouTube Shorts', aspectRatio: '9:16', durations: [15, 30, 45, 60], defaultDuration: 30 },
   { id: 'youtube', label: 'YouTube', aspectRatio: '16:9', durations: [30, 60, 90, 120, 180], defaultDuration: 60 },
   { id: 'feed', label: 'Feed (IG / LinkedIn)', aspectRatio: '1:1', durations: [15, 30, 45, 60], defaultDuration: 30 },
-  { id: 'other', label: 'Lainnya', aspectRatio: null, durations: [15, 30, 45, 60, 90, 120], defaultDuration: 30 }
+  { id: 'other', label: L('Lainnya'), aspectRatio: null, durations: [15, 30, 45, 60, 90, 120], defaultDuration: 30 }
 ];
 
-export const BRIEF_TONES = ['Santai', 'Edukatif', 'Energik', 'Serius', 'Lucu', 'Inspiratif', 'Dramatis'];
+export const BRIEF_TONES = ['Santai', 'Edukatif', 'Energik', 'Serius', 'Lucu', 'Inspiratif', 'Dramatis'].map(L);
 
 export const MIN_TARGET_SECONDS = 10;
 export const MAX_TARGET_SECONDS = 300;
@@ -88,9 +89,9 @@ export function briefSummary(brief: CreativeBrief | undefined): string {
   if (!brief) return '';
   const parts: string[] = [];
   const platform = getBriefPlatform(brief.platform);
-  if (platform && platform.id !== 'other') parts.push(platform.label);
-  if (brief.targetDurationSec) parts.push(`${brief.targetDurationSec} dtk`);
-  if (brief.tone) parts.push(brief.tone);
+  if (platform && platform.id !== 'other') parts.push(t(platform.label));
+  if (brief.targetDurationSec) parts.push(t('{0} dtk', brief.targetDurationSec));
+  if (brief.tone) parts.push(t(brief.tone));
   if (brief.audience) parts.push(brief.audience);
   return parts.join(' · ');
 }

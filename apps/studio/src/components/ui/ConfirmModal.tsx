@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sheet } from './Sheet';
 import { Button } from './Button';
+import { t } from '../../i18n';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -21,8 +22,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   title,
   description,
-  confirmLabel = 'Lanjutkan',
-  cancelLabel = 'Batal',
+  confirmLabel = t('Lanjutkan'),
+  cancelLabel = t('Batal'),
   variant = 'primary',
   icon = 'warning',
   isLoading = false

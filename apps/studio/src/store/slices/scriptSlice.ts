@@ -10,6 +10,7 @@ import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
 import { stopPlaybackAudio } from './playbackSlice';
 import { flushPendingSave } from './projectSlice';
 import type { MooStoreState, ScriptSlice } from '../types';
+import { t } from '../../i18n';
 
 let scriptAbortController: AbortController | null = null;
 
@@ -115,7 +116,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         restored.id,
         before.rawVoiceBlob ? { kind: 'voice', blob: before.rawVoiceBlob } : before.bgmOnlyAudio ? { kind: 'bgm' } : null
       );
-      get().addToast('Naskah sebelumnya dikembalikan.', 'success');
+      get().addToast(t('Naskah sebelumnya dikembalikan.'), 'success');
       return;
     }
 
@@ -127,7 +128,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       audioStale: !!current.audioBlob
     });
     await saveProjectToDb(syncedProject);
-    get().addToast('Naskah sebelumnya dikembalikan.', 'success');
+    get().addToast(t('Naskah sebelumnya dikembalikan.'), 'success');
   },
 
   generateScript: async () => {
@@ -138,7 +139,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
     const apiKey = settings.apiKeys[provider] || '';
 
     if (!apiKey || apiKey.trim() === '') {
-      addToast(`Masukkan API Key ${provider.toUpperCase()} di Pengaturan terlebih dahulu.`, 'warning');
+      addToast(t('Masukkan API Key {0} di Pengaturan terlebih dahulu.', provider.toUpperCase()), 'warning');
       return;
     }
 
@@ -173,7 +174,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       const latest = get().project;
       if (latest.id !== startedProjectId) {
         set({ isGeneratingScript: false });
-        addToast('Proyek berganti, hasil naskah AI dibuang.', 'warning');
+        addToast(t('Proyek berganti, hasil naskah AI dibuang.'), 'warning');
         return;
       }
 
@@ -242,7 +243,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       });
       await flushPendingSave();
       await saveVoiceTrackToDb(syncedProject.id, null);
-      addToast(`Storyboard AI siap: ${newScenes.length} adegan.`, 'success');
+      addToast(t('Storyboard AI siap: {0} adegan.', newScenes.length), 'success');
     } catch (err: unknown) {
       const isUserCancelled =
         controller.signal.aborted ||
@@ -252,10 +253,10 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       if (scriptAbortController === controller || !isUserCancelled) set({ isGeneratingScript: false });
 
       if (isUserCancelled) {
-        addToast('Penyusunan naskah AI dibatalkan.', 'info');
+        addToast(t('Penyusunan naskah AI dibatalkan.'), 'info');
       } else {
         const message = err instanceof Error ? err.message : String(err);
-        addToast(`Gagal menyusun naskah AI: ${message}`, 'error');
+        addToast(t('Gagal menyusun naskah AI: {0}', message), 'error');
       }
     } finally {
       if (scriptAbortController === controller) scriptAbortController = null;

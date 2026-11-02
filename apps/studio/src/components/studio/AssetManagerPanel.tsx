@@ -4,6 +4,7 @@ import { useMooStore } from '../../store/useMooStore';
 import type { AssetRecord } from '../../db/mooDb';
 import type { AssetAnimationPreset, AssetFramePreset } from '../../store/types';
 import { MAX_ASSET_BYTES, MAX_VIDEO_BYTES } from '../../store/slices/assetSlice';
+import { t } from '../../i18n';
 
 /** A small muted preview of a video asset (first frame). */
 const VideoThumb: React.FC<{ blob?: Blob; name: string }> = ({ blob, name }) => {
@@ -53,19 +54,19 @@ export const AssetManagerPanel: React.FC = () => {
     if (!file) return;
     if (file.type.startsWith('video/')) {
       if (file.size > MAX_VIDEO_BYTES) {
-        addToast('Ukuran video melebihi batas 300 MB.', 'error');
+        addToast(t('Ukuran video melebihi batas 300 MB.'), 'error');
         return;
       }
       await addAsset(file);
       return;
     }
     if (!file.type.startsWith('image/')) {
-      addToast('Harap pilih gambar (PNG, JPG, WebP, SVG) atau video (MP4, WebM, MOV).', 'error');
+      addToast(t('Harap pilih gambar (PNG, JPG, WebP, SVG) atau video (MP4, WebM, MOV).'), 'error');
       return;
     }
 
     if (file.size > MAX_ASSET_BYTES) {
-      addToast('Ukuran berkas melebihi batas 5 MB.', 'error');
+      addToast(t('Ukuran berkas melebihi batas 5 MB.'), 'error');
       return;
     }
 
@@ -95,9 +96,9 @@ export const AssetManagerPanel: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[18px] text-accent">perm_media</span>
-          <span className="text-[13px] font-bold text-on-surface">Aset Media Lokal</span>
+          <span className="text-[13px] font-bold text-on-surface">{t('Aset Media Lokal')}</span>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-3 text-text-muted border border-border">
-            {assets.length} berkas
+            {assets.length === 1 ? t('1 berkas') : t('{0} berkas', assets.length)}
           </span>
         </div>
 
@@ -107,7 +108,7 @@ export const AssetManagerPanel: React.FC = () => {
           className="px-2.5 py-1 rounded-lg bg-surface-3 hover:bg-surface-4 border border-border text-on-surface text-[11px] font-semibold flex items-center gap-1 transition-all active:scale-95"
         >
           <span className="material-symbols-outlined text-[15px] text-accent">upload_file</span>
-          <span>Unggah</span>
+          <span>{t('Unggah')}</span>
         </button>
 
         <input
@@ -121,7 +122,7 @@ export const AssetManagerPanel: React.FC = () => {
 
       {/* Info subheader */}
       <p className="text-[11px] text-text-muted leading-relaxed">
-        Unggah gambar, logo, atau stiker (maks 5 MB), atau video untuk B-roll (maks 300 MB). Semua tersimpan di browser Anda.
+        {t('Unggah gambar, logo, atau stiker (maks 5 MB), atau video untuk B-roll (maks 300 MB). Semua tersimpan di browser Anda.')}
       </p>
 
       {/* B-roll of the target shot */}
@@ -130,17 +131,17 @@ export const AssetManagerPanel: React.FC = () => {
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-semibold text-on-surface flex items-center gap-1">
               <span aria-hidden="true" className="material-symbols-outlined text-[15px] text-accent">movie</span>
-              B-roll Shot #{targetSceneIdx + 1}
+              {t('B-roll Shot #')}{targetSceneIdx + 1}
             </span>
             <button type="button" onClick={() => setSceneBroll(targetScene.id, null)} className="text-[10px] text-text-muted hover:text-rose-300">
-              Lepas
+              {t('Lepas')}
             </button>
           </div>
           <span className="text-[10px] text-text-muted truncate">
-            {assets.find((a) => a.id === targetScene.broll!.assetId)?.name || 'Video tidak ditemukan di proyek ini'}
+            {assets.find((a) => a.id === targetScene.broll!.assetId)?.name || t('Video tidak ditemukan di proyek ini')}
           </span>
           <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
-            Mulai dari detik
+            {t('Mulai dari detik')}
             <input
               type="number"
               min={0}
@@ -153,8 +154,8 @@ export const AssetManagerPanel: React.FC = () => {
           <div className="grid grid-cols-2 gap-1">
             {(
               [
-                ['cover', 'Penuhi layar'],
-                ['contain', 'Utuh']
+                ['cover', t('Penuhi layar')],
+                ['contain', t('Utuh')]
               ] as const
             ).map(([fit, name]) => (
               <button
@@ -171,7 +172,7 @@ export const AssetManagerPanel: React.FC = () => {
             ))}
           </div>
           <label className="flex flex-col gap-1 text-[10px] text-text-muted">
-            Gelapkan video {Math.round(targetScene.broll.dim * 100)}%
+            {t('Gelapkan video')} {Math.round(targetScene.broll.dim * 100)}%
             <input
               type="range"
               min={0}
@@ -183,7 +184,7 @@ export const AssetManagerPanel: React.FC = () => {
             />
           </label>
           <span className="text-[10px] text-text-faint leading-snug">
-            Latar shot ini dikosongkan supaya video terlihat; grafik dan teks tetap di atasnya.
+            {t('Latar shot ini dikosongkan supaya video terlihat; grafik dan teks tetap di atasnya.')}
           </span>
         </div>
       )}
@@ -193,10 +194,10 @@ export const AssetManagerPanel: React.FC = () => {
         <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-1 border border-border">
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-semibold text-text-muted uppercase tracking-wider">
-              Target Adegan untuk Disisipkan:
+              {t('Target Adegan untuk Disisipkan:')}
             </span>
             <span className="text-accent font-mono font-bold text-[10px]">
-              {targetScene ? `Shot #${targetSceneIdx + 1}` : 'Belum dipilih'}
+              {targetScene ? t('Shot #{0}', targetSceneIdx + 1) : t('Belum dipilih')}
             </span>
           </div>
           <select
@@ -206,7 +207,7 @@ export const AssetManagerPanel: React.FC = () => {
           >
             {activeProject.scenes.map((s, idx) => (
               <option key={s.id} value={s.id} className="bg-surface-1">
-                Shot #{idx + 1}: {s.narrationText?.slice(0, 32) || s.text?.slice(0, 32) || `Adegan ${idx + 1}`}
+                {t('Shot #')}{idx + 1}: {s.narrationText?.slice(0, 32) || s.text?.slice(0, 32) || t('Adegan {0}', idx + 1)}
               </option>
             ))}
           </select>
@@ -217,14 +218,14 @@ export const AssetManagerPanel: React.FC = () => {
       <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-surface-1 border border-border">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-            Preset Animasi Kemunculan
+            {t('Preset Animasi Kemunculan')}
           </span>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
             {[
-              { id: 'pop', label: 'Pop In (Elastic)' },
-              { id: 'slide', label: 'Slide Up' },
-              { id: 'float', label: 'Floating Loop' },
-              { id: 'zoom', label: 'Zoom Punch' }
+              { id: 'pop', label: t('Pop In (Elastic)') },
+              { id: 'slide', label: t('Slide Up') },
+              { id: 'float', label: t('Floating Loop') },
+              { id: 'zoom', label: t('Zoom Punch') }
             ].map((preset) => (
               <button
                 key={preset.id}
@@ -244,13 +245,13 @@ export const AssetManagerPanel: React.FC = () => {
 
         <div className="flex flex-col gap-1 pt-1 border-t border-border/50">
           <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-            Preset Bingkai Gambar
+            {t('Preset Bingkai Gambar')}
           </span>
           <div className="grid grid-cols-3 gap-1">
             {[
-              { id: 'cutout', label: 'Cutout (Bayangan)' },
-              { id: 'bento', label: 'Bento Card' },
-              { id: 'avatar', label: 'Avatar Bulat' }
+              { id: 'cutout', label: t('Cutout (Bayangan)') },
+              { id: 'bento', label: t('Bento Card') },
+              { id: 'avatar', label: t('Avatar Bulat') }
             ].map((preset) => (
               <button
                 key={preset.id}
@@ -271,12 +272,12 @@ export const AssetManagerPanel: React.FC = () => {
 
       {/* Galeri / List Aset */}
       {isLoadingAssets ? (
-        <div className="py-6 text-center text-[12px] text-text-muted">Memuat aset...</div>
+        <div className="py-6 text-center text-[12px] text-text-muted">{t('Memuat aset...')}</div>
       ) : assets.length === 0 ? (
         <div className="py-6 px-4 rounded-xl border border-dashed border-border text-center flex flex-col items-center justify-center gap-1.5 text-text-muted">
           <span className="material-symbols-outlined text-[24px] text-text-faint">image_not_supported</span>
-          <span className="text-[12px]">Belum ada gambar yang diunggah.</span>
-          <span className="text-[10px] text-text-faint">Klik tombol Unggah untuk menambahkan logo atau foto.</span>
+          <span className="text-[12px]">{t('Belum ada gambar yang diunggah.')}</span>
+          <span className="text-[10px] text-text-faint">{t('Klik tombol Unggah untuk menambahkan logo atau foto.')}</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
@@ -302,7 +303,7 @@ export const AssetManagerPanel: React.FC = () => {
                       />
                     )}
                     {isInserted && (
-                      <span className="absolute -top-1 -right-1 bg-accent text-black rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold shadow" title="Aktif di shot ini">
+                      <span className="absolute -top-1 -right-1 bg-accent text-black rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold shadow" title={t('Aktif di shot ini')}>
                         ✓
                       </span>
                     )}
@@ -326,39 +327,39 @@ export const AssetManagerPanel: React.FC = () => {
                         targetScene &&
                         setSceneBroll(targetScene.id, isBroll ? null : { assetId: asset.id, start: 0, fit: 'cover', dim: 0.35 })
                       }
-                      title={isBroll ? `Lepas dari Shot #${targetSceneIdx + 1}` : `Putar di belakang Shot #${targetSceneIdx + 1}`}
+                      title={isBroll ? t('Lepas dari Shot #{0}', targetSceneIdx + 1) : t('Putar di belakang Shot #{0}', targetSceneIdx + 1)}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors disabled:opacity-40 ${
                         isBroll ? 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25' : 'bg-accent/15 text-accent hover:bg-accent/25'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[15px]">{isBroll ? 'remove_circle' : 'movie'}</span>
-                      <span>{isBroll ? 'Lepas' : 'B-roll'}</span>
+                      <span>{isBroll ? t('Lepas') : t('B-roll')}</span>
                     </button>
                   ) : isInserted ? (
                     <button
                       type="button"
                       onClick={() => handleRemove(asset)}
-                      title={`Keluarkan dari Shot #${targetSceneIdx + 1}`}
+                      title={t('Keluarkan dari Shot #{0}', targetSceneIdx + 1)}
                       className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-[11px] font-bold flex items-center gap-1 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[15px]">remove_circle</span>
-                      <span>Keluarkan</span>
+                      <span>{t('Keluarkan')}</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => handleInsert(asset)}
-                      title={`Sisipkan ke Shot #${targetSceneIdx + 1}`}
+                      title={t('Sisipkan ke Shot #{0}', targetSceneIdx + 1)}
                       className="px-2.5 py-1 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-[11px] font-bold flex items-center gap-1 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[15px]">add_photo_alternate</span>
-                      <span>Sisipkan</span>
+                      <span>{t('Sisipkan')}</span>
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => deleteAsset(asset.id)}
-                    title="Hapus aset dari database"
+                    title={t('Hapus aset dari database')}
                     className="p-1.5 rounded-lg hover:bg-red-500/15 text-text-muted hover:text-red-400 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>

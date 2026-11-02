@@ -1,6 +1,7 @@
 import type { WordTimestamp } from '../../types';
 import type { TTSResult } from './tts';
 import { computeDeterministicWordAlignment } from './tts';
+import { L, t } from '../../i18n';
 
 export interface LocalVoice {
   id: string;
@@ -17,10 +18,10 @@ export interface LocalVoice {
 export const LOCAL_VOICES: LocalVoice[] = [
   {
     id: 'id_ID-news_tts',
-    name: 'Ayu (Narasi Berita)',
+    name: L('Ayu (Narasi Berita)'),
     language: 'id',
-    languageLabel: 'Bahasa Indonesia',
-    description: 'Suara narator jernih khas berita & video edukasi (Zero API, Offline)',
+    languageLabel: L('Bahasa Indonesia'),
+    description: L('Suara narator jernih khas berita & video edukasi (Zero API, Offline)'),
     sizeMb: 60.0,
     sampleRate: 22050,
     modelUrl:
@@ -30,10 +31,10 @@ export const LOCAL_VOICES: LocalVoice[] = [
   },
   {
     id: 'en_US-lessac',
-    name: 'Lessac (Storyteller)',
+    name: L('Lessac (Storyteller)'),
     language: 'en',
-    languageLabel: 'English (US)',
-    description: 'Clear, natural American narrative & explainer voice (Zero API, Offline)',
+    languageLabel: L('English (US)'),
+    description: L('Clear, natural American narrative & explainer voice (Zero API, Offline)'),
     sizeMb: 63.0,
     sampleRate: 22050,
     modelUrl:
@@ -328,19 +329,19 @@ export async function synthesizeLocalTTS(params: {
   // If not cached and offline, throw clear helpful error in browser
   if (isBrowser && !isCached && typeof navigator !== 'undefined' && navigator.onLine === false) {
     throw new Error(
-      `Model lokal '${voice.name}' belum tersimpan di cache dan perangkat sedang offline. Silakan sambungkan internet untuk mengunduh model satu kali.`
+      t('Model lokal \'{0}\' belum tersimpan di cache dan perangkat sedang offline. Silakan sambungkan internet untuk mengunduh model satu kali.', voice.name)
     );
   }
 
   // If not cached, auto-download
   if (!isCached && isBrowser && typeof caches !== 'undefined') {
-    onProgress?.({ percent: 5, message: `Mengunduh model suara lokal ${voice.name} (~${voice.sizeMb}MB)...` });
+    onProgress?.({ percent: 5, message: t('Mengunduh model suara lokal {0} (~{1}MB)...', voice.name, voice.sizeMb) });
     await downloadLocalModel(
       voice.id,
       (p) => {
         onProgress?.({
           percent: p.percent,
-          message: `Mengunduh model suara (${(p.loadedBytes / 1024 / 1024).toFixed(1)} / ${(p.totalBytes / 1024 / 1024).toFixed(1)} MB)...`
+          message: t('Mengunduh model suara ({0} / {1} MB)...', (p.loadedBytes / 1024 / 1024).toFixed(1), (p.totalBytes / 1024 / 1024).toFixed(1))
         });
       },
       signal
@@ -363,7 +364,7 @@ export async function synthesizeLocalTTS(params: {
     } catch (workerErr: any) {
       // Never mask browser inference errors with a procedural buzzing tone
       const message = workerErr?.message || String(workerErr);
-      throw new Error(`Gagal melakukan sintesis suara lokal (${voice.name}): ${message}`);
+      throw new Error(t('Gagal melakukan sintesis suara lokal ({0}): {1}', voice.name, message));
     }
   } else {
     // Environment without WebWorker/browser (e.g. Node tests / Vitest)

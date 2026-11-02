@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { PersonaSkill, LLMProvider, MotionNode, CreativeBrief } from '../../types';
 import { briefPromptLines, planShots } from './brief';
+import { t } from '../../i18n';
 import { migrateLegacyScene } from '../../types';
 
 /**
@@ -468,34 +469,37 @@ function handleApiError(provider: string, status: number, errorText: string): Er
     cleanMessage = errorText.slice(0, 300);
   }
 
+  const detail = cleanMessage ? t('Detail: "{0}". ', cleanMessage) : '';
+  const bracketed = cleanMessage ? `(${cleanMessage})` : '';
+
   if (status === 401) {
     return new Error(
-      `${provider}: API Key tidak valid atau telah dicabut (401 Unauthorized). Periksa kembali API Key Anda.`
+      t('{0}: API Key tidak valid atau telah dicabut (401 Unauthorized). Periksa kembali API Key Anda.', provider)
     );
   }
   if (status === 402) {
     return new Error(
-      `${provider}: Saldo/kredit tidak mencukupi (402 Payment Required). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Silakan top-up saldo OpenRouter Anda atau gunakan provider alternatif seperti Google Gemini.`
+      t('{0}: Saldo/kredit tidak mencukupi (402 Payment Required). {1}Silakan top-up saldo OpenRouter Anda atau gunakan provider alternatif seperti Google Gemini.', provider, detail)
     );
   }
   if (status === 403) {
     return new Error(
-      `${provider}: Akses ditolak (403 Forbidden). Pastikan akun Anda memiliki akses ke model ini. ${cleanMessage ? `(${cleanMessage})` : ''}`
+      t('{0}: Akses ditolak (403 Forbidden). Pastikan akun Anda memiliki akses ke model ini. {1}', provider, bracketed)
     );
   }
   if (status === 404) {
     return new Error(
-      `${provider}: Model tidak ditemukan (404 Not Found). Pastikan ID model valid. ${cleanMessage ? `(${cleanMessage})` : ''}`
+      t('{0}: Model tidak ditemukan (404 Not Found). Pastikan ID model valid. {1}', provider, bracketed)
     );
   }
   if (status === 429) {
     return new Error(
-      `${provider}: Batas kuota atau rate limit tercapai (429 Too Many Requests). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Cek billing/saldo API key Anda atau tunggu sesaat.`
+      t('{0}: Batas kuota atau rate limit tercapai (429 Too Many Requests). {1}Cek billing/saldo API key Anda atau tunggu sesaat.', provider, detail)
     );
   }
   if (status >= 500) {
     return new Error(
-      `${provider}: Server provider sedang mengalami gangguan (${status} Server Error). ${cleanMessage ? `Detail: "${cleanMessage}". ` : ''}Coba gunakan model resmi yang stabil atau tunggu sesaat.`
+      t('{0}: Server provider sedang mengalami gangguan ({1} Server Error). {2}Coba gunakan model resmi yang stabil atau tunggu sesaat.', provider, status, detail)
     );
   }
   return new Error(`${provider} error (${status}): ${cleanMessage}`);
@@ -1318,7 +1322,7 @@ export async function callRawLLM(opts: {
   const cleanKey = apiKey.trim();
 
   if (!cleanKey) {
-    throw new Error(`API Key untuk ${provider.toUpperCase()} belum diisi. Silakan isi di Pengaturan terlebih dahulu.`);
+    throw new Error(t('API Key untuk {0} belum diisi. Silakan isi di Pengaturan terlebih dahulu.', provider.toUpperCase()));
   }
 
   const cleanModel = sanitizeModelName(provider, model);
@@ -1650,7 +1654,7 @@ export async function testProviderApiKey(
           return {
             success: false,
             message:
-              'ElevenLabs: key terdeteksi tapi izinnya tidak cukup. Aktifkan permission text_to_speech (dan user_read bila tersedia) untuk key ini di dashboard ElevenLabs.'
+              t('ElevenLabs: key terdeteksi tapi izinnya tidak cukup. Aktifkan permission text_to_speech (dan user_read bila tersedia) untuk key ini di dashboard ElevenLabs.')
           };
         }
       }

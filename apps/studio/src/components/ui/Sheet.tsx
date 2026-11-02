@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { t } from '../../i18n';
 
 export interface SheetProps {
   isOpen: boolean;
@@ -83,7 +84,7 @@ export const Sheet: React.FC<SheetProps> = ({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Tutup dialog"
+              aria-label={t('Tutup dialog')}
               className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-text-muted hover:text-on-surface hover:bg-surface-2 transition-colors -mr-1"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>

@@ -40,6 +40,25 @@
         border-radius: 4px;
         font-size: 0.9em;
       }
+      .lang-switch {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 20px;
+      }
+      .lang-switch button {
+        background: #1f1f23;
+        color: #d4d4d8;
+        border: 1px solid #3f3f46;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      .lang-switch button[aria-pressed='true'] {
+        color: #a3e635;
+        border-color: #a3e635;
+      }
       .meta {
         color: #a1a1aa;
         font-size: 0.85rem;
@@ -48,74 +67,192 @@
   </head>
   <body>
     <main>
-      <p><a href="/">&larr; Kembali ke MooScript Studio</a></p>
-      <h1>Kebijakan Privasi &amp; Ketentuan</h1>
-      <p class="meta">Terakhir diperbarui: 2026-10-12</p>
-
-      <h2>1. Data lokal</h2>
-      <p>
-        Proyek, audio, dan pengaturan Anda disimpan di IndexedDB browser pada perangkat Anda sendiri.
-        MooScript Studio tidak memiliki server aplikasi, akun pengguna, analitik, maupun cookie pelacak.
+      <p class="lang-switch" aria-label="Language">
+        <button type="button" data-set-lang="id">Bahasa Indonesia</button>
+        <button type="button" data-set-lang="en">English</button>
       </p>
+      <div lang="id" data-lang="id">
+        <p><a href="/">&larr; Kembali ke MooScript Studio</a></p>
+        <h1>Kebijakan Privasi &amp; Ketentuan</h1>
+        <p class="meta">Terakhir diperbarui: 2026-10-12</p>
 
-      <h2>2. API key</h2>
-      <p>
-        API key disimpan di IndexedDB perangkat (mode &ldquo;Persisten&rdquo;) atau di sessionStorage
-        (mode &ldquo;Sesi&rdquo;; terhapus saat tab ditutup). Key tidak pernah dikirim ke server MooScript;
-        key hanya dikirim langsung dari browser Anda ke provider yang Anda pilih. Mode Persisten menyimpan
-        key sebagai teks biasa di perangkat, jadi hindari memakainya di komputer bersama.
-      </p>
+        <h2>1. Data lokal</h2>
+        <p>
+          Proyek, audio, dan pengaturan Anda disimpan di IndexedDB browser pada perangkat Anda sendiri.
+          MooScript Studio tidak memiliki server aplikasi, akun pengguna, analitik, maupun cookie pelacak.
+        </p>
 
-      <h2>3. Permintaan jaringan</h2>
-      <p>Aplikasi hanya dapat menghubungi alamat berikut (dibatasi oleh Content Security Policy):</p>
-      <ul>
-        <li><code>generativelanguage.googleapis.com</code> (Google Gemini)</li>
-        <li><code>api.openai.com</code> (OpenAI)</li>
-        <li><code>api.groq.com</code> (Groq)</li>
-        <li><code>api.anthropic.com</code> (Anthropic)</li>
-        <li><code>openrouter.ai</code> (OpenRouter)</li>
-        <li><code>api.elevenlabs.io</code> (ElevenLabs)</li>
-        <li>
-          <code>huggingface.co</code> dan <code>xethub.hf.co</code> (hanya saat mengunduh model suara
-          lokal)
-        </li>
-        <li>
-          <code>cdn.jsdelivr.net</code> (cadangan untuk berkas runtime ONNX suara lokal, bila tidak bisa
-          dimuat dari situs ini)
-        </li>
-      </ul>
-      <p>
-        Permintaan ke provider AI hanya terjadi bila Anda memakai fitur terkait, dan tunduk pada
-        kebijakan privasi provider tersebut.
-      </p>
+        <h2>2. API key</h2>
+        <p>
+          API key disimpan di IndexedDB perangkat (mode &ldquo;Persisten&rdquo;) atau di sessionStorage
+          (mode &ldquo;Sesi&rdquo;; terhapus saat tab ditutup). Key tidak pernah dikirim ke server MooScript;
+          key hanya dikirim langsung dari browser Anda ke provider yang Anda pilih. Mode Persisten menyimpan
+          key sebagai teks biasa di perangkat, jadi hindari memakainya di komputer bersama.
+        </p>
 
-      <h2>4. Penghapusan data</h2>
-      <p>
-        Hapus data lewat fitur &ldquo;Clear site data&rdquo; di browser, atau lewat tombol hapus proyek
-        dan hapus cache audio di Pengaturan. Browser tertentu (misalnya Safari) dapat menghapus data situs
-        secara otomatis; gunakan fitur Unduh Cadangan di Manajer Proyek untuk menyimpan salinan.
-      </p>
+        <h2>3. Permintaan jaringan</h2>
+        <p>Aplikasi hanya dapat menghubungi alamat berikut (dibatasi oleh Content Security Policy):</p>
+        <ul>
+          <li><code>generativelanguage.googleapis.com</code> (Google Gemini)</li>
+          <li><code>api.openai.com</code> (OpenAI)</li>
+          <li><code>api.groq.com</code> (Groq)</li>
+          <li><code>api.anthropic.com</code> (Anthropic)</li>
+          <li><code>openrouter.ai</code> (OpenRouter)</li>
+          <li><code>api.elevenlabs.io</code> (ElevenLabs)</li>
+          <li>
+            <code>huggingface.co</code> dan <code>xethub.hf.co</code> (hanya saat mengunduh model suara
+            lokal)
+          </li>
+          <li>
+            <code>cdn.jsdelivr.net</code> (cadangan untuk berkas runtime ONNX suara lokal, bila tidak bisa
+            dimuat dari situs ini)
+          </li>
+        </ul>
+        <p>
+          Permintaan ke provider AI hanya terjadi bila Anda memakai fitur terkait, dan tunduk pada
+          kebijakan privasi provider tersebut.
+        </p>
 
-      <h2>5. Ketentuan penggunaan</h2>
-      <ul>
-        <li>
-          MooScript Studio dilisensikan di bawah GNU Affero General Public License v3.0 atau yang lebih baru
-          (AGPL-3.0-or-later). Kode sumbernya tersedia di
-          <a href="https://github.com/hernataramadhan79-bit/MooScript">github.com/hernataramadhan79-bit/MooScript</a>.
-        </li>
-        <li>Perangkat lunak disediakan apa adanya, tanpa jaminan apa pun.</li>
-        <li>Anda bertanggung jawab atas biaya pemakaian API provider yang Anda gunakan.</li>
-        <li>Anda wajib mematuhi ketentuan layanan masing-masing provider AI.</li>
-        <li>Anda bertanggung jawab atas konten yang Anda hasilkan dan publikasikan.</li>
-      </ul>
+        <h2>4. Penghapusan data</h2>
+        <p>
+          Hapus data lewat fitur &ldquo;Clear site data&rdquo; di browser, atau lewat tombol hapus proyek
+          dan hapus cache audio di Pengaturan. Browser tertentu (misalnya Safari) dapat menghapus data situs
+          secara otomatis; gunakan fitur Unduh Cadangan di Manajer Proyek untuk menyimpan salinan.
+        </p>
 
-      <h2>6. Kontak</h2>
-      <p>
-        Pertanyaan atau laporan masalah:
-        <a href="https://github.com/hernataramadhan79-bit/MooScript/issues" rel="noopener noreferrer"
-          >github.com/hernataramadhan79-bit/MooScript/issues</a
-        >
-      </p>
+        <h2>5. Ketentuan penggunaan</h2>
+        <ul>
+          <li>
+            MooScript Studio dilisensikan di bawah GNU Affero General Public License v3.0 atau yang lebih baru
+            (AGPL-3.0-or-later). Kode sumbernya tersedia di
+            <a href="https://github.com/hernataramadhan79-bit/MooScript">github.com/hernataramadhan79-bit/MooScript</a>.
+          </li>
+          <li>Perangkat lunak disediakan apa adanya, tanpa jaminan apa pun.</li>
+          <li>Anda bertanggung jawab atas biaya pemakaian API provider yang Anda gunakan.</li>
+          <li>Anda wajib mematuhi ketentuan layanan masing-masing provider AI.</li>
+          <li>Anda bertanggung jawab atas konten yang Anda hasilkan dan publikasikan.</li>
+        </ul>
+
+        <h2>6. Kontak</h2>
+        <p>
+          Pertanyaan atau laporan masalah:
+          <a href="https://github.com/hernataramadhan79-bit/MooScript/issues" rel="noopener noreferrer"
+            >github.com/hernataramadhan79-bit/MooScript/issues</a
+          >
+        </p>
+      </div>
+      <div lang="en" data-lang="en" hidden>
+        <p><a href="/">&larr; Back to MooScript Studio</a></p>
+        <h1>Privacy Policy &amp; Terms</h1>
+        <p class="meta">Last updated: 2026-10-12</p>
+
+        <h2>1. Local data</h2>
+        <p>
+          Your projects, audio, and settings are stored in your browser's IndexedDB on your own device.
+          MooScript Studio has no application server, user accounts, analytics, or tracking cookies.
+        </p>
+
+        <h2>2. API keys</h2>
+        <p>
+          API keys are stored in the device's IndexedDB ("Persistent" mode) or in sessionStorage
+          ("Session" mode; cleared when the tab is closed). Keys are never sent to a MooScript server;
+          they are sent only directly from your browser to the provider you choose. Persistent mode stores
+          the key as plain text on the device, so avoid using it on a shared computer.
+        </p>
+
+        <h2>3. Network requests</h2>
+        <p>The app can only contact the following addresses (restricted by the Content Security Policy):</p>
+        <ul>
+          <li><code>generativelanguage.googleapis.com</code> (Google Gemini)</li>
+          <li><code>api.openai.com</code> (OpenAI)</li>
+          <li><code>api.groq.com</code> (Groq)</li>
+          <li><code>api.anthropic.com</code> (Anthropic)</li>
+          <li><code>openrouter.ai</code> (OpenRouter)</li>
+          <li><code>api.elevenlabs.io</code> (ElevenLabs)</li>
+          <li>
+            <code>huggingface.co</code> and <code>xethub.hf.co</code> (only when downloading local voice
+            models)
+          </li>
+          <li>
+            <code>cdn.jsdelivr.net</code> (fallback for the local voice ONNX runtime files, if they cannot
+            be loaded from this site)
+          </li>
+        </ul>
+        <p>
+          Requests to AI providers only happen when you use the related feature, and are subject to those
+          providers' privacy policies.
+        </p>
+
+        <h2>4. Deleting data</h2>
+        <p>
+          Delete data with your browser's "Clear site data" feature, or with the delete-project and clear-audio-cache
+          buttons in Settings. Some browsers (for example Safari) may clear site data automatically; use
+          Download Backup in the Project Manager to keep a copy.
+        </p>
+
+        <h2>5. Terms of use</h2>
+        <ul>
+          <li>
+            MooScript Studio is licensed under the GNU Affero General Public License v3.0 or later
+            (AGPL-3.0-or-later). The source code is available at
+            <a href="https://github.com/hernataramadhan79-bit/MooScript">github.com/hernataramadhan79-bit/MooScript</a>.
+          </li>
+          <li>The software is provided as is, without any warranty.</li>
+          <li>You are responsible for the API usage costs of the providers you use.</li>
+          <li>You must comply with each AI provider's terms of service.</li>
+          <li>You are responsible for the content you generate and publish.</li>
+        </ul>
+
+        <h2>6. Contact</h2>
+        <p>
+          Questions or problem reports:
+          <a href="https://github.com/hernataramadhan79-bit/MooScript/issues" rel="noopener noreferrer"
+            >github.com/hernataramadhan79-bit/MooScript/issues</a
+          >
+        </p>
+      </div>
     </main>
+    <script>
+      // Same rule as the studio: the saved choice wins; otherwise Indonesian for Indonesia, English elsewhere.
+      (function () {
+        var KEY = 'mooscript_locale';
+        var zones = ['Asia/Jakarta', 'Asia/Pontianak', 'Asia/Makassar', 'Asia/Jayapura', 'Asia/Ujung_Pandang'];
+        function saved() {
+          try {
+            var v = localStorage.getItem(KEY);
+            return v === 'id' || v === 'en' ? v : null;
+          } catch (e) {
+            return null;
+          }
+        }
+        function detect() {
+          try {
+            if (zones.indexOf(Intl.DateTimeFormat().resolvedOptions().timeZone) !== -1) return 'id';
+          } catch (e) {}
+          var l = String((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase();
+          return /^(id|in)(-|$)/.test(l) ? 'id' : 'en';
+        }
+        function show(lang) {
+          document.documentElement.lang = lang;
+          document.title = lang === 'en' ? 'Privacy Policy & Terms | MooScript Studio' : 'Kebijakan Privasi & Ketentuan | MooScript Studio';
+          var blocks = document.querySelectorAll('[data-lang]');
+          for (var i = 0; i < blocks.length; i++) blocks[i].hidden = blocks[i].getAttribute('data-lang') !== lang;
+          var buttons = document.querySelectorAll('[data-set-lang]');
+          for (var j = 0; j < buttons.length; j++) {
+            buttons[j].setAttribute('aria-pressed', buttons[j].getAttribute('data-set-lang') === lang ? 'true' : 'false');
+          }
+        }
+        document.addEventListener('click', function (e) {
+          var b = e.target && e.target.closest && e.target.closest('[data-set-lang]');
+          if (!b) return;
+          var lang = b.getAttribute('data-set-lang');
+          try {
+            localStorage.setItem(KEY, lang);
+          } catch (err) {}
+          show(lang);
+        });
+        show(saved() || detect());
+      })();
+    </script>
   </body>
 </html>

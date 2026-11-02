@@ -19,6 +19,9 @@ import type { LLMProvider, PersonaSkill } from '../types';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { isFromModalDialog } from '../utils/hooks';
 import { triggerFileDownload } from '../utils/fileUtils';
+import { t } from '../i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { InstallAppButton } from './InstallApp';
 
 interface ProviderModelSelectorProps {
   provider: LLMProvider;
@@ -48,16 +51,16 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
     <div className="pt-2.5 mt-2 space-y-2 border-t border-white/[0.06]">
       <div className="flex items-center justify-between gap-2 text-[10px]">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-zinc-400 font-medium shrink-0">Model Aktif:</span>
+          <span className="text-zinc-400 font-medium shrink-0">{t('Model Aktif:')}</span>
           <span
             className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/25 truncate max-w-[160px] sm:max-w-[220px]"
-            title={`Model aktif: ${currentModel}`}
+            title={t('Model aktif: {0}', currentModel)}
           >
             {currentModel}
           </span>
           {!isKnown && currentModel && (
             <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              Custom
+              {t('Custom')}
             </span>
           )}
         </div>
@@ -66,7 +69,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           type="button"
           disabled={isScanning || !apiKey.trim()}
           onClick={onScan}
-          title={apiKey.trim() ? 'Pindai model aktif langsung dari API provider' : 'Masukkan API Key terlebih dahulu'}
+          title={apiKey.trim() ? t('Pindai model aktif langsung dari API provider') : t('Masukkan API Key terlebih dahulu')}
           className="text-[10px] font-mono text-zinc-300 hover:text-primary flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors disabled:opacity-30 shrink-0"
         >
           <span className={`material-symbols-outlined text-[12px] ${isScanning ? 'animate-spin' : ''}`}>
@@ -74,10 +77,10 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
           </span>
           <span>
             {isScanning
-              ? 'Memindai...'
+              ? t('Memindai...')
               : models.length > 0
-                ? `Pindai API (${models.length})`
-                : 'Pindai API'}
+                ? t('Pindai API ({0})', models.length)
+                : t('Pindai API')}
           </span>
         </button>
       </div>
@@ -91,7 +94,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
             className="w-full bg-black/70 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-zinc-200 border border-white/[0.1] focus:outline-none focus:border-primary/50 cursor-pointer appearance-none pr-7"
           >
             {!isKnown && currentModel && (
-              <option value={currentModel}>Custom: {currentModel}</option>
+              <option value={currentModel}>{t('Custom:')} {currentModel}</option>
             )}
             {models.map((m) => (
               <option key={m.id} value={m.id}>
@@ -136,9 +139,9 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
               ? 'bg-white/[0.12] text-zinc-200 border-white/[0.25]'
               : 'bg-white/[0.03] text-zinc-400 border-white/[0.07] hover:text-zinc-200'
           }`}
-          title="Ketik manual model ID"
+          title={t('Ketik manual model ID')}
         >
-          {showCustom ? '✕ Tutup' : '+ Model Kustom'}
+          {showCustom ? t('✕ Tutup') : t('+ Model Kustom')}
         </button>
       </div>
 
@@ -147,7 +150,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
         <div className="flex items-center gap-1.5 pt-1 animate-fadeIn">
           <input
             type="text"
-            placeholder="Ketik ID model (misal: gemini-2.5-flash)..."
+            placeholder={t('Ketik ID model (misal: gemini-2.5-flash)...')}
             value={customVal}
             onChange={(e) => setCustomVal(e.target.value)}
             onKeyDown={(e) => {
@@ -169,7 +172,7 @@ const ProviderModelSelector: React.FC<ProviderModelSelectorProps> = ({
             }}
             className="px-2.5 py-1 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-mono font-bold border border-primary/40 disabled:opacity-40"
           >
-            Pakai
+            {t('Pakai')}
           </button>
         </div>
       )}
@@ -243,11 +246,11 @@ export const SettingsDrawer: React.FC = () => {
       await downloadLocalModel(voice.id, (p) => {
         setDownloadProgressMap((prev) => ({ ...prev, [voice.id]: p.percent }));
       });
-      addToast(`Model suara "${voice.name}" berhasil diunduh dan siap digunakan offline!`, 'success');
+      addToast(t('Model suara "{0}" berhasil diunduh dan siap digunakan offline!', voice.name), 'success');
       await refreshModelStatuses();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal mengunduh model: ${msg}`, 'error');
+      addToast(t('Gagal mengunduh model: {0}', msg), 'error');
     } finally {
       setDownloadingVoiceId(null);
     }
@@ -256,11 +259,11 @@ export const SettingsDrawer: React.FC = () => {
   const handleDeleteVoice = async (voice: LocalVoice) => {
     try {
       await purgeLocalModel(voice.id);
-      addToast(`Model suara "${voice.name}" dihapus dari cache.`, 'info');
+      addToast(t('Model suara "{0}" dihapus dari cache.', voice.name), 'info');
       await refreshModelStatuses();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal menghapus model: ${msg}`, 'error');
+      addToast(t('Gagal menghapus model: {0}', msg), 'error');
     }
   };
 
@@ -336,7 +339,7 @@ export const SettingsDrawer: React.FC = () => {
   const handleTestKey = async (provider: LLMProvider | 'elevenlabs') => {
     const key = settings.apiKeys[provider] || '';
     if (!key.trim()) {
-      addToast(`Masukkan API Key ${provider.toUpperCase()} sebelum menguji.`, 'warning');
+      addToast(t('Masukkan API Key {0} sebelum menguji.', provider.toUpperCase()), 'warning');
       return;
     }
     setTestingKey((prev) => ({ ...prev, [provider]: true }));
@@ -352,17 +355,17 @@ export const SettingsDrawer: React.FC = () => {
   const handleScanModels = async (provider: LLMProvider) => {
     const key = settings.apiKeys[provider] || '';
     if (!key.trim()) {
-      addToast(`Masukkan API Key ${provider.toUpperCase()} terlebih dahulu.`, 'warning');
+      addToast(t('Masukkan API Key {0} terlebih dahulu.', provider.toUpperCase()), 'warning');
       return;
     }
     setScanningModels((prev) => ({ ...prev, [provider]: true }));
     try {
       const models = await fetchAvailableModels(provider, key);
       setProviderModels((prev) => ({ ...prev, [provider]: models }));
-      addToast(`${models.length} model aktif terdeteksi dari ${provider.toUpperCase()}!`, 'success');
+      addToast(t('{0} model aktif terdeteksi dari {1}!', models.length, provider.toUpperCase()), 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal memindai model: ${msg}`, 'error');
+      addToast(t('Gagal memindai model: {0}', msg), 'error');
     } finally {
       setScanningModels((prev) => ({ ...prev, [provider]: false }));
     }
@@ -372,11 +375,11 @@ export const SettingsDrawer: React.FC = () => {
     const result = await requestPersistentStorage();
     setPersistenceStatus(result);
     if (result.persisted) {
-      addToast('Proteksi penyimpanan aktif: data proyek tidak akan dihapus otomatis oleh browser.', 'success');
+      addToast(t('Proteksi penyimpanan aktif: data proyek tidak akan dihapus otomatis oleh browser.'), 'success');
     } else if (!result.supported) {
-      addToast('Browser ini tidak mendukung proteksi penyimpanan.', 'warning');
+      addToast(t('Browser ini tidak mendukung proteksi penyimpanan.'), 'warning');
     } else {
-      addToast('Browser menolak permintaan proteksi penyimpanan.', 'warning');
+      addToast(t('Browser menolak permintaan proteksi penyimpanan.'), 'warning');
     }
   };
 
@@ -386,7 +389,7 @@ export const SettingsDrawer: React.FC = () => {
 
   const handleSave = () => {
     setSaveSuccess(true);
-    addToast('Pengaturan berhasil disimpan!', 'success');
+    addToast(t('Pengaturan berhasil disimpan!'), 'success');
     setTimeout(() => {
       setSaveSuccess(false);
       setSettingsOpen(false);
@@ -413,10 +416,10 @@ export const SettingsDrawer: React.FC = () => {
         const text = evt.target?.result as string;
         await importSkillFromJson(text);
         await refreshSkills();
-        addToast('Persona kustom berhasil diimpor!', 'success');
+        addToast(t('Persona kustom berhasil diimpor!'), 'success');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Gagal mengimpor persona: ${msg}`, 'error');
+        addToast(t('Gagal mengimpor persona: {0}', msg), 'error');
       }
     };
     reader.readAsText(file);
@@ -424,7 +427,7 @@ export const SettingsDrawer: React.FC = () => {
 
   const handleCreateSkill = async () => {
     if (!newSkillName.trim() || !newSkillPrompt.trim()) {
-      addToast('Nama persona dan instruksi system prompt wajib diisi.', 'warning');
+      addToast(t('Nama persona dan instruksi system prompt wajib diisi.'), 'warning');
       return;
     }
     await addCustomSkill({
@@ -434,7 +437,7 @@ export const SettingsDrawer: React.FC = () => {
       systemPrompt: newSkillPrompt.trim()
     });
     await refreshSkills();
-    addToast('Persona kustom berhasil dibuat!', 'success');
+    addToast(t('Persona kustom berhasil dibuat!'), 'success');
     setShowAddSkillModal(false);
     setNewSkillName('');
     setNewSkillDesc('');
@@ -453,18 +456,18 @@ export const SettingsDrawer: React.FC = () => {
       <div className="flex-1" onClick={() => setSettingsOpen(false)} />
 
       {/* Drawer Container */}
-      <div role="dialog" aria-modal="true" aria-label="Pengaturan Studio" className="w-full max-w-lg bg-[#0e0e12] border-l border-white/[0.08] shadow-2xl flex flex-col h-full overflow-hidden animate-slideLeft pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div role="dialog" aria-modal="true" aria-label={t('Pengaturan Studio')} className="w-full max-w-lg bg-[#0e0e12] border-l border-white/[0.08] shadow-2xl flex flex-col h-full overflow-hidden animate-slideLeft pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* Drawer Header */}
         <div className="h-11 sm:h-14 px-3.5 sm:px-5 border-b border-white/[0.08] flex items-center justify-between shrink-0 bg-white/[0.02]">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[18px] sm:text-[20px]">tune</span>
-            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">Pengaturan Studio</h2>
+            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">{t('Pengaturan Studio')}</h2>
           </div>
 
           <button
             type="button"
             onClick={() => setSettingsOpen(false)}
-            aria-label="Tutup pengaturan"
+            aria-label={t('Tutup pengaturan')}
             className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
           >
             <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
@@ -473,23 +476,33 @@ export const SettingsDrawer: React.FC = () => {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 text-xs">
+          {/* Bahasa & aplikasi */}
+          <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3 shadow-md">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[18px]">translate</span>
+              <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">{t('Bahasa & Aplikasi')}</h3>
+            </div>
+            <LanguageSwitcher variant="full" className="w-full" />
+            <InstallAppButton variant="full" className="w-full" />
+          </section>
+
           {/* KONTAINER 1: KONFIGURASI UTAMA AI */}
           <section className="p-3.5 sm:p-4 rounded-2xl bg-[#14141b] border border-white/[0.09] space-y-3.5 shadow-md">
             <div className="flex flex-col gap-0.5 pb-2 border-b border-white/[0.07]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[18px]">neurology</span>
                 <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                  1. Konfigurasi Utama AI
+                  {t('1. Konfigurasi Utama AI')}
                 </h3>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Pilih penyedia AI utama yang digunakan untuk menyusun naskah & kode Mograph.
+                {t('Pilih penyedia AI utama yang digunakan untuk menyusun naskah & kode Mograph.')}
               </p>
             </div>
 
             {/* Primary AI Provider */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-zinc-300 block">Penyedia AI Utama</span>
+              <span className="text-[11px] font-semibold text-zinc-300 block">{t('Penyedia AI Utama')}</span>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                 {(['gemini', 'openai', 'groq', 'anthropic', 'openrouter'] as LLMProvider[]).map((prov) => {
                   const isSelected = settings.selectedLLMProvider === prov;
@@ -523,7 +536,7 @@ export const SettingsDrawer: React.FC = () => {
                         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                           hasKey ? 'bg-emerald-400' : 'bg-zinc-600'
                         }`}
-                        title={hasKey ? 'API Key sudah diisi' : 'API Key belum diisi'}
+                        title={hasKey ? t('API Key sudah diisi') : t('API Key belum diisi')}
                       />
                     </button>
                   );
@@ -534,9 +547,9 @@ export const SettingsDrawer: React.FC = () => {
             {/* Storage Mode */}
             <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-zinc-300">Mode Penyimpanan Kunci API</span>
+                <span className="text-[11px] font-semibold text-zinc-300">{t('Mode Penyimpanan Kunci API')}</span>
                 <span className="text-[10px] font-mono text-zinc-400">
-                  {settings.apiKeyStorage === 'session' ? 'Sementara (RAM)' : 'Lokal Browser'}
+                  {settings.apiKeyStorage === 'session' ? t('Sementara (RAM)') : t('Lokal Browser')}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -549,7 +562,7 @@ export const SettingsDrawer: React.FC = () => {
                       : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-zinc-200'
                   }`}
                 >
-                  Permanen (Tersimpan)
+                  {t('Permanen (Tersimpan)')}
                 </button>
                 <button
                   type="button"
@@ -560,7 +573,7 @@ export const SettingsDrawer: React.FC = () => {
                       : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-zinc-200'
                   }`}
                 >
-                  Sesi Ini Saja
+                  {t('Sesi Ini Saja')}
                 </button>
               </div>
             </div>
@@ -570,10 +583,10 @@ export const SettingsDrawer: React.FC = () => {
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[15px] text-primary">data_thresholding</span>
-                  Batas Panjang Respons (Max Tokens)
+                  {t('Batas Panjang Respons (Max Tokens)')}
                 </span>
                 <span className="font-mono font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[11px]">
-                  {settings.maxOutputTokens || 2048} tok
+                  {settings.maxOutputTokens || 2048} {t('tok')}
                 </span>
               </div>
               <input
@@ -613,11 +626,11 @@ export const SettingsDrawer: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[18px]">key</span>
                 <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                  2. Kunci API & Model per Provider
+                  {t('2. Kunci API & Model per Provider')}
                 </h3>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Ketuk salah satu kartu penyedia AI di bawah untuk memasukkan API Key dan memilih model.
+                {t('Ketuk salah satu kartu penyedia AI di bawah untuk memasukkan API Key dan memilih model.')}
               </p>
             </div>
 
@@ -625,62 +638,62 @@ export const SettingsDrawer: React.FC = () => {
               {([
                 {
                   id: 'gemini' as LLMProvider,
-                  title: 'Google Gemini',
-                  subtitle: 'Cepat & Multimodal',
-                  placeholder: 'AIzaSy...',
+                  title: t('Google Gemini'),
+                  subtitle: t('Cepat & Multimodal'),
+                  placeholder: t('AIzaSy...'),
                   url: 'https://aistudio.google.com/app/apikey',
                   currentModel: settings.geminiModel,
                   onSelectModel: (m: string) => {
                     updateSettings({ geminiModel: m });
-                    addToast(`Model Gemini diubah ke ${m}`, 'info');
+                    addToast(t('Model Gemini diubah ke {0}', m), 'info');
                   }
                 },
                 {
                   id: 'openai' as LLMProvider,
-                  title: 'OpenAI (GPT & TTS)',
-                  subtitle: 'GPT-4o & Suara OpenAI',
-                  placeholder: 'sk-proj-...',
+                  title: t('OpenAI (GPT & TTS)'),
+                  subtitle: t('GPT-4o & Suara OpenAI'),
+                  placeholder: t('sk-proj-...'),
                   url: 'https://platform.openai.com/api-keys',
                   currentModel: settings.openaiModel,
                   onSelectModel: (m: string) => {
                     updateSettings({ openaiModel: m });
-                    addToast(`Model OpenAI diubah ke ${m}`, 'info');
+                    addToast(t('Model OpenAI diubah ke {0}', m), 'info');
                   }
                 },
                 {
                   id: 'groq' as LLMProvider,
-                  title: 'Groq Cloud',
-                  subtitle: 'Inferensi LPU Ultra-Cepat',
-                  placeholder: 'gsk_...',
+                  title: t('Groq Cloud'),
+                  subtitle: t('Inferensi LPU Ultra-Cepat'),
+                  placeholder: t('gsk_...'),
                   url: 'https://console.groq.com/keys',
                   currentModel: settings.groqModel,
                   onSelectModel: (m: string) => {
                     updateSettings({ groqModel: m });
-                    addToast(`Model Groq diubah ke ${m}`, 'info');
+                    addToast(t('Model Groq diubah ke {0}', m), 'info');
                   }
                 },
                 {
                   id: 'anthropic' as LLMProvider,
-                  title: 'Anthropic Claude',
-                  subtitle: 'Claude Sonnet & Haiku',
-                  placeholder: 'sk-ant-api03-...',
+                  title: t('Anthropic Claude'),
+                  subtitle: t('Claude Sonnet & Haiku'),
+                  placeholder: t('sk-ant-api03-...'),
                   url: 'https://console.anthropic.com/settings/keys',
                   currentModel: settings.anthropicModel || 'claude-3-7-sonnet-20250219',
                   onSelectModel: (m: string) => {
                     updateSettings({ anthropicModel: m });
-                    addToast(`Model Anthropic diubah ke ${m}`, 'info');
+                    addToast(t('Model Anthropic diubah ke {0}', m), 'info');
                   }
                 },
                 {
                   id: 'openrouter' as LLMProvider,
-                  title: 'OpenRouter',
-                  subtitle: 'Akses Multi-Model Terpadu',
-                  placeholder: 'sk-or-v1-...',
+                  title: t('OpenRouter'),
+                  subtitle: t('Akses Multi-Model Terpadu'),
+                  placeholder: t('sk-or-v1-...'),
                   url: 'https://openrouter.ai/keys',
                   currentModel: settings.openrouterModel || 'anthropic/claude-3.7-sonnet',
                   onSelectModel: (m: string) => {
                     updateSettings({ openrouterModel: m });
-                    addToast(`Model OpenRouter diubah ke ${m}`, 'info');
+                    addToast(t('Model OpenRouter diubah ke {0}', m), 'info');
                   }
                 }
               ]).map((p) => {
@@ -711,7 +724,7 @@ export const SettingsDrawer: React.FC = () => {
                         <span className="text-xs font-bold text-white">{p.title}</span>
                         {isPrimary && (
                           <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/40">
-                            Utama
+                            {t('Utama')}
                           </span>
                         )}
                         <span
@@ -721,7 +734,7 @@ export const SettingsDrawer: React.FC = () => {
                               : 'bg-zinc-500/10 text-zinc-400 border-white/[0.06]'
                           }`}
                         >
-                          {hasKey ? '✓ Kunci Terisi' : 'Belum Diatur'}
+                          {hasKey ? t('✓ Kunci Terisi') : t('Belum Diatur')}
                         </span>
                       </div>
 
@@ -746,7 +759,7 @@ export const SettingsDrawer: React.FC = () => {
                             rel="noreferrer"
                             className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-0.5"
                           >
-                            <span>Dapatkan Kunci API</span>
+                            <span>{t('Dapatkan Kunci API')}</span>
                             <span>↗</span>
                           </a>
                         </div>
@@ -768,7 +781,7 @@ export const SettingsDrawer: React.FC = () => {
                               type="button"
                               onClick={() => toggleVisibility(p.id)}
                               className="p-0.5 text-zinc-400 hover:text-white shrink-0 ml-1"
-                              title={visibleKeys[p.id] ? 'Sembunyikan kunci' : 'Tampilkan kunci'}
+                              title={visibleKeys[p.id] ? t('Sembunyikan kunci') : t('Tampilkan kunci')}
                             >
                               <span className="material-symbols-outlined text-[16px]">
                                 {visibleKeys[p.id] ? 'visibility_off' : 'visibility'}
@@ -785,7 +798,7 @@ export const SettingsDrawer: React.FC = () => {
                             <span className={`material-symbols-outlined text-[13px] ${testingKey[p.id] ? 'animate-spin' : ''}`}>
                               {testingKey[p.id] ? 'progress_activity' : 'network_check'}
                             </span>
-                            <span>{testingKey[p.id] ? 'Uji...' : 'Test Key'}</span>
+                            <span>{testingKey[p.id] ? t('Uji...') : t('Test Key')}</span>
                           </button>
                         </div>
 
@@ -797,7 +810,7 @@ export const SettingsDrawer: React.FC = () => {
                                 : 'text-red-400 border-red-500/30'
                             }`}
                           >
-                            {testRes.success ? '✓ Kunci API Valid & Aktif' : '✗ ' + testRes.message}
+                            {testRes.success ? t('✓ Kunci API Valid & Aktif') : '✗ ' + testRes.message}
                           </div>
                         )}
 
@@ -826,7 +839,7 @@ export const SettingsDrawer: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[18px]">graphic_eq</span>
                   <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                    3. Kunci API Suara Cloud (ElevenLabs)
+                    {t('3. Kunci API Suara Cloud (ElevenLabs)')}
                   </h3>
                 </div>
                 <a
@@ -835,11 +848,11 @@ export const SettingsDrawer: React.FC = () => {
                   rel="noreferrer"
                   className="text-[10px] font-semibold text-primary hover:underline"
                 >
-                  Dapatkan Kunci ↗
+                  {t('Dapatkan Kunci ↗')}
                 </a>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Opsional — Digunakan khusus jika Anda memilih penyedia suara ElevenLabs di Tab Suara.
+                {t('Opsional — Digunakan khusus jika Anda memilih penyedia suara ElevenLabs di Tab Suara.')}
               </p>
             </div>
 
@@ -849,7 +862,7 @@ export const SettingsDrawer: React.FC = () => {
                   type={visibleKeys.elevenlabs ? 'text' : 'password'}
                   value={settings.apiKeys.elevenlabs || ''}
                   onChange={(e) => updateApiKey('elevenlabs', e.target.value)}
-                  placeholder="xi-api-key..."
+                  placeholder={t('xi-api-key...')}
                   className="bg-transparent font-mono text-xs text-zinc-100 w-full focus:outline-none"
                 />
                 <button
@@ -872,7 +885,7 @@ export const SettingsDrawer: React.FC = () => {
                 <span className={`material-symbols-outlined text-[13px] ${testingKey.elevenlabs ? 'animate-spin' : ''}`}>
                   {testingKey.elevenlabs ? 'progress_activity' : 'network_check'}
                 </span>
-                <span>{testingKey.elevenlabs ? 'Uji...' : 'Test Key'}</span>
+                <span>{testingKey.elevenlabs ? t('Uji...') : t('Test Key')}</span>
               </button>
             </div>
 
@@ -884,7 +897,7 @@ export const SettingsDrawer: React.FC = () => {
                     : 'text-red-400 border-red-500/30'
                 }`}
               >
-                {testResults.elevenlabs.success ? '✓ Kunci ElevenLabs Valid' : '✗ ' + testResults.elevenlabs.message}
+                {testResults.elevenlabs.success ? t('✓ Kunci ElevenLabs Valid') : '✗ ' + testResults.elevenlabs.message}
               </div>
             )}
           </section>
@@ -896,15 +909,15 @@ export const SettingsDrawer: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[18px]">record_voice_over</span>
                   <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                    4. Model Suara Lokal (Offline TTS)
+                    {t('4. Model Suara Lokal (Offline TTS)')}
                   </h3>
                 </div>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-300 border border-white/[0.08]">
-                  Zero-Server
+                  {t('Zero-Server')}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Unduh model suara sekali ke cache browser untuk membuat voiceover 100% lokal tanpa kuota API.
+                {t('Unduh model suara sekali ke cache browser untuk membuat voiceover 100% lokal tanpa kuota API.')}
               </p>
             </div>
 
@@ -922,22 +935,22 @@ export const SettingsDrawer: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-white">{v.name}</span>
+                          <span className="text-xs font-bold text-white">{t(v.name)}</span>
                           <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.08]">
-                            {v.languageLabel}
+                            {t(v.languageLabel)}
                           </span>
                           {isCached ? (
                             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                               <span className="material-symbols-outlined text-[11px]">check_circle</span>
-                              Siap Offline
+                              {t('Siap Offline')}
                             </span>
                           ) : (
                             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
-                              Belum Diunduh
+                              {t('Belum Diunduh')}
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-zinc-400 mt-1">{v.description}</p>
+                        <p className="text-[10px] text-zinc-400 mt-1">{t(v.description)}</p>
                       </div>
                       <span className="text-[10px] font-mono text-zinc-400 shrink-0">~{v.sizeMb} MB</span>
                     </div>
@@ -945,7 +958,7 @@ export const SettingsDrawer: React.FC = () => {
                     {isDownloading ? (
                       <div className="flex flex-col gap-1 pt-1">
                         <div className="flex items-center justify-between text-[10px] font-mono text-primary">
-                          <span>Mengunduh bobot ONNX...</span>
+                          <span>{t('Mengunduh bobot ONNX...')}</span>
                           <span>{progress}%</span>
                         </div>
                         <div className="w-full bg-white/[0.06] rounded-full h-1.5 overflow-hidden">
@@ -964,7 +977,7 @@ export const SettingsDrawer: React.FC = () => {
                             className="text-[11px] text-zinc-400 hover:text-red-400 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] transition-colors"
                           >
                             <span className="material-symbols-outlined text-[13px]">delete</span>
-                            <span>Hapus dari Cache</span>
+                            <span>{t('Hapus dari Cache')}</span>
                           </button>
                         ) : (
                           <button
@@ -973,7 +986,7 @@ export const SettingsDrawer: React.FC = () => {
                             className="text-[11px] font-semibold text-black bg-primary hover:bg-lime-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95"
                           >
                             <span className="material-symbols-outlined text-[15px]">download</span>
-                            <span>Unduh Model ({v.sizeMb} MB)</span>
+                            <span>{t('Unduh Model (')}{v.sizeMb} MB)</span>
                           </button>
                         )}
                       </div>
@@ -991,13 +1004,13 @@ export const SettingsDrawer: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
                   <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                    5. Gaya Penulisan Naskah (Persona)
+                    {t('5. Gaya Penulisan Naskah (Persona)')}
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-[10px] font-mono px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:text-white cursor-pointer flex items-center gap-1 transition-colors">
                     <span className="material-symbols-outlined text-[13px]">file_upload</span>
-                    <span>Impor</span>
+                    <span>{t('Impor')}</span>
                     <input accept=".json" className="hidden" type="file" onChange={handleImportSkill} />
                   </label>
                   <button
@@ -1006,12 +1019,12 @@ export const SettingsDrawer: React.FC = () => {
                     className="text-[10px] font-mono px-2 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 flex items-center gap-1 font-semibold transition-colors"
                   >
                     <span className="material-symbols-outlined text-[13px]">add</span>
-                    <span>Buat Baru</span>
+                    <span>{t('Buat Baru')}</span>
                   </button>
                 </div>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Preset instruksi karakter sutradara AI saat menghasilkan storyboard naskah.
+                {t('Preset instruksi karakter sutradara AI saat menghasilkan storyboard naskah.')}
               </p>
             </div>
 
@@ -1023,7 +1036,7 @@ export const SettingsDrawer: React.FC = () => {
                     key={s.id}
                     onClick={() => {
                       setActiveSkillId(s.id);
-                      addToast(`Persona aktif: ${s.name}`, 'info');
+                      addToast(t('Persona aktif: {0}', s.name), 'info');
                     }}
                     className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
                       isActive
@@ -1041,22 +1054,22 @@ export const SettingsDrawer: React.FC = () => {
                         <span className="font-bold text-white text-xs truncate">{s.name}</span>
                         {isActive && (
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary text-black font-extrabold uppercase">
-                            Aktif
+                            {t('Aktif')}
                           </span>
                         )}
                         {s.isBuiltin && (
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400">
-                            Bawaan
+                            {t('Bawaan')}
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-zinc-400 truncate block mt-0.5">{s.description}</span>
+                      <span className="text-[10px] text-zinc-400 truncate block mt-0.5">{t(s.description)}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={() => handleExportSkill(s)}
-                        title="Ekspor Skill JSON"
+                        title={t('Ekspor Skill JSON')}
                         className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                       >
                         <span className="material-symbols-outlined text-[15px]">file_download</span>
@@ -1065,7 +1078,7 @@ export const SettingsDrawer: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleDeleteSkill(s.id)}
-                          title="Hapus Skill"
+                          title={t('Hapus Skill')}
                           className="w-7 h-7 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                         >
                           <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -1084,32 +1097,32 @@ export const SettingsDrawer: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[18px]">storage</span>
                 <h3 className="text-xs sm:text-[13px] font-bold text-white tracking-wide">
-                  6. Penyimpanan, Cache & Perangkat
+                  {t('6. Penyimpanan, Cache & Perangkat')}
                 </h3>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Kelola memori cache lokal browser dan status kemampuan perangkat keras Anda.
+                {t('Kelola memori cache lokal browser dan status kemampuan perangkat keras Anda.')}
               </p>
             </div>
 
             <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400">Ukuran Cache Audio TTS:</span>
+                <span className="text-zinc-400">{t('Ukuran Cache Audio TTS:')}</span>
                 <span className="font-mono text-zinc-200 font-semibold">{cacheMb} MB</span>
               </div>
 
               {storageEstimate && storageEstimate.quota > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Penyimpanan Browser Terpakai:</span>
+                  <span className="text-zinc-400">{t('Penyimpanan Browser Terpakai:')}</span>
                   <span className="font-mono text-zinc-200 font-semibold">
-                    {(storageEstimate.usage / (1024 * 1024)).toFixed(0)} MB dari{' '}
+                    {(storageEstimate.usage / (1024 * 1024)).toFixed(0)} {t('MB dari')}{' '}
                     {(storageEstimate.quota / (1024 * 1024 * 1024)).toFixed(1)} GB
                   </span>
                 </div>
               )}
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400">Ukuran Model Suara Lokal:</span>
+                <span className="text-zinc-400">{t('Ukuran Model Suara Lokal:')}</span>
                 <span className="font-mono text-zinc-200 font-semibold">
                   {(localModelsSizeBytes / (1024 * 1024)).toFixed(1)} MB
                 </span>
@@ -1120,12 +1133,12 @@ export const SettingsDrawer: React.FC = () => {
                   type="button"
                   onClick={async () => {
                     await clearCache();
-                    addToast('Cache suara berhasil dibersihkan!', 'info');
+                    addToast(t('Cache suara berhasil dibersihkan!'), 'info');
                   }}
                   className="py-2 px-3 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-zinc-200 rounded-xl hover:bg-white/[0.1] active:scale-95 transition-all flex items-center justify-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
-                  <span>Bersihkan Cache Audio</span>
+                  <span>{t('Bersihkan Cache Audio')}</span>
                 </button>
 
                 <button
@@ -1134,15 +1147,15 @@ export const SettingsDrawer: React.FC = () => {
                   className="py-2 px-3 text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-red-300 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[15px]">delete</span>
-                  <span>Hapus Model Suara Lokal</span>
+                  <span>{t('Hapus Model Suara Lokal')}</span>
                 </button>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-xs">
-                <span className="text-zinc-400 text-[11px]">Proteksi Penyimpanan Browser:</span>
+                <span className="text-zinc-400 text-[11px]">{t('Proteksi Penyimpanan Browser:')}</span>
                 {persistenceStatus?.persisted ? (
                   <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-md">
-                    ✓ Aktif
+                    {t('✓ Aktif')}
                   </span>
                 ) : (
                   <button
@@ -1150,7 +1163,7 @@ export const SettingsDrawer: React.FC = () => {
                     onClick={handleRequestPersistence}
                     className="text-[10px] font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2.5 py-0.5 rounded-md transition-colors"
                   >
-                    Aktifkan Proteksi
+                    {t('Aktifkan Proteksi')}
                   </button>
                 )}
               </div>
@@ -1159,21 +1172,21 @@ export const SettingsDrawer: React.FC = () => {
             {/* Hardware Stats */}
             <div className="grid grid-cols-3 gap-2 text-center pt-1">
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Akselerasi GPU</span>
+                <span className="text-[10px] text-zinc-400">{t('Akselerasi GPU')}</span>
                 <span className={`text-xs font-mono font-bold mt-0.5 ${deviceCaps?.hasWebGpu ? 'text-primary' : 'text-zinc-200'}`}>
-                  {deviceCaps?.hasWebGpu ? 'WebGPU Aktif' : 'Standar'}
+                  {deviceCaps?.hasWebGpu ? t('WebGPU Aktif') : t('Standar')}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Memori Sistem</span>
+                <span className="text-[10px] text-zinc-400">{t('Memori Sistem')}</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
-                  {deviceCaps?.deviceMemoryGb ? `~${deviceCaps.deviceMemoryGb} GB` : 'Standar'}
+                  {deviceCaps?.deviceMemoryGb ? t('~{0} GB', deviceCaps.deviceMemoryGb) : t('Standar')}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center">
-                <span className="text-[10px] text-zinc-400">Inti CPU</span>
+                <span className="text-[10px] text-zinc-400">{t('Inti CPU')}</span>
                 <span className="text-xs font-mono font-bold text-zinc-200 mt-0.5">
-                  {deviceCaps?.hardwareConcurrency || 4} Core
+                  {deviceCaps?.hardwareConcurrency || 4} {t('Core')}
                 </span>
               </div>
             </div>
@@ -1188,7 +1201,7 @@ export const SettingsDrawer: React.FC = () => {
             className="w-full h-10 rounded-xl bg-primary text-black font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-lime-300 active:scale-[0.99] transition-all shadow-md shadow-primary/20"
           >
             <span className="material-symbols-outlined text-[17px]">{saveSuccess ? 'done_all' : 'check'}</span>
-            <span>{saveSuccess ? 'Tersimpan!' : 'Simpan Pengaturan'}</span>
+            <span>{saveSuccess ? t('Tersimpan!') : t('Simpan Pengaturan')}</span>
           </button>
         </div>
       </div>
@@ -1206,13 +1219,13 @@ export const SettingsDrawer: React.FC = () => {
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[18px]">psychology</span>
-                <h3 className="text-sm font-bold text-white">Buat Persona Sutradara Kustom</h3>
+                <h3 className="text-sm font-bold text-white">{t('Buat Persona Sutradara Kustom')}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddSkillModal(false)}
                 className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors"
-                title="Tutup"
+                title={t('Tutup')}
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -1220,10 +1233,10 @@ export const SettingsDrawer: React.FC = () => {
 
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Nama Persona</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">{t('Nama Persona')}</label>
                 <input
                   type="text"
-                  placeholder="misal: 🚀 SaaS Launch Hook"
+                  placeholder={t('misal: 🚀 SaaS Launch Hook')}
                   value={newSkillName}
                   onChange={(e) => setNewSkillName(e.target.value)}
                   className="w-full bg-black/60 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
@@ -1231,16 +1244,16 @@ export const SettingsDrawer: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-zinc-300 block mb-1.5">Ikon Persona</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1.5">{t('Ikon Persona')}</label>
                 <div className="flex flex-wrap gap-2 pt-0.5">
                   {[
-                    { id: 'sparkles', label: 'Kreatif' },
-                    { id: 'zap', label: 'Energetik' },
-                    { id: 'brain', label: 'Wawasan' },
-                    { id: 'flame', label: 'Viral' },
-                    { id: 'palette', label: 'Estetika' },
-                    { id: 'code', label: 'Teknikal' },
-                    { id: 'mascot', label: 'Karakter' }
+                    { id: 'sparkles', label: t('Kreatif') },
+                    { id: 'zap', label: t('Energetik') },
+                    { id: 'brain', label: t('Wawasan') },
+                    { id: 'flame', label: t('Viral') },
+                    { id: 'palette', label: t('Estetika') },
+                    { id: 'code', label: t('Teknikal') },
+                    { id: 'mascot', label: t('Karakter') }
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -1262,10 +1275,10 @@ export const SettingsDrawer: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Deskripsi Singkat</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">{t('Deskripsi Singkat')}</label>
                 <input
                   type="text"
-                  placeholder="misal: Format demo produk berkonversi tinggi"
+                  placeholder={t('misal: Format demo produk berkonversi tinggi')}
                   value={newSkillDesc}
                   onChange={(e) => setNewSkillDesc(e.target.value)}
                   className="w-full bg-black/60 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-colors"
@@ -1273,9 +1286,9 @@ export const SettingsDrawer: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-zinc-300 block mb-1">Instruksi System Prompt</label>
+                <label className="text-[11px] font-medium text-zinc-300 block mb-1">{t('Instruksi System Prompt')}</label>
                 <textarea
-                  placeholder="Arahkan sutradara terkait tone, cadence, struktur kalimat, vocabulary, dan ritme penceritaan..."
+                  placeholder={t('Arahkan sutradara terkait tone, cadence, struktur kalimat, vocabulary, dan ritme penceritaan...')}
                   value={newSkillPrompt}
                   onChange={(e) => setNewSkillPrompt(e.target.value)}
                   className="w-full h-24 bg-black/60 border border-white/[0.1] rounded-xl p-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary resize-none leading-relaxed transition-colors"
@@ -1289,14 +1302,14 @@ export const SettingsDrawer: React.FC = () => {
                 onClick={() => setShowAddSkillModal(false)}
                 className="px-3.5 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.04] transition-colors"
               >
-                Batal
+                {t('Batal')}
               </button>
               <button
                 type="button"
                 onClick={handleCreateSkill}
                 className="px-4 py-1.5 text-xs font-bold rounded-xl bg-primary text-black hover:bg-lime-300 shadow-md transition-colors"
               >
-                Simpan Persona
+                {t('Simpan Persona')}
               </button>
             </div>
           </div>
@@ -1310,12 +1323,12 @@ export const SettingsDrawer: React.FC = () => {
         onConfirm={async () => {
           await purgeAllLocalModels();
           await refreshModelStatuses();
-          addToast('Semua cache model suara lokal berhasil dihapus!', 'info');
+          addToast(t('Semua cache model suara lokal berhasil dihapus!'), 'info');
         }}
-        title="Hapus Cache Model Suara"
-        description="Apakah Anda yakin ingin menghapus semua cache model suara lokal dari browser? Model akan diunduh ulang saat dibutuhkan."
-        confirmLabel="Hapus Cache"
-        cancelLabel="Batal"
+        title={t('Hapus Cache Model Suara')}
+        description={t('Apakah Anda yakin ingin menghapus semua cache model suara lokal dari browser? Model akan diunduh ulang saat dibutuhkan.')}
+        confirmLabel={t('Hapus Cache')}
+        cancelLabel={t('Batal')}
         variant="danger"
         icon="delete_sweep"
       />
@@ -1329,13 +1342,13 @@ export const SettingsDrawer: React.FC = () => {
             await deleteSkill(skillToDelete);
             await refreshSkills();
             setSkillToDelete(null);
-            addToast('Persona kustom berhasil dihapus!', 'info');
+            addToast(t('Persona kustom berhasil dihapus!'), 'info');
           }
         }}
-        title="Hapus Custom Persona Skill"
-        description="Apakah Anda yakin ingin menghapus custom persona skill ini? Tindakan ini tidak dapat dibatalkan."
-        confirmLabel="Hapus Skill"
-        cancelLabel="Batal"
+        title={t('Hapus Custom Persona Skill')}
+        description={t('Apakah Anda yakin ingin menghapus custom persona skill ini? Tindakan ini tidak dapat dibatalkan.')}
+        confirmLabel={t('Hapus Skill')}
+        cancelLabel={t('Batal')}
         variant="danger"
         icon="delete"
       />

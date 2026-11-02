@@ -9,6 +9,7 @@ import { syncComposition } from '../../engine/composition/sync';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { DEFAULT_EXPORT_SETTINGS } from '../../types';
 import { MultiFormatExport } from './MultiFormatExport';
+import { t } from '../../i18n';
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -146,14 +147,14 @@ export const ExportPanel: React.FC = () => {
     if (isExporting || scenes.length === 0) return;
     await startExport({ format, fps, quality, watermark, hud, transparent: format !== 'gif' && Boolean(transparent) });
     if (useMooStore.getState().exportResult) {
-      addToast('Video selesai dirender. Tonton pratinjaunya lalu unduh.', 'success');
+      addToast(t('Video selesai dirender. Tonton pratinjaunya lalu unduh.'), 'success');
     }
   };
 
   const handleDownload = () => {
     if (!exportResult) return;
     triggerFileDownload(exportResult.objectUrl, resultFileName);
-    addToast(`Mengunduh ${resultFileName}...`, 'success');
+    addToast(t('Mengunduh {0}...', resultFileName), 'success');
   };
 
   const handleShare = async () => {
@@ -163,7 +164,7 @@ export const ExportPanel: React.FC = () => {
       await navigator.share({ files: [file], title: project.title });
     } catch (err) {
       if ((err as DOMException)?.name !== 'AbortError') {
-        addToast('Gagal membagikan video. Coba unduh saja.', 'error');
+        addToast(t('Gagal membagikan video. Coba unduh saja.'), 'error');
       }
     }
   };
@@ -183,7 +184,7 @@ export const ExportPanel: React.FC = () => {
     const url = URL.createObjectURL(blob);
     triggerFileDownload(url, `${safeFileName(project.title)}.html`);
     setTimeout(() => URL.revokeObjectURL(url), 15000);
-    addToast('HTML Standalone Mograph berhasil diunduh!', 'success');
+    addToast(t('HTML Standalone Mograph berhasil diunduh!'), 'success');
   };
 
   const isPortrait = project.height > project.width;
@@ -198,19 +199,19 @@ export const ExportPanel: React.FC = () => {
               <span aria-hidden="true" className="material-symbols-outlined text-[17px] text-accent">
                 check_circle
               </span>
-              Video siap
+              {t('Video siap')}
             </span>
             <span className="text-[11px] font-mono text-text-muted">
               {resultExt.toUpperCase()} · {formatBytes(exportResult.fileSizeBytes)} ·{' '}
               {formatDuration(exportResult.durationSeconds)}
-              {!exportResult.hasAudio && ' · tanpa suara'}
+              {!exportResult.hasAudio && t(' · tanpa suara')}
             </span>
           </div>
 
           {resultExt === 'gif' ? (
             <img
               src={exportResult.objectUrl}
-              alt="Pratinjau GIF"
+              alt={t('Pratinjau GIF')}
               className={`w-full rounded-xl bg-black border border-border object-contain ${isPortrait ? 'max-h-[360px]' : ''}`}
             />
           ) : (
@@ -244,7 +245,7 @@ export const ExportPanel: React.FC = () => {
               className={`${canShareFiles ? 'col-span-1' : ''} min-h-[44px] px-3 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-1.5 hover:bg-accent-hover active:scale-[0.98] transition-all`}
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">download</span>
-              Unduh
+              {t('Unduh')}
             </button>
             {canShareFiles && (
               <button
@@ -253,7 +254,7 @@ export const ExportPanel: React.FC = () => {
                 className="min-h-[44px] px-3 rounded-xl bg-surface-2 border border-border text-on-surface font-semibold text-[13px] flex items-center justify-center gap-1.5 hover:bg-surface-3 active:scale-[0.98] transition-all"
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">share</span>
-                Bagikan
+                {t('Bagikan')}
               </button>
             )}
             <button
@@ -262,7 +263,7 @@ export const ExportPanel: React.FC = () => {
               className="min-h-[44px] px-3 rounded-xl bg-surface-2 border border-border text-text-muted font-medium text-[13px] flex items-center justify-center gap-1.5 hover:text-rose-300 hover:border-rose-500/40 active:scale-[0.98] transition-all"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
-              Buang
+              {t('Buang')}
             </button>
           </div>
         </div>
@@ -270,26 +271,26 @@ export const ExportPanel: React.FC = () => {
 
       {/* Resolusi Video */}
       <div className="flex flex-col gap-2.5">
-        <SectionLabel>Resolusi</SectionLabel>
+        <SectionLabel>{t('Resolusi')}</SectionLabel>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => updateResolution('1080p')} className={optionClass(currentResolution === '1080p')}>
-            1080p (Full HD)
+            {t('1080p (Full HD)')}
           </button>
           <button type="button" onClick={() => updateResolution('720p')} className={optionClass(currentResolution === '720p')}>
-            720p (HD)
+            {t('720p (HD)')}
           </button>
         </div>
       </div>
 
       {/* Format Video Kontainer */}
       <div className="flex flex-col gap-2.5">
-        <SectionLabel>Format Video</SectionLabel>
+        <SectionLabel>{t('Format Video')}</SectionLabel>
         <div className="grid grid-cols-3 gap-2">
           <button type="button" onClick={() => updateExportSettings({ format: 'mp4' })} className={optionClass(format === 'mp4')}>
             MP4
           </button>
           <button type="button" onClick={() => updateExportSettings({ format: 'webm' })} className={optionClass(format === 'webm')}>
-            WebM
+            {t('WebM')}
           </button>
           <button type="button" onClick={() => updateExportSettings({ format: 'gif' })} className={optionClass(format === 'gif')}>
             GIF
@@ -297,8 +298,8 @@ export const ExportPanel: React.FC = () => {
         </div>
         <span className="text-[10px] text-text-muted">
           {format === 'gif'
-            ? 'GIF berputar terus tanpa suara, maks 480 px dan 12 fps supaya ukurannya wajar.'
-            : 'MP4 paling cocok untuk diunggah ke medsos.'}
+            ? t('GIF berputar terus tanpa suara, maks 480 px dan 12 fps supaya ukurannya wajar.')
+            : t('MP4 paling cocok untuk diunggah ke medsos.')}
         </span>
         {format !== 'gif' && (
           <label className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
@@ -309,9 +310,9 @@ export const ExportPanel: React.FC = () => {
               className="w-4 h-4 mt-0.5 rounded accent-accent cursor-pointer"
             />
             <span className="flex flex-col gap-0.5">
-              <span className="text-[12px] font-semibold text-on-surface">Latar transparan (WebM)</span>
+              <span className="text-[12px] font-semibold text-on-surface">{t('Latar transparan (WebM)')}</span>
               <span className="text-[10px] text-text-muted leading-snug">
-                Hanya grafik dan teks, tanpa latar shot, untuk ditumpuk di atas video lain di CapCut, Premiere atau DaVinci.
+                {t('Hanya grafik dan teks, tanpa latar shot, untuk ditumpuk di atas video lain di CapCut, Premiere atau DaVinci.')}
               </span>
             </span>
           </label>
@@ -320,28 +321,28 @@ export const ExportPanel: React.FC = () => {
 
       {/* Frame Rate */}
       <div className="flex flex-col gap-2.5">
-        <SectionLabel>Frame Rate</SectionLabel>
+        <SectionLabel>{t('Frame Rate')}</SectionLabel>
         <div className="grid grid-cols-3 gap-2">
           {EXPORT_FPS_CHOICES.map((value) => (
             <button key={value} type="button" onClick={() => updateExportSettings({ fps: value })} className={optionClass(fps === value)}>
-              {value} fps
+              {value} {t('fps')}
             </button>
           ))}
         </div>
         {fps === 60 && (
-          <span className="text-[10px] text-text-muted">60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.</span>
+          <span className="text-[10px] text-text-muted">{t('60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.')}</span>
         )}
       </div>
 
       {/* Kualitas */}
       <div className="flex flex-col gap-2.5">
-        <SectionLabel>Kualitas</SectionLabel>
+        <SectionLabel>{t('Kualitas')}</SectionLabel>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
-              ['compact', 'Hemat'],
-              ['standard', 'Standar'],
-              ['high', 'Tinggi']
+              ['compact', t('Hemat')],
+              ['standard', t('Standar')],
+              ['high', t('Tinggi')]
             ] as [ExportQuality, string][]
           ).map(([value, label]) => (
             <button key={value} type="button" onClick={() => updateExportSettings({ quality: value })} className={optionClass(quality === value)}>
@@ -354,7 +355,7 @@ export const ExportPanel: React.FC = () => {
       {/* Opsi Overlay Ekspor: hanya berlaku untuk render legacy (canvas) */}
       {!isCompositionExport && (
         <div className="flex flex-col gap-2">
-          <SectionLabel>Opsi Ekspor</SectionLabel>
+          <SectionLabel>{t('Opsi Ekspor')}</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
               <input
@@ -364,8 +365,8 @@ export const ExportPanel: React.FC = () => {
                 className="w-4 h-4 rounded accent-accent cursor-pointer"
               />
               <div className="flex flex-col">
-                <span className="text-[12px] font-semibold text-on-surface">Watermark</span>
-                <span className="text-[10px] text-text-muted">Logo MooScript</span>
+                <span className="text-[12px] font-semibold text-on-surface">{t('Watermark')}</span>
+                <span className="text-[10px] text-text-muted">{t('Logo MooScript')}</span>
               </div>
             </label>
             <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
@@ -376,8 +377,8 @@ export const ExportPanel: React.FC = () => {
                 className="w-4 h-4 rounded accent-accent cursor-pointer"
               />
               <div className="flex flex-col">
-                <span className="text-[12px] font-semibold text-on-surface">Info FPS</span>
-                <span className="text-[10px] text-text-muted">Overlay teknis</span>
+                <span className="text-[12px] font-semibold text-on-surface">{t('Info FPS')}</span>
+                <span className="text-[10px] text-text-muted">{t('Overlay teknis')}</span>
               </div>
             </label>
           </div>
@@ -387,24 +388,22 @@ export const ExportPanel: React.FC = () => {
       {/* Peringatan audio sebelum ekspor */}
       {!hasProjectAudio && (
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-          Audio belum dibuat, video akan diekspor tanpa suara. Buka tab Audio untuk membuat suara.
+          {t('Audio belum dibuat, video akan diekspor tanpa suara. Buka tab Audio untuk membuat suara.')}
         </div>
       )}
       {hasProjectAudio && audioStale && (
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed">
-          Naskah berubah sejak suara dibuat. Buat ulang suara di tab Audio agar video sesuai naskah.
+          {t('Naskah berubah sejak suara dibuat. Buat ulang suara di tab Audio agar video sesuai naskah.')}
         </div>
       )}
       {scenes.length > 0 && failedVisualCount > 0 && (
         <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] leading-relaxed">
-          {failedVisualCount} adegan gagal dibuat dan akan tampil sebagai kartu error. Buat ulang visualnya dari kartu
-          adegan atau tab Gaya sebelum mengekspor.
+          {failedVisualCount} {t('adegan gagal dibuat dan akan tampil sebagai kartu error. Buat ulang visualnya dari kartu adegan atau tab Gaya sebelum mengekspor.')}
         </div>
       )}
       {scenes.length > 0 && pendingVisualCount > 0 && (
         <div className="p-3 rounded-xl bg-surface-2 border border-border text-text-muted text-[11px] leading-relaxed">
-          {pendingVisualCount} adegan belum punya visual sendiri dan akan dirender dengan visual instan seperti di
-          pratinjau.
+          {pendingVisualCount} {t('adegan belum punya visual sendiri dan akan dirender dengan visual instan seperti di pratinjau.')}
         </div>
       )}
 
@@ -421,14 +420,14 @@ export const ExportPanel: React.FC = () => {
           </span>
           <span>
             {isExporting
-              ? 'Merender Video...'
+              ? t('Merender Video...')
               : scenes.length === 0
-                ? 'Tambahkan adegan dulu'
+                ? t('Tambahkan adegan dulu')
                 : exportResult
-                  ? 'Render Ulang'
+                  ? t('Render Ulang')
                   : format === 'gif'
-                    ? 'Buat GIF'
-                    : `Render Video ${format.toUpperCase()}`}
+                    ? t('Buat GIF')
+                    : t('Render Video {0}', format.toUpperCase())}
           </span>
         </button>
 
@@ -438,14 +437,14 @@ export const ExportPanel: React.FC = () => {
             onClick={() => cancelExport()}
             className="w-full py-2 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
           >
-            Batalkan Ekspor
+            {t('Batalkan Ekspor')}
           </button>
         )}
 
         {isExporting && exportProgress && (
           <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-surface-2 border border-border" aria-live="polite">
             <div className="flex items-center justify-between gap-2 text-[11px]">
-              <span className="text-text-muted truncate">{exportProgress.statusText || 'Sedang memproses...'}</span>
+              <span className="text-text-muted truncate">{exportProgress.statusText || t('Sedang memproses...')}</span>
               <span className="font-mono text-accent font-bold">{exportProgress.percent}%</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-surface-3 overflow-hidden">
@@ -462,20 +461,20 @@ export const ExportPanel: React.FC = () => {
 
       {/* Unduh Bundle Mograph Web HTML */}
       <div className="flex flex-col gap-2 pt-1 border-t border-border">
-        <SectionLabel>Bundle Web Mograph</SectionLabel>
+        <SectionLabel>{t('Bundle Web Mograph')}</SectionLabel>
         <button
           type="button"
           onClick={handleExportHtml}
           className="py-2.5 px-3 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 text-on-surface text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95"
         >
           <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-accent">html</span>
-          <span>Unduh HTML Standalone Web</span>
+          <span>{t('Unduh HTML Standalone Web')}</span>
         </button>
       </div>
 
       {/* Subtitle */}
       <div className="flex flex-col gap-2 pt-1 border-t border-border">
-        <SectionLabel>Subtitle</SectionLabel>
+        <SectionLabel>{t('Subtitle')}</SectionLabel>
         <div className="grid grid-cols-2 gap-2">
           {(['srt', 'vtt'] as const).map((kind) => (
             <button
@@ -483,12 +482,12 @@ export const ExportPanel: React.FC = () => {
               type="button"
               onClick={() => {
                 downloadSubtitleFile(project, kind);
-                addToast(`Mengunduh subtitle (.${kind})...`, 'success');
+                addToast(t('Mengunduh subtitle (.{0})...', kind), 'success');
               }}
               className="py-2.5 px-2.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 text-on-surface text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-95"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-text-muted shrink-0">subtitles</span>
-              <span className="truncate">Subtitle (.{kind})</span>
+              <span className="truncate">{t('Subtitle (.')}{kind})</span>
             </button>
           ))}
         </div>

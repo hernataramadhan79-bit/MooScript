@@ -3,8 +3,11 @@ import {
   ALL_STARTER_TEMPLATES,
   findStarterTemplate,
   getShowcasePreset,
-  type MooShowcasePreset
+  getStarterTemplates,
+  type MooShowcasePreset,
+  type StarterProjectTemplate
 } from '@mooscript/presets';
+import { getLocale } from '../../i18n';
 
 export interface TemplateScene {
   narration: string;
@@ -22,8 +25,7 @@ export interface ProjectTemplate {
   presetSlug?: string;
 }
 
-/** Starter storyboards & pre-compiled MooTween showcase presets from @mooscript/presets. */
-export const PROJECT_TEMPLATES: ProjectTemplate[] = ALL_STARTER_TEMPLATES.map((tpl) => ({
+const toProjectTemplate = (tpl: StarterProjectTemplate): ProjectTemplate => ({
   id: tpl.id,
   title: tpl.title,
   description: tpl.description,
@@ -31,20 +33,19 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = ALL_STARTER_TEMPLATES.map((t
   aspectRatio: tpl.aspectRatio,
   scenes: tpl.scenes,
   presetSlug: tpl.presetSlug
-}));
+});
+
+/** Starter storyboards & pre-compiled MooTween showcase presets from @mooscript/presets, in Indonesian. */
+export const PROJECT_TEMPLATES: ProjectTemplate[] = ALL_STARTER_TEMPLATES.map(toProjectTemplate);
+
+/** The same starters in the interface language, for the template picker. */
+export function getProjectTemplates(): ProjectTemplate[] {
+  return getStarterTemplates(getLocale()).map(toProjectTemplate);
+}
 
 export function getProjectTemplate(id: string): ProjectTemplate | undefined {
-  const found = findStarterTemplate(id);
-  if (!found) return undefined;
-  return {
-    id: found.id,
-    title: found.title,
-    description: found.description,
-    icon: found.icon,
-    aspectRatio: found.aspectRatio,
-    scenes: found.scenes,
-    presetSlug: found.presetSlug
-  };
+  const found = findStarterTemplate(id, getLocale());
+  return found ? toProjectTemplate(found) : undefined;
 }
 
 export function getPrecompiledShowcase(idOrSlug: string): MooShowcasePreset | undefined {

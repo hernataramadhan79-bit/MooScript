@@ -17,6 +17,7 @@ import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
 import { getProjectDuration } from '../../utils/projectDuration';
 import type { MooStoreState, AudioSlice } from '../types';
+import { t } from '../../i18n';
 
 let audioAbortController: AbortController | null = null;
 /** Bumped by every remix or music render: only the newest one may write its result. */
@@ -105,7 +106,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       const { settings, project, addToast } = get();
       if (get().isGeneratingAudio) return;
       if (project.scenes.length === 0) {
-        addToast('Tambahkan adegan dulu sebelum membuat audio.', 'warning');
+        addToast(t('Tambahkan adegan dulu sebelum membuat audio.'), 'warning');
         return;
       }
 
@@ -134,7 +135,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
             musicBlob = (await renderMix({ ...project, scenes: timeByText(project.scenes).timed }, null)) ?? undefined;
           } catch (err: unknown) {
             set({ isGeneratingAudio: false });
-            addToast(`Gagal membuat BGM audio: ${err instanceof Error ? err.message : String(err)}`, 'error');
+            addToast(t('Gagal membuat BGM audio: {0}', err instanceof Error ? err.message : String(err)), 'error');
             return;
           }
         }
@@ -142,7 +143,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         const latest = get().project;
         if (latest.id !== startedProjectId) {
           set({ isGeneratingAudio: false });
-          addToast('Project berganti, hasil audio dibuang.', 'warning');
+          addToast(t('Project berganti, hasil audio dibuang.'), 'warning');
           return;
         }
         // Retimed from the latest scenes, so edits made while the music rendered are kept.
@@ -170,9 +171,9 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         await saveVoiceTrackToDb(finalProject.id, musicBlob ? { kind: 'bgm' } : null);
         await get().refreshCacheSize();
         if (musicBlob) {
-          addToast(`Mode timer dengan BGM (${project.bgm.preset}): durasi ${roundedDuration}s.`, 'info');
+          addToast(t('Mode timer dengan BGM ({0}): durasi {1}s.', project.bgm.preset, roundedDuration), 'info');
         } else {
-          addToast('Mode timer: durasi dihitung dari panjang teks (tanpa suara).', 'info');
+          addToast(t('Mode timer: durasi dihitung dari panjang teks (tanpa suara).'), 'info');
         }
         return;
       }
@@ -185,7 +186,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           currentScene: 0,
           totalScenes: project.scenes.length,
           sceneId: project.scenes[0]?.id || '',
-          statusText: `Menyiapkan suara untuk ${project.scenes.length} adegan...`
+          statusText: t('Menyiapkan suara untuk {0} adegan...', project.scenes.length)
         }
       });
 
@@ -208,7 +209,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
               currentScene: result.updatedProject.scenes.length,
               totalScenes: result.updatedProject.scenes.length,
               sceneId: 'bgm',
-              statusText: 'Mencampur musik dan efek suara…'
+              statusText: t('Mencampur musik dan efek suara…')
             }
           });
           finalAudioBlob = (await renderMix(result.updatedProject, result.audioBlob)) ?? result.audioBlob;
@@ -219,7 +220,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         const latest = get().project;
         if (latest.id !== startedProjectId) {
           set({ isGeneratingAudio: false, audioProgress: null });
-          addToast('Project berganti, hasil audio dibuang.', 'warning');
+          addToast(t('Project berganti, hasil audio dibuang.'), 'warning');
           return;
         }
 
@@ -263,7 +264,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
 
         const bgmLabel = hasMusic(bgmSettings) ? ` + BGM (${bgmSettings.preset})` : '';
         addToast(
-          `Suara siap! (${result.totalDuration.toFixed(1)} detik, ${result.apiCallCount} disintesis, ${result.cacheHitCount} dari cache${bgmLabel})`,
+          t('Suara siap! ({0} detik, {1} disintesis, {2} dari cache{3})', result.totalDuration.toFixed(1), result.apiCallCount, result.cacheHitCount, bgmLabel),
           'success'
         );
       } catch (err: unknown) {
@@ -276,10 +277,10 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           set({ isGeneratingAudio: false, audioProgress: null });
         }
         if (isAborted) {
-          addToast('Pembuatan suara dibatalkan.', 'info');
+          addToast(t('Pembuatan suara dibatalkan.'), 'info');
         } else {
           const message = err instanceof Error ? err.message : String(err);
-          addToast(`Gagal membuat suara: ${message}`, 'error');
+          addToast(t('Gagal membuat suara: {0}', message), 'error');
         }
       } finally {
         if (audioAbortController === controller) audioAbortController = null;
@@ -315,7 +316,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       await saveProjectToDb(updatedProject);
       await saveVoiceTrackToDb(updatedProject.id, null);
       await get().refreshCacheSize();
-      addToast('Audio proyek berhasil dihapus.', 'info');
+      addToast(t('Audio proyek berhasil dihapus.'), 'info');
     },
 
     auditionVoice: async (providerOverride?: TTSProvider, voiceOverride?: string) => {
@@ -330,7 +331,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
             : settings.voiceIds?.openai);
 
       if (provider === 'timer') {
-        addToast('Mode Tanpa Suara (Timer) menghitung durasi adegan tanpa narasi suara.', 'info');
+        addToast(t('Mode Tanpa Suara (Timer) menghitung durasi adegan tanpa narasi suara.'), 'info');
         return;
       }
 
@@ -352,9 +353,9 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       // WebSpeech / Browser native speech support
       if (provider === 'fallback' || voice === 'fallback') {
         if (speakWithBrowser(sampleText.includes('deterministik') ? 'id-ID' : 'en-US')) {
-          addToast('Memutar suara menggunakan WebSpeech browser.', 'info');
+          addToast(t('Memutar suara menggunakan WebSpeech browser.'), 'info');
         } else {
-          addToast('Browser ini tidak mendukung WebSpeech.', 'warning');
+          addToast(t('Browser ini tidak mendukung WebSpeech.'), 'warning');
         }
         return;
       }
@@ -367,7 +368,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           // Preview with the browser voice instead of downloading a large model unexpectedly.
           if (!cached && speakWithBrowser(targetVoiceId.startsWith('id_') ? 'id-ID' : 'en-US')) {
             addToast(
-              'Model lokal belum diunduh. Memutar contoh dengan WebSpeech browser. Silakan klik Unduh Model untuk suara Piper offline.',
+              t('Model lokal belum diunduh. Memutar contoh dengan WebSpeech browser. Silakan klik Unduh Model untuk suara Piper offline.'),
               'info'
             );
             return;
@@ -383,7 +384,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         } else if (provider === 'openai') {
           const key = settings.apiKeys.openai;
           if (!key) {
-            addToast('OpenAI API key belum diisi di Pengaturan.', 'warning');
+            addToast(t('OpenAI API key belum diisi di Pengaturan.'), 'warning');
             return;
           }
           audioBlob = await generateOpenAITTS({
@@ -395,7 +396,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         } else if (provider === 'elevenlabs') {
           const key = settings.apiKeys.elevenlabs;
           if (!key) {
-            addToast('ElevenLabs API key belum diisi di Pengaturan.', 'warning');
+            addToast(t('ElevenLabs API key belum diisi di Pengaturan.'), 'warning');
             return;
           }
           const res = await generateElevenLabsTTS({
@@ -407,7 +408,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           });
           audioBlob = res.audioBlob;
         } else {
-          if (!speakWithBrowser('en-US')) addToast('Penyedia suara tidak valid.', 'warning');
+          if (!speakWithBrowser('en-US')) addToast(t('Penyedia suara tidak valid.'), 'warning');
           return;
         }
 
@@ -417,7 +418,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         await audio.play();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Audisi gagal: ${msg}`, 'error');
+        addToast(t('Audisi gagal: {0}', msg), 'error');
       }
     },
 
@@ -426,7 +427,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       if (!file || get().isGeneratingAudio) return;
       const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|aac|flac|webm)$/i.test(file.name);
       if (!isAudio) {
-        addToast('Format berkas tidak didukung. Unggah berkas audio (MP3, WAV, M4A, OGG).', 'error');
+        addToast(t('Format berkas tidak didukung. Unggah berkas audio (MP3, WAV, M4A, OGG).'), 'error');
         return;
       }
 
@@ -441,7 +442,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
           currentScene: 0,
           totalScenes: project.scenes.length,
           sceneId: 'upload',
-          statusText: `Memproses berkas audio "${file.name}"...`
+          statusText: t('Memproses berkas audio "{0}"...', file.name)
         }
       });
 
@@ -460,7 +461,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
               currentScene: 0,
               totalScenes: startedScenes.length,
               sceneId: 'upload',
-              statusText: 'Menyelaraskan naskah dengan suara (Whisper)...'
+              statusText: t('Menyelaraskan naskah dengan suara (Whisper)...')
             }
           });
           try {
@@ -492,7 +493,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         if (controller.signal.aborted) return;
         const latest = get().project;
         if (latest.id !== startedProjectId) {
-          addToast('Project berganti, hasil audio dibuang.', 'warning');
+          addToast(t('Project berganti, hasil audio dibuang.'), 'warning');
           set({ isGeneratingAudio: false, audioProgress: null });
           return;
         }
@@ -525,12 +526,12 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
 
         await saveProjectToDb(finalProject);
         await saveVoiceTrackToDb(finalProject.id, { kind: 'voice', blob: file });
-        addToast(`Audio "${file.name}" (${totalAudioDur.toFixed(1)}s) berhasil diterapkan & disinkronkan!`, 'success');
+        addToast(t('Audio "{0}" ({1}s) berhasil diterapkan & disinkronkan!', file.name, totalAudioDur.toFixed(1)), 'success');
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         set({ isGeneratingAudio: false, audioProgress: null });
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Gagal memuat berkas audio: ${msg}`, 'error');
+        addToast(t('Gagal memuat berkas audio: {0}', msg), 'error');
       } finally {
         if (audioAbortController === controller) audioAbortController = null;
       }
@@ -562,7 +563,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         await saveVoiceTrackToDb(updatedProject.id, { kind: 'voice', blob: rawVoiceBlob });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Gagal me-remix audio: ${msg}`, 'error');
+        addToast(t('Gagal me-remix audio: {0}', msg), 'error');
       }
     },
 
@@ -572,7 +573,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       if (rawVoiceBlob) return get().remixAudio();
       if (!project.audioBlob || bgmOnlyAudio) return get().generateBgmOnlyAudio();
       // An older track without its voice kept apart cannot be mixed again.
-      if (!audioStale) addToast('Buat ulang suara supaya perubahan audio kedengaran.', 'info');
+      if (!audioStale) addToast(t('Buat ulang suara supaya perubahan audio kedengaran.'), 'info');
       set({ audioStale: true });
     },
 
@@ -581,11 +582,11 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
       const scene = project.scenes.find((s) => s.id === sceneId);
       if (!scene) return;
       if (settings.selectedTTSProvider === 'fallback' || settings.selectedTTSProvider === 'timer') {
-        addToast('Pilih penyedia suara (lokal, OpenAI atau ElevenLabs) untuk membuat suara.', 'info');
+        addToast(t('Pilih penyedia suara (lokal, OpenAI atau ElevenLabs) untuk membuat suara.'), 'info');
         return;
       }
       if (!(scene.narrationText || scene.text || '').trim()) {
-        addToast('Adegan ini belum punya narasi.', 'info');
+        addToast(t('Adegan ini belum punya narasi.'), 'info');
         return;
       }
       // Only this scene's take is dropped; the others come straight from the cache.
@@ -630,7 +631,7 @@ export const createAudioSlice: StateCreator<MooStoreState, [], [], AudioSlice> =
         await saveVoiceTrackToDb(updatedProject.id, { kind: 'bgm' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`Gagal membuat BGM audio: ${msg}`, 'error');
+        addToast(t('Gagal membuat BGM audio: {0}', msg), 'error');
       }
     }
   };

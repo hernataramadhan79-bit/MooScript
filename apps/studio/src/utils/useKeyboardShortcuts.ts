@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import { getProjectDuration } from './projectDuration';
+import { t } from '../i18n';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -146,7 +147,7 @@ export function useKeyboardShortcuts(): void {
           if (totalDuration > 0) {
             e.preventDefault();
             useMooStore.getState().addMarker(currentFrame / fps);
-            addToast(`Marker ditambahkan di ${(currentFrame / fps).toFixed(1)} dtk.`, 'info', 2000);
+            addToast(t('Marker ditambahkan di {0} dtk.', (currentFrame / fps).toFixed(1)), 'info', 2000);
           }
           break;
 
@@ -197,7 +198,7 @@ export function useKeyboardShortcuts(): void {
             const remaining = useMooStore.getState().project.scenes;
             const next = remaining[Math.min(Math.max(0, idx), remaining.length - 1)];
             if (next) focusScene(next.id);
-            addToast(`Adegan #${idx + 1} dihapus. Tekan Ctrl+Z untuk mengembalikan.`, 'info');
+            addToast(t('Adegan #{0} dihapus. Tekan Ctrl+Z untuk mengembalikan.', idx + 1), 'info');
           }
           break;
         }

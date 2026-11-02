@@ -7,18 +7,19 @@ const TRANSITION_DURATIONS = [0.2, 0.3, 0.5, 0.8, 1, 1.5];
 
 /** Curve families in words an editor uses; the runtime keeps each transition's in/out direction. */
 const TRANSITION_CURVE_LABELS: { id: TransitionCurve; label: string }[] = [
-  { id: 'smooth', label: 'Halus' },
-  { id: 'soft', label: 'Lembut' },
-  { id: 'strong', label: 'Tegas' },
-  { id: 'sharp', label: 'Tajam' },
-  { id: 'rush', label: 'Melesat' },
-  { id: 'linear', label: 'Rata' }
+  { id: 'smooth', label: L('Halus') },
+  { id: 'soft', label: L('Lembut') },
+  { id: 'strong', label: L('Tegas') },
+  { id: 'sharp', label: L('Tajam') },
+  { id: 'rush', label: L('Melesat') },
+  { id: 'linear', label: L('Rata') }
 ];
 import { resolveSkillIcon } from '../../engine/skills/skillManager';
 import { Button } from '../ui/Button';
 import { MAX_SCENE_SECONDS, sceneSeconds } from '../../utils/projectDuration';
 import { briefSummary } from '../../engine/ai/brief';
 import { BriefPanel } from './BriefPanel';
+import { L, t } from '../../i18n';
 
 interface AutoExpandTextareaProps {
   value: string;
@@ -100,7 +101,7 @@ const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCom
     <div
       className="flex items-center h-8 lg:h-6 text-[11px] font-mono text-text-muted bg-surface-2/80 border border-border/60 hover:border-border focus-within:border-accent/60 rounded-md px-1.5 transition-colors shrink-0"
       onClick={(e) => e.stopPropagation()}
-      title="Durasi tayang adegan (detik)"
+      title={t('Durasi tayang adegan (detik)')}
     >
       <input
         type="text"
@@ -118,7 +119,7 @@ const SceneDurationInput: React.FC<SceneDurationInputProps> = ({ duration, onCom
         }}
         onFocus={(e) => e.currentTarget.select()}
         className="w-9 bg-transparent text-right text-text font-medium text-[12px] lg:text-[11px] font-mono focus:outline-none"
-        aria-label="Durasi adegan (detik)"
+        aria-label={t('Durasi adegan (detik)')}
       />
       <span className="text-[10px] text-text-faint select-none ml-0.5">s</span>
     </div>
@@ -311,17 +312,17 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-text flex items-center gap-1.5">
             <span className="material-symbols-outlined text-[15px] text-accent">subtitles</span>
-            Ide Cerita & Naskah
+            {t('Ide Cerita & Naskah')}
           </span>
           {previousScenesSnapshot && previousScenesSnapshot.length > 0 && (
             <button
               type="button"
               onClick={() => undoGenerateScript()}
               className="text-[10px] font-medium text-text-muted hover:text-text flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-2 border border-border transition-colors"
-              title="Kembalikan naskah sebelumnya"
+              title={t('Kembalikan naskah sebelumnya')}
             >
               <span className="material-symbols-outlined text-[13px]">undo</span>
-              <span>Urungkan</span>
+              <span>{t('Urungkan')}</span>
             </button>
           )}
         </div>
@@ -330,7 +331,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           <textarea
             value={scriptPrompt}
             onChange={(e) => setScriptPrompt(e.target.value)}
-            placeholder="Tulis topik atau tempel naskah video… (Ctrl+Enter untuk menyusun)"
+            placeholder={t('Tulis topik atau tempel naskah video… (Ctrl+Enter untuk menyusun)')}
             rows={3}
             onKeyDown={(e) => {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && scriptPrompt.trim() && !isGeneratingScript) {
@@ -338,7 +339,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 generateScript();
               }
             }}
-            aria-label="Ide atau naskah video"
+            aria-label={t('Ide atau naskah video')}
             className="w-full bg-surface-2/70 border border-border/70 focus:border-accent rounded-lg px-2.5 py-2 text-[13px] text-text placeholder:text-text-faint resize-y min-h-[64px] focus:outline-none transition-colors leading-relaxed max-h-48 overflow-y-auto"
           />
 
@@ -347,20 +348,20 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           <div className="flex items-center justify-between gap-2">
             {(() => {
               const activeSkill = skills.find((s) => s.id === activeSkillId) || skills[0];
-              const summary = briefSummary(project.brief) || `Gaya: ${activeSkill?.name || 'Creative'}`;
+              const summary = briefSummary(project.brief) || t('Gaya: {0}', activeSkill?.name || 'Creative');
               return (
                 <button
                   type="button"
                   onClick={() => setIsBriefOpen((open) => !open)}
                   aria-expanded={isBriefOpen}
                   className="min-w-0 flex items-center gap-1.5 px-2 py-1 min-h-[32px] rounded-md bg-surface-2/60 hover:bg-surface-3 text-[11px] text-text-muted hover:text-text border border-border/60 transition-all max-w-[190px]"
-                  title="Atur platform, durasi, nada, audiens dan gaya sutradara"
+                  title={t('Atur platform, durasi, nada, audiens dan gaya sutradara')}
                 >
                   <span className="material-symbols-outlined text-[14px] text-text-muted shrink-0">
                     {activeSkill ? resolveSkillIcon(activeSkill.icon) : 'tune'}
                   </span>
                   <span className="truncate">
-                    Brief: <strong className="text-text font-medium">{summary}</strong>
+                    {t('Brief:')} <strong className="text-text font-medium">{summary}</strong>
                   </span>
                   <span className="material-symbols-outlined text-[14px] shrink-0">
                     {isBriefOpen ? 'expand_less' : 'expand_more'}
@@ -376,7 +377,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   onClick={cancelGenerateScript}
                   className="min-h-[36px] lg:min-h-[32px] px-2.5 rounded-lg bg-surface-2 border border-border text-[12px] font-medium text-text-muted hover:text-rose-300 hover:border-rose-500/40 transition-colors"
                 >
-                  Batal
+                  {t('Batal')}
                 </button>
               )}
               <Button
@@ -388,12 +389,12 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 onClick={() => generateScript()}
                 title={
                   scenes.length > 0
-                    ? 'Menyusun storyboard baru menggantikan adegan saat ini (bisa diurungkan)'
-                    : 'Susun shot list dari ide atau naskah'
+                    ? t('Menyusun storyboard baru menggantikan adegan saat ini (bisa diurungkan)')
+                    : t('Susun shot list dari ide atau naskah')
                 }
                 className="!px-3 !text-[12px] !min-h-[36px] lg:!min-h-[32px] whitespace-nowrap"
               >
-                {isGeneratingScript ? 'Menyusun…' : 'Susun Adegan'}
+                {isGeneratingScript ? t('Menyusun…') : t('Susun Adegan')}
               </Button>
             </div>
           </div>
@@ -407,9 +408,9 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               <span className="material-symbols-outlined text-[20px]">movie_edit</span>
             </div>
             <div className="space-y-1">
-              <h4 className="text-xs font-semibold text-text">Mulai Naskah Motion Graphics</h4>
+              <h4 className="text-xs font-semibold text-text">{t('Mulai Naskah Motion Graphics')}</h4>
               <p className="text-[11px] text-text-muted max-w-[240px]">
-                Ketik ide atau naskah Anda di kolom atas untuk menyusun shot otomatis, atau buat adegan manual.
+                {t('Ketik ide atau naskah Anda di kolom atas untuk menyusun shot otomatis, atau buat adegan manual.')}
               </p>
             </div>
             <Button
@@ -419,7 +420,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
               onClick={addScene}
               className="mt-1"
             >
-              Tambah Adegan Pertama
+              {t('Tambah Adegan Pertama')}
             </Button>
           </div>
         ) : (
@@ -480,8 +481,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       onPointerUp={() => endReorderDrag(true)}
                       onPointerCancel={() => endReorderDrag(false)}
                       style={{ touchAction: 'none' }}
-                      title="Tahan & geser untuk mengubah urutan"
-                      aria-label={`Geser untuk mengubah urutan adegan ${index + 1}`}
+                      title={t('Tahan & geser untuk mengubah urutan')}
+                      aria-label={t('Geser untuk mengubah urutan adegan {0}', index + 1)}
                       className="w-7 h-8 lg:w-5 lg:h-6 -ml-1 rounded-md flex items-center justify-center text-text-faint hover:text-text hover:bg-surface-3 cursor-grab active:cursor-grabbing shrink-0"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[16px]">drag_indicator</span>
@@ -495,35 +496,35 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   {compStatus === 'error' && (
                     <span
                       className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase font-bold shrink-0 bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                      title="Kesalahan kompilasi adegan"
+                      title={t('Kesalahan kompilasi adegan')}
                     >
-                      error
+                      {t('error')}
                     </span>
                   )}
                   {compStatus === 'needs-repair' && (
                     <span
                       className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                      title="Adegan memakai API di luar MooTween. Perbaiki dari tab Gaya."
+                      title={t('Adegan memakai API di luar MooTween. Perbaiki dari tab Gaya.')}
                     >
-                      perlu perbaikan
+                      {t('perlu perbaikan')}
                     </span>
                   )}
                   {isBusyHere && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 bg-accent/15 text-accent border border-accent/30 animate-pulse">
-                      AI menyusun…
+                      {t('AI menyusun…')}
                     </span>
                   )}
                   {bulkStatus === 'pending' && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0 bg-surface-2 text-text-muted border border-border">
-                      antre
+                      {t('antre')}
                     </span>
                   )}
                   {isEdited && (
                     <span
                       className="text-[9px] px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-mono shrink-0 border border-border"
-                      title="Adegan telah disunting manual"
+                      title={t('Adegan telah disunting manual')}
                     >
-                      edit
+                      {t('edit')}
                     </span>
                   )}
 
@@ -540,8 +541,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     type="button"
                     disabled={index === 0}
                     onClick={() => reorderScenes(index, index - 1)}
-                    title="Geser adegan ke atas"
-                    aria-label="Geser adegan ke atas"
+                    title={t('Geser adegan ke atas')}
+                    aria-label={t('Geser adegan ke atas')}
                     className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">arrow_upward</span>
@@ -550,8 +551,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     type="button"
                     disabled={index === scenes.length - 1}
                     onClick={() => reorderScenes(index, index + 1)}
-                    title="Geser adegan ke bawah"
-                    aria-label="Geser adegan ke bawah"
+                    title={t('Geser adegan ke bawah')}
+                    aria-label={t('Geser adegan ke bawah')}
                     className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">arrow_downward</span>
@@ -561,8 +562,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       type="button"
                       onClick={() => regenerateSceneVoice(scene.id)}
                       disabled={isGeneratingAudio}
-                      title="Rekam ulang suara adegan ini saja (adegan lain dipakai dari cache)"
-                      aria-label={`Suara ulang adegan ${index + 1}`}
+                      title={t('Rekam ulang suara adegan ini saja (adegan lain dipakai dari cache)')}
+                      aria-label={t('Suara ulang adegan {0}', index + 1)}
                       className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-surface-3 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-text flex items-center justify-center transition-colors"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">record_voice_over</span>
@@ -571,8 +572,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <button
                     type="button"
                     onClick={() => duplicateScene(scene.id)}
-                    title="Duplikat adegan"
-                    aria-label="Duplikat adegan"
+                    title={t('Duplikat adegan')}
+                    aria-label={t('Duplikat adegan')}
                     className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-surface-3 text-text-muted hover:text-text flex items-center justify-center transition-colors"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">content_copy</span>
@@ -582,10 +583,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     disabled={scenes.length <= 1}
                     onClick={() => {
                       removeScene(scene.id);
-                      addToast(`Adegan #${index + 1} dihapus. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.`, 'info');
+                      addToast(t('Adegan #{0} dihapus. Tekan Urungkan (Ctrl+Z) untuk mengembalikan.', index + 1), 'info');
                     }}
-                    title="Hapus adegan"
-                    aria-label="Hapus adegan"
+                    title={t('Hapus adegan')}
+                    aria-label={t('Hapus adegan')}
                     className="w-8 h-8 lg:w-6 lg:h-6 rounded-md hover:bg-rose-500/15 disabled:opacity-25 disabled:pointer-events-none text-text-muted hover:text-rose-400 flex items-center justify-center transition-colors"
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">delete</span>
@@ -599,7 +600,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   value={narration}
                   onChange={(text) => updateSceneText(scene.id, text)}
                   onFocus={() => focusScene(scene.id)}
-                  placeholder="Tulis naskah narasi adegan..."
+                  placeholder={t('Tulis naskah narasi adegan...')}
                 />
               </div>
 
@@ -617,10 +618,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <span className="material-symbols-outlined text-[14px] text-text-muted">
                     {isDetailOpen ? 'expand_less' : 'tune'}
                   </span>
-                  <span className="hidden sm:inline">Detail & Aset</span>
-                  <span className="sm:hidden">Detail</span>
+                  <span className="hidden sm:inline">{t('Detail & Aset')}</span>
+                  <span className="sm:hidden">{t('Detail')}</span>
                   {(scene.visualIntent || scene.visualConcept || (scene.focusWords?.length || 0) > 0) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Memiliki arahan visual / kata kunci" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title={t('Memiliki arahan visual / kata kunci')} />
                   )}
                   {(scene.assignedAssets?.length || 0) > 0 && (
                     <span className="text-[9px] px-1 rounded-full bg-surface-3 text-text-muted font-mono font-bold shrink-0">
@@ -637,10 +638,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                       compileSceneProcedural(scene.id, 'auto');
                     }}
                     className="h-9 lg:h-7 px-2.5 lg:px-2 rounded-md bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 text-[12px] lg:text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
-                    title="Susun visual motion graphics instan tanpa kuota API (berdasarkan konteks naskah)"
+                    title={t('Susun visual motion graphics instan tanpa kuota API (berdasarkan konteks naskah)')}
                   >
                     <span aria-hidden="true" className="material-symbols-outlined text-[15px] lg:text-[13px]">bolt</span>
-                    <span>Visual</span>
+                    <span>{t('Visual')}</span>
                   </button>
 
                   <button
@@ -663,10 +664,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     }`}
                     title={
                       isRevisingHere
-                        ? 'Batalkan pembuatan ulang'
+                        ? t('Batalkan pembuatan ulang')
                         : hasLlmKey
-                          ? 'Buat ulang visual adegan ini dengan AI'
-                          : 'Atur API key di Pengaturan untuk memakai AI'
+                          ? t('Buat ulang visual adegan ini dengan AI')
+                          : t('Atur API key di Pengaturan untuk memakai AI')
                     }
                   >
                     <span
@@ -675,7 +676,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     >
                       {isRevisingHere ? 'progress_activity' : 'auto_awesome'}
                     </span>
-                    <span>{isRevisingHere ? 'Batal' : 'AI'}</span>
+                    <span>{isRevisingHere ? t('Batal') : 'AI'}</span>
                   </button>
 
                   <div className="flex items-center bg-surface-2/70 border border-border/50 rounded-md p-0.5 shrink-0">
@@ -686,8 +687,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           onEditScene(scene.id);
                         }}
                         className="w-8 h-8 lg:w-6 lg:h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
-                        title="Gaya & Layer Adegan"
-                    aria-label="Gaya & Layer Adegan"
+                        title={t('Gaya & Layer Adegan')}
+                    aria-label={t('Gaya & Layer Adegan')}
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">palette</span>
                       </button>
@@ -699,8 +700,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           onOpenAssets(scene.id);
                         }}
                         className="w-8 h-8 lg:w-6 lg:h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
-                        title="Sisipkan Aset / Media"
-                    aria-label="Sisipkan Aset / Media"
+                        title={t('Sisipkan Aset / Media')}
+                    aria-label={t('Sisipkan Aset / Media')}
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">perm_media</span>
                       </button>
@@ -710,8 +711,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                         type="button"
                         onClick={() => onOpenCodeInspector(scene.id)}
                         className="w-8 h-8 lg:w-6 lg:h-6 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
-                        title="Editor Kode Mograph"
-                    aria-label="Editor Kode Mograph"
+                        title={t('Editor Kode Mograph')}
+                    aria-label={t('Editor Kode Mograph')}
                       >
                         <span aria-hidden="true" className="material-symbols-outlined text-[18px] lg:text-[14px]">code</span>
                       </button>
@@ -731,7 +732,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1 select-none">
                         <span className="material-symbols-outlined text-[13px] text-accent">star</span>
-                        Sorotan Kata Kunci
+                        {t('Sorotan Kata Kunci')}
                       </span>
                       <div className="flex flex-wrap gap-1">
                         {words.map((w, wIdx) => {
@@ -761,26 +762,26 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <div className="grid grid-cols-1 gap-2 pt-1 border-t border-border/30">
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                        Arah Visual (Visual Intent)
+                        {t('Arah Visual (Visual Intent)')}
                       </label>
                       <input
                         type="text"
                         value={scene.visualIntent || ''}
                         onChange={(e) => updateSceneVisualIntent(scene.id, e.target.value)}
-                        placeholder="Contoh: Pesawat masuk frame, aliran udara digambar..."
+                        placeholder={t('Contoh: Pesawat masuk frame, aliran udara digambar...')}
                         className="w-full bg-surface-1 border border-border/70 focus:border-accent rounded-lg px-2.5 py-1 text-[11px] sm:text-[12px] text-on-surface focus:outline-none"
                       />
                     </div>
 
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                        Konsep / Metafora Visual
+                        {t('Konsep / Metafora Visual')}
                       </label>
                       <input
                         type="text"
                         value={scene.visualConcept || ''}
                         onChange={(e) => updateSceneVisualConcept(scene.id, e.target.value)}
-                        placeholder="Contoh: Diagram vektor gaya angkat, partikel melengkung..."
+                        placeholder={t('Contoh: Diagram vektor gaya angkat, partikel melengkung...')}
                         className="w-full bg-surface-1 border border-border/70 focus:border-accent rounded-lg px-2.5 py-1 text-[11px] sm:text-[12px] text-on-surface focus:outline-none"
                       />
                     </div>
@@ -791,7 +792,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1">
                         <span className="material-symbols-outlined text-[13px] text-accent">attach_file</span>
-                        <span>Aset Visual Adegan</span>
+                        <span>{t('Aset Visual Adegan')}</span>
                         {(scene.assignedAssets?.length || 0) > 0 && (
                           <span className="text-[9px] px-1 rounded-full bg-accent/20 text-accent font-mono font-bold">
                             {scene.assignedAssets?.length}
@@ -806,13 +807,13 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           className="text-[10px] text-accent hover:text-accent-hover font-medium flex items-center gap-0.5 transition-colors"
                         >
                           <span className="material-symbols-outlined text-[13px]">add_circle</span>
-                          <span>Lampirkan Aset</span>
+                          <span>{t('Lampirkan Aset')}</span>
                         </button>
 
                         {openAssetPickerForScene === scene.id && (
                           <div className="absolute right-0 bottom-full mb-1 z-30 w-64 p-2 rounded-xl bg-surface-2 border border-border shadow-xl flex flex-col gap-1.5">
                             <div className="flex items-center justify-between pb-1 border-b border-border/50">
-                              <span className="text-[11px] font-semibold text-on-surface">Pilih Aset untuk Adegan</span>
+                              <span className="text-[11px] font-semibold text-on-surface">{t('Pilih Aset untuk Adegan')}</span>
                               <button
                                 type="button"
                                 onClick={() => setOpenAssetPickerForScene(null)}
@@ -824,7 +825,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
                             {assets.length === 0 ? (
                               <div className="p-3 text-center text-text-muted text-[11px] leading-relaxed">
-                                Belum ada aset diunggah. Unggah gambar/logo pada Tab Aset terlebih dahulu.
+                                {t('Belum ada aset diunggah. Unggah gambar/logo pada Tab Aset terlebih dahulu.')}
                               </div>
                             ) : (
                               <div className="max-h-48 overflow-y-auto flex flex-col gap-1">
@@ -859,7 +860,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                                       <div className="min-w-0 flex-1">
                                         <p className="text-[11px] font-medium truncate">{asset.name}</p>
                                         <p className="text-[9px] text-text-muted font-mono">
-                                          {isAlreadyAttached ? 'Sudah dilampirkan' : 'Klik untuk melampirkan'}
+                                          {isAlreadyAttached ? t('Sudah dilampirkan') : t('Klik untuk melampirkan')}
                                         </p>
                                       </div>
                                     </button>
@@ -900,7 +901,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                                             : 'bg-surface-2 border border-border/60 text-text-muted hover:text-on-surface'
                                         }`}
                                       >
-                                        {r === 'logo' ? 'Logo' : r === 'product' ? 'Produk' : r === 'screenshot' ? 'Screenshot' : r === 'character' ? 'Karakter' : 'Badge'}
+                                        {r === 'logo' ? t('Logo') : r === 'product' ? t('Produk') : r === 'screenshot' ? t('Screenshot') : r === 'character' ? t('Karakter') : t('Badge')}
                                       </button>
                                     ))}
                                   </div>
@@ -911,7 +912,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                                 type="button"
                                 onClick={() => removeAssetFromSceneBeat(scene.id, att.assetId)}
                                 className="p-1 rounded hover:bg-surface-3 text-text-muted hover:text-rose-400 transition-colors shrink-0"
-                                title="Copot aset dari adegan ini"
+                                title={t('Copot aset dari adegan ini')}
                               >
                                 <span className="material-symbols-outlined text-[14px]">close</span>
                               </button>
@@ -921,7 +922,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                               type="text"
                               value={att.motionGuidance || ''}
                               onChange={(e) => updateSceneAssetRole(scene.id, att.assetId, att.role, e.target.value)}
-                              placeholder="Arahan gerak AI (misal: 'Posisikan di tengah memantul masuk')"
+                              placeholder={t('Arahan gerak AI (misal: \'Posisikan di tengah memantul masuk\')')}
                               className="w-full px-2 py-1 rounded-lg bg-surface-2 border border-border text-[11px] text-on-surface placeholder:text-text-muted/60 focus:outline-none focus:border-accent"
                             />
                           </div>
@@ -932,7 +933,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
                   {/* 4. Slider Durasi Adegan */}
                   <div className="flex items-center gap-2 pt-1 border-t border-border/30 text-text-faint text-[10px] font-mono">
-                    <span>Durasi:</span>
+                    <span>{t('Durasi:')}</span>
                     <input
                       type="range"
                       min="0.5"
@@ -946,7 +947,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                         }
                       }}
                       className="flex-1 h-1 bg-surface-3 rounded-lg appearance-none cursor-pointer accent-accent"
-                      aria-label={`Durasi adegan #${index + 1}`}
+                      aria-label={t('Durasi adegan #{0}', index + 1)}
                     />
                     <span className="w-8 text-right font-medium text-text-muted select-none">
                       {duration.toFixed(1)}s
@@ -957,17 +958,17 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/30">
                     <span className="flex flex-col">
                       <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                        Subtitel adegan ini
+                        {t('Subtitel adegan ini')}
                       </span>
                       {!subtitlesOn && (
-                        <span className="text-[10px] text-text-faint">Aktifkan subtitel proyek di tab Mograph.</span>
+                        <span className="text-[10px] text-text-faint">{t('Aktifkan subtitel proyek di tab Mograph.')}</span>
                       )}
                     </span>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={subtitlesOn && !scene.hideSubtitles}
-                      aria-label={`Subtitel adegan #${index + 1}`}
+                      aria-label={t('Subtitel adegan #{0}', index + 1)}
                       disabled={!subtitlesOn}
                       onClick={() => toggleSceneSubtitles(scene.id)}
                       className={`w-9 h-5 rounded-full transition-colors relative shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -993,19 +994,19 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                 </div>
                 <div className="relative flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 px-2 py-0.5 rounded-full bg-surface-1 border border-border/70 text-[10px] text-text-muted hover:border-border transition-colors">
                   <span className="material-symbols-outlined text-[12px] text-text-faint">swap_horiz</span>
-                  <span className="text-[10px] text-text-muted">Transisi:</span>
+                  <span className="text-[10px] text-text-muted">{t('Transisi:')}</span>
                   <select
                     value={scene.transition || 'flow'}
                     onChange={(e) => setSceneTransition(scene.id, e.target.value as SceneTransition)}
                     className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer pr-1"
-                    aria-label={`Transisi dari adegan ${index + 1}`}
+                    aria-label={t('Transisi dari adegan {0}', index + 1)}
                   >
-                    <option value="flow" className="bg-surface-1 text-text">Flow (Menyambung)</option>
-                    <option value="cut" className="bg-surface-1 text-text">Cut (Langsung)</option>
-                    <option value="fade" className="bg-surface-1 text-text">Fade (Pudar)</option>
-                    <option value="slide" className="bg-surface-1 text-text">Slide (Geser)</option>
-                    <option value="zoom" className="bg-surface-1 text-text">Zoom (Perbesar)</option>
-                    <option value="wipe" className="bg-surface-1 text-text">Wipe (Sapuan)</option>
+                    <option value="flow" className="bg-surface-1 text-text">{t('Flow (Menyambung)')}</option>
+                    <option value="cut" className="bg-surface-1 text-text">{t('Cut (Langsung)')}</option>
+                    <option value="fade" className="bg-surface-1 text-text">{t('Fade (Pudar)')}</option>
+                    <option value="slide" className="bg-surface-1 text-text">{t('Slide (Geser)')}</option>
+                    <option value="zoom" className="bg-surface-1 text-text">{t('Zoom (Perbesar)')}</option>
+                    <option value="wipe" className="bg-surface-1 text-text">{t('Wipe (Sapuan)')}</option>
                   </select>
                   {(scene.transition || 'flow') !== 'cut' && (
                     <>
@@ -1018,18 +1019,18 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           })
                         }
                         className="bg-transparent text-text text-[10px] font-medium font-mono focus:outline-none cursor-pointer"
-                        aria-label={`Durasi transisi dari adegan ${index + 1}`}
-                        title="Lama transisi ke adegan berikutnya"
+                        aria-label={t('Durasi transisi dari adegan {0}', index + 1)}
+                        title={t('Lama transisi ke adegan berikutnya')}
                       >
-                        <option value="" className="bg-surface-1 text-text">Otomatis</option>
+                        <option value="" className="bg-surface-1 text-text">{t('Otomatis')}</option>
                         {TRANSITION_DURATIONS.map((d) => (
                           <option key={d} value={d} className="bg-surface-1 text-text">
-                            {String(d).replace('.', ',')} dtk
+                            {String(d).replace('.', ',')} {t('dtk')}
                           </option>
                         ))}
                         {scene.transitionDuration !== undefined && !TRANSITION_DURATIONS.includes(scene.transitionDuration) && (
                           <option value={scene.transitionDuration} className="bg-surface-1 text-text">
-                            {String(scene.transitionDuration).replace('.', ',')} dtk
+                            {String(scene.transitionDuration).replace('.', ',')} {t('dtk')}
                           </option>
                         )}
                       </select>
@@ -1042,10 +1043,10 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           })
                         }
                         className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer"
-                        aria-label={`Gaya gerak transisi dari adegan ${index + 1}`}
-                        title="Percepatan transisi: halus, tegas, tajam, dan seterusnya"
+                        aria-label={t('Gaya gerak transisi dari adegan {0}', index + 1)}
+                        title={t('Percepatan transisi: halus, tegas, tajam, dan seterusnya')}
                       >
-                        <option value="" className="bg-surface-1 text-text">Gerak otomatis</option>
+                        <option value="" className="bg-surface-1 text-text">{t('Gerak otomatis')}</option>
                         {TRANSITION_CURVE_LABELS.map((c) => (
                           <option key={c.id} value={c.id} className="bg-surface-1 text-text">
                             {c.label}
@@ -1074,7 +1075,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
           className="w-full py-2.5 px-3 rounded-xl border border-dashed border-border/80 hover:border-border-strong bg-surface-1/40 hover:bg-surface-2 text-text-muted hover:text-on-surface text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] select-none"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
-          <span>Tambah Adegan</span>
+          <span>{t('Tambah Adegan')}</span>
         </button>
         )}
 

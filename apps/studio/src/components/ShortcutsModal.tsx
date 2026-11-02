@@ -1,51 +1,52 @@
 import React from 'react';
 import { Sheet } from './ui/Sheet';
 import { useMooStore } from '../store/useMooStore';
+import { L, t } from '../i18n';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const MOD = isMac ? '⌘' : 'Ctrl';
 
 const GROUPS: { title: string; items: { keys: string[][]; label: string }[] }[] = [
   {
-    title: 'Pemutaran',
+    title: L('Pemutaran'),
     items: [
-      { keys: [['Space']], label: 'Putar / jeda' },
-      { keys: [['J'], ['L']], label: 'Mundur / maju 1 detik' },
-      { keys: [['K']], label: 'Jeda' },
-      { keys: [['←'], ['→']], label: 'Mundur / maju 1 frame' },
-      { keys: [['Home'], ['End']], label: 'Ke awal / akhir video' },
-      { keys: [['Esc']], label: 'Tutup layar penuh / lepas pilihan adegan' }
+      { keys: [['Space']], label: L('Putar / jeda') },
+      { keys: [['J'], ['L']], label: L('Mundur / maju 1 detik') },
+      { keys: [['K']], label: L('Jeda') },
+      { keys: [['←'], ['→']], label: L('Mundur / maju 1 frame') },
+      { keys: [['Home'], ['End']], label: L('Ke awal / akhir video') },
+      { keys: [['Esc']], label: L('Tutup layar penuh / lepas pilihan adegan') }
     ]
   },
   {
-    title: 'Timeline',
+    title: L('Timeline'),
     items: [
-      { keys: [['I'], ['O']], label: 'Awal / akhir rentang putar ulang di playhead' },
-      { keys: [['X']], label: 'Hapus rentang putar ulang' },
-      { keys: [['M']], label: 'Tambah marker di playhead' },
-      { keys: [['S']], label: 'Potong shot di playhead' },
-      { keys: [[MOD, 'Scroll']], label: 'Perbesar / perkecil timeline' }
+      { keys: [['I'], ['O']], label: L('Awal / akhir rentang putar ulang di playhead') },
+      { keys: [['X']], label: L('Hapus rentang putar ulang') },
+      { keys: [['M']], label: L('Tambah marker di playhead') },
+      { keys: [['S']], label: L('Potong shot di playhead') },
+      { keys: [[MOD, 'Scroll']], label: L('Perbesar / perkecil timeline') }
     ]
   },
   {
-    title: 'Adegan',
+    title: L('Adegan'),
     items: [
-      { keys: [['↑'], ['↓']], label: 'Adegan sebelumnya / berikutnya' },
-      { keys: [[MOD, 'D']], label: 'Duplikat adegan aktif' },
-      { keys: [['Delete']], label: 'Hapus adegan aktif' },
-      { keys: [[MOD, 'Enter']], label: 'Susun adegan dari kolom ide' }
+      { keys: [['↑'], ['↓']], label: L('Adegan sebelumnya / berikutnya') },
+      { keys: [[MOD, 'D']], label: L('Duplikat adegan aktif') },
+      { keys: [['Delete']], label: L('Hapus adegan aktif') },
+      { keys: [[MOD, 'Enter']], label: L('Susun adegan dari kolom ide') }
     ]
   },
   {
-    title: 'Riwayat',
+    title: L('Riwayat'),
     items: [
-      { keys: [[MOD, 'Z']], label: 'Urungkan' },
-      { keys: [[MOD, 'Y'], [MOD, 'Shift', 'Z']], label: 'Ulangi' }
+      { keys: [[MOD, 'Z']], label: L('Urungkan') },
+      { keys: [[MOD, 'Y'], [MOD, 'Shift', 'Z']], label: L('Ulangi') }
     ]
   },
   {
-    title: 'Bantuan',
-    items: [{ keys: [['?']], label: 'Tampilkan daftar ini' }]
+    title: L('Bantuan'),
+    items: [{ keys: [['?']], label: L('Tampilkan daftar ini') }]
   }
 ];
 
@@ -63,18 +64,18 @@ export const ShortcutsModal: React.FC = () => {
     <Sheet
       isOpen={isOpen}
       onClose={() => setOpen(false)}
-      title="Shortcut Keyboard"
-      description="Berlaku saat kursor tidak sedang di kolom teks."
+      title={t('Shortcut Keyboard')}
+      description={t('Berlaku saat kursor tidak sedang di kolom teks.')}
       maxWidth="max-w-xl"
     >
       <div className="grid gap-5 sm:grid-cols-2">
         {GROUPS.map((group) => (
           <section key={group.title} className="flex flex-col gap-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">{group.title}</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">{t(group.title)}</h3>
             <ul className="flex flex-col gap-2">
               {group.items.map((item) => (
                 <li key={item.label} className="flex items-center justify-between gap-3">
-                  <span className="text-[13px] text-on-surface">{item.label}</span>
+                  <span className="text-[13px] text-on-surface">{t(item.label)}</span>
                   <span className="flex items-center gap-1 shrink-0">
                     {item.keys.map((combo, i) => (
                       <React.Fragment key={combo.join('+')}>

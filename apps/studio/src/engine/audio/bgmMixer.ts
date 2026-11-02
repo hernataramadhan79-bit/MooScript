@@ -13,6 +13,7 @@ import { audioBufferToWavBlob } from '../ai/tts';
 import { renderSfxTrack } from './sfx';
 import { voiceShift } from './voiceEdit';
 import type { SfxCue, VoiceEdit } from '../../types';
+import { t } from '../../i18n';
 
 export type { VoiceEdit };
 
@@ -42,7 +43,7 @@ export function hasCustomBgm(): boolean {
 export async function decodeCustomBgm(blob: Blob): Promise<AudioBuffer> {
   const scope = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
   const AudioCtx = scope.AudioContext || scope.webkitAudioContext;
-  if (!AudioCtx) throw new Error('AudioContext tidak tersedia di browser ini.');
+  if (!AudioCtx) throw new Error(t('AudioContext tidak tersedia di browser ini.'));
   const ctx = new AudioCtx();
   try {
     return await ctx.decodeAudioData(await blob.arrayBuffer());

@@ -2,6 +2,7 @@ import type { BrandKit, GeneratedScene, MooProject, ProjectBrand, Scene, Waterma
 import { assetRef } from '../composition/assetRefs';
 import { extractLayersFromHtml } from '../composition/layers';
 import { syncComposition } from '../composition/sync';
+import { t } from '../../i18n';
 
 export const BRAND_LOGO_ASSET_ID = 'brand-logo';
 export const BRAND_FONT_ID = 'brand-font';
@@ -14,7 +15,7 @@ export const DEFAULT_BRAND_KIT: BrandKit = {
   palette: { bg: '#0b1020', primary: '#f8fafc', accent: '#f59e0b', text: '#f8fafc' },
   watermark: { enabled: true, position: 'bottom-right', opacity: 0.85, size: 14 },
   intro: false,
-  outro: { enabled: false, text: 'Ikuti untuk konten berikutnya' }
+  outro: { enabled: false, text: t('Ikuti untuk konten berikutnya') }
 };
 
 function escapeHtml(raw: string): string {

@@ -5,19 +5,20 @@ import type { AspectRatio } from '../../types';
 import { DEFAULT_EXPORT_SETTINGS } from '../../types';
 import type { ReframeMode } from '../../engine/export/reframe';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
+import { L, t } from '../../i18n';
 
 const ASPECTS: { id: AspectRatio; label: string }[] = [
-  { id: '9:16', label: '9:16 Reels / TikTok' },
-  { id: '1:1', label: '1:1 Feed' },
-  { id: '16:9', label: '16:9 YouTube' }
+  { id: '9:16', label: L('9:16 Reels / TikTok') },
+  { id: '1:1', label: L('1:1 Feed') },
+  { id: '16:9', label: L('16:9 YouTube') }
 ];
 
 const STATUS_LABEL = {
-  waiting: 'Menunggu',
-  rendering: 'Merender…',
-  done: 'Selesai',
-  error: 'Gagal',
-  cancelled: 'Dibatalkan'
+  waiting: L('Menunggu'),
+  rendering: L('Merender…'),
+  done: L('Selesai'),
+  error: L('Gagal'),
+  cancelled: L('Dibatalkan')
 } as const;
 
 const optionClass = (selected: boolean) =>
@@ -57,7 +58,7 @@ export const MultiFormatExport: React.FC = () => {
       triggerFileDownload(url, `${base}-cover-${aspect.replace(':', 'x')}.png`);
       setTimeout(() => URL.revokeObjectURL(url), 15000);
     } catch (err) {
-      addToast(`Gagal membuat cover: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      addToast(t('Gagal membuat cover: {0}', err instanceof Error ? err.message : String(err)), 'error');
     } finally {
       setIsCovering(false);
     }
@@ -65,28 +66,27 @@ export const MultiFormatExport: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-2.5 pt-1 border-t border-border">
-      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Banyak Format Sekaligus</span>
+      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{t('Banyak Format Sekaligus')}</span>
       <div className="grid grid-cols-3 gap-1.5">
         {ASPECTS.map((a) => (
           <button key={a.id} type="button" aria-pressed={picked.includes(a.id)} onClick={() => toggle(a.id)} className={optionClass(picked.includes(a.id))}>
-            {a.label}
-            {a.id === project.aspectRatio && <span className="block text-[9px] font-normal opacity-70">asli</span>}
+            {t(a.label)}
+            {a.id === project.aspectRatio && <span className="block text-[9px] font-normal opacity-70">{t('asli')}</span>}
           </button>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         <button type="button" aria-pressed={mode === 'fit'} onClick={() => setMode('fit')} className={optionClass(mode === 'fit')}>
-          Muat utuh
-          <span className="block text-[9px] font-normal opacity-70">latar blur</span>
+          {t('Muat utuh')}
+          <span className="block text-[9px] font-normal opacity-70">{t('latar blur')}</span>
         </button>
         <button type="button" aria-pressed={mode === 'crop'} onClick={() => setMode('crop')} className={optionClass(mode === 'crop')}>
-          Potong tengah
-          <span className="block text-[9px] font-normal opacity-70">penuh, tepi terpotong</span>
+          {t('Potong tengah')}
+          <span className="block text-[9px] font-normal opacity-70">{t('penuh, tepi terpotong')}</span>
         </button>
       </div>
       <p className="text-[10px] text-text-faint leading-snug">
-        Setiap format dirender dari frame {project.aspectRatio} proyek ini. Untuk tata letak yang benar-benar disusun ulang, ganti rasio
-        proyek lalu render biasa.
+        {t('Setiap format dirender dari frame')} {project.aspectRatio} {t('proyek ini. Untuk tata letak yang benar-benar disusun ulang, ganti rasio proyek lalu render biasa.')}
       </p>
       <button
         type="button"
@@ -101,7 +101,7 @@ export const MultiFormatExport: React.FC = () => {
         className="w-full min-h-[40px] px-3 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
       >
         <span aria-hidden="true" className="material-symbols-outlined text-[16px]">video_library</span>
-        Render {picked.length} format
+        {t('Render')} {picked.length} {t('format')}
       </button>
 
       {queue.length > 0 && (
@@ -113,8 +113,8 @@ export const MultiFormatExport: React.FC = () => {
               <li key={item.aspect} className="flex items-center gap-2 p-2 rounded-xl bg-surface-2 border border-border text-[11px]">
                 <span className="font-mono text-on-surface w-10">{item.aspect}</span>
                 <span className={`flex-1 truncate ${item.status === 'error' ? 'text-rose-300' : 'text-text-muted'}`} title={item.error}>
-                  {STATUS_LABEL[item.status]}
-                  {item.result && ` · ${(item.result.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB`}
+                  {t(STATUS_LABEL[item.status])}
+                  {item.result && t(' · {0} MB', (item.result.fileSizeBytes / (1024 * 1024)).toFixed(1))}
                 </span>
                 {item.result && (
                   <button
@@ -122,7 +122,7 @@ export const MultiFormatExport: React.FC = () => {
                     onClick={() => triggerFileDownload(item.result!.objectUrl, `${base}-${item.aspect.replace(':', 'x')}.${ext}`)}
                     className="h-7 px-2 rounded-lg bg-accent text-on-accent font-semibold"
                   >
-                    Unduh
+                    {t('Unduh')}
                   </button>
                 )}
               </li>
@@ -130,14 +130,14 @@ export const MultiFormatExport: React.FC = () => {
           })}
           {!isExporting && (
             <button type="button" onClick={clearQueue} className="self-end text-[10px] text-text-muted hover:text-rose-300">
-              Bersihkan daftar
+              {t('Bersihkan daftar')}
             </button>
           )}
         </ul>
       )}
 
       <div className="flex flex-col gap-1.5 pt-1">
-        <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Cover / Thumbnail (PNG)</span>
+        <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{t('Cover / Thumbnail (PNG)')}</span>
         <div className="grid grid-cols-3 gap-1.5">
           {ASPECTS.map((a) => (
             <button
@@ -151,7 +151,7 @@ export const MultiFormatExport: React.FC = () => {
             </button>
           ))}
         </div>
-        <span className="text-[10px] text-text-faint">Diambil dari frame di posisi playhead.</span>
+        <span className="text-[10px] text-text-faint">{t('Diambil dari frame di posisi playhead.')}</span>
       </div>
     </div>
   );

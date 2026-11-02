@@ -8,8 +8,9 @@ import { loadProjectFromDb } from '../db/mooDb';
 import { MAX_BACKUP_BYTES, parseProjectBackup, serializeProjectBackup } from '../db/projectBackup';
 import { safeFileName, triggerFileDownload } from '../utils/fileUtils';
 import { isFromModalDialog } from '../utils/hooks';
-import { PROJECT_TEMPLATES } from '../engine/templates/projectTemplates';
+import { getProjectTemplates } from '../engine/templates/projectTemplates';
 import { getProjectDuration } from '../utils/projectDuration';
+import { getLocale, t } from '../i18n';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -52,13 +53,13 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   // Work that belongs to the open project and stops when another project is opened.
   const runningJob = useMooStore((s) =>
     s.isExporting
-      ? 'Ekspor video'
+      ? t('Ekspor video')
       : s.isCompilingMograph || s.revisingSceneId
-        ? 'Pembuatan visual AI'
+        ? t('Pembuatan visual AI')
         : s.isGeneratingScript
-          ? 'Penyusunan naskah AI'
+          ? t('Penyusunan naskah AI')
           : s.isGeneratingAudio
-            ? 'Pembuatan suara'
+            ? t('Pembuatan suara')
             : null
   );
 
@@ -131,7 +132,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
       await flushPendingSave();
       const full = p.id === activeProject.id ? activeProject : await loadProjectFromDb(p.id);
       if (!full) {
-        addToast('Proyek tidak ditemukan.', 'error');
+        addToast(t('Proyek tidak ditemukan.'), 'error');
         return;
       }
       const blob = new Blob([serializeProjectBackup(full)], { type: 'application/json' });
@@ -139,7 +140,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
       triggerFileDownload(url, `${safeFileName(full.title)}.mooscript.json`);
       setTimeout(() => URL.revokeObjectURL(url), 15000);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Gagal mengunduh cadangan.', 'error');
+      addToast(err instanceof Error ? err.message : t('Gagal mengunduh cadangan.'), 'error');
     }
   };
 
@@ -148,13 +149,13 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
     e.target.value = '';
     if (!file) return;
     if (file.size > MAX_BACKUP_BYTES) {
-      addToast('Berkas terlalu besar (maks 20 MB).', 'error');
+      addToast(t('Berkas terlalu besar (maks 20 MB).'), 'error');
       return;
     }
     try {
       await importProject(parseProjectBackup(await file.text()));
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Gagal mengimpor proyek.', 'error');
+      addToast(err instanceof Error ? err.message : t('Gagal mengimpor proyek.'), 'error');
     }
   };
 
@@ -167,9 +168,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
   };
 
   const formatTimestamp = (ts?: number) => {
-    if (!ts) return 'Baru';
+    if (!ts) return t('Baru');
     const date = new Date(ts);
-    return date.toLocaleDateString('id-ID', {
+    return date.toLocaleDateString(getLocale() === 'en' ? 'en-US' : 'id-ID', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -191,9 +192,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[22px]">video_library</span>
             <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-bold text-white">Daftar Proyek</h2>
+              <h2 className="text-sm font-bold text-white">{t('Daftar Proyek')}</h2>
               <span className="text-[11px] font-mono text-zinc-500">
-                {projectsList.length} proyek
+                {projectsList.length === 1 ? t('1 proyek') : t('{0} proyek', projectsList.length)}
               </span>
             </div>
           </div>
@@ -201,7 +202,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           <div className="flex items-center gap-2">
             <label className="px-3 h-8 rounded-lg border border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
               <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              <span>Impor</span>
+              <span>{t('Impor')}</span>
               <input
                 type="file"
                 accept=".json,application/json"
@@ -216,13 +217,13 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
               className="px-3 h-8 rounded-lg bg-primary hover:bg-lime-300 text-black text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Proyek Baru</span>
+              <span>{t('Proyek Baru')}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
-              aria-label="Tutup modal"
+              aria-label={t('Tutup modal')}
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
@@ -236,16 +237,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[16px] shrink-0">info</span>
             <span>
-              {runningJob} sedang berjalan. Proses itu dibatalkan jika Anda membuka atau membuat proyek lain.
+              {runningJob} {t('sedang berjalan. Proses itu dibatalkan jika Anda membuka atau membuat proyek lain.')}
             </span>
           </div>
         )}
 
         {/* Template starters */}
         <div className="px-4 pt-3 pb-1">
-          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Mulai dari template</span>
+          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">{t('Mulai dari template')}</span>
           <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {PROJECT_TEMPLATES.map((tpl) => (
+            {getProjectTemplates().map((tpl) => (
               <button
                 key={tpl.id}
                 type="button"
@@ -257,7 +258,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                 <span className="material-symbols-outlined text-[18px] text-primary">{tpl.icon}</span>
                 <span className="text-[12px] font-semibold text-zinc-100 leading-tight">{tpl.title}</span>
                 <span className="text-[10px] font-mono text-zinc-500">
-                  {tpl.aspectRatio} · {tpl.scenes.length} adegan
+                  {tpl.aspectRatio} · {tpl.scenes.length === 1 ? t('1 adegan') : t('{0} adegan', tpl.scenes.length)}
                 </span>
               </button>
             ))}
@@ -310,7 +311,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
                     {isActive && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider">
-                        Aktif
+                        {t('Aktif')}
                       </span>
                     )}
                   </div>
@@ -318,7 +319,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                   <div className="flex items-center gap-3 mt-1 text-[10px] font-mono text-zinc-400">
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-[13px] text-zinc-500">movie</span>
-                      {sceneCount} adegan
+                      {sceneCount === 1 ? t('1 adegan') : t('{0} adegan', sceneCount)}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
@@ -336,7 +337,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     <button
                       type="button"
                       onClick={() => handleStartRename(p)}
-                      title="Ubah nama proyek"
+                      title={t('Ubah nama proyek')}
                       className="w-7 h-7 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                     >
                       <span className="material-symbols-outlined text-[15px]">edit</span>
@@ -346,7 +347,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                   <button
                     type="button"
                     onClick={(e) => handleExport(e, p)}
-                    title="Unduh cadangan proyek"
+                    title={t('Unduh cadangan proyek')}
                     className="w-8 h-8 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">download</span>
@@ -355,7 +356,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                   <button
                     type="button"
                     onClick={(e) => handleDuplicate(e, p.id)}
-                    title="Duplikat proyek"
+                    title={t('Duplikat proyek')}
                     className="w-8 h-8 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">content_copy</span>
@@ -365,7 +366,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
                     type="button"
                     onClick={(e) => handleDelete(e, p)}
                     disabled={projectsList.length <= 1}
-                    title={projectsList.length <= 1 ? 'Tidak dapat menghapus proyek satu-satunya' : 'Hapus proyek'}
+                    title={projectsList.length <= 1 ? t('Tidak dapat menghapus proyek satu-satunya') : t('Hapus proyek')}
                     className="w-8 h-8 rounded-lg hover:bg-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -378,14 +379,14 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
 
         {/* Footer info */}
         <div className="px-5 py-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-[11px] font-mono text-zinc-500">
-          <span>Penyimpanan Lokal</span>
+          <span>{t('Penyimpanan Lokal')}</span>
           <a
             href="/privacy.html"
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:text-white"
           >
-            Kebijakan Privasi
+            {t('Kebijakan Privasi')}
           </a>
         </div>
       </div>
@@ -400,10 +401,10 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({ isOpen
             setProjectToDelete(null);
           }
         }}
-        title="Hapus Proyek"
-        description={`Apakah Anda yakin ingin menghapus proyek "${projectToDelete?.title || ''}"? Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus Proyek"
-        cancelLabel="Batal"
+        title={t('Hapus Proyek')}
+        description={t('Apakah Anda yakin ingin menghapus proyek "{0}"? Tindakan ini tidak dapat dibatalkan.', projectToDelete?.title || '')}
+        confirmLabel={t('Hapus Proyek')}
+        cancelLabel={t('Batal')}
         variant="danger"
         icon="delete_forever"
       />

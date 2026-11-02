@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -28,9 +29,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         role="alert"
         className="h-screen w-screen flex flex-col items-center justify-center gap-4 bg-background text-on-surface p-6 text-center"
       >
-        <h1 className="text-xl font-bold">Terjadi kesalahan tak terduga</h1>
+        <h1 className="text-xl font-bold">{t('Terjadi kesalahan tak terduga')}</h1>
         <p className="text-sm text-text-muted max-w-md">
-          Proyek Anda tersimpan otomatis di browser. Muat ulang aplikasi untuk melanjutkan.
+          {t('Proyek Anda tersimpan otomatis di browser. Muat ulang aplikasi untuk melanjutkan.')}
         </p>
         <pre className="font-mono text-xs text-text-muted max-w-full overflow-auto">
           {error.message}
@@ -40,7 +41,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           onClick={() => window.location.reload()}
           className="px-4 py-2 bg-primary text-black text-sm font-bold rounded-lg hover:opacity-90 transition-opacity"
         >
-          Muat Ulang
+          {t('Muat Ulang')}
         </button>
       </div>
     );

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMooStore } from '../store/useMooStore';
+import { t } from '../i18n';
 
 export const ToastContainer: React.FC = () => {
   const toasts = useMooStore((s) => s.toasts);
@@ -9,7 +10,7 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <aside
-      aria-label="Notifications"
+      aria-label={t('Notifications')}
       role="status"
       aria-live="polite"
       className="fixed top-[calc(var(--header-h)+0.5rem)] inset-x-4 sm:inset-x-auto sm:right-4 sm:w-full z-[60] flex flex-col gap-2 sm:max-w-sm pointer-events-none"
@@ -48,7 +49,7 @@ export const ToastContainer: React.FC = () => {
             <button
               onClick={() => removeToast(toast.id)}
               className="text-zinc-400 hover:text-white shrink-0 p-0.5 rounded transition-colors"
-              aria-label="Close notification"
+              aria-label={t('Close notification')}
               type="button"
             >
               <span className="material-symbols-outlined text-[16px]">close</span>

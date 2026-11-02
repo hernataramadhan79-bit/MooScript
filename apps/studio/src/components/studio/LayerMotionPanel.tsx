@@ -2,34 +2,35 @@ import React from 'react';
 import type { LayerMotion, LayerMotionPreset, TransitionCurve } from '../../types';
 import { LAYER_MOTION_PRESETS } from '../../types';
 import { CommitNumberInput } from '../ui/CommitNumberInput';
+import { L, t } from '../../i18n';
 
 const PRESET_LABEL: Record<LayerMotionPreset, string> = {
-  fade: 'Pudar',
-  pop: 'Pop',
-  'slide-up': 'Geser dari bawah',
-  'slide-down': 'Geser dari atas',
-  'slide-left': 'Geser dari kanan',
-  'slide-right': 'Geser dari kiri',
-  zoom: 'Zoom',
-  spin: 'Putar',
-  blur: 'Blur'
+  fade: L('Pudar'),
+  pop: L('Pop'),
+  'slide-up': L('Geser dari bawah'),
+  'slide-down': L('Geser dari atas'),
+  'slide-left': L('Geser dari kanan'),
+  'slide-right': L('Geser dari kiri'),
+  zoom: L('Zoom'),
+  spin: L('Putar'),
+  blur: L('Blur')
 };
 
 /** Exit presets read as where the layer goes. */
 const EXIT_LABEL: Partial<Record<LayerMotionPreset, string>> = {
-  'slide-up': 'Geser ke atas',
-  'slide-down': 'Geser ke bawah',
-  'slide-left': 'Geser ke kiri',
-  'slide-right': 'Geser ke kanan'
+  'slide-up': L('Geser ke atas'),
+  'slide-down': L('Geser ke bawah'),
+  'slide-left': L('Geser ke kiri'),
+  'slide-right': L('Geser ke kanan')
 };
 
 const CURVES: { id: TransitionCurve; label: string }[] = [
-  { id: 'smooth', label: 'Halus' },
-  { id: 'soft', label: 'Lembut' },
-  { id: 'strong', label: 'Tegas' },
-  { id: 'sharp', label: 'Tajam' },
-  { id: 'rush', label: 'Melesat' },
-  { id: 'linear', label: 'Rata' }
+  { id: 'smooth', label: L('Halus') },
+  { id: 'soft', label: L('Lembut') },
+  { id: 'strong', label: L('Tegas') },
+  { id: 'sharp', label: L('Tajam') },
+  { id: 'rush', label: L('Melesat') },
+  { id: 'linear', label: L('Rata') }
 ];
 
 interface LayerMotionPanelProps {
@@ -60,38 +61,38 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
   ) => (
     <div className="grid grid-cols-[1fr_1fr_1.2fr_auto] gap-1 items-end">
       <label className="flex flex-col gap-0.5 text-[9px] text-text-muted">
-        Mulai (dtk)
+        {t('Mulai (dtk)')}
         <CommitNumberInput
           value={step.at}
           min={0}
           max={maxT}
           step={0.1}
           onCommit={(v) => onStep({ at: v })}
-          ariaLabel={`Waktu mulai ${label}`}
+          ariaLabel={t('Waktu mulai {0}', label)}
           className={inputClass}
         />
       </label>
       <label className="flex flex-col gap-0.5 text-[9px] text-text-muted">
-        Durasi
+        {t('Durasi')}
         <CommitNumberInput
           value={step.dur}
           min={0.05}
           max={10}
           step={0.1}
           onCommit={(v) => onStep({ dur: v })}
-          ariaLabel={`Durasi ${label}`}
+          ariaLabel={t('Durasi {0}', label)}
           className={inputClass}
         />
       </label>
       <label className="flex flex-col gap-0.5 text-[9px] text-text-muted">
-        Gerak
+        {t('Gerak')}
         <select
           value={step.curve || ''}
           onChange={(e) => onStep({ curve: (e.target.value || undefined) as TransitionCurve | undefined })}
-          aria-label={`Gaya gerak ${label}`}
+          aria-label={t('Gaya gerak {0}', label)}
           className={selectClass}
         >
-          <option value="">Halus</option>
+          <option value="">{t('Halus')}</option>
           {CURVES.filter((c) => c.id !== 'smooth').map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
@@ -102,8 +103,8 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
       <button
         type="button"
         onClick={() => onStep({ at: here() })}
-        title="Mulai di posisi playhead"
-        aria-label={`Mulai ${label} di playhead`}
+        title={t('Mulai di posisi playhead')}
+        aria-label={t('Mulai {0} di playhead', label)}
         className="h-7 w-7 rounded-md bg-surface-2 border border-border text-text-muted hover:text-accent flex items-center justify-center"
       >
         <span className="material-symbols-outlined text-[14px]">my_location</span>
@@ -123,10 +124,10 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
       aria-label={label}
       className={selectClass}
     >
-      <option value="">Tidak ada</option>
+      <option value="">{t('Tidak ada')}</option>
       {LAYER_MOTION_PRESETS.map((p) => (
         <option key={p} value={p}>
-          {names[p] || PRESET_LABEL[p]}
+          {t(names[p] || PRESET_LABEL[p])}
         </option>
       ))}
     </select>
@@ -142,7 +143,7 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
         min={key === 'opacity' ? 0 : key === 'scale' ? 0.05 : undefined}
         max={key === 'opacity' ? 1 : undefined}
         onCommit={(v) => move && update({ ...m, move: { ...move, to: { ...move.to, [key]: v } } })}
-        ariaLabel={`Tujuan ${label}`}
+        ariaLabel={t('Tujuan {0}', label)}
         className={inputClass}
       />
     </label>
@@ -153,30 +154,30 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold text-on-surface flex items-center gap-1.5">
           <span className="material-symbols-outlined text-[15px] text-accent">animation</span>
-          Animasi Layer
+          {t('Animasi Layer')}
         </span>
         {(m.enter || m.move || m.exit) && (
           <button type="button" onClick={() => onChange(null)} className="text-[10px] text-text-muted hover:text-rose-300">
-            Hapus semua
+            {t('Hapus semua')}
           </button>
         )}
       </div>
 
       {/* Entrance */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Masuk</span>
+        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">{t('Masuk')}</span>
         {presetSelect(
           m.enter?.preset,
           (p) => update({ ...m, enter: p ? { at: m.enter?.at ?? 0, dur: m.enter?.dur ?? 0.5, curve: m.enter?.curve, preset: p } : undefined }),
-          'Animasi masuk'
+          t('Animasi masuk')
         )}
-        {m.enter && timingRow(m.enter, (patch) => update({ ...m, enter: { ...m.enter!, ...patch } }), 'animasi masuk')}
+        {m.enter && timingRow(m.enter, (patch) => update({ ...m, enter: { ...m.enter!, ...patch } }), t('animasi masuk'))}
       </div>
 
       {/* A → B move */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Gerak A → B</span>
+          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">{t('Gerak A → B')}</span>
           <button
             type="button"
             onClick={() =>
@@ -192,29 +193,29 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
               move ? 'bg-accent/15 border-accent text-accent font-semibold' : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
             }`}
           >
-            {move ? 'Aktif' : 'Tambah'}
+            {move ? t('Aktif') : t('Tambah')}
           </button>
         </div>
         {move && (
           <>
             <p className="text-[10px] text-text-faint leading-snug">
-              Layer bergerak dari posisinya sekarang (A) ke posisi B, diukur dari A.
+              {t('Layer bergerak dari posisinya sekarang (A) ke posisi B, diukur dari A.')}
             </p>
             <div className="grid grid-cols-5 gap-1">
               {moveField('x', 'X (px)', 0, 10)}
               {moveField('y', 'Y (px)', 0, 10)}
-              {moveField('scale', 'Skala', 1, 0.05)}
-              {moveField('rotation', 'Putar°', 0, 5)}
-              {moveField('opacity', 'Opasitas', 1, 0.05)}
+              {moveField('scale', t('Skala'), 1, 0.05)}
+              {moveField('rotation', t('Putar°'), 0, 5)}
+              {moveField('opacity', t('Opasitas'), 1, 0.05)}
             </div>
-            {timingRow(move, (patch) => update({ ...m, move: { ...move, ...patch } }), 'gerak')}
+            {timingRow(move, (patch) => update({ ...m, move: { ...move, ...patch } }), t('gerak'))}
           </>
         )}
       </div>
 
       {/* Exit */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Keluar</span>
+        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">{t('Keluar')}</span>
         {presetSelect(
           m.exit?.preset,
           (p) =>
@@ -229,10 +230,10 @@ export const LayerMotionPanel: React.FC<LayerMotionPanelProps> = ({ motion, scen
                   }
                 : undefined
             }),
-          'Animasi keluar',
+          t('Animasi keluar'),
           EXIT_LABEL
         )}
-        {m.exit && timingRow(m.exit, (patch) => update({ ...m, exit: { ...m.exit!, ...patch } }), 'animasi keluar')}
+        {m.exit && timingRow(m.exit, (patch) => update({ ...m, exit: { ...m.exit!, ...patch } }), t('animasi keluar'))}
       </div>
     </div>
   );

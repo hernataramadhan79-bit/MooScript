@@ -1,5 +1,6 @@
 import type { GeneratedScene, MooProject, Scene, ScenePalette } from '../../types';
 import { extractLayersFromHtml } from './layers';
+import { L } from '../../i18n';
 
 export type ProceduralArchetype =
   | 'auto'
@@ -23,64 +24,64 @@ export interface ProceduralArchetypeInfo {
 export const PROCEDURAL_ARCHETYPES: ProceduralArchetypeInfo[] = [
   {
     id: 'auto',
-    label: 'Cerdas Otomatis (Auto)',
-    description: 'Deteksi otomatis tata letak terbaik dari isi kalimat, angka, atau daftar pada naskah.',
+    label: L('Cerdas Otomatis (Auto)'),
+    description: L('Deteksi otomatis tata letak terbaik dari isi kalimat, angka, atau daftar pada naskah.'),
     badge: 'AI-Rule',
     icon: 'auto_awesome'
   },
   {
     id: 'kinetic-impact',
-    label: 'Kinetic Impact Slam',
-    description: 'Tipografi kinetik besar dengan aksen kata menyala dan partikel geometris.',
+    label: L('Kinetic Impact Slam'),
+    description: L('Tipografi kinetik besar dengan aksen kata menyala dan partikel geometris.'),
     badge: 'Hook',
     icon: 'bolt'
   },
   {
     id: 'glass-spotlight',
-    label: 'Glass Card Spotlight',
-    description: 'Kartu kaca modern (glassmorphism) dengan lencana fokus dan poin sorotan.',
+    label: L('Glass Card Spotlight'),
+    description: L('Kartu kaca modern (glassmorphism) dengan lencana fokus dan poin sorotan.'),
     badge: 'Explainer',
     icon: 'dashboard'
   },
   {
     id: 'stat-counter',
-    label: 'Big Stat & Counter',
-    description: 'Sorotan angka/persentase raksasa dengan grafik progres radial & bar.',
+    label: L('Big Stat & Counter'),
+    description: L('Sorotan angka/persentase raksasa dengan grafik progres radial & bar.'),
     badge: 'Data',
     icon: 'monitoring'
   },
   {
     id: 'code-terminal',
-    label: 'Code & Terminal Window',
-    description: 'Jendela kode bergaya macOS gelap dengan efek pengetikan baris demi baris.',
+    label: L('Code & Terminal Window'),
+    description: L('Jendela kode bergaya macOS gelap dengan efek pengetikan baris demi baris.'),
     badge: 'Tech',
     icon: 'terminal'
   },
   {
     id: 'split-versus',
-    label: 'Split VS Comparison',
-    description: 'Perbandingan dua sisi (Cara Lama vs Cara Baru / Pro vs Kontra) secara kontras.',
+    label: L('Split VS Comparison'),
+    description: L('Perbandingan dua sisi (Cara Lama vs Cara Baru / Pro vs Kontra) secara kontras.'),
     badge: 'Compare',
     icon: 'compare_arrows'
   },
   {
     id: 'bento-list',
-    label: 'Staggered Bento List',
-    description: 'Susunan kartu poin bernomor yang muncul berurutan secara dinamis.',
+    label: L('Staggered Bento List'),
+    description: L('Susunan kartu poin bernomor yang muncul berurutan secara dinamis.'),
     badge: 'List',
     icon: 'format_list_bulleted'
   },
   {
     id: 'social-quote',
-    label: 'Editorial Quote Card',
-    description: 'Kartu kutipan sinematik dengan tanda kutip besar dan indikator gelombang.',
+    label: L('Editorial Quote Card'),
+    description: L('Kartu kutipan sinematik dengan tanda kutip besar dan indikator gelombang.'),
     badge: 'Story',
     icon: 'format_quote'
   },
   {
     id: 'chart-data',
-    label: 'Animated Growth Chart',
-    description: 'Grafik batang & kurva pertumbuhan SVG yang tumbuh mengikuti timeline.',
+    label: L('Animated Growth Chart'),
+    description: L('Grafik batang & kurva pertumbuhan SVG yang tumbuh mengikuti timeline.'),
     badge: 'Chart',
     icon: 'bar_chart'
   }

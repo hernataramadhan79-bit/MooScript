@@ -5,6 +5,7 @@ import { extractWaveformPeaks } from '../../engine/audio/waveform';
 import { getProjectDuration, MAX_SCENE_SECONDS } from '../../utils/projectDuration';
 import type { LayerMotion, SfxCue, SfxKind } from '../../types';
 import { SFX_KINDS, SFX_LABEL } from '../../engine/audio/sfx';
+import { L, t } from '../../i18n';
 
 interface TimelineBarProps {
   className?: string;
@@ -242,7 +243,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
           <button
             type="button"
             onClick={togglePlay}
-            aria-label={isPlaying ? 'Jeda' : 'Putar'}
+            aria-label={isPlaying ? t('Jeda') : t('Putar')}
             className="h-9 w-11 rounded-lg bg-[#84cc16] hover:bg-[#9ae62e] text-black flex items-center justify-center active:scale-95 shadow-sm shadow-[#84cc16]/20"
           >
             <span className="material-symbols-outlined fill text-[22px]">{isPlaying ? 'pause' : 'play_arrow'}</span>
@@ -250,7 +251,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
           <button
             type="button"
             onClick={toggleLoop}
-            aria-label={isLooping ? 'Matikan putar ulang' : 'Putar ulang terus'}
+            aria-label={isLooping ? t('Matikan putar ulang') : t('Putar ulang terus')}
             aria-pressed={isLooping}
             className={`${compactBtn} ${isLooping ? '!bg-[#84cc16]/15 !border-[#84cc16]/40 !text-[#84cc16]' : ''}`}
           >
@@ -268,8 +269,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
           <button
             type="button"
             onClick={() => setPreviewMode(previewMode === 'ticker' ? 'compact' : 'ticker')}
-            aria-label={previewMode === 'ticker' ? 'Tampilkan panggung' : 'Sembunyikan panggung'}
-            title={previewMode === 'ticker' ? 'Tampilkan panggung' : 'Sembunyikan panggung'}
+            aria-label={previewMode === 'ticker' ? t('Tampilkan panggung') : t('Sembunyikan panggung')}
+            title={previewMode === 'ticker' ? t('Tampilkan panggung') : t('Sembunyikan panggung')}
             className={compactBtn}
           >
             <span className="material-symbols-outlined text-[20px]">
@@ -279,8 +280,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
           <button
             type="button"
             onClick={() => setPreviewMode('theater')}
-            aria-label="Layar penuh"
-            title="Layar penuh"
+            aria-label={t('Layar penuh')}
+            title={t('Layar penuh')}
             className={compactBtn}
           >
             <span className="material-symbols-outlined text-[18px]">fullscreen</span>
@@ -293,7 +294,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         <div
           role="slider"
           tabIndex={0}
-          aria-label="Posisi pemutaran"
+          aria-label={t('Posisi pemutaran')}
           aria-valuemin={0}
           aria-valuemax={totalFrames}
           aria-valuenow={currentFrame}
@@ -364,7 +365,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         </div>
       ) : (
         <div className="h-8 w-full rounded-md border border-dashed border-white/[0.1] flex items-center justify-center text-[11px] text-zinc-500">
-          Belum ada shot
+          {t('Belum ada shot')}
         </div>
       )}
 
@@ -402,12 +403,12 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         isLooping={isLooping}
         audioStale={audioStale}
         isAudioActive={isAudioActive}
-        audioLabel={bgmOnlyAudio ? 'Audio' : 'Suara'}
+        audioLabel={bgmOnlyAudio ? t('Audio') : t('Suara')}
         audioDuration={project.audioDuration || totalDuration}
         waveformPeaks={waveformPeaks}
         musicLabel={
           project.bgm?.preset && project.bgm.preset !== 'none'
-            ? `${project.bgm.preset === 'custom' ? project.bgm.customName || 'Musik sendiri' : project.bgm.preset} · ${Math.round((project.bgm.level ?? 0) * 100)}%`
+            ? `${project.bgm.preset === 'custom' ? project.bgm.customName || t('Musik sendiri') : project.bgm.preset} · ${Math.round((project.bgm.level ?? 0) * 100)}%`
             : null
         }
         chunkSize={project.theme?.subtitleCustomization?.maxWordsPerChunk || 4}
@@ -443,15 +444,15 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
         onRemoveSfx={removeSfxCue}
         onAutoSfx={() => {
           const n = autoPlaceSfx();
-          addToast(n > 0 ? `${n} efek suara ditempatkan. Geser atau hapus di track SFX.` : 'Tidak ada titik baru untuk efek suara.', 'info');
+          addToast(n > 0 ? t('{0} efek suara ditempatkan. Geser atau hapus di track SFX.', n) : t('Tidak ada titik baru untuk efek suara.'), 'info');
         }}
         onAnalyzeBeats={async () => {
           const n = await analyzeMusicBeats();
-          if (n > 0) addToast(`${n} ketukan ditemukan. Potongan dan cue sekarang bisa menempel ke ketukan.`, 'success');
+          if (n > 0) addToast(t('{0} ketukan ditemukan. Potongan dan cue sekarang bisa menempel ke ketukan.', n), 'success');
         }}
         onSnapToBeats={() => {
           const n = snapCutsToBeats();
-          addToast(n > 0 ? `${n} potongan dipindah ke ketukan terdekat.` : 'Semua potongan sudah pas di ketukan.', 'info');
+          addToast(n > 0 ? t('{0} potongan dipindah ke ketukan terdekat.', n) : t('Semua potongan sudah pas di ketukan.'), 'info');
         }}
       />
     );
@@ -810,7 +811,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
       {/* Toolbar: zoom, markers, loop range */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1">
-          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead((z) => z / 1.5)} disabled={zoom <= 1} title="Perkecil (Ctrl + scroll)" aria-label="Perkecil timeline">
+          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead((z) => z / 1.5)} disabled={zoom <= 1} title={t('Perkecil (Ctrl + scroll)')} aria-label={t('Perkecil timeline')}>
             <span className="material-symbols-outlined text-[16px]">zoom_out</span>
           </button>
           <input
@@ -820,14 +821,14 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             step={0.01}
             value={Math.log(zoom)}
             onChange={(e) => setZoomKeepingPlayhead(Math.exp(parseFloat(e.target.value)))}
-            aria-label="Zoom timeline"
+            aria-label={t('Zoom timeline')}
             className="w-24 accent-[#84cc16] h-1 cursor-pointer"
           />
-          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead((z) => z * 1.5)} disabled={zoom >= MAX_ZOOM} title="Perbesar (Ctrl + scroll)" aria-label="Perbesar timeline">
+          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead((z) => z * 1.5)} disabled={zoom >= MAX_ZOOM} title={t('Perbesar (Ctrl + scroll)')} aria-label={t('Perbesar timeline')}>
             <span className="material-symbols-outlined text-[16px]">zoom_in</span>
           </button>
-          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead(1)} disabled={zoom === 1} title="Tampilkan seluruh video">
-            Pas
+          <button type="button" className={toolBtn} onClick={() => setZoomKeepingPlayhead(1)} disabled={zoom === 1} title={t('Tampilkan seluruh video')}>
+            {t('Pas')}
           </button>
         </div>
 
@@ -837,14 +838,14 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             className={toolBtn}
             onClick={props.onSplit}
             disabled={sceneBoundaries.length === 0}
-            title="Potong shot di playhead (S); potongan kedua melanjutkan animasi yang sama"
+            title={t('Potong shot di playhead (S); potongan kedua melanjutkan animasi yang sama')}
           >
             <span className="material-symbols-outlined text-[15px]">content_cut</span>
-            Potong
+            {t('Potong')}
           </button>
-          <button type="button" className={toolBtn} onClick={addMarkerHere} disabled={totalDuration <= 0} title="Tambah marker di playhead (M)">
+          <button type="button" className={toolBtn} onClick={addMarkerHere} disabled={totalDuration <= 0} title={t('Tambah marker di playhead (M)')}>
             <span className="material-symbols-outlined text-[15px]">bookmark_add</span>
-            Marker
+            {t('Marker')}
           </button>
           {selectedMarker && (
             <div className="flex items-center gap-1 pl-1">
@@ -852,8 +853,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                 type="text"
                 value={selectedMarker.label}
                 onChange={(e) => props.onUpdateMarker(selectedMarker.id, { label: e.target.value })}
-                placeholder={`Marker ${formatTimecode(selectedMarker.time)}`}
-                aria-label="Nama marker"
+                placeholder={t('Marker {0}', formatTimecode(selectedMarker.time))}
+                aria-label={t('Nama marker')}
                 maxLength={60}
                 className="h-7 w-32 px-2 rounded-md bg-black/60 border border-amber-300/40 focus:border-amber-300 text-[11px] text-zinc-100 focus:outline-none"
               />
@@ -864,22 +865,22 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                   props.onRemoveMarker(selectedMarker.id);
                   setSelectedMarkerId(null);
                 }}
-                title="Hapus marker"
-                aria-label="Hapus marker"
+                title={t('Hapus marker')}
+                aria-label={t('Hapus marker')}
               >
                 <span className="material-symbols-outlined text-[15px]">delete</span>
               </button>
             </div>
           )}
           <span className="w-px h-5 bg-white/[0.08] mx-1" aria-hidden="true" />
-          <button type="button" className={toolBtn} onClick={() => props.onSetLoopPoint('start', currentTimeSec)} disabled={totalDuration <= 0} title="Awal rentang putar ulang di playhead (I)">
-            In
+          <button type="button" className={toolBtn} onClick={() => props.onSetLoopPoint('start', currentTimeSec)} disabled={totalDuration <= 0} title={t('Awal rentang putar ulang di playhead (I)')}>
+            {t('In')}
           </button>
-          <button type="button" className={toolBtn} onClick={() => props.onSetLoopPoint('end', currentTimeSec)} disabled={totalDuration <= 0} title="Akhir rentang putar ulang di playhead (O)">
-            Out
+          <button type="button" className={toolBtn} onClick={() => props.onSetLoopPoint('end', currentTimeSec)} disabled={totalDuration <= 0} title={t('Akhir rentang putar ulang di playhead (O)')}>
+            {t('Out')}
           </button>
           {loopRange && (
-            <button type="button" className={toolBtn} onClick={props.onClearLoop} title="Hapus rentang (X)">
+            <button type="button" className={toolBtn} onClick={props.onClearLoop} title={t('Hapus rentang (X)')}>
               <span className="font-mono text-sky-300">
                 {formatTimecode(loopRange.start)}–{formatTimecode(loopRange.end)}
               </span>
@@ -896,22 +897,22 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           className={toolBtn}
           onClick={props.onAutoSfx}
           disabled={!props.hasScenes}
-          title="Tempatkan whoosh di setiap potongan dan pop/hentakan di momen visual. Cue yang kamu taruh sendiri tetap."
+          title={t('Tempatkan whoosh di setiap potongan dan pop/hentakan di momen visual. Cue yang kamu taruh sendiri tetap.')}
         >
           <span className="material-symbols-outlined text-[15px]">graphic_eq</span>
-          SFX otomatis
+          {t('SFX otomatis')}
         </button>
         <select
           value=""
           onChange={(e) => e.target.value && props.onAddSfx(e.target.value as SfxKind)}
           disabled={!props.hasScenes}
-          aria-label="Tambah efek suara di playhead"
+          aria-label={t('Tambah efek suara di playhead')}
           className="h-7 px-1.5 rounded-md bg-white/[0.04] border border-white/[0.06] text-[10px] font-semibold text-zinc-400 focus:outline-none disabled:opacity-40"
         >
-          <option value="">+ SFX di playhead</option>
+          <option value="">{t('+ SFX di playhead')}</option>
           {SFX_KINDS.map((k) => (
             <option key={k} value={k}>
-              {SFX_LABEL[k]}
+              {t(SFX_LABEL[k])}
             </option>
           ))}
         </select>
@@ -920,12 +921,12 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             <select
               value={selectedCue.kind}
               onChange={(e) => props.onUpdateSfx(selectedCue.id, { kind: e.target.value as SfxKind })}
-              aria-label="Jenis efek suara"
+              aria-label={t('Jenis efek suara')}
               className="h-7 px-1.5 rounded-md bg-black/60 border border-orange-300/40 text-[10px] text-zinc-100 focus:outline-none"
             >
               {SFX_KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {SFX_LABEL[k]}
+                  {t(SFX_LABEL[k])}
                 </option>
               ))}
             </select>
@@ -936,8 +937,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
               step={0.05}
               value={selectedCue.gain ?? 1}
               onChange={(e) => props.onUpdateSfx(selectedCue.id, { gain: parseFloat(e.target.value) })}
-              aria-label="Volume efek suara ini"
-              title={`Volume ${Math.round((selectedCue.gain ?? 1) * 100)}%`}
+              aria-label={t('Volume efek suara ini')}
+              title={t('Volume {0}%', Math.round((selectedCue.gain ?? 1) * 100))}
               className="w-16 accent-orange-300 h-1 cursor-pointer"
             />
             <button
@@ -947,8 +948,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                 props.onRemoveSfx(selectedCue.id);
                 setSelectedCueId(null);
               }}
-              title="Hapus efek suara"
-              aria-label="Hapus efek suara"
+              title={t('Hapus efek suara')}
+              aria-label={t('Hapus efek suara')}
             >
               <span className="material-symbols-outlined text-[15px]">delete</span>
             </button>
@@ -960,10 +961,10 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           className={toolBtn}
           onClick={props.onAnalyzeBeats}
           disabled={!props.musicLabel}
-          title={props.musicLabel ? 'Cari ketukan musik latar' : 'Pilih musik latar di tab Audio dulu'}
+          title={props.musicLabel ? t('Cari ketukan musik latar') : t('Pilih musik latar di tab Audio dulu')}
         >
           <span className="material-symbols-outlined text-[15px]">music_note</span>
-          {props.beats.length ? `Ketukan${props.beatsBpm ? ` · ${Math.round(props.beatsBpm)} BPM` : ''}` : 'Cari ketukan'}
+          {props.beats.length ? `${t('Ketukan')}${props.beatsBpm ? ` · ${Math.round(props.beatsBpm)} BPM` : ''}` : t('Cari ketukan')}
         </button>
         {props.beats.length > 1 && (
           <button
@@ -971,10 +972,10 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             className={toolBtn}
             onClick={props.onSnapToBeats}
             disabled={sceneBoundaries.length < 2}
-            title="Pindahkan setiap potongan antar-shot ke ketukan terdekat (durasi total tetap)"
+            title={t('Pindahkan setiap potongan antar-shot ke ketukan terdekat (durasi total tetap)')}
           >
             <span className="material-symbols-outlined text-[15px]">align_horizontal_center</span>
-            Potongan ke ketukan
+            {t('Potongan ke ketukan')}
           </button>
         )}
       </div>
@@ -992,7 +993,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                 onPointerDown={onRulerPointerDown}
                 onPointerMove={onRulerPointerMove}
                 data-timeline-ruler
-                title="Klik atau seret untuk memindah playhead"
+                title={t('Klik atau seret untuk memindah playhead')}
               >
                 {ticks.map((tk) => (
                   <div
@@ -1016,8 +1017,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                       setSelectedMarkerId(m.id);
                       props.onSeekFrame(Math.round(m.time * fps));
                     }}
-                    title={m.label || `Marker ${formatTimecode(m.time)}`}
-                    aria-label={`Marker ${m.label || formatTimecode(m.time)}`}
+                    title={m.label || t('Marker {0}', formatTimecode(m.time))}
+                    aria-label={t('Marker {0}', m.label || formatTimecode(m.time))}
                     className={`absolute top-0 -ml-1.5 w-3 h-3 rotate-45 rounded-[2px] border ${
                       m.id === selectedMarkerId ? 'bg-amber-300 border-amber-100' : 'bg-amber-400/80 border-amber-300/60'
                     }`}
@@ -1031,7 +1032,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
               <div className="relative">
                 {/* Shot track */}
                 {trackRow(
-                  'Shot',
+                  t('Shot'),
                   'movie',
                   '34px',
                   <>
@@ -1043,7 +1044,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                         <div
                           key={scene.id}
                           onClick={() => props.onSelectScene(scene.id, scene.startSec)}
-                          title={`Shot ${scene.shotNumber} (${scene.durationInSeconds.toFixed(1)} dtk)${scene.narrationText ? `: ${scene.narrationText}` : ''}`}
+                          title={t('Shot {0} ({1} dtk){2}', scene.shotNumber, scene.durationInSeconds.toFixed(1), scene.narrationText ? `: ${scene.narrationText}` : '')}
                           className={`group absolute top-1 bottom-1 rounded-md border px-1.5 flex items-center gap-1.5 overflow-hidden cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-[#84cc16]/20 border-[#84cc16]/70'
@@ -1066,7 +1067,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                             <div
                               onPointerDown={(e) => startTrimStart(e, sceneBoundaries[idx], sceneBoundaries[idx - 1])}
                               onClick={(e) => e.stopPropagation()}
-                              title="Tarik untuk menggeser potongan dengan shot sebelumnya (durasi total tetap)"
+                              title={t('Tarik untuk menggeser potongan dengan shot sebelumnya (durasi total tetap)')}
                               className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-sky-400/60 active:bg-sky-400 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100"
                             >
                               <span className="w-[1.5px] h-3 rounded-full bg-white/80" />
@@ -1075,7 +1076,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                           <div
                             onPointerDown={(e) => startTrimEnd(e, scene)}
                             onClick={(e) => e.stopPropagation()}
-                            title="Tarik untuk mengubah durasi (shot berikutnya ikut bergeser)"
+                            title={t('Tarik untuk mengubah durasi (shot berikutnya ikut bergeser)')}
                             className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-[#84cc16]/60 active:bg-[#84cc16] z-10 flex items-center justify-center opacity-0 group-hover:opacity-100"
                           >
                             <span className="w-[1.5px] h-3 rounded-full bg-white/80" />
@@ -1103,7 +1104,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
 
                 {/* Caption track */}
                 {trackRow(
-                  'Teks',
+                  t('Teks'),
                   'subtitles',
                   '20px',
                   captionChunks.map((c) => (
@@ -1118,17 +1119,17 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                       )}
                     </div>
                   )),
-                  'Kalimat narasi menurut waktu kata'
+                  t('Kalimat narasi menurut waktu kata')
                 )}
 
                 {/* Selected layer's animation: drag a step to retime it, drag its right edge to change its length */}
                 {props.layerTrack &&
                   trackRow(
-                    'Layer',
+                    t('Layer'),
                     'layers',
                     '22px',
                     <LayerMotionTrack track={props.layerTrack} pxPerSec={pxPerSec} />,
-                    `Animasi layer ${props.layerTrack.layerId}`
+                    t('Animasi layer {0}', props.layerTrack.layerId)
                   )}
 
                 {/* Voice-over / audio track */}
@@ -1151,7 +1152,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                 {/* Sound effects */}
                 {props.hasScenes &&
                   trackRow(
-                    'SFX',
+                    t('SFX'),
                     'graphic_eq',
                     '20px',
                     <SfxTrack
@@ -1163,13 +1164,13 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                       snapTime={snapTime}
                       maxTime={totalDuration}
                     />,
-                    'Efek suara; seret untuk memindah, klik untuk mengatur'
+                    t('Efek suara; seret untuk memindah, klik untuk mengatur')
                   )}
 
                 {/* Music track, with its beats */}
                 {props.musicLabel &&
                   trackRow(
-                    'Musik',
+                    t('Musik'),
                     'music_note',
                     '18px',
                     <>
@@ -1187,7 +1188,7 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
                         />
                       ))}
                     </>,
-                    'Musik latar dicampur ke trek suara; garis kecil = ketukan'
+                    t('Musik latar dicampur ke trek suara; garis kecil = ketukan')
                   )}
 
                 {/* Loop range shading */}
@@ -1234,9 +1235,9 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           {props.audioStale && (
             <span
               className="text-[9px] font-mono text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded hidden sm:inline"
-              title="Durasi adegan berubah setelah suara dibuat; buat ulang suara agar sinkron"
+              title={t('Durasi adegan berubah setelah suara dibuat; buat ulang suara agar sinkron')}
             >
-              Sync
+              {t('Sync')}
             </span>
           )}
         </div>
@@ -1245,8 +1246,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           <button
             type="button"
             onClick={() => props.onSeekFrame(Math.max(0, currentFrame - 1))}
-            title="Mundur 1 frame (←)"
-            aria-label="Mundur 1 frame"
+            title={t('Mundur 1 frame (←)')}
+            aria-label={t('Mundur 1 frame')}
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/[0.06] text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition-all"
           >
             <span className="material-symbols-outlined text-[16px] sm:text-[18px]">skip_previous</span>
@@ -1254,18 +1255,18 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           <button
             type="button"
             onClick={props.onTogglePlay}
-            title={isPlaying ? 'Jeda (Space)' : 'Putar (Space)'}
-            aria-label={isPlaying ? 'Jeda' : 'Putar'}
+            title={isPlaying ? t('Jeda (Space)') : t('Putar (Space)')}
+            aria-label={isPlaying ? t('Jeda') : t('Putar')}
             className="h-7 sm:h-8 px-3 sm:px-3.5 rounded-md bg-[#84cc16] hover:bg-[#9ae62e] text-black font-semibold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm shadow-[#84cc16]/20"
           >
             <span className="material-symbols-outlined text-[17px] sm:text-[19px] font-bold">{isPlaying ? 'pause' : 'play_arrow'}</span>
-            <span className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-75">Space</span>
+            <span className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-75">{t('Space')}</span>
           </button>
           <button
             type="button"
             onClick={() => props.onSeekFrame(Math.min(totalFrames, currentFrame + 1))}
-            title="Maju 1 frame (→)"
-            aria-label="Maju 1 frame"
+            title={t('Maju 1 frame (→)')}
+            aria-label={t('Maju 1 frame')}
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/[0.06] text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition-all"
           >
             <span className="material-symbols-outlined text-[16px] sm:text-[18px]">skip_next</span>
@@ -1274,8 +1275,8 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
             type="button"
             onClick={props.onToggleLoop}
             aria-pressed={isLooping}
-            title={isLooping ? (loopRange ? 'Putar ulang rentang In–Out: aktif' : 'Putar ulang: aktif') : 'Putar ulang: mati'}
-            aria-label="Putar ulang"
+            title={isLooping ? (loopRange ? t('Putar ulang rentang In–Out: aktif') : t('Putar ulang: aktif')) : t('Putar ulang: mati')}
+            aria-label={t('Putar ulang')}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md active:scale-95 flex items-center justify-center transition-all border ${
               isLooping
                 ? 'bg-[#84cc16]/15 border-[#84cc16]/40 text-[#84cc16] shadow-[0_0_8px_rgba(132,204,22,0.15)]'
@@ -1290,14 +1291,14 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
           {activeIndex >= 0 && sceneBoundaries[activeIndex] && (
             <div className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[10px] font-mono text-zinc-300 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#84cc16]" />
-              <span>Shot {sceneBoundaries[activeIndex].shotNumber}</span>
+              <span>{t('Shot')} {sceneBoundaries[activeIndex].shotNumber}</span>
             </div>
           )}
           <button
             type="button"
             onClick={props.onTheater}
-            title="Layar penuh"
-            aria-label="Layar penuh"
+            title={t('Layar penuh')}
+            aria-label={t('Layar penuh')}
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition-colors"
           >
             <span className="material-symbols-outlined text-[15px]">open_in_full</span>
@@ -1309,9 +1310,9 @@ const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = (props) => {
 };
 
 const STEP_STYLE: Record<'enter' | 'move' | 'exit', { label: string; cls: string }> = {
-  enter: { label: 'Masuk', cls: 'bg-emerald-400/20 border-emerald-400/50 text-emerald-200' },
-  move: { label: 'Gerak', cls: 'bg-amber-400/20 border-amber-400/50 text-amber-200' },
-  exit: { label: 'Keluar', cls: 'bg-rose-400/20 border-rose-400/50 text-rose-200' }
+  enter: { label: L('Masuk'), cls: 'bg-emerald-400/20 border-emerald-400/50 text-emerald-200' },
+  move: { label: L('Gerak'), cls: 'bg-amber-400/20 border-amber-400/50 text-amber-200' },
+  exit: { label: L('Keluar'), cls: 'bg-rose-400/20 border-rose-400/50 text-rose-200' }
 };
 
 /** The selected layer's entrance / move / exit as draggable blocks inside its shot. */
@@ -1359,7 +1360,7 @@ const LayerMotionTrack: React.FC<{
       />
       {steps.length === 0 && (
         <span className="absolute top-0.5 text-[9px] text-zinc-600 whitespace-nowrap" style={{ left: track.shotStart * pxPerSec + 4 }}>
-          Belum ada animasi untuk layer ini
+          {t('Belum ada animasi untuk layer ini')}
         </span>
       )}
       {steps.map((step) => {
@@ -1371,11 +1372,11 @@ const LayerMotionTrack: React.FC<{
           <div
             key={step}
             onPointerDown={(e) => startDrag(e, step, 'body')}
-            title={`${STEP_STYLE[step].label}: mulai ${s.at.toFixed(2)} dtk, ${s.dur.toFixed(2)} dtk`}
+            title={t('{0}: mulai {1} dtk, {2} dtk', t(STEP_STYLE[step].label), s.at.toFixed(2), s.dur.toFixed(2))}
             className={`group absolute top-0.5 bottom-0.5 rounded-sm border px-1 overflow-hidden cursor-grab active:cursor-grabbing ${STEP_STYLE[step].cls}`}
             style={{ left: (track.shotStart + s.at) * pxPerSec, width }}
           >
-            {width > 34 && <span className="block text-[9px] leading-[16px] truncate">{STEP_STYLE[step].label}</span>}
+            {width > 34 && <span className="block text-[9px] leading-[16px] truncate">{t(STEP_STYLE[step].label)}</span>}
             {canResize && (
               <div
                 onPointerDown={(e) => startDrag(e, step, 'end')}
@@ -1433,7 +1434,7 @@ const SfxTrack: React.FC<{
   };
 
   if (cues.length === 0) {
-    return <span className="absolute top-1 left-1 text-[9px] text-zinc-600 whitespace-nowrap">Belum ada efek suara</span>;
+    return <span className="absolute top-1 left-1 text-[9px] text-zinc-600 whitespace-nowrap">{t('Belum ada efek suara')}</span>;
   }
   return (
     <>
@@ -1445,14 +1446,14 @@ const SfxTrack: React.FC<{
             key={cue.id}
             type="button"
             onPointerDown={(e) => startDrag(e, cue)}
-            title={`${SFX_LABEL[cue.kind]} di ${time.toFixed(2)} dtk${cue.auto ? ' (otomatis)' : ''}`}
-            aria-label={`Efek suara ${SFX_LABEL[cue.kind]} di ${time.toFixed(2)} detik`}
+            title={t('{0} di {1} dtk{2}', t(SFX_LABEL[cue.kind]), time.toFixed(2), cue.auto ? t(' (otomatis)') : '')}
+            aria-label={t('Efek suara {0} di {1} detik', t(SFX_LABEL[cue.kind]), time.toFixed(2))}
             className={`absolute top-0.5 bottom-0.5 -ml-1.5 min-w-[12px] px-1 rounded-sm border text-[9px] leading-[14px] text-zinc-100 cursor-grab active:cursor-grabbing ${SFX_COLOR[cue.kind]} ${
               selected ? 'ring-1 ring-white' : ''
             } ${cue.auto ? 'border-dashed' : ''}`}
             style={{ left: time * pxPerSec }}
           >
-            {pxPerSec > 60 ? SFX_LABEL[cue.kind] : ''}
+            {pxPerSec > 60 ? t(SFX_LABEL[cue.kind]) : ''}
           </button>
         );
       })}

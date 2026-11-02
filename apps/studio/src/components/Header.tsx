@@ -4,6 +4,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { ProjectManagerModal } from './ProjectManagerModal';
 import { IconButton } from './ui/IconButton';
 import { Button } from './ui/Button';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { InstallAppButton } from './InstallApp';
+import { t } from '../i18n';
 
 interface HeaderProps {
   onOpenExport?: () => void;
@@ -64,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div className="flex items-center gap-2.5 shrink-0">
               <svg
-                aria-label="MooScript Logo"
+                aria-label={t('MooScript Logo')}
                 className="w-7 h-7 rounded-lg shrink-0 shadow-sm"
                 fill="none"
                 viewBox="0 0 100 100"
@@ -82,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                 <rect fill="#09090b" height="8" rx="3" width="6" x="56" y="66" />
               </svg>
               <span className="font-extrabold text-[15px] tracking-tight text-on-surface hidden sm:inline">
-                MooScript<span className="text-accent ml-0.5">Studio</span>
+                {t('MooScript')}<span className="text-accent ml-0.5">{t('Studio')}</span>
               </span>
             </div>
 
@@ -116,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                       setTitleInput(project.title);
                       setEditingTitle(true);
                     }}
-                    title="Klik untuk mengubah nama proyek"
+                    title={t('Klik untuk mengubah nama proyek')}
                     className="flex items-center justify-between gap-1.5 px-2.5 h-8 rounded-lg bg-surface-2/60 sm:bg-transparent hover:bg-surface-2 border border-border/60 sm:border-transparent text-[13px] font-semibold text-on-surface transition-colors min-w-0 flex-1 sm:flex-initial sm:max-w-[240px]"
                   >
                     <span className="truncate">{project.title}</span>
@@ -125,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
 
                   <IconButton
                     icon="folder_open"
-                    aria-label="Kelola Proyek"
+                    aria-label={t('Kelola Proyek')}
                     size="sm"
                     onClick={() => setShowProjectModal(true)}
                   />
@@ -140,14 +143,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
               <div className="flex items-center gap-0.5 bg-surface-2/60 sm:bg-transparent border border-border/60 sm:border-0 rounded-lg p-0.5 sm:p-0">
                 <IconButton
                   icon="undo"
-                  aria-label="Batalkan (Ctrl+Z)"
+                  aria-label={t('Batalkan (Ctrl+Z)')}
                   size="sm"
                   disabled={!canUndo}
                   onClick={undo}
                 />
                 <IconButton
                   icon="redo"
-                  aria-label="Ulangi (Ctrl+Y)"
+                  aria-label={t('Ulangi (Ctrl+Y)')}
                   size="sm"
                   disabled={!canRedo}
                   onClick={redo}
@@ -155,9 +158,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
               </div>
             )}
 
+            <LanguageSwitcher className="hidden sm:inline-flex" />
+
+            <InstallAppButton className="hidden sm:inline-flex" />
+
             <IconButton
               icon="keyboard"
-              aria-label="Shortcut keyboard (?)"
+              aria-label={t('Shortcut keyboard (?)')}
               size="sm"
               onClick={() => setShortcutsOpen(true)}
               className="hidden lg:inline-flex"
@@ -170,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
               className="hidden md:flex items-center gap-2 px-3 h-8 rounded-lg bg-surface-2 border border-border text-[12px] font-medium text-text-muted hover:text-on-surface transition-colors"
             >
               <span className={`w-2 h-2 rounded-full ${hasApiKey ? 'bg-accent' : 'bg-amber-400'}`} />
-              <span>{hasApiKey ? 'Kunci API Aktif' : 'Mode Lokal'}</span>
+              <span>{hasApiKey ? t('Kunci API Aktif') : t('Mode Lokal')}</span>
             </button>
 
             {onOpenExport && (
@@ -178,18 +185,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
                 variant="primary"
                 size="sm"
                 icon="file_download"
-                aria-label="Ekspor Video"
-                title="Ekspor Video"
+                aria-label={t('Ekspor Video')}
+                title={t('Ekspor Video')}
                 onClick={onOpenExport}
                 className="!px-2.5 sm:!px-3"
               >
-                <span className="hidden sm:inline">Ekspor</span>
+                <span className="hidden sm:inline">{t('Ekspor')}</span>
               </Button>
             )}
 
             <IconButton
               icon="tune"
-              aria-label="Pengaturan API & Studio"
+              aria-label={t('Pengaturan API & Studio')}
               size="sm"
               badge={!hasApiKey}
               onClick={() => setSettingsOpen(true)}

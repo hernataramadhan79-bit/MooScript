@@ -5,6 +5,7 @@ import { deleteBgmFromDb, saveBgmToDb } from '../../db/mooDb';
 import { MAX_CUSTOM_BGM_BYTES } from '../../db/customBgm';
 import { decodeCustomBgm, hasCustomBgm, setCustomBgmBuffer } from '../../engine/audio/bgmMixer';
 import type { MooStoreState, BgmSlice } from '../types';
+import { t } from '../../i18n';
 
 export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (set, get) => {
   const handleBgmUpdate = async (newBgm: MooStoreState['project']['bgm']) => {
@@ -28,7 +29,7 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
     // Audio saved before the voice-over was kept apart from the music cannot be remixed:
     // the voice has to be generated again for the new music to be heard.
     if (!audioStale) {
-      addToast('BGM berubah. Generate ulang audio supaya kedengeran.', 'info');
+      addToast(t('BGM berubah. Generate ulang audio supaya kedengeran.'), 'info');
     }
     set({ audioStale: true });
   };
@@ -37,7 +38,7 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
     updateBgmPreset: (preset: BgmPreset) => {
       const { project } = get();
       if (preset === 'custom' && !hasCustomBgm()) {
-        get().addToast('Unggah berkas musik dulu untuk memakai BGM sendiri.', 'info');
+        get().addToast(t('Unggah berkas musik dulu untuk memakai BGM sendiri.'), 'info');
         return;
       }
       if (preset === project.bgm?.preset) return;
@@ -60,11 +61,11 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
       const { project, addToast } = get();
       const looksLikeAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|aac|flac|webm)$/i.test(file.name);
       if (!looksLikeAudio) {
-        addToast('Format berkas tidak didukung. Unggah berkas audio (MP3, WAV, M4A, OGG).', 'error');
+        addToast(t('Format berkas tidak didukung. Unggah berkas audio (MP3, WAV, M4A, OGG).'), 'error');
         return;
       }
       if (file.size > MAX_CUSTOM_BGM_BYTES) {
-        addToast('Ukuran BGM melebihi batas 25 MB.', 'error');
+        addToast(t('Ukuran BGM melebihi batas 25 MB.'), 'error');
         return;
       }
       try {
@@ -75,10 +76,10 @@ export const createBgmSlice: StateCreator<MooStoreState, [], [], BgmSlice> = (se
         setCustomBgmBuffer(buffer);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        addToast(`BGM gagal diproses: ${msg}`, 'error');
+        addToast(t('BGM gagal diproses: {0}', msg), 'error');
         return;
       }
-      addToast(`BGM "${file.name}" dipakai sebagai musik latar.`, 'success');
+      addToast(t('BGM "{0}" dipakai sebagai musik latar.', file.name), 'success');
       await handleBgmUpdate({ ...get().project.bgm, preset: 'custom', customName: file.name });
     },
 

@@ -24,7 +24,8 @@ export function readValidIconNames() {
 function listSourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return listSourceFiles(full);
+    // The translation tables hold words like 'files' that are also icon names but are never rendered as icons.
+    if (entry.isDirectory()) return entry.name === 'i18n' ? [] : listSourceFiles(full);
     return /\.(tsx?|css)$/.test(entry.name) ? [full] : [];
   });
 }

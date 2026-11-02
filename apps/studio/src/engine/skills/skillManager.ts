@@ -1,5 +1,6 @@
 import type { PersonaSkill } from '../../types';
 import { db } from '../../db/mooDb';
+import { L } from '../../i18n';
 
 export function resolveSkillIcon(icon?: string): string {
   if (!icon) return 'auto_awesome';
@@ -34,7 +35,7 @@ export const BUILTIN_SKILLS: PersonaSkill[] = [
     id: 'skill-creative-director',
     name: 'Creative Director',
     icon: 'palette',
-    description: 'Adaptif, ekspresif, dan visual-first. Bebas template kaku.',
+    description: L('Adaptif, ekspresif, dan visual-first. Bebas template kaku.'),
     systemPrompt: `Style: Adaptif, ekspresif, dan berfokus pada kekuatan penceritaan visual yang segar.
 Pacing: Mengalir dinamis sesuai emosi dan konteks topik cerita pengguna.
 Tone: Sutradara kreatif yang mengutamakan analogi visual konkret, metafora orisinal, dan kejelasan konsep.
@@ -46,7 +47,7 @@ Motion Personality: Gerakan kinetik organik dan sinematik yang mengekspresikan e
     id: 'skill-tech-explainer',
     name: 'Tech Explainer',
     icon: 'bolt',
-    description: 'Penjelasan sistematis, tajam, dengan logika visual berstruktur.',
+    description: L('Penjelasan sistematis, tajam, dengan logika visual berstruktur.'),
     systemPrompt: `Style: Penjelasan konsep dan teknologi secara jernih, tajam, dan berenergi.
 Pacing: Mantap, lugas, mengalir terstruktur tanpa basa-basi berlebih.
 Tone: Pakar yang menguraikan konsep rumit menjadi analogi logis yang mudah dipahami.
@@ -59,7 +60,7 @@ Motion Personality: Presisi, snappy, kaya diagram alur, skematik visual, dan tra
     id: 'skill-viral-hook',
     name: 'Viral Hook',
     icon: 'psychology',
-    description: 'Hook 3 detik pertama yang kuat, format penceritaan memikat.',
+    description: L('Hook 3 detik pertama yang kuat, format penceritaan memikat.'),
     systemPrompt: `Style: Format penceritaan short-form dengan daya pikat dan retensi tinggi.
 Pacing: Pembuka memikat rasa ingin tahu (curiosity gap) diikuti perkembangan cerita yang dinamis.
 Tone: Provokatif, dramatis, dan penuh wawasan menarik.
@@ -72,7 +73,7 @@ Motion Personality: Pergerakan kamera dinamis, titik fokus berkontras tinggi, da
     id: 'skill-chill-lofi',
     name: 'Chill Lofi Story',
     icon: 'auto_awesome',
-    description: 'Tempo tenang, kalimat puitis dan estetis, transisi halus.',
+    description: L('Tempo tenang, kalimat puitis dan estetis, transisi halus.'),
     systemPrompt: `Style: Narasi reflektif, tenang, dan kontemplatif dengan ruang estetis.
 Pacing: Mengalir santai dan teratur, memberi ruang bernapas bagi penonton.
 Tone: Tenang, hangat, puitis, dan berwawasan mendalam.

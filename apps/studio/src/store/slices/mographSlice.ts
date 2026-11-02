@@ -11,6 +11,7 @@ import { callRawLLM } from '../../engine/ai/llm';
 import { extractLayersFromHtml } from '../../engine/composition/layers';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { syncComposition } from '../../engine/composition/sync';
+import { t, tr } from '../../i18n';
 
 /** Scene code (SVG + CSS + timeline) runs long; a 2048-token cap truncates it mid-block. */
 const SCENE_CODEGEN_MIN_TOKENS = 4096;
@@ -109,7 +110,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
     const { settings, addToast } = get();
     const provider = settings.selectedLLMProvider;
     if ((settings.apiKeys[provider] || '').trim()) return true;
-    addToast(`Masukkan API Key untuk ${provider.toUpperCase()} di Pengaturan terlebih dahulu.`, 'warning');
+    addToast(t('Masukkan API Key untuk {0} di Pengaturan terlebih dahulu.', provider.toUpperCase()), 'warning');
     return false;
   };
 
@@ -147,7 +148,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
 
       get().setIsCompilingMograph(true);
       set({
-        mographProgress: 'Menyiapkan brief style dan instruksi motion director...',
+        mographProgress: t('Menyiapkan brief style dan instruksi motion director...'),
         mographStats: { completed: 0, total, sceneStatuses: statuses }
       });
 
@@ -172,13 +173,13 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           controller.signal.addEventListener('abort', onParentAbort, { once: true });
 
           let lastActivity = Date.now();
-          let activityDetail = 'Menghubungkan ke AI...';
+          let activityDetail = t('Menghubungkan ke AI...');
           const startedAt = Date.now();
           const recordActivity = (detail: string) => {
             lastActivity = Date.now();
             activityDetail = detail;
           };
-          set({ mographProgress: `Mendesain adegan ${i + 1} dari ${total}... (${completedCount}/${total} selesai)` });
+          set({ mographProgress: t('Mendesain adegan {0} dari {1}... ({2}/{1} selesai)', i + 1, total, completedCount) });
 
           const ticker = setInterval(() => {
             if (sceneAbort.signal.aborted) {
@@ -190,13 +191,13 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
               clearInterval(ticker);
               sceneAbort.abort(
                 new Error(
-                  `Koneksi tidak merespons: server AI tidak mengirim data selama ${silence} detik. Periksa koneksi internet atau ganti model.`
+                  t('Koneksi tidak merespons: server AI tidak mengirim data selama {0} detik. Periksa koneksi internet atau ganti model.', silence)
                 )
               );
               return;
             }
             const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-            set({ mographProgress: `Mendesain adegan ${i + 1} dari ${total}... (${elapsed}s) • ${activityDetail}` });
+            set({ mographProgress: t('Mendesain adegan {0} dari {1}... ({2}s) • {3}', i + 1, total, elapsed, activityDetail) });
           }, 1000);
 
           let module: SceneModule;
@@ -264,23 +265,23 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
       try {
         await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker()));
         if (controller.signal.aborted) {
-          get().addToast('Pembuatan mograph dibatalkan.', 'info');
+          get().addToast(t('Pembuatan mograph dibatalkan.'), 'info');
         } else if (get().project.id !== startProject.id) {
-          get().addToast('Proyek berganti, hasil visual yang tersisa dibuang.', 'warning');
+          get().addToast(t('Proyek berganti, hasil visual yang tersisa dibuang.'), 'warning');
         } else if (failureCount > 0) {
           const kept = keptShots.sort((a, b) => a - b);
           get().addToast(
             kept.length > 0
-              ? `${failureCount} dari ${total} adegan gagal dibuat. Adegan #${kept.join(', #')} memakai visual sebelumnya; coba lagi dari kartunya.`
-              : `${failureCount} dari ${total} adegan mengalami kendala rendering. Buat ulang adegan itu dari kartunya.`,
+              ? t('{0} dari {1} adegan gagal dibuat. Adegan #{2} memakai visual sebelumnya; coba lagi dari kartunya.', failureCount, total, kept.join(', #'))
+              : t('{0} dari {1} adegan mengalami kendala rendering. Buat ulang adegan itu dari kartunya.', failureCount, total),
             'warning',
             6000
           );
         } else {
-          get().addToast('Mograph AI berhasil dibuat untuk semua adegan!', 'success');
+          get().addToast(t('Mograph AI berhasil dibuat untuk semua adegan!'), 'success');
         }
       } catch (err: unknown) {
-        get().addToast(`Gagal membuat mograph: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        get().addToast(t('Gagal membuat mograph: {0}', err instanceof Error ? err.message : String(err)), 'error');
       } finally {
         if (bulkController === controller) bulkController = null;
         get().setIsCompilingMograph(false);
@@ -297,7 +298,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
       const settings = get().settings;
       const controller = new AbortController();
       sceneController = controller;
-      set({ revisingSceneId: sceneId, revisionProgress: 'Menghubungi AI...' });
+      set({ revisingSceneId: sceneId, revisionProgress: t('Menghubungi AI...') });
       const onActivity = (status: string) => set({ revisionProgress: status });
 
       try {
@@ -319,14 +320,14 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
         });
 
         if (controller.signal.aborted) {
-          get().addToast('Pembuatan ulang adegan dibatalkan.', 'info');
+          get().addToast(t('Pembuatan ulang adegan dibatalkan.'), 'info');
           return;
         }
         // A failed attempt keeps the visual the scene already had.
         if (module.status === 'error' && sceneHasRenderableCode(currentModule(get, sceneId))) {
           const reason = module.errors?.[0];
           get().addToast(
-            `Adegan #${index + 1} gagal dibuat ulang, visual sebelumnya dipertahankan.${reason ? ` ${reason}` : ''}`,
+            t('Adegan #{0} gagal dibuat ulang, visual sebelumnya dipertahankan.{1}', index + 1, reason ? ` ${tr(reason)}` : ''),
             'error',
             7000
           );
@@ -341,21 +342,21 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
         );
         if (outcome !== 'written') {
           get().addToast(
-            outcome === 'scene-removed' ? 'Adegan sudah dihapus, hasil AI dibuang.' : 'Proyek berganti, hasil adegan dibuang.',
+            outcome === 'scene-removed' ? t('Adegan sudah dihapus, hasil AI dibuang.') : t('Proyek berganti, hasil adegan dibuang.'),
             'warning'
           );
           return;
         }
         if (module.status === 'error') {
-          get().addToast(`Adegan #${index + 1} gagal dibuat ulang. Lihat detail error di tab Gaya.`, 'error');
+          get().addToast(t('Adegan #{0} gagal dibuat ulang. Lihat detail error di tab Gaya.', index + 1), 'error');
         } else {
-          get().addToast(`Adegan #${index + 1} berhasil dibuat ulang.`, 'success');
+          get().addToast(t('Adegan #{0} berhasil dibuat ulang.', index + 1), 'success');
         }
       } catch (err: unknown) {
         if (controller.signal.aborted) {
-          get().addToast('Pembuatan ulang adegan dibatalkan.', 'info');
+          get().addToast(t('Pembuatan ulang adegan dibatalkan.'), 'info');
         } else {
-          get().addToast(`Error membuat ulang adegan: ${err instanceof Error ? err.message : String(err)}`, 'error');
+          get().addToast(t('Error membuat ulang adegan: {0}', err instanceof Error ? err.message : String(err)), 'error');
         }
       } finally {
         if (sceneController === controller) sceneController = null;
@@ -373,7 +374,7 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
       const settings = get().settings;
       const controller = new AbortController();
       sceneController = controller;
-      set({ revisingSceneId: sceneId, revisionProgress: 'Menghubungi AI...' });
+      set({ revisingSceneId: sceneId, revisionProgress: t('Menghubungi AI...') });
       const onActivity = (status: string) => set({ revisionProgress: status });
 
       try {
@@ -387,12 +388,12 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           executeLlm: llmExecutor(settings, controller.signal, onActivity)
         });
         if (controller.signal.aborted) {
-          get().addToast('Perbaikan adegan dibatalkan.', 'info');
+          get().addToast(t('Perbaikan adegan dibatalkan.'), 'info');
           return;
         }
         if (!result.valid) {
           get().addToast(
-            `Perbaikan AI belum lolos validasi, kode lama dipertahankan: ${result.errors[0] || 'tidak diketahui'}`,
+            t('Perbaikan AI belum lolos validasi, kode lama dipertahankan: {0}', result.errors[0] ? tr(result.errors[0]) : t('tidak diketahui')),
             'error'
           );
           return;
@@ -408,12 +409,12 @@ export const createMographSlice: StateCreator<MooStoreState, [], [], MographSlic
           version: (target.version || 1) + 1,
           userEdited: true
         });
-        if (outcome === 'written') get().addToast(`Adegan #${index + 1} diperbaiki untuk MooTween.`, 'success');
+        if (outcome === 'written') get().addToast(t('Adegan #{0} diperbaiki untuk MooTween.', index + 1), 'success');
       } catch (err: unknown) {
         if (controller.signal.aborted) {
-          get().addToast('Perbaikan adegan dibatalkan.', 'info');
+          get().addToast(t('Perbaikan adegan dibatalkan.'), 'info');
         } else {
-          get().addToast(`Error memperbaiki adegan: ${err instanceof Error ? err.message : String(err)}`, 'error');
+          get().addToast(t('Error memperbaiki adegan: {0}', err instanceof Error ? err.message : String(err)), 'error');
         }
       } finally {
         if (sceneController === controller) sceneController = null;

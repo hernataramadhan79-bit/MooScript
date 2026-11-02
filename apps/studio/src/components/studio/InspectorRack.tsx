@@ -29,25 +29,26 @@ import {
   PROCEDURAL_ARCHETYPES,
   type ProceduralArchetype
 } from '../../engine/composition/proceduralCompiler';
+import { L, t, tr } from '../../i18n';
 
 export type InspectorTab = 'mograph' | 'style' | 'asset' | 'audio' | 'subtitle' | 'ekspor';
 
 /** What each visual state means to the person editing, not to the engine. */
 const SCENE_STATUS_LABEL: Record<string, string> = {
-  ok: 'siap',
-  pending: 'belum dibuat',
-  generating: 'sedang dibuat',
-  error: 'gagal',
-  'needs-repair': 'perlu perbaikan'
+  ok: L('siap'),
+  pending: L('belum dibuat'),
+  generating: L('sedang dibuat'),
+  error: L('gagal'),
+  'needs-repair': L('perlu perbaikan')
 };
 
 export const INSPECTOR_TABS: { id: InspectorTab; label: string; icon: string }[] = [
-  { id: 'mograph', label: 'Mograph', icon: 'movie_filter' },
-  { id: 'style', label: 'Gaya', icon: 'tune' },
-  { id: 'asset', label: 'Aset', icon: 'perm_media' },
-  { id: 'audio', label: 'Audio', icon: 'graphic_eq' },
-  { id: 'subtitle', label: 'Subtitel', icon: 'subtitles' },
-  { id: 'ekspor', label: 'Ekspor', icon: 'download' }
+  { id: 'mograph', label: L('Mograph'), icon: 'movie_filter' },
+  { id: 'style', label: L('Gaya'), icon: 'tune' },
+  { id: 'asset', label: L('Aset'), icon: 'perm_media' },
+  { id: 'audio', label: L('Audio'), icon: 'graphic_eq' },
+  { id: 'subtitle', label: L('Subtitel'), icon: 'subtitles' },
+  { id: 'ekspor', label: L('Ekspor'), icon: 'download' }
 ];
 
 const DebouncedSlider: React.FC<{
@@ -414,7 +415,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   const handleResetLayerOverride = () => {
     if (!activeScene || !activeLayer) return;
     resetLayerOverride(activeScene.id, activeLayer.id);
-    addToast(`Override layer ${activeLayer.label} direset.`, 'info');
+    addToast(t('Override layer {0} direset.', activeLayer.label), 'info');
   };
 
   const handleRemoveLayer = () => {
@@ -459,7 +460,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
       accent: undefined,
       text: undefined
     });
-    addToast('Palet warna adegan dikembalikan ke default.', 'info');
+    addToast(t('Palet warna adegan dikembalikan ke default.'), 'info');
   };
 
   const handleReviseSingleScene = async () => {
@@ -477,19 +478,19 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // Text position options
   const currentPosition = project.theme?.captionPosition || 'bottom';
   const positionOptions: { value: CaptionPosition; label: string }[] = [
-    { value: 'top', label: 'Atas' },
-    { value: 'center', label: 'Tengah' },
-    { value: 'bottom', label: 'Bawah' }
+    { value: 'top', label: t('Atas') },
+    { value: 'center', label: t('Tengah') },
+    { value: 'bottom', label: t('Bawah') }
   ];
 
   // Text style options
   const currentStyle = project.theme?.captionStyle || 'boxed';
   const styleOptions: { value: CaptionStyle; label: string }[] = [
-    { value: 'boxed', label: 'Kotak (Klasik)' },
-    { value: 'karaoke', label: 'Highlight (Neon)' },
-    { value: 'bold-pop', label: 'Bold Pop (Viral)' },
-    { value: 'minimal', label: 'Minimalis' },
-    { value: 'outline', label: 'Kontras Outline' }
+    { value: 'boxed', label: t('Kotak (Klasik)') },
+    { value: 'karaoke', label: t('Highlight (Neon)') },
+    { value: 'bold-pop', label: t('Bold Pop (Viral)') },
+    { value: 'minimal', label: t('Minimalis') },
+    { value: 'outline', label: t('Kontras Outline') }
   ];
 
   const subCust = project.theme?.subtitleCustomization || {};
@@ -505,34 +506,34 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   }, [settings.selectedTTSProvider]);
 
   const voiceProviders = [
-    { id: 'timer', label: 'Tanpa Suara (Timer)' },
-    { id: 'openai', label: 'OpenAI' },
-    { id: 'elevenlabs', label: 'ElevenLabs' },
-    { id: 'local', label: 'Offline Lokal' }
+    { id: 'timer', label: t('Tanpa Suara (Timer)') },
+    { id: 'openai', label: t('OpenAI') },
+    { id: 'elevenlabs', label: t('ElevenLabs') },
+    { id: 'local', label: t('Offline Lokal') }
   ];
 
   const OPENAI_VOICE_OPTIONS = [
-    { id: 'alloy', label: 'Alloy' },
-    { id: 'echo', label: 'Echo' },
-    { id: 'fable', label: 'Fable' },
-    { id: 'onyx', label: 'Onyx' },
-    { id: 'nova', label: 'Nova' },
-    { id: 'shimmer', label: 'Shimmer' }
+    { id: 'alloy', label: t('Alloy') },
+    { id: 'echo', label: t('Echo') },
+    { id: 'fable', label: t('Fable') },
+    { id: 'onyx', label: t('Onyx') },
+    { id: 'nova', label: t('Nova') },
+    { id: 'shimmer', label: t('Shimmer') }
   ];
 
   const ELEVENLABS_VOICE_OPTIONS = [
-    { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel' },
-    { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi' },
-    { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Bella' },
-    { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni' },
-    { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh' },
-    { id: 'custom', label: 'Kustom' }
+    { id: '21m00Tcm4TlvDq8ikWAM', label: t('Rachel') },
+    { id: 'AZnzlk1XvdvUeBnXmlld', label: t('Domi') },
+    { id: 'EXAVITQu4vr4xnSDxMaL', label: t('Bella') },
+    { id: 'ErXwobaYiN019PkySvjV', label: t('Antoni') },
+    { id: 'TxGEqnHWrfWFTfGW9XjX', label: t('Josh') },
+    { id: 'custom', label: t('Kustom') }
   ];
 
   const LOCAL_VOICE_OPTIONS = [
-    { id: 'id_ID-news_tts', label: 'Ayu (id_ID) - Narasi Berita & Edukasi' },
-    { id: 'en_US-lessac', label: 'Lessac (en_US) - Storyteller & Narasi' },
-    { id: 'fallback', label: 'WebSpeech - Standar Suara Browser (Live)' }
+    { id: 'id_ID-news_tts', label: t('Ayu (id_ID) - Narasi Berita & Edukasi') },
+    { id: 'en_US-lessac', label: t('Lessac (en_US) - Storyteller & Narasi') },
+    { id: 'fallback', label: t('WebSpeech - Standar Suara Browser (Live)') }
   ];
 
   const currentOpenAIVoice = settings.voiceIds?.openai || 'alloy';
@@ -561,10 +562,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
         setLocalVoiceDownloadProgress(p.percent);
       });
       setIsLocalVoiceCached(true);
-      addToast(`Model suara ${voice.name} berhasil diunduh dan siap offline!`, 'success');
+      addToast(t('Model suara {0} berhasil diunduh dan siap offline!', voice.name), 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal mengunduh model: ${msg}`, 'error');
+      addToast(t('Gagal mengunduh model: {0}', msg), 'error');
     } finally {
       setIsDownloadingLocalVoice(false);
     }
@@ -576,10 +577,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
     try {
       await purgeLocalModel(voice.id);
       setIsLocalVoiceCached(false);
-      addToast(`Model suara ${voice.name} dihapus dari cache browser.`, 'info');
+      addToast(t('Model suara {0} dihapus dari cache browser.', voice.name), 'info');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Gagal menghapus model: ${msg}`, 'error');
+      addToast(t('Gagal menghapus model: {0}', msg), 'error');
     }
   };
 
@@ -615,12 +616,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
   // BGM Presets
   const currentBgmPreset = project.bgm?.preset || 'none';
   const bgmPresets: { value: BgmPreset; label: string }[] = [
-    { value: 'none', label: 'Tanpa' },
-    { value: 'ambient', label: 'Ambient' },
-    { value: 'lofi', label: 'Lofi' },
-    { value: 'cinematic', label: 'Cinematic' },
-    { value: 'hiphop', label: 'Hiphop' },
-    ...(project.bgm?.customName ? [{ value: 'custom' as BgmPreset, label: 'Kustom' }] : [])
+    { value: 'none', label: t('Tanpa') },
+    { value: 'ambient', label: t('Ambient') },
+    { value: 'lofi', label: t('Lofi') },
+    { value: 'cinematic', label: t('Cinematic') },
+    { value: 'hiphop', label: t('Hiphop') },
+    ...(project.bgm?.customName ? [{ value: 'custom' as BgmPreset, label: t('Kustom') }] : [])
   ];
 
   const bgmLevel = project.bgm?.level ?? 0.18;
@@ -662,7 +663,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
-              <span className="tracking-tight truncate max-w-full">{tab.label}</span>
+              <span className="tracking-tight truncate max-w-full">{t(tab.label)}</span>
             </button>
           ))}
         </div>
@@ -675,7 +676,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
           <div className="flex flex-col gap-4">
             {!activeScene ? (
               <div className="p-4 rounded-xl bg-surface-2 border border-border text-center text-text-muted text-[13px]">
-                Belum ada adegan. Tambahkan adegan pada naskah terlebih dahulu.
+                {t('Belum ada adegan. Tambahkan adegan pada naskah terlebih dahulu.')}
               </div>
             ) : (
               <>
@@ -687,7 +688,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         #{activeSceneIndex + 1}
                       </span>
                       <span className="text-[12px] font-semibold text-on-surface truncate">
-                        {activeScene.visualIntent || activeScene.narrationText || `Adegan #${activeSceneIndex + 1}`}
+                        {activeScene.visualIntent || activeScene.narrationText || t('Adegan #{0}', activeSceneIndex + 1)}
                       </span>
                     </div>
 
@@ -707,7 +708,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   : 'bg-zinc-500/15 text-zinc-400'
                           }`}
                         >
-                          {SCENE_STATUS_LABEL[activeCompScene.status] || activeCompScene.status}
+                          {SCENE_STATUS_LABEL[activeCompScene.status] ? t(SCENE_STATUS_LABEL[activeCompScene.status]) : activeCompScene.status}
                         </span>
                       )}
                     </div>
@@ -716,7 +717,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* Scene Selector Dropdown */}
                   {scenes.length > 1 && (
                     <div className="flex items-center gap-2 pt-1 border-t border-border/40">
-                      <span className="text-[11px] text-text-muted shrink-0">Pilih Adegan:</span>
+                      <span className="text-[11px] text-text-muted shrink-0">{t('Pilih Adegan:')}</span>
                       <select
                         value={activeScene.id}
                         onChange={(e) => focusScene(e.target.value)}
@@ -724,7 +725,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       >
                         {scenes.map((s, idx) => (
                           <option key={s.id} value={s.id}>
-                            #{idx + 1} - {(s.visualIntent || s.narrationText || `Adegan ${idx + 1}`).slice(0, 32)}
+                            #{idx + 1} - {(s.visualIntent || s.narrationText || t('Adegan {0}', idx + 1)).slice(0, 32)}
                           </option>
                         ))}
                       </select>
@@ -737,11 +738,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-rose-400 font-semibold text-[12px]">
                       <span className="material-symbols-outlined text-[17px]">error</span>
-                      <span>Adegan ini mengalami kendala rendering</span>
+                      <span>{t('Adegan ini mengalami kendala rendering')}</span>
                     </div>
                     {activeCompScene.errors && activeCompScene.errors.length > 0 && (
                       <p className="text-[11px] text-rose-300/80 font-mono truncate">
-                        {activeCompScene.errors[0]}
+                        {tr(activeCompScene.errors[0])}
                       </p>
                     )}
                     <button
@@ -750,13 +751,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
-                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          ? t('Silakan masukkan API Key untuk {0} di Pengaturan', currentLlmProvider.toUpperCase())
                           : undefined
                       }
                       className="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors self-start flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
                     >
                       <span className="material-symbols-outlined text-[14px]">refresh</span>
-                      Generate Ulang Adegan Ini
+                      {t('Generate Ulang Adegan Ini')}
                     </button>
                   </div>
                 )}
@@ -766,17 +767,16 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-amber-300 font-semibold text-[12px]">
                       <span className="material-symbols-outlined text-[17px]">build</span>
-                      <span>Kode adegan ini bukan API MooScript</span>
+                      <span>{t('Kode adegan ini bukan API MooScript')}</span>
                     </div>
                     <p className="text-[11px] text-amber-100/70 leading-relaxed">
-                      Kodenya ditulis untuk API animasi lain (gaya GSAP), jadi adegan tampil diam sampai diperbaiki. Kode
-                      belum diubah; AI akan menerjemahkan bagian berikut ke API MooScript dan mempertahankan desainnya.
+                      {t('Kodenya ditulis untuk API animasi lain (gaya GSAP), jadi adegan tampil diam sampai diperbaiki. Kode belum diubah; AI akan menerjemahkan bagian berikut ke API MooScript dan mempertahankan desainnya.')}
                     </p>
                     {activeCompScene.errors && activeCompScene.errors.length > 0 && (
                       <ul className="flex flex-col gap-1">
                         {activeCompScene.errors.map((err) => (
                           <li key={err} className="text-[11px] text-amber-200/90 font-mono leading-snug">
-                            {err.replace(/^Bukan API MooScript: /, '')}
+                            {tr(err).replace(/^(Bukan API MooScript|Not a MooScript API): /, '')}
                           </li>
                         ))}
                       </ul>
@@ -787,7 +787,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
-                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          ? t('Silakan masukkan API Key untuk {0} di Pengaturan', currentLlmProvider.toUpperCase())
                           : undefined
                       }
                       className="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-[11px] font-semibold hover:bg-amber-400 transition-colors self-start flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
@@ -795,7 +795,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className={`material-symbols-outlined text-[14px] ${isRevisingThisScene ? 'animate-spin' : ''}`}>
                         {isRevisingThisScene ? 'progress_activity' : 'auto_fix_high'}
                       </span>
-                      {isRevisingThisScene ? revisionProgress || 'Memperbaiki...' : 'Perbaiki dengan AI'}
+                      {isRevisingThisScene ? revisionProgress || t('Memperbaiki...') : t('Perbaiki dengan AI')}
                     </button>
                   </div>
                 )}
@@ -805,15 +805,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-accent">auto_awesome</span>
-                      Revisi AI Adegan #{activeSceneIndex + 1}
+                      {t('Revisi AI Adegan #')}{activeSceneIndex + 1}
                     </span>
-                    <span className="text-[10px] text-text-muted">Khusus adegan ini</span>
+                    <span className="text-[10px] text-text-muted">{t('Khusus adegan ini')}</span>
                   </div>
 
                   <textarea
                     value={revisionPrompt}
                     onChange={(e) => setRevisionPrompt(e.target.value)}
-                    placeholder="Instruksi revisi, misal: 'Ubah grafik batang jadi diagram lingkaran'..."
+                    placeholder={t('Instruksi revisi, misal: \'Ubah grafik batang jadi diagram lingkaran\'...')}
                     rows={2}
                     className="w-full px-2.5 py-1.5 rounded-xl bg-surface-1 border border-border text-[12px] text-on-surface placeholder:text-text-muted/60 focus:outline-none focus:border-accent resize-none"
                   />
@@ -832,7 +832,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       disabled={isRevisingScene || isCompilingMograph || !hasLlmApiKey}
                       title={
                         !hasLlmApiKey
-                          ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan`
+                          ? t('Silakan masukkan API Key untuk {0} di Pengaturan', currentLlmProvider.toUpperCase())
                           : undefined
                       }
                       className="flex-1 py-1.5 px-3 rounded-xl bg-accent text-on-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
@@ -840,12 +840,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       {isRevisingThisScene ? (
                         <>
                           <span className="material-symbols-outlined animate-spin text-[15px]">sync</span>
-                          <span>Merevisi...</span>
+                          <span>{t('Merevisi...')}</span>
                         </>
                       ) : (
                         <>
                           <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
-                          <span>Revisi Adegan Ini</span>
+                          <span>{t('Revisi Adegan Ini')}</span>
                         </>
                       )}
                     </button>
@@ -855,7 +855,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         onClick={cancelMographGeneration}
                         className="py-1.5 px-2.5 rounded-xl bg-surface-1 border border-border text-[11px] text-text-muted hover:text-rose-400 transition-colors"
                       >
-                        Batal
+                        {t('Batal')}
                       </button>
                     )}
                   </div>
@@ -866,30 +866,30 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-accent">layers</span>
-                      Layer & Transform
+                      {t('Layer & Transform')}
                     </span>
                     <span className="text-[10px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-surface-3">
-                      {availableLayers.length} Layer
+                      {availableLayers.length} {t('Layer')}
                     </span>
                   </div>
 
                   {/* New layers from scratch */}
                   <div className="flex flex-wrap items-center gap-1">
-                    <span className="text-[10px] text-text-muted mr-0.5">Tambah:</span>
+                    <span className="text-[10px] text-text-muted mr-0.5">{t('Tambah:')}</span>
                     {(
                       [
-                        { kind: 'text', icon: 'title', label: 'Teks' },
-                        { kind: 'rect', icon: 'crop_square', label: 'Kotak' },
-                        { kind: 'circle', icon: 'circle', label: 'Lingkaran' },
-                        { kind: 'pill', icon: 'rounded_corner', label: 'Pil' },
-                        { kind: 'line', icon: 'horizontal_rule', label: 'Garis' }
+                        { kind: 'text', icon: 'title', label: t('Teks') },
+                        { kind: 'rect', icon: 'crop_square', label: t('Kotak') },
+                        { kind: 'circle', icon: 'circle', label: t('Lingkaran') },
+                        { kind: 'pill', icon: 'rounded_corner', label: t('Pil') },
+                        { kind: 'line', icon: 'horizontal_rule', label: t('Garis') }
                       ] as const
                     ).map((item) => (
                       <button
                         key={item.kind}
                         type="button"
                         onClick={() => insertElementIntoScene(activeScene.id, item.kind)}
-                        title={`Tambah ${item.label.toLowerCase()} ke adegan ini`}
+                        title={t('Tambah {0} ke adegan ini', item.label.toLowerCase())}
                         className="h-7 px-2 rounded-lg bg-surface-1 border border-border text-[10px] font-semibold text-text-muted hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
                       >
                         <span className="material-symbols-outlined text-[14px]">{item.icon}</span>
@@ -902,8 +902,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     <div className="p-3 rounded-xl bg-surface-1 border border-border text-center text-text-muted text-[11px] leading-relaxed flex flex-col items-center gap-2">
                       <span>
                         {activeCompScene?.html
-                          ? 'Tidak ada layer yang ditandai data-moo-layer pada adegan ini.'
-                          : 'Layer visual belum disusun secara permanen untuk adegan ini.'}
+                          ? t('Tidak ada layer yang ditandai data-moo-layer pada adegan ini.')
+                          : t('Layer visual belum disusun secara permanen untuk adegan ini.')}
                       </span>
                       <button
                         type="button"
@@ -911,7 +911,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         className="px-3 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent border border-accent/40 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         <span className="material-symbols-outlined text-[14px]">bolt</span>
-                        <span>Susun Layer & Visual Instan</span>
+                        <span>{t('Susun Layer & Visual Instan')}</span>
                       </button>
                     </div>
                   ) : (
@@ -974,7 +974,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                     ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
                                     : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
                                 }`}
-                                title={activeLayerOverride.hidden ? 'Layer tersembunyi (Klik untuk tampilkan)' : 'Sembunyikan layer'}
+                                title={activeLayerOverride.hidden ? t('Layer tersembunyi (Klik untuk tampilkan)') : t('Sembunyikan layer')}
                               >
                                 <span className="material-symbols-outlined text-[15px]">
                                   {activeLayerOverride.hidden ? 'visibility_off' : 'visibility'}
@@ -987,7 +987,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   type="button"
                                   onClick={() => handleOverrideChange('zIndex', Math.max(0, (activeLayerOverride.zIndex || 0) - 1))}
                                   className="p-0.5 rounded hover:bg-surface-3 text-text-muted hover:text-on-surface transition-colors"
-                                  title="Kirim ke Belakang (Z-Index -1)"
+                                  title={t('Kirim ke Belakang (Z-Index -1)')}
                                 >
                                   <span className="material-symbols-outlined text-[13px]">arrow_downward</span>
                                 </button>
@@ -998,7 +998,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   type="button"
                                   onClick={() => handleOverrideChange('zIndex', (activeLayerOverride.zIndex || 0) + 1)}
                                   className="p-0.5 rounded hover:bg-surface-3 text-text-muted hover:text-on-surface transition-colors"
-                                  title="Bawa ke Depan (Z-Index +1)"
+                                  title={t('Bawa ke Depan (Z-Index +1)')}
                                 >
                                   <span className="material-symbols-outlined text-[13px]">arrow_upward</span>
                                 </button>
@@ -1009,7 +1009,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 type="button"
                                 onClick={handleResetLayerOverride}
                                 className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-accent transition-colors"
-                                title="Reset transform ke default"
+                                title={t('Reset transform ke default')}
                               >
                                 <span className="material-symbols-outlined text-[15px]">restart_alt</span>
                               </button>
@@ -1017,7 +1017,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 type="button"
                                 onClick={handleRemoveLayer}
                                 className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-rose-400 transition-colors"
-                                title="Hapus layer ini dari adegan"
+                                title={t('Hapus layer ini dari adegan')}
                               >
                                 <span className="material-symbols-outlined text-[15px]">delete</span>
                               </button>
@@ -1029,7 +1029,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             <div className="space-y-2 p-2.5 rounded-xl bg-surface-2/50 border border-border/70">
                               <div className="space-y-1">
                                 <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                                  Isi teks
+                                  {t('Isi teks')}
                                 </span>
                                 <input
                                   type="text"
@@ -1039,7 +1039,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') commitLayerText(localLayerText);
                                   }}
-                                  placeholder="Ketik teks layer di sini..."
+                                  placeholder={t('Ketik teks layer di sini...')}
                                   className="w-full px-2.5 py-1.5 rounded-lg bg-surface-1 border border-border text-[12px] text-on-surface focus:outline-none focus:border-accent"
                                 />
                               </div>
@@ -1047,7 +1047,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               {/* Ukuran Teks (fontSizeScale) */}
                               <div className="space-y-1 pt-1 border-t border-border/50">
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
-                                  <span>Ukuran Font</span>
+                                  <span>{t('Ukuran Font')}</span>
                                   <span className="text-accent">{Math.round((activeLayerOverride.fontSizeScale || 1.0) * 100)}%</span>
                                 </div>
                                 <DebouncedSlider
@@ -1078,7 +1078,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                               {/* Perataan Teks (textAlign) */}
                               <div className="flex items-center justify-between pt-1 border-t border-border/50">
-                                <span className="text-[10px] text-text-muted font-medium">Perataan Teks</span>
+                                <span className="text-[10px] text-text-muted font-medium">{t('Perataan Teks')}</span>
                                 <div className="flex items-center gap-1 bg-surface-1 p-0.5 rounded-lg border border-border">
                                   {(['left', 'center', 'right'] as const).map((align) => {
                                     const isSel = (activeLayerOverride.textAlign || 'center') === align;
@@ -1091,7 +1091,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                           isSel ? 'bg-surface-3 text-accent font-bold shadow-xs' : 'text-text-muted hover:text-on-surface'
                                         }`}
                                       >
-                                        {align === 'left' ? 'Kiri' : align === 'center' ? 'Tengah' : 'Kanan'}
+                                        {align === 'left' ? t('Kiri') : align === 'center' ? t('Tengah') : t('Kanan')}
                                       </button>
                                     );
                                   })}
@@ -1110,13 +1110,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                           {/* Position X and Y */}
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
-                              <span className="font-semibold uppercase tracking-wider text-[9px]">Posisi Koordinat</span>
+                              <span className="font-semibold uppercase tracking-wider text-[9px]">{t('Posisi Koordinat')}</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
                                   onClick={() => handleOverrideChange('x', 0)}
                                   className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
-                                  title="Rata Tengah X"
+                                  title={t('Rata Tengah X')}
                                 >
                                   X=0
                                 </button>
@@ -1124,7 +1124,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   type="button"
                                   onClick={() => handleOverrideChange('y', 0)}
                                   className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
-                                  title="Rata Tengah Y"
+                                  title={t('Rata Tengah Y')}
                                 >
                                   Y=0
                                 </button>
@@ -1132,9 +1132,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                   type="button"
                                   onClick={() => handleOverridesChange({ x: 0, y: 0 })}
                                   className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] hover:text-accent"
-                                  title="Pusat Canvas"
+                                  title={t('Pusat Canvas')}
                                 >
-                                  Pusat
+                                  {t('Pusat')}
                                 </button>
                               </div>
                             </div>
@@ -1142,14 +1142,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Pos X</span>
+                                  <span>{t('Pos X')}</span>
                                   <CommitNumberInput
                                     min={-960}
                                     max={960}
                                     step={1}
                                     value={activeLayerOverride.x || 0}
                                     onCommit={(val) => handleOverrideChange('x', val)}
-                                    ariaLabel="Posisi X"
+                                    ariaLabel={t('Posisi X')}
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1165,14 +1165,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Pos Y</span>
+                                  <span>{t('Pos Y')}</span>
                                   <CommitNumberInput
                                     min={-1080}
                                     max={1080}
                                     step={1}
                                     value={activeLayerOverride.y || 0}
                                     onCommit={(val) => handleOverrideChange('y', val)}
-                                    ariaLabel="Posisi Y"
+                                    ariaLabel={t('Posisi Y')}
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1193,7 +1193,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Skala</span>
+                                  <span>{t('Skala')}</span>
                                   <div className="flex items-center gap-1">
                                     <CommitNumberInput
                                       min={0.1}
@@ -1201,14 +1201,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                       step={0.05}
                                       value={activeLayerOverride.scale !== undefined ? activeLayerOverride.scale : 1.0}
                                       onCommit={(val) => handleOverrideChange('scale', val)}
-                                      ariaLabel="Skala Layer"
+                                      ariaLabel={t('Skala Layer')}
                                       className="w-11 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => handleOverrideChange('scale', 1.0)}
                                       className="text-[9px] px-1 py-0.2 rounded bg-surface-2 border border-border text-text-muted hover:text-accent"
-                                      title="Reset 1.0x"
+                                      title={t('Reset 1.0x')}
                                     >
                                       1x
                                     </button>
@@ -1226,14 +1226,14 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Rotasi</span>
+                                  <span>{t('Rotasi')}</span>
                                   <CommitNumberInput
                                     min={-180}
                                     max={180}
                                     step={5}
                                     value={activeLayerOverride.rotation || 0}
                                     onCommit={(val) => handleOverrideChange('rotation', val)}
-                                    ariaLabel="Rotasi Layer"
+                                    ariaLabel={t('Rotasi Layer')}
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
                                 </div>
@@ -1266,7 +1266,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                             {/* Flip Buttons */}
                             <div className="flex items-center justify-between pt-1">
-                              <span className="text-[10px] text-text-muted font-medium">Balik Arah (Flip):</span>
+                              <span className="text-[10px] text-text-muted font-medium">{t('Balik Arah (Flip):')}</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
@@ -1276,10 +1276,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                       ? 'bg-accent/15 border-accent text-accent font-bold'
                                       : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
                                   }`}
-                                  title="Balik Horisontal (Flip H)"
+                                  title={t('Balik Horisontal (Flip H)')}
                                 >
                                   <span className="material-symbols-outlined text-[13px]">swap_horiz</span>
-                                  <span>Flip H</span>
+                                  <span>{t('Flip H')}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1289,10 +1289,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                       ? 'bg-accent/15 border-accent text-accent font-bold'
                                       : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
                                   }`}
-                                  title="Balik Vertikal (Flip V)"
+                                  title={t('Balik Vertikal (Flip V)')}
                                 >
                                   <span className="material-symbols-outlined text-[13px]">swap_vert</span>
-                                  <span>Flip V</span>
+                                  <span>{t('Flip V')}</span>
                                 </button>
                               </div>
                             </div>
@@ -1302,7 +1302,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                           {(activeLayer.type === 'shape' || activeLayer.type === 'group' || activeLayer.type === 'image') && (
                             <div className="space-y-1 pt-1 border-t border-border/40">
                               <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                <span>Kelengkungan Sudut</span>
+                                <span>{t('Kelengkungan Sudut')}</span>
                                 <div className="flex items-center gap-1">
                                   <CommitNumberInput
                                     min={0}
@@ -1310,10 +1310,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                     step={1}
                                     value={activeLayerOverride.borderRadius || 0}
                                     onCommit={(val) => handleOverrideChange('borderRadius', val)}
-                                    ariaLabel="Kelengkungan Sudut"
+                                    ariaLabel={t('Kelengkungan Sudut')}
                                     className="w-12 px-1 py-0.2 rounded bg-surface-2 border border-border text-[9px] font-mono text-right text-accent focus:outline-none focus:border-accent"
                                   />
-                                  <span className="text-[9px]">px</span>
+                                  <span className="text-[9px]">{t('px')}</span>
                                 </div>
                               </div>
                               <DebouncedSlider
@@ -1336,7 +1336,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                         : 'bg-surface-2 border-border text-text-muted hover:text-on-surface'
                                     }`}
                                   >
-                                    {r}px
+                                    {r}{t('px')}
                                   </button>
                                 ))}
                               </div>
@@ -1348,7 +1348,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Transparansi</span>
+                                  <span>{t('Transparansi')}</span>
                                   <span className="text-accent">
                                     {Math.round((activeLayerOverride.opacity !== undefined ? activeLayerOverride.opacity : 1.0) * 100)}%
                                   </span>
@@ -1365,8 +1365,8 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                               <div>
                                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-0.5">
-                                  <span>Warna Layer</span>
-                                  <span className="text-accent text-[9px]">{activeLayerOverride.color || 'Bawaan'}</span>
+                                  <span>{t('Warna Layer')}</span>
+                                  <span className="text-accent text-[9px]">{activeLayerOverride.color || t('Bawaan')}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <DebouncedColor
@@ -1380,7 +1380,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                       onClick={() => handleOverrideChange('color', undefined)}
                                       className="text-[9px] text-text-muted hover:text-on-surface"
                                     >
-                                      Reset
+                                      {t('Reset')}
                                     </button>
                                   )}
                                 </div>
@@ -1389,7 +1389,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                             {/* Quick color palette chips */}
                             <div className="flex items-center gap-1 pt-0.5">
-                              <span className="text-[9px] text-text-muted mr-1">Palet Cepat:</span>
+                              <span className="text-[9px] text-text-muted mr-1">{t('Palet Cepat:')}</span>
                               {['#84cc16', '#38bdf8', '#f59e0b', '#ef4444', '#ec4899', '#ffffff'].map((c) => (
                                 <button
                                   key={c}
@@ -1427,7 +1427,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-accent">palette</span>
-                      Palet Warna Adegan #{activeSceneIndex + 1}
+                      {t('Palet Warna Adegan #')}{activeSceneIndex + 1}
                     </span>
                     <button
                       type="button"
@@ -1435,13 +1435,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       className="text-[10px] text-text-muted hover:text-rose-400 flex items-center gap-0.5 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[13px]">restart_alt</span>
-                      Reset
+                      {t('Reset')}
                     </button>
                   </div>
 
                   <div className="grid grid-cols-4 gap-1.5">
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted uppercase">Bg</span>
+                      <span className="text-[9px] font-mono text-text-muted uppercase">{t('Bg')}</span>
                       <DebouncedColor
                         value={currentPalette.bg || project.theme.bg || '#09090b'}
                         onChangeComplete={(val) => handlePaletteChange('bg', val)}
@@ -1450,7 +1450,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted uppercase">Primary</span>
+                      <span className="text-[9px] font-mono text-text-muted uppercase">{t('Primary')}</span>
                       <DebouncedColor
                         value={currentPalette.primary || project.theme.textPrimary || '#ffffff'}
                         onChangeComplete={(val) => handlePaletteChange('primary', val)}
@@ -1459,7 +1459,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted uppercase">Accent</span>
+                      <span className="text-[9px] font-mono text-text-muted uppercase">{t('Accent')}</span>
                       <DebouncedColor
                         value={currentPalette.accent || project.theme.textHighlight || '#84cc16'}
                         onChangeComplete={(val) => handlePaletteChange('accent', val)}
@@ -1468,7 +1468,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
 
                     <div className="p-2 rounded-xl bg-surface-1 border border-border flex flex-col items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted uppercase">Text</span>
+                      <span className="text-[9px] font-mono text-text-muted uppercase">{t('Text')}</span>
                       <DebouncedColor
                         value={currentPalette.text || project.theme.textPrimary || '#ffffff'}
                         onChangeComplete={(val) => handlePaletteChange('text', val)}
@@ -1483,7 +1483,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-accent">font_download</span>
-                      Tipografi & Font Proyek
+                      {t('Tipografi & Font Proyek')}
                     </span>
                     <span className="text-[10px] font-mono text-text-muted">
                       {mapFontDisplay(project.theme.fontFamily)}
@@ -1493,9 +1493,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="grid grid-cols-3 gap-1.5">
                     {(
                       [
-                        { id: 'Jakarta', label: 'Jakarta Sans', sub: 'Modern & Bersih' },
-                        { id: 'Impact', label: 'Syne Display', sub: 'Kinetik & Bold' },
-                        { id: 'Mono', label: 'JetBrains Mono', sub: 'Teknis & Kode' }
+                        { id: 'Jakarta', label: t('Jakarta Sans'), sub: t('Modern & Bersih') },
+                        { id: 'Impact', label: t('Syne Display'), sub: t('Kinetik & Bold') },
+                        { id: 'Mono', label: t('JetBrains Mono'), sub: t('Teknis & Kode') }
                       ] as const
                     ).map((f) => {
                       const isSel = (project.theme.fontFamily || 'Jakarta') === f.id;
@@ -1541,15 +1541,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-accent">bolt</span>
-                  Visual & Widget Instan
+                  {t('Visual & Widget Instan')}
                 </span>
                 <span className="text-[10px] font-mono text-accent px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25">
-                  Tanpa API key
+                  {t('Tanpa API key')}
                 </span>
               </div>
 
               <p className="text-[11px] text-text-muted leading-relaxed">
-                Susun animasi tipografi kinetik & widget grafik secara instan dari naskah tanpa kuota API. Seluruh elemen langsung memiliki layer yang dapat digeser di kanvas.
+                {t('Susun animasi tipografi kinetik & widget grafik secara instan dari naskah tanpa kuota API. Seluruh elemen langsung memiliki layer yang dapat digeser di kanvas.')}
               </p>
 
               {/* Pilihan Archetype Widget */}
@@ -1566,7 +1566,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                           compileSceneProcedural(activeScene.id, arch.id);
                         }
                       }}
-                      title={arch.description}
+                      title={t(arch.description)}
                       className={`p-2 rounded-xl border text-left flex flex-col gap-1 transition-all active:scale-95 ${
                         isSel
                           ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs'
@@ -1577,7 +1577,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         <span className="material-symbols-outlined text-[15px] text-accent">{arch.icon}</span>
                         {isSel && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
                       </div>
-                      <span className="text-[10px] font-semibold leading-tight line-clamp-2 min-h-[2lh]">{arch.label}</span>
+                      <span className="text-[10px] font-semibold leading-tight line-clamp-2 min-h-[2lh]">{t(arch.label)}</span>
                     </button>
                   );
                 })}
@@ -1591,7 +1591,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   className="py-2 px-2.5 rounded-xl bg-surface-1 hover:bg-surface-3 border border-border text-on-surface text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[15px] text-accent">auto_fix_high</span>
-                  <span>{activeScene ? `Terapkan ke Shot #${activeSceneIndex + 1}` : 'Terapkan ke Shot'}</span>
+                  <span>{activeScene ? t('Terapkan ke Shot #{0}', activeSceneIndex + 1) : t('Terapkan ke Shot')}</span>
                 </button>
 
                 <button
@@ -1610,7 +1610,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   className="py-2 px-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[15px]">bolt</span>
-                  <span>Susun Semua ({scenes.length})</span>
+                  <span>{t('Susun Semua (')}{scenes.length})</span>
                 </button>
               </div>
             </div>
@@ -1620,10 +1620,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-accent">auto_awesome</span>
-                  Generator Mograph AI
+                  {t('Generator Mograph AI')}
                 </span>
                 <span className="text-[11px] font-mono text-text-muted px-2 py-0.5 rounded-full bg-surface-1 border border-border">
-                  {project.scenes?.length || 0} Adegan
+                  {project.scenes?.length || 0} {t('Adegan')}
                 </span>
               </div>
 
@@ -1635,7 +1635,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className="material-symbols-outlined animate-spin text-[16px] shrink-0">
                         sync
                       </span>
-                      <span className="truncate">{mographProgress || 'Menyiapkan...'}</span>
+                      <span className="truncate">{mographProgress || t('Menyiapkan...')}</span>
                     </span>
                     {mographStats && (
                       <span className="text-[11px] font-mono text-text-muted shrink-0 ml-1">
@@ -1686,7 +1686,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     onClick={cancelMographGeneration}
                     className="w-full mt-1 py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
                   >
-                    Batalkan Pembuatan
+                    {t('Batalkan Pembuatan')}
                   </button>
                 </div>
               ) : (
@@ -1696,7 +1696,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <div className="flex items-start gap-2 text-amber-300 text-[11px] leading-relaxed">
                         <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">key_off</span>
                         <span>
-                          API Key untuk <strong>{currentLlmProvider.toUpperCase()}</strong> belum diatur. Masukkan API Key di Pengaturan agar AI dapat membuat visual adegan.
+                          {t('API Key untuk')} <strong>{currentLlmProvider.toUpperCase()}</strong> {t('belum diatur. Masukkan API Key di Pengaturan agar AI dapat membuat visual adegan.')}
                         </span>
                       </div>
                       <button
@@ -1705,7 +1705,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         className="w-full py-1.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <span className="material-symbols-outlined text-[15px]">settings</span>
-                        <span>Buka Pengaturan API</span>
+                        <span>{t('Buka Pengaturan API')}</span>
                       </button>
                     </div>
                   )}
@@ -1716,13 +1716,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     disabled={isCompilingMograph || (project.scenes?.length || 0) === 0 || !hasLlmApiKey}
                     title={
                       !hasLlmApiKey
-                        ? `Silakan masukkan API Key untuk ${currentLlmProvider.toUpperCase()} di Pengaturan terlebih dahulu`
+                        ? t('Silakan masukkan API Key untuk {0} di Pengaturan terlebih dahulu', currentLlmProvider.toUpperCase())
                         : undefined
                     }
                     className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-accent text-on-accent font-semibold text-[13px] flex items-center justify-center gap-2 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm"
                   >
                     <span className="material-symbols-outlined text-[18px]">movie_filter</span>
-                    <span>Buat Mograph AI</span>
+                    <span>{t('Buat Mograph AI')}</span>
                   </button>
                 </div>
               )}
@@ -1737,7 +1737,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               >
                 <span className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[17px]">code</span>
-                  Buka Editor Kode Adegan
+                  {t('Buka Editor Kode Adegan')}
                 </span>
                 <span className="material-symbols-outlined text-[16px] text-text-muted">chevron_right</span>
               </button>
@@ -1748,7 +1748,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               <summary className="flex items-center justify-between cursor-pointer list-none text-[12px] font-semibold text-on-surface">
                 <span className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px] text-text-muted">settings</span>
-                  Lanjutan
+                  {t('Lanjutan')}
                 </span>
                 <span className="material-symbols-outlined text-[16px] text-text-muted transition-transform group-open:rotate-180">
                   expand_more
@@ -1756,13 +1756,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               </summary>
               <div className="flex flex-col gap-2.5 pt-3">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-semibold text-on-surface">Panjang jawaban AI</span>
+                  <span className="font-semibold text-on-surface">{t('Panjang jawaban AI')}</span>
                   <span className="font-mono text-accent font-semibold">
-                    {settings.maxOutputTokens || 2048} token
+                    {t('{0} token', settings.maxOutputTokens || 2048)}
                   </span>
                 </div>
                 <p className="text-[11px] text-text-muted leading-relaxed">
-                  Naikkan kalau visual adegan sering terpotong atau gagal. Angka lebih besar memakai kuota API lebih banyak.
+                  {t('Naikkan kalau visual adegan sering terpotong atau gagal. Angka lebih besar memakai kuota API lebih banyak.')}
                 </p>
   
                 <input
@@ -1810,7 +1810,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-semibold text-on-surface flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-accent">subtitles</span>
-                  Pengaturan Subtitel Video
+                  {t('Pengaturan Subtitel Video')}
                 </span>
                 <button
                   type="button"
@@ -1826,7 +1826,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       project.theme.showSubtitles ? 'bg-accent' : 'bg-zinc-600'
                     }`}
                   />
-                  <span>{project.theme.showSubtitles ? 'Aktif' : 'Nonaktif'}</span>
+                  <span>{project.theme.showSubtitles ? t('Aktif') : t('Nonaktif')}</span>
                 </button>
               </div>
 
@@ -1836,7 +1836,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 1. Live Subtitle Preview */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Pratinjau Langsung
+                      {t('Pratinjau Langsung')}
                     </span>
                     <div className="w-full h-16 rounded-xl bg-black/90 border border-border flex items-center justify-center p-2 overflow-hidden relative shadow-inner">
                       <div
@@ -1859,7 +1859,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                                 : '0 2px 8px rgba(0,0,0,0.8)'
                         }}
                       >
-                        <span style={{ color: subCust.textColor || '#ffffff' }}>MooScript </span>
+                        <span style={{ color: subCust.textColor || '#ffffff' }}>{t('MooScript')} </span>
                         <span
                           style={{
                             color: activeHighlightColor,
@@ -1867,7 +1867,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             display: 'inline-block'
                           }}
                         >
-                          Studio
+                          {t('Studio')}
                         </span>
                         <span style={{ color: subCust.textColor || '#ffffff' }}> AI</span>
                       </div>
@@ -1877,7 +1877,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 2. Pilihan Gaya Tampilan (Style Presets) */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Pilihan Gaya Tampilan
+                      {t('Pilihan Gaya Tampilan')}
                     </span>
                     <div className="grid grid-cols-2 gap-1.5">
                       {styleOptions.map((opt) => {
@@ -1914,7 +1914,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 3. Tata Letak & Posisi */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Tata Letak & Posisi
+                      {t('Tata Letak & Posisi')}
                     </span>
                     <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
                       {positionOptions.map((pos) => {
@@ -1940,7 +1940,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 4. Tipografi & Ukuran */}
                   <div className="flex flex-col gap-2 pt-1 border-t border-border/60">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-text-muted font-medium">Ukuran Huruf</span>
+                      <span className="text-text-muted font-medium">{t('Ukuran Huruf')}</span>
                       <span className="font-mono text-on-surface font-semibold">
                         {Math.round((subCust.fontScale || 1.0) * 100)}%
                       </span>
@@ -1977,7 +1977,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-[11px] text-text-muted">Huruf Besar (UPPERCASE)</span>
+                      <span className="text-[11px] text-text-muted">{t('Huruf Besar (UPPERCASE)')}</span>
                       <button
                         type="button"
                         onClick={() => updateSubtitleCustomization({ uppercase: !subCust.uppercase })}
@@ -1997,16 +1997,16 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 5. Warna Sorotan Kata */}
                   <div className="flex flex-col gap-1.5 pt-1 border-t border-border/60">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                      Warna Sorotan Kata
+                      {t('Warna Sorotan Kata')}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {[
                         { color: '#84cc16', name: 'Lime' },
-                        { color: '#eab308', name: 'Kuning' },
+                        { color: '#eab308', name: t('Kuning') },
                         { color: '#06b6d4', name: 'Cyan' },
-                        { color: '#f97316', name: 'Oranye' },
+                        { color: '#f97316', name: t('Oranye') },
                         { color: '#ec4899', name: 'Pink' },
-                        { color: '#ffffff', name: 'Putih' }
+                        { color: '#ffffff', name: t('Putih') }
                       ].map((c) => {
                         const isSelected = (subCust.activeColor || project.theme.textHighlight || '#84cc16') === c.color;
                         return (
@@ -2027,7 +2027,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         value={subCust.activeColor || project.theme.textHighlight || '#84cc16'}
                         onChange={(e) => updateSubtitleCustomization({ activeColor: e.target.value })}
                         className="w-7 h-7 rounded-full bg-transparent border border-border cursor-pointer overflow-hidden p-0"
-                        title="Pilih warna kustom"
+                        title={t('Pilih warna kustom')}
                       />
                     </div>
                   </div>
@@ -2035,12 +2035,12 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {/* 6. Ritme & Pacing Teks */}
                   <div className="flex flex-col gap-2 pt-1 border-t border-border/60">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-text-muted">Ritme Kata per Frasa</span>
+                      <span className="text-text-muted">{t('Ritme Kata per Frasa')}</span>
                       <div className="flex items-center gap-1">
                         {[
-                          { label: '3 kata', count: 3 },
-                          { label: '4 kata', count: 4 },
-                          { label: '5 kata', count: 5 }
+                          { label: t('3 kata'), count: 3 },
+                          { label: t('4 kata'), count: 4 },
+                          { label: t('5 kata'), count: 5 }
                         ].map((chunk) => {
                           const isSelected = (subCust.maxWordsPerChunk || 4) === chunk.count;
                           return (
@@ -2065,7 +2065,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     {currentStyle === 'boxed' && (
                       <div className="flex flex-col gap-1 pt-1 border-t border-border/40">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-text-muted">Opasitas Latar Kotak</span>
+                          <span className="text-text-muted">{t('Opasitas Latar Kotak')}</span>
                           <span className="font-mono text-on-surface font-semibold">
                             {Math.round((subCust.bgOpacity !== undefined ? subCust.bgOpacity : 0.65) * 100)}%
                           </span>
@@ -2096,7 +2096,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             <div className="flex flex-col gap-3.5">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                  Penyedia Suara (TTS)
+                  {t('Penyedia Suara (TTS)')}
                 </span>
                 <div className="relative">
                   <select
@@ -2120,7 +2120,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               {currentVoiceProvider === 'openai' && (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                    Karakter Suara OpenAI
+                    {t('Karakter Suara OpenAI')}
                   </span>
                   <div className="relative">
                     <select
@@ -2148,7 +2148,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               {currentVoiceProvider === 'elevenlabs' && (
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                    Karakter Suara ElevenLabs
+                    {t('Karakter Suara ElevenLabs')}
                   </span>
                   <div className="relative">
                     <select
@@ -2183,10 +2183,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
                   {isElevenLabsCustom && (
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-text-muted font-medium">Custom Voice ID</span>
+                      <span className="text-[10px] text-text-muted font-medium">{t('Custom Voice ID')}</span>
                       <input
                         type="text"
-                        placeholder="Masukkan Custom Voice ID ElevenLabs..."
+                        placeholder={t('Masukkan Custom Voice ID ElevenLabs...')}
                         value={currentElevenLabsVoice === 'custom' ? '' : currentElevenLabsVoice}
                         onChange={(e) =>
                           updateSettings({
@@ -2205,9 +2205,9 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-bold text-text-muted uppercase tracking-wider">
-                        Karakter Suara Lokal (Offline)
+                        {t('Karakter Suara Lokal (Offline)')}
                       </span>
-                      <span className="font-mono text-[10px] text-accent">Zero-API</span>
+                      <span className="font-mono text-[10px] text-accent">{t('Zero-API')}</span>
                     </div>
                     <div className="relative">
                       <select
@@ -2238,7 +2238,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                         <div className="flex items-center justify-between text-emerald-400 font-medium">
                           <span className="flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                            <span>Model siap offline</span>
+                            <span>{t('Model siap offline')}</span>
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-mono text-text-muted">
@@ -2248,7 +2248,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               type="button"
                               onClick={handlePurgeCurrentLocalVoice}
                               className="p-1 rounded hover:bg-rose-500/10 text-text-muted hover:text-rose-400 transition-colors"
-                              title="Hapus file model dari cache browser"
+                              title={t('Hapus file model dari cache browser')}
                             >
                               <span className="material-symbols-outlined text-[15px]">delete</span>
                             </button>
@@ -2259,7 +2259,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                           <div className="flex items-center justify-between text-[11px] font-mono text-accent">
                             <span className="flex items-center gap-1">
                               <span className="material-symbols-outlined text-[15px] animate-spin">sync</span>
-                              <span>Mengunduh bobot ONNX...</span>
+                              <span>{t('Mengunduh bobot ONNX...')}</span>
                             </span>
                             <span>{localVoiceDownloadProgress}%</span>
                           </div>
@@ -2277,7 +2277,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                               download_for_offline
                             </span>
                             <span>
-                              Model ini ({getLocalVoice(currentLocalVoice)?.sizeMb} MB) belum tersimpan di browser. Unduh sekali agar dapat bersuara tanpa internet.
+                              {t('Model ini (')}{getLocalVoice(currentLocalVoice)?.sizeMb} {t('MB) belum tersimpan di browser. Unduh sekali agar dapat bersuara tanpa internet.')}
                             </span>
                           </div>
                           <button
@@ -2286,7 +2286,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                             className="w-full py-2 px-3 rounded-lg bg-accent text-on-accent text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
                           >
                             <span className="material-symbols-outlined text-[15px]">download</span>
-                            <span>Unduh Model ({getLocalVoice(currentLocalVoice)?.sizeMb} MB)</span>
+                            <span>{t('Unduh Model (')}{getLocalVoice(currentLocalVoice)?.sizeMb} MB)</span>
                           </button>
                         </div>
                       )}
@@ -2297,11 +2297,11 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   {currentLocalVoice !== 'fallback' && (
                     <div className="p-2.5 rounded-xl border border-border/80 bg-surface-2/40 flex flex-col gap-2">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                        Kustomisasi Akustik Piper
+                        {t('Kustomisasi Akustik Piper')}
                       </span>
                       <CommitSliderRow
                         size="sm"
-                        label="Variasi Intonasi (Ekspresivitas)"
+                        label={t('Variasi Intonasi (Ekspresivitas)')}
                         value={settings.piperNoiseScale ?? 0.667}
                         min={0.1}
                         max={1.0}
@@ -2311,7 +2311,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       />
                       <CommitSliderRow
                         size="sm"
-                        label="Variasi Ritme / Fonem"
+                        label={t('Variasi Ritme / Fonem')}
                         value={settings.piperNoiseW ?? 0.8}
                         min={0.1}
                         max={1.0}
@@ -2327,7 +2327,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
               {/* Slider Kecepatan Bicara (Speech Rate) */}
               <div className="flex flex-col gap-1.5 pt-0.5">
                 <CommitSliderRow
-                  label="Kecepatan Bicara"
+                  label={t('Kecepatan Bicara')}
                   value={settings.speed ?? 1.05}
                   min={0.5}
                   max={2.0}
@@ -2361,17 +2361,17 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   onClick={handleAuditionVoice}
                   disabled={currentVoiceProvider === 'timer'}
                   className="min-h-[40px] px-3 py-2 rounded-xl bg-surface-2 border border-border hover:bg-surface-3 text-on-surface font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:pointer-events-none"
-                  title={currentVoiceProvider === 'timer' ? 'Mode tanpa suara tidak punya contoh suara' : 'Dengarkan contoh suara'}
+                  title={currentVoiceProvider === 'timer' ? t('Mode tanpa suara tidak punya contoh suara') : t('Dengarkan contoh suara')}
                 >
                   <span className="material-symbols-outlined text-[17px] text-accent">volume_up</span>
-                  <span>Coba Suara</span>
+                  <span>{t('Coba Suara')}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => generateAudio()}
                   disabled={isGeneratingAudio || !hasNarration}
-                  title={!hasNarration ? 'Tulis naskah adegan terlebih dahulu' : undefined}
+                  title={!hasNarration ? t('Tulis naskah adegan terlebih dahulu') : undefined}
                   className="min-h-[40px] px-3 py-2 rounded-xl bg-accent text-on-accent font-semibold text-[12px] flex items-center justify-center gap-1.5 transition-all hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none shadow-sm"
                 >
                   {isGeneratingAudio ? (
@@ -2382,13 +2382,13 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       <span className="truncate">
                         {audioProgress?.currentScene
                           ? `(${audioProgress.currentScene}/${audioProgress.totalScenes})`
-                          : 'Proses...'}
+                          : t('Proses...')}
                       </span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[16px]">record_voice_over</span>
-                      <span className="truncate">Generate Suara</span>
+                      <span className="truncate">{t('Generate Suara')}</span>
                     </>
                   )}
                 </button>
@@ -2400,7 +2400,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   onClick={() => cancelAudioGeneration()}
                   className="w-full py-1.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-rose-400 text-[12px] font-medium transition-colors"
                 >
-                  Batalkan Pembuatan Suara
+                  {t('Batalkan Pembuatan Suara')}
                 </button>
               )}
 
@@ -2424,10 +2424,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   disabled={isGeneratingAudio}
                   onClick={() => customAudioInputRef.current?.click()}
                   className="w-full py-2 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-dashed border-border hover:border-accent/50 text-on-surface text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] disabled:opacity-50"
-                  title="Unggah rekaman voiceover atau musik MP3/WAV/M4A untuk disinkronkan otomatis ke adegan"
+                  title={t('Unggah rekaman voiceover atau musik MP3/WAV/M4A untuk disinkronkan otomatis ke adegan')}
                 >
                   <span className="material-symbols-outlined text-[16px] text-accent">upload_file</span>
-                  <span>Unggah Audio / Voiceover Sendiri (MP3/WAV)</span>
+                  <span>{t('Unggah Audio / Voiceover Sendiri (MP3/WAV)')}</span>
                 </button>
               </div>
 
@@ -2449,15 +2449,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   <span className="flex-1">
                     {hasProjectAudio && bgmOnlyAudio
                       ? audioStale
-                        ? 'Durasi adegan berubah. Tekan Generate Suara agar musik latar menyesuaikan.'
-                        : `Musik latar siap (${(project.audioDuration || 0).toFixed(1)} detik), tanpa narasi suara.`
+                        ? t('Durasi adegan berubah. Tekan Generate Suara agar musik latar menyesuaikan.')
+                        : t('Musik latar siap ({0} detik), tanpa narasi suara.', (project.audioDuration || 0).toFixed(1))
                       : currentVoiceProvider === 'timer' && !hasProjectAudio
-                        ? 'Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.'
+                        ? t('Mode tanpa suara: hanya durasi adegan yang dihitung dari panjang naskah.')
                         : !hasProjectAudio
-                          ? 'Suara belum dibuat.'
+                          ? t('Suara belum dibuat.')
                           : audioStale
-                            ? 'Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.'
-                            : `Suara siap (${(project.audioDuration || 0).toFixed(1)} detik).`}
+                            ? t('Naskah atau pengaturan berubah. Buat ulang suara agar sinkron.')
+                            : t('Suara siap ({0} detik).', (project.audioDuration || 0).toFixed(1))}
                   </span>
                 </div>
 
@@ -2466,10 +2466,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     type="button"
                     onClick={() => deleteAudio()}
                     className="w-full py-1.5 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
-                    title="Hapus trek audio dari proyek"
+                    title={t('Hapus trek audio dari proyek')}
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
-                    <span>Hapus Suara Proyek</span>
+                    <span>{t('Hapus Suara Proyek')}</span>
                   </button>
                 )}
               </div>
@@ -2478,7 +2478,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             {/* Musik Latar (BGM) */}
             <div className="flex flex-col gap-3 pt-1 border-t border-border">
               <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Musik Latar
+                {t('Musik Latar')}
               </span>
 
               {/* Preset Musik */}
@@ -2526,10 +2526,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   disabled={isGeneratingAudio}
                   onClick={() => customBgmInputRef.current?.click()}
                   className="w-full py-2 px-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-dashed border-border hover:border-accent/50 text-on-surface text-[11px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] disabled:opacity-50"
-                  title="Unggah musik latar sendiri (maks 25 MB). Musik diulang otomatis sampai video selesai."
+                  title={t('Unggah musik latar sendiri (maks 25 MB). Musik diulang otomatis sampai video selesai.')}
                 >
                   <span className="material-symbols-outlined text-[16px] text-accent">library_music</span>
-                  <span>{project.bgm?.customName ? 'Ganti Musik Sendiri' : 'Unggah Musik Sendiri'}</span>
+                  <span>{project.bgm?.customName ? t('Ganti Musik Sendiri') : t('Unggah Musik Sendiri')}</span>
                 </button>
                 {project.bgm?.customName && (
                   <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
@@ -2541,7 +2541,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       onClick={() => removeCustomBgm()}
                       className="shrink-0 text-rose-400 hover:text-rose-300 font-semibold"
                     >
-                      Hapus
+                      {t('Hapus')}
                     </button>
                   </div>
                 )}
@@ -2549,7 +2549,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
 
               {/* Volume & ducking: the mix is rendered once, when the thumb is released */}
               <CommitSliderRow
-                label="Volume"
+                label={t('Volume')}
                 value={bgmLevel}
                 min={0}
                 max={1}
@@ -2559,7 +2559,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 onCommit={(v) => updateBgmLevel(v)}
               />
               <CommitSliderRow
-                label="Volume Musik Saat Ada Suara (Ducking)"
+                label={t('Volume Musik Saat Ada Suara (Ducking)')}
                 value={duckRatio}
                 min={0}
                 max={1}
@@ -2574,7 +2574,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             {hasRawVoice && (
               <div className="flex flex-col gap-3 pt-1 border-t border-border">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Edit Suara</span>
+                  <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{t('Edit Suara')}</span>
                   {voiceEditActive && (
                     <button
                       type="button"
@@ -2583,15 +2583,15 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                       }
                       className="text-[10px] text-text-muted hover:text-rose-300"
                     >
-                      Reset
+                      {t('Reset')}
                     </button>
                   )}
                 </div>
                 <p className="text-[11px] text-text-faint leading-snug">
-                  Subtitel dan ketukan kata ikut bergeser bersama suara.
+                  {t('Subtitel dan ketukan kata ikut bergeser bersama suara.')}
                 </p>
                 <CommitSliderRow
-                  label="Geser suara"
+                  label={t('Geser suara')}
                   value={voiceEdit.offset ?? 0}
                   min={-2}
                   max={2}
@@ -2600,7 +2600,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   onCommit={(v) => updateVoiceEdit({ offset: v })}
                 />
                 <CommitSliderRow
-                  label="Potong awal"
+                  label={t('Potong awal')}
                   value={voiceEdit.trimStart ?? 0}
                   min={0}
                   max={3}
@@ -2609,7 +2609,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   onCommit={(v) => updateVoiceEdit({ trimStart: v })}
                 />
                 <CommitSliderRow
-                  label="Potong akhir"
+                  label={t('Potong akhir')}
                   value={voiceEdit.trimEnd ?? 0}
                   min={0}
                   max={3}
@@ -2619,7 +2619,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <CommitSliderRow
-                    label="Fade masuk"
+                    label={t('Fade masuk')}
                     value={voiceEdit.fadeIn ?? 0}
                     min={0}
                     max={2}
@@ -2629,7 +2629,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                     onCommit={(v) => updateVoiceEdit({ fadeIn: v })}
                   />
                   <CommitSliderRow
-                    label="Fade keluar"
+                    label={t('Fade keluar')}
                     value={voiceEdit.fadeOut ?? 0}
                     min={0}
                     max={2}
@@ -2640,7 +2640,7 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
                   />
                 </div>
                 <CommitSliderRow
-                  label="Volume suara"
+                  label={t('Volume suara')}
                   value={voiceEdit.gain ?? 1}
                   min={0}
                   max={2}
@@ -2654,26 +2654,26 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
             {/* Sound effects */}
             <div className="flex flex-col gap-3 pt-1 border-t border-border">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Efek Suara (SFX)</span>
-                <span className="text-[10px] font-mono text-text-muted">{(project.sfxCues || []).length} cue</span>
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{t('Efek Suara (SFX)')}</span>
+                <span className="text-[10px] font-mono text-text-muted">{(project.sfxCues || []).length} {t('cue')}</span>
               </div>
               <p className="text-[11px] text-text-faint leading-snug">
-                Whoosh di setiap potongan, pop dan hentakan di momen visual. Atur satu per satu di track SFX timeline.
+                {t('Whoosh di setiap potongan, pop dan hentakan di momen visual. Atur satu per satu di track SFX timeline.')}
               </p>
               <button
                 type="button"
                 disabled={scenes.length === 0}
                 onClick={() => {
                   const n = autoPlaceSfx();
-                  addToast(n > 0 ? `${n} efek suara ditempatkan.` : 'Tidak ada titik baru untuk efek suara.', 'info');
+                  addToast(n > 0 ? t('{0} efek suara ditempatkan.', n) : t('Tidak ada titik baru untuk efek suara.'), 'info');
                 }}
                 className="w-full py-2 px-3 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
-                SFX otomatis
+                {t('SFX otomatis')}
               </button>
               <CommitSliderRow
-                label="Volume SFX"
+                label={t('Volume SFX')}
                 value={project.sfxLevel ?? 0.8}
                 min={0}
                 max={1.5}
@@ -2698,10 +2698,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
           setShowOverwriteConfirm(false);
           handleGenerateCustomMograph(true);
         }}
-        title="Timpa Perubahan Manual?"
-        description="Beberapa adegan dalam proyek ini telah diedit secara manual. Menjalankan AI Generator akan menimpa kode adegan tersebut dengan hasil generasi baru. Lanjutkan?"
-        confirmLabel="Timpa & Generate"
-        cancelLabel="Batal"
+        title={t('Timpa Perubahan Manual?')}
+        description={t('Beberapa adegan dalam proyek ini telah diedit secara manual. Menjalankan AI Generator akan menimpa kode adegan tersebut dengan hasil generasi baru. Lanjutkan?')}
+        confirmLabel={t('Timpa & Generate')}
+        cancelLabel={t('Batal')}
         variant="warning"
         icon="warning"
       />
@@ -2714,10 +2714,10 @@ export const InspectorRack: React.FC<InspectorRackProps> = ({
           setShowProceduralOverwriteConfirm(false);
           compileAllScenesProcedural(selectedArchetype, true);
         }}
-        title="Ganti Semua Visual?"
-        description="Beberapa adegan memakai visual AI atau sudah diedit manual. Visual instan akan menggantikan semuanya. Anda masih bisa mengembalikannya dengan Urungkan (Ctrl+Z)."
-        confirmLabel="Ganti Semua"
-        cancelLabel="Batal"
+        title={t('Ganti Semua Visual?')}
+        description={t('Beberapa adegan memakai visual AI atau sudah diedit manual. Visual instan akan menggantikan semuanya. Anda masih bisa mengembalikannya dengan Urungkan (Ctrl+Z).')}
+        confirmLabel={t('Ganti Semua')}
+        cancelLabel={t('Batal')}
         variant="warning"
         icon="bolt"
       />

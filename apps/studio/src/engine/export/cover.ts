@@ -2,6 +2,7 @@ import type { MooProject } from '../../types';
 import { createCompositionFrameRenderer } from '../composition/compositionFrameRenderer';
 import { drawReframed, frameSize, type ReframeOptions } from './reframe';
 import { createBrollReader, drawBrollFrame } from './brollReader';
+import { t } from '../../i18n';
 
 /**
  * One frame of the film as a PNG, rendered by the same stage as the video (thumbnail / cover).
@@ -16,7 +17,7 @@ export async function renderCoverPng(
   const width = project.width || 1080;
   const height = project.height || 1920;
   const renderer = await createCompositionFrameRenderer(project, width, height);
-  if (!renderer) throw new Error('Panggung render tidak bisa dimuat.');
+  if (!renderer) throw new Error(t('Panggung render tidak bisa dimuat.'));
   const reader = await createBrollReader(project.scenes, brollSources);
   try {
     const frame = document.createElement('canvas');
@@ -37,7 +38,7 @@ export async function renderCoverPng(
       drawReframed(frame, out, reframe.mode);
     }
     return await new Promise<Blob>((resolve, reject) =>
-      out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Gagal membuat PNG.'))), 'image/png')
+      out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('Gagal membuat PNG.')))), 'image/png')
     );
   } finally {
     renderer.cleanup();

@@ -1,6 +1,7 @@
 import type { WordTimestamp, Scene, MooProject, EngineSettings, TTSProvider } from '../../types';
 import { getCachedSceneAudio, putCachedSceneAudio } from '../../db/mooDb';
 import { synthesizeLocalTTS, pcmFloat32ToWavBlob } from './localTts';
+import { t } from '../../i18n';
 
 export interface TTSResult {
   audioBlob: Blob;
@@ -284,17 +285,17 @@ export function mapElevenLabsError(status: number, errText: string): Error {
 
   if (status === 401) {
     return new Error(
-      'ElevenLabs: API key ditolak (401). Penyebab paling umum: key bertipe scoped tanpa permission text_to_speech, atau key sudah dicabut. Aktifkan permission text_to_speech untuk key ini di dashboard ElevenLabs (Profile → API Keys).'
+      t('ElevenLabs: API key ditolak (401). Penyebab paling umum: key bertipe scoped tanpa permission text_to_speech, atau key sudah dicabut. Aktifkan permission text_to_speech untuk key ini di dashboard ElevenLabs (Profile → API Keys).')
     );
   }
   if (status === 402 || /quota|credit|payment|insufficient|balance/i.test(detail)) {
     return new Error(
-      'ElevenLabs: kuota kredit habis. Cek sisa kredit di dashboard ElevenLabs, atau hemat pemakaian dengan model Flash v2.5 di tab Voice.'
+      t('ElevenLabs: kuota kredit habis. Cek sisa kredit di dashboard ElevenLabs, atau hemat pemakaian dengan model Flash v2.5 di tab Voice.')
     );
   }
   if (/model[^.]{0,60}(not available|upgrade|plan)|plan[^.]{0,40}model|only available/i.test(detail)) {
     return new Error(
-      'ElevenLabs: model ini tidak termasuk paket akunmu. Ganti ke Flash v2.5 (gratis, paling hemat) di tab Voice.'
+      t('ElevenLabs: model ini tidak termasuk paket akunmu. Ganti ke Flash v2.5 (gratis, paling hemat) di tab Voice.')
     );
   }
   return new Error(`ElevenLabs TTS Error (${status}): ${detail.slice(0, 300)}`);
