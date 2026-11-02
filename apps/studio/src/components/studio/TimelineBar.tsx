@@ -213,6 +213,21 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
     seekFrame(Math.round(ratio * totalFrames));
   };
 
+  // Computed before any early return: renderFull() reads these from the ticker branch too.
+  // The selected layer's editor animation, drawn on its own track under the shot it belongs to.
+  const activeModule = project.composition?.scenes.find((m) => m.beatId === activeSceneId);
+  const activeShot = sceneBoundaries.find((s) => s.id === activeSceneId);
+  const layerTrack =
+    selectedLayerId && activeShot && activeModule
+      ? {
+          layerId: selectedLayerId,
+          shotStart: activeShot.startSec,
+          shotDuration: activeShot.durationInSeconds,
+          motion: activeModule.layerMotions?.[selectedLayerId],
+          onChange: (motion: LayerMotion | null) => updateLayerMotion(activeShot.id, selectedLayerId, motion)
+        }
+      : null;
+
   const compactBtn =
     'w-9 h-9 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/[0.06] text-zinc-300 flex items-center justify-center transition-colors';
 
@@ -373,20 +388,6 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ className = '', compac
   }
 
   // 3. FULL MULTI-TRACK TIMELINE (desktop)
-  // The selected layer's editor animation, drawn on its own track under the shot it belongs to.
-  const activeModule = project.composition?.scenes.find((m) => m.beatId === activeSceneId);
-  const activeShot = sceneBoundaries.find((s) => s.id === activeSceneId);
-  const layerTrack =
-    selectedLayerId && activeShot && activeModule
-      ? {
-          layerId: selectedLayerId,
-          shotStart: activeShot.startSec,
-          shotDuration: activeShot.durationInSeconds,
-          motion: activeModule.layerMotions?.[selectedLayerId],
-          onChange: (motion: LayerMotion | null) => updateLayerMotion(activeShot.id, selectedLayerId, motion)
-        }
-      : null;
-
   function renderFull() {
     return (
       <MultiTrackTimeline
