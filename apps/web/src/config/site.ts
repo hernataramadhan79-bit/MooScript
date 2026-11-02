@@ -5,6 +5,9 @@ export type Locale = 'en' | 'id';
 export const SITE_URL = 'https://mooscript.web.id';
 export const STUDIO_URL = 'https://app.mooscript.web.id';
 export const GITHUB_URL = 'https://github.com/hernataramadhan79-bit/MooScript';
+// Search engine ownership tokens, set per deploy (PUBLIC_GOOGLE_SITE_VERIFICATION, PUBLIC_BING_SITE_VERIFICATION).
+export const GOOGLE_SITE_VERIFICATION: string = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION ?? '';
+export const BING_SITE_VERIFICATION: string = import.meta.env.PUBLIC_BING_SITE_VERIFICATION ?? '';
 // The packages are versioned in lockstep; the site shows the same number.
 export const RELEASE_VERSION = `v${version}`;
 

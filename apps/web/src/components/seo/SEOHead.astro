@@ -1,5 +1,14 @@
 ---
-import { SITE_URL, STUDIO_URL, GITHUB_URL, RELEASE_VERSION, alternatePaths, type Locale } from '../../config/site';
+import {
+  SITE_URL,
+  STUDIO_URL,
+  GITHUB_URL,
+  RELEASE_VERSION,
+  GOOGLE_SITE_VERIFICATION,
+  BING_SITE_VERIFICATION,
+  alternatePaths,
+  type Locale
+} from '../../config/site';
 import type { FaqItem } from '../../data/faqs';
 
 interface BreadcrumbItem {
@@ -109,6 +118,8 @@ if (breadcrumbs.length > 0) {
   name="robots"
   content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'}
 />
+{GOOGLE_SITE_VERIFICATION && <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />}
+{BING_SITE_VERIFICATION && <meta name="msvalidate.01" content={BING_SITE_VERIFICATION} />}
 <link rel="icon" type="image/svg+xml" href="/logo.svg" />
 <link rel="alternate icon" href="/favicon.ico" />
 

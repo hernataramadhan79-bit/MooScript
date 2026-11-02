@@ -40,6 +40,17 @@ const props = Astro.props;
     </main>
     <QuietFooter locale={props.locale} />
 
+    {
+      import.meta.env.PROD && (
+        <>
+          <script is:inline>
+            window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+          </script>
+          <script is:inline defer src="/_vercel/insights/script.js" />
+        </>
+      )
+    }
+
     <script is:inline>
       (function () {
         var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
