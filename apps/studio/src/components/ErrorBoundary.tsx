@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return (
       <div
         role="alert"
-        className="h-screen w-screen flex flex-col items-center justify-center gap-4 bg-background text-on-surface p-6 text-center"
+        className="h-app w-full flex flex-col items-center justify-center gap-4 bg-background text-on-surface p-6 text-center"
       >
         <h1 className="text-xl font-bold">{t('Terjadi kesalahan tak terduga')}</h1>
         <p className="text-sm text-text-muted max-w-md">

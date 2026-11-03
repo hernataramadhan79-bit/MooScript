@@ -121,7 +121,7 @@ export const App: React.FC = () => {
 
   return (
     <>
-      <div key={locale} className="h-screen h-dvh w-full flex flex-col bg-background text-on-surface font-sans selection:bg-accent selection:text-on-accent overflow-hidden">
+      <div key={locale} className="h-app w-full flex flex-col bg-background text-on-surface font-sans selection:bg-accent selection:text-on-accent overflow-hidden">
         {/* 1. Header Minimalis Pro */}
         <Header onOpenExport={handleOpenExport} />
 

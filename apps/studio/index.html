@@ -32,14 +32,27 @@
       }
       html,
       body {
-        width: 100vw;
+        width: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
         background-color: #131315;
         color: #f4f4f5;
       }
+      /* The studio shell fills the screen and scrolls inside its own panels. A document taller
+         than the visible viewport lets the browser toolbar cover the bottom navigation. */
+      html,
+      body {
+        overflow: hidden;
+      }
       body {
         overscroll-behavior: none;
+      }
+      /* 100vh is the viewport with the browser toolbar retracted, so it overshoots while the
+         toolbar is showing. dvh follows the visible area; the vh line is only the fallback. */
+      .h-app {
+        height: 100vh;
+        height: 100dvh;
       }
       .pb-safe {
         padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -91,7 +104,7 @@
       }
     </style>
   </head>
-  <body class="bg-surface text-on-surface font-sans antialiased flex flex-col min-h-screen">
+  <body class="bg-surface text-on-surface font-sans antialiased flex flex-col">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

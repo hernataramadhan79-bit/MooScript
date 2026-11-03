@@ -67,7 +67,7 @@ export const Sheet: React.FC<SheetProps> = ({
       onClick={handleBackdropClick}
       className={`fixed inset-0 z-50 p-0 m-auto bg-transparent backdrop:bg-black/70 backdrop:backdrop-blur-sm text-on-surface overflow-visible ${
         side === 'right'
-          ? 'mr-0 h-full max-h-screen w-full sm:w-[480px] rounded-l-2xl'
+          ? 'mr-0 h-full max-h-dvh w-full sm:w-[480px] rounded-l-2xl'
           : side === 'bottom'
             ? 'mb-0 w-full max-w-full rounded-t-2xl'
             : `w-[calc(100%-2rem)] ${maxWidth} rounded-2xl`
