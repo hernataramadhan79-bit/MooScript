@@ -17,7 +17,7 @@ import { resolveTheme } from '../../types';
 import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
 import { sceneHasRenderableCode } from '../composition/legacyScenes';
-import { EXPORT_QUALITY_FACTOR, type ExportQuality } from './exportOptions';
+import { EXPORT_AUDIO_BITRATE, EXPORT_QUALITY_FACTOR, MOTION_BLUR_SAMPLES, motionBlurTimes, type ExportQuality } from './exportOptions';
 import { t } from '../../i18n';
 
 export interface ExportProgress {
@@ -57,6 +57,8 @@ export interface ExportOptions {
   brollSources?: Record<string, Blob>;
   /** WebM (VP9) with an alpha channel: only the graphics, every shot's background cleared. */
   transparent?: boolean;
+  /** Blends several moments into each frame (composition projects). */
+  motionBlur?: boolean;
 }
 
 export async function runWorkerRenderPipeline(
@@ -233,6 +235,7 @@ export async function exportMooProjectToMP4(
     throw new Error(t('Browser ini belum bisa membuat video transparan (VP9 dengan alpha). Coba Google Chrome versi terbaru.'));
   }
   const audioCodec = isWebm ? 'opus' : 'aac';
+  const audioBitrate = EXPORT_AUDIO_BITRATE[opts?.quality ?? 'standard'] ?? 160_000;
 
   // Calculate adaptive bitrate based on resolution and fps
   const basePixels = 1080 * 1920 * 30;
@@ -436,7 +439,7 @@ export async function exportMooProjectToMP4(
     if (hasAudioTrack && targetAudioBuffer) {
       audioSource = new AudioBufferSource({
         codec: audioCodec,
-        bitrate: 128_000
+        bitrate: audioBitrate
       });
       output.addAudioTrack(audioSource);
     }
@@ -560,6 +563,14 @@ export async function exportMooProjectToMP4(
 
   let compRenderer: FrameRenderer | null = null;
   let brollReader: BrollReader | null = null;
+  // Motion blur: each moment is drawn here, then added to the frame at an equal share.
+  const blurSamples = opts?.motionBlur && isCompositionMode ? MOTION_BLUR_SAMPLES : 1;
+  let sampleCanvas: HTMLCanvasElement | null = null;
+  if (blurSamples > 1) {
+    sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = width;
+    sampleCanvas.height = height;
+  }
   if (isCompositionMode) {
     onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: t('Menyiapkan panggung render...') });
     compRenderer = await createCompositionFrameRenderer(project, width, height, transparent ? { clearBackgrounds: true } : undefined);
@@ -594,7 +605,7 @@ export async function exportMooProjectToMP4(
   if (hasAudioTrack && targetAudioBuffer) {
     audioSource = new AudioBufferSource({
       codec: isWebm ? 'opus' : 'aac',
-      bitrate: 128_000
+      bitrate: audioBitrate
     });
     output.addAudioTrack(audioSource);
   }
@@ -632,10 +643,27 @@ export async function exportMooProjectToMP4(
       if (compRenderer) {
         try {
           const footage = brollReader ? await brollReader.frameAt(frame / fps) : null;
-          await compRenderer.renderFrame(frame, frame / fps, frameCanvas, {
+          const draw = {
             transparent,
-            underlay: footage ? (ctx) => drawBrollFrame(ctx, footage.canvas, footage.broll, width, height) : undefined
-          });
+            underlay: footage ? (ctx: CanvasRenderingContext2D) => drawBrollFrame(ctx, footage.canvas, footage.broll, width, height) : undefined
+          };
+          if (sampleCanvas) {
+            // 'lighter' adds the premultiplied samples, each at 1/n: an exact average, alpha included.
+            const times = motionBlurTimes(frame, fps, blurSamples);
+            const frameCtx = frameCanvas.getContext('2d');
+            if (!frameCtx) throw new Error('Canvas 2D context is unavailable');
+            for (let k = 0; k < times.length; k++) {
+              await compRenderer.renderFrame(frame * blurSamples + k, times[k], sampleCanvas, draw);
+              frameCtx.save();
+              if (k === 0) frameCtx.clearRect(0, 0, width, height);
+              frameCtx.globalCompositeOperation = 'lighter';
+              frameCtx.globalAlpha = 1 / times.length;
+              frameCtx.drawImage(sampleCanvas, 0, 0);
+              frameCtx.restore();
+            }
+          } else {
+            await compRenderer.renderFrame(frame, frame / fps, frameCanvas, draw);
+          }
           consecutiveFrameFailures = 0;
         } catch (frameErr) {
           consecutiveFrameFailures++;

@@ -1137,5 +1137,7 @@ export const EN: Record<string, string> = {
   'Gerak keluar di 0.4 detik terakhir: \'zoom\' | \'whip-left\' | \'whip-right\' | \'whip-up\' | \'drop\' | \'spin\'. Shot berikutnya otomatis masuk dari arah pasangannya.': 'Exit move in the last 0.4 seconds: \'zoom\' | \'whip-left\' | \'whip-right\' | \'whip-up\' | \'drop\' | \'spin\'. The next shot opens on the matching entrance by itself.',
   'Squash and stretch saat mendarat atau terkena hentakan.': 'Squash and stretch on a landing or a hit.',
   'Bergerak mengikuti garis path SVG; rotate: true menghadap arah jalur.': 'Moves along an SVG path; rotate: true faces along the line.',
-  'Kurva sendiri, sama seperti cubic-bezier di CSS.': 'Your own curve, the same as cubic-bezier in CSS.'
+  'Kurva sendiri, sama seperti cubic-bezier di CSS.': 'Your own curve, the same as cubic-bezier in CSS.',
+  'Motion blur': 'Motion blur',
+  'Gerak cepat (whip, slam, zoom) jadi berbayang seperti rekaman kamera. Render sekitar {0}x lebih lama.': 'Fast moves (whips, slams, zooms) smear the way a camera records them. Rendering takes about {0}x longer.'
 };

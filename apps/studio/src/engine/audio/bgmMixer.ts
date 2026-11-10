@@ -11,6 +11,7 @@
 
 import { audioBufferToWavBlob } from '../ai/tts';
 import { renderSfxTrack } from './sfx';
+import { limitAudioBuffer } from './limiter';
 import { voiceShift } from './voiceEdit';
 import type { SfxCue, VoiceEdit } from '../../types';
 import { t } from '../../i18n';
@@ -480,6 +481,7 @@ export async function mixVoiceAndBgm(
 
   // 4. Render
   const mixed = await mixCtx.startRendering();
+  limitAudioBuffer(mixed);
   return audioBufferToWavBlob(mixed);
 }
 
@@ -588,6 +590,7 @@ export async function mixProjectAudio(opts: ProjectMixOptions): Promise<Blob | n
   }
 
   const mixed = await ctx.startRendering();
+  limitAudioBuffer(mixed);
   return audioBufferToWavBlob(mixed);
 }
 
@@ -615,6 +618,7 @@ export async function renderStandaloneBgm(
   src.start(0);
 
   const mixed = await ctx.startRendering();
+  limitAudioBuffer(mixed);
   return audioBufferToWavBlob(mixed);
 }
 

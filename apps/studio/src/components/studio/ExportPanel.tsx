@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMooStore } from '../../store/useMooStore';
 import { safeFileName, triggerFileDownload } from '../../utils/fileUtils';
 import { downloadSubtitleFile } from '../../engine/export/subtitleExporter';
-import { EXPORT_FPS_CHOICES, type ExportQuality } from '../../engine/export/exportOptions';
+import { EXPORT_FPS_CHOICES, MOTION_BLUR_SAMPLES, type ExportQuality } from '../../engine/export/exportOptions';
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
@@ -70,7 +70,7 @@ export const ExportPanel: React.FC = () => {
 
   // Export choices are remembered per project.
   const exportSettings = { ...DEFAULT_EXPORT_SETTINGS, ...project.exportSettings };
-  const { format, fps, quality, watermark, hud, transparent } = exportSettings;
+  const { format, fps, quality, watermark, hud, transparent, motionBlur } = exportSettings;
 
   const scenes = project.scenes || [];
   const hasProjectAudio = Boolean(project.audioBlob);
@@ -100,7 +100,8 @@ export const ExportPanel: React.FC = () => {
       quality,
       watermark,
       hud,
-      transparent
+      transparent,
+      motionBlur
     ];
     const prev = exportSnapshotRef.current;
     exportSnapshotRef.current = snapshot;
@@ -121,6 +122,7 @@ export const ExportPanel: React.FC = () => {
     watermark,
     hud,
     transparent,
+    motionBlur,
     revokeExportResult
   ]);
 
@@ -145,7 +147,15 @@ export const ExportPanel: React.FC = () => {
 
   const handleExport = async () => {
     if (isExporting || scenes.length === 0) return;
-    await startExport({ format, fps, quality, watermark, hud, transparent: format !== 'gif' && Boolean(transparent) });
+    await startExport({
+      format,
+      fps,
+      quality,
+      watermark,
+      hud,
+      transparent: format !== 'gif' && Boolean(transparent),
+      motionBlur: format !== 'gif' && Boolean(motionBlur)
+    });
     if (useMooStore.getState().exportResult) {
       addToast(t('Video selesai dirender. Tonton pratinjaunya lalu unduh.'), 'success');
     }
@@ -331,6 +341,22 @@ export const ExportPanel: React.FC = () => {
         </div>
         {fps === 60 && (
           <span className="text-[10px] text-text-muted">{t('60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.')}</span>
+        )}
+        {format !== 'gif' && isCompositionExport && (
+          <label className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+            <input
+              type="checkbox"
+              checked={Boolean(motionBlur)}
+              onChange={(e) => updateExportSettings({ motionBlur: e.target.checked })}
+              className="w-4 h-4 mt-0.5 rounded accent-accent cursor-pointer"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-semibold text-on-surface">{t('Motion blur')}</span>
+              <span className="text-[10px] text-text-muted leading-snug">
+                {t('Gerak cepat (whip, slam, zoom) jadi berbayang seperti rekaman kamera. Render sekitar {0}x lebih lama.', MOTION_BLUR_SAMPLES)}
+              </span>
+            </span>
+          </label>
         )}
       </div>
 

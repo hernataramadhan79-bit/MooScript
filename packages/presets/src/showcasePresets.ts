@@ -74,7 +74,7 @@ export const SHOWCASE_PRESETS: MooShowcasePreset[] = [
         html: `<div class="scene-kt1">
   <div class="moo-camera" data-moo-layer="camera">
     <svg class="kt1-stage" data-moo-layer="radar-svg" viewBox="0 0 1080 1920">
-      <g class="kt1-spokes" stroke="var(--moo-primary, #e4e4e7)" stroke-opacity="0.22" stroke-width="3" stroke-linecap="round" fill="none">
+      <g class="kt1-spokes" data-moo-depth="0.5" stroke="var(--moo-primary, #e4e4e7)" stroke-opacity="0.22" stroke-width="3" stroke-linecap="round" fill="none">
         <path d="M540 960 L180 520" />
         <path d="M540 960 L900 520" />
         <path d="M540 960 L150 960" />
@@ -95,8 +95,8 @@ export const SHOWCASE_PRESETS: MooShowcasePreset[] = [
         <polygon points="512,914 586,960 512,1006" fill="var(--moo-accent, #84cc16)" />
       </g>
     </svg>
-    <div class="kt1-top" data-moo-layer="headline-top"><span>ZERO</span> <span>CLOUD</span></div>
-    <div class="kt1-bottom" data-moo-layer="headline-bottom"><span>60 FPS</span> <span>LOCAL</span></div>
+    <div class="kt1-top" data-moo-layer="headline-top" data-moo-depth="1.25"><span>ZERO</span> <span>CLOUD</span></div>
+    <div class="kt1-bottom" data-moo-layer="headline-bottom" data-moo-depth="1.25"><span>60 FPS</span> <span>LOCAL</span></div>
   </div>
 </div>`,
         css: `.scene-kt1 { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--moo-bg, #09090b); }
@@ -111,9 +111,10 @@ ctx.particles({ count: 20, size: [4, 9], color: 'rgba(132,204,22,0.45)' });
 ctx.hero('.kt1-core');
 ctx.orbit('.kt1-orbit-ring', { turns: 0.35, cx: 540, cy: 960 });
 shot.travel('.kt1-wave', { scale: 0.9, opacity: 0.85, pivotPoint: '540 960' }, { scale: 3.1, opacity: 0, dur: 1.25, curve: 'rush-out', loop: 2 }, 0.1);
-ctx.draw('.kt1-spokes path', { at: 0.25, dur: 0.65, cascade: 0.08 });
+ctx.draw('.kt1-spokes path', { at: 0.1, dur: 0.7, cascade: 0.08, from: 0.35 });
 ctx.pop('.kt1-nodes circle', { at: 0.75, cascade: 0.09 });
-ctx.kinetic('.kt1-top', { style: 'slam', by: 'words', at: 0.2 });
+// The headline is on screen from frame 0 (the shot's poster) and slams into place.
+shot.travel('.kt1-top span', { scale: 1.7, opacity: 0.45 }, { scale: 1, opacity: 1, dur: 0.42, cascade: 0.09, curve: 'sharp-out' }, 0);
 ctx.kinetic('.kt1-bottom', { style: 'rise', by: 'words', at: hit });
 ctx.punch('.kt1-core', { at: hit, scale: 1.24 });`
       },

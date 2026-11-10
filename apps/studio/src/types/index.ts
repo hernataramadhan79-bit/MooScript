@@ -951,6 +951,8 @@ export interface ProjectExportSettings {
   hud: boolean;
   /** WebM with an alpha channel: only the graphics, for layering in another editor. */
   transparent?: boolean;
+  /** Blends several moments of each frame, so fast moves smear like a camera shutter would. */
+  motionBlur?: boolean;
 }
 
 export const DEFAULT_EXPORT_SETTINGS: ProjectExportSettings = {

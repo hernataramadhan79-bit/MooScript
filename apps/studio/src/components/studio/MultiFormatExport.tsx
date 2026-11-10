@@ -95,7 +95,7 @@ export const MultiFormatExport: React.FC = () => {
           startQueue(
             ASPECTS.map((a) => a.id).filter((a) => picked.includes(a)),
             mode,
-            { format: settings.format, fps: settings.fps, quality: settings.quality }
+            { format: settings.format, fps: settings.fps, quality: settings.quality, motionBlur: settings.format !== 'gif' && Boolean(settings.motionBlur) }
           )
         }
         className="w-full min-h-[40px] px-3 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent text-[12px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
