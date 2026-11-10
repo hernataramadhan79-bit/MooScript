@@ -5,6 +5,7 @@ import FormatTicker from '../sections/FormatTicker.astro';
 import ShowcaseStudio from '../islands/ShowcaseStudio';
 import HowSlider from '../islands/HowSlider';
 import FeatureFields from '../sections/FeatureFields.astro';
+import ReelSection from '../sections/ReelSection.astro';
 import CompareSection from '../sections/CompareSection.astro';
 import GuidesList from '../sections/GuidesList.astro';
 import FaqDetails from '../sections/FaqDetails.astro';
@@ -39,6 +40,8 @@ const pathname = localizePath('/', locale);
       <ShowcaseStudio client:visible locale={locale} />
     </div>
   </section>
+
+  <ReelSection locale={locale} />
 
   <section id="how" class="w-full">
     <HowSlider client:visible locale={locale} />

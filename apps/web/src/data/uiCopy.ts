@@ -57,7 +57,7 @@ export const UI_COPY: Record<Locale, UiCopy> = {
       shot: 'Shot',
       beatNote: 'Auto-SFX on · whoosh at 0.00s · impact at 2.50s',
       renderTitle: 'WebCodecs export queue',
-      renderWhere: 'GPU · local',
+      renderWhere: 'On this device',
       done: 'Done'
     }
   },
@@ -89,7 +89,7 @@ export const UI_COPY: Record<Locale, UiCopy> = {
       shot: 'Adegan',
       beatNote: 'Auto-SFX aktif · whoosh di 0.00s · impact di 2.50s',
       renderTitle: 'Antrean ekspor WebCodecs',
-      renderWhere: 'GPU · lokal',
+      renderWhere: 'Di perangkat ini',
       done: 'Selesai'
     }
   }

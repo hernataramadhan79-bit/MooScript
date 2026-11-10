@@ -73,6 +73,15 @@ export interface HomeCopy {
     steps: StageStep[];
     formats: string[];
   };
+  reel: {
+    heading: string;
+    body: string;
+    facts: string[];
+    videoLabel: string;
+    videoCaption: string;
+    screenshotAlt: string;
+    screenshotCaption: string;
+  };
   features: FeatureField[];
   compare: {
     heading: string;
@@ -136,11 +145,11 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       lineTwoBefore: 'from',
       lineTwoAfter: 'code',
       subheadline:
-        'Write a shot or prompt it. MooScript plays SVG scenes over your B-roll, then encodes MP4, transparent WebM or GIF on your own GPU, in one browser tab.',
+        'Write a shot or prompt it. MooScript plays SVG scenes over your B-roll, then encodes MP4, transparent WebM or GIF on your own device, in one browser tab.',
       primaryCta: 'Launch Studio',
       secondaryCta: 'Browse templates',
       installCta: 'Install as app',
-      specLine: 'No install required. No sign-up. Nothing leaves your device.',
+      specLine: 'No install required. No sign-up. Rendering never leaves your device; an AI key, if you add one, talks only to its provider.',
       railPlay: 'Play',
       railPause: 'Pause',
       railLabel: 'Drag the playhead. All four stages above run live MooTween code.',
@@ -183,11 +192,20 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         },
         {
           name: 'Render',
-          clause: 'Three ratios, one GPU queue.',
+          clause: 'Three ratios, one local queue.',
           note: '9:16, 16:9 and 1:1 masters encode locally, side by side.'
         }
       ],
       formats: ['MP4 (H.264 + AAC)', 'WebM (VP9 + Alpha)', 'Animated GIF', 'Cover PNG']
+    },
+    reel: {
+      heading: 'What comes out',
+      body: 'This file came straight from the export panel, untouched: two shots from the kinetic typography template, a zoom hand-off between them, motion blur on.',
+      facts: ['MP4 · H.264 · 720 × 1280', '7 seconds · 30 fps · 1.3 MB', 'Encoded in a browser tab'],
+      videoLabel: 'A seven-second vertical video exported from MooScript Studio',
+      videoCaption: 'The exported file, playing as it was rendered.',
+      screenshotAlt: 'MooScript Studio: the storyboard on the left, the stage and timeline in the middle, the inspector on the right',
+      screenshotCaption: 'The Studio it was made in: storyboard, stage and timeline, inspector.'
     },
     features: [
       {
@@ -195,7 +213,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         body: 'Open a tab and the studio is running. No 4 GB download, no Node, no FFmpeg, no account to create.'
       },
       {
-        phrase: 'Your GPU renders',
+        phrase: 'Your device renders',
         body: 'WebCodecs encodes H.264 MP4, transparent VP9 WebM and animated GIF on the machine you are using. No render farm, no cloud bill, no upload.'
       },
       {
@@ -209,7 +227,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
     ],
     compare: {
       heading: 'Why not After Effects or Remotion?',
-      lead: 'Same destination, a different road: browser-native WebCodecs against a desktop keyframer and a Node video framework.',
+      lead: 'Same destination, a different road. After Effects goes deeper on hand-keyed craft and Remotion on React pipelines; MooScript is the one that runs in a tab.',
       colMetric: 'Parameter',
       colMoo: 'MooScript Studio',
       colAe: 'After Effects',
@@ -224,14 +242,14 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         {
           criterion: 'AI scriptability',
           mooscript: 'Native HTML/SVG + MooTween + Linter',
-          afterEffects: 'Fragile ExtendScript panels',
+          afterEffects: 'ExtendScript and expressions',
           remotion: 'React TSX + bundler build step'
         },
         {
           criterion: 'Rendering engine',
-          mooscript: 'WebCodecs local GPU (mediabunny)',
-          afterEffects: 'CPU/RAM frame cache',
-          remotion: 'Headless Chromium + Lambda cost'
+          mooscript: 'Browser stage + local WebCodecs encoder',
+          afterEffects: 'Native desktop renderer',
+          remotion: 'Headless Chromium, locally or on Lambda'
         },
         {
           criterion: 'Output formats',
@@ -242,20 +260,20 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         {
           criterion: 'Multi-ratio batch',
           mooscript: 'Built-in 9:16 + 16:9 + 1:1 queue',
-          afterEffects: 'Manual comp duplication',
+          afterEffects: 'One composition per ratio',
           remotion: 'Separate composition renders'
         },
         {
           criterion: 'Voice, SFX & B-roll',
           mooscript: 'Offline Piper TTS, Auto-SFX, 300 MB B-roll',
-          afterEffects: 'External plugins & manual mixing',
-          remotion: 'External TTS APIs & coded audio'
+          afterEffects: 'Full audio tools, TTS via plugins',
+          remotion: 'Audio in code, TTS via APIs'
         },
         {
           criterion: 'License & render cost',
           mooscript: '100% Free & Open Source (AGPLv3)',
-          afterEffects: 'Paid monthly subscription',
-          remotion: 'Free solo, paid company + cloud'
+          afterEffects: 'Subscription',
+          remotion: 'Free for individuals, company licence'
         }
       ],
       stats: [
@@ -276,7 +294,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
     faqHeading: 'Technical questions',
     cta: {
       heading: 'Render your first shot',
-      body: 'Open the studio in this browser. No sign-up, no install, full local GPU encoding.',
+      body: 'Open the studio in this browser. No sign-up, no install, and the video is encoded on your own device.',
       primary: 'Launch Studio',
       secondary: 'Browse templates',
       after: 'Either way, your files stay on your device.',
@@ -316,11 +334,11 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       lineTwoBefore: 'lewat',
       lineTwoAfter: 'kode',
       subheadline:
-        'Tulis adegan atau minta AI membuatnya. MooScript memutar adegan SVG di atas B-roll, lalu mengekspor MP4, WebM transparan atau GIF lewat GPU Anda sendiri, cukup di satu tab browser.',
+        'Tulis adegan atau minta AI membuatnya. MooScript memutar adegan SVG di atas B-roll, lalu mengekspor MP4, WebM transparan atau GIF di perangkat Anda sendiri, cukup di satu tab browser.',
       primaryCta: 'Buka Studio',
       secondaryCta: 'Lihat template',
       installCta: 'Pasang sebagai aplikasi',
-      specLine: 'Tanpa instalasi wajib. Tanpa daftar akun. Tidak ada yang keluar dari perangkat Anda.',
+      specLine: 'Tanpa instalasi wajib. Tanpa daftar akun. Render tidak pernah keluar dari perangkat Anda; API key AI, kalau dipakai, hanya terhubung ke penyedianya.',
       railPlay: 'Putar',
       railPause: 'Jeda',
       railLabel: 'Geser playhead. Keempat panggung di atas menjalankan kode MooTween sungguhan.',
@@ -363,11 +381,20 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         },
         {
           name: 'Render',
-          clause: 'Tiga rasio, satu antrean GPU.',
+          clause: 'Tiga rasio, satu antrean lokal.',
           note: 'Master 9:16, 16:9 dan 1:1 dikodekan lokal, berdampingan.'
         }
       ],
       formats: ['MP4 (H.264 + AAC)', 'WebM (VP9 + Alpha)', 'GIF Animasi', 'Cover PNG']
+    },
+    reel: {
+      heading: 'Hasil jadinya',
+      body: 'Berkas ini langsung dari panel ekspor, tanpa disentuh lagi: dua shot dari template tipografi kinetik, hand-off zoom di antaranya, dengan motion blur menyala.',
+      facts: ['MP4 · H.264 · 720 × 1280', '7 detik · 30 fps · 1,3 MB', 'Dikodekan di satu tab browser'],
+      videoLabel: 'Video vertikal tujuh detik hasil ekspor MooScript Studio',
+      videoCaption: 'Berkas hasil ekspor, diputar apa adanya.',
+      screenshotAlt: 'MooScript Studio: storyboard di kiri, panggung dan timeline di tengah, inspector di kanan',
+      screenshotCaption: 'Studio tempat video itu dibuat: storyboard, panggung dan timeline, inspector.'
     },
     features: [
       {
@@ -375,7 +402,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         body: 'Buka satu tab dan studionya langsung jalan. Tanpa unduhan 4 GB, tanpa Node, tanpa FFmpeg, tanpa akun.'
       },
       {
-        phrase: 'GPU Anda merender',
+        phrase: 'Perangkat Anda merender',
         body: 'WebCodecs mengekspor MP4 H.264, WebM VP9 transparan dan GIF di mesin yang Anda pakai. Tanpa render farm, tanpa tagihan cloud, tanpa unggah.'
       },
       {
@@ -389,7 +416,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
     ],
     compare: {
       heading: 'Kenapa bukan After Effects atau Remotion?',
-      lead: 'Tujuannya sama, jalannya berbeda: WebCodecs di browser melawan aplikasi keyframe desktop dan framework video Node.js.',
+      lead: 'Tujuannya sama, jalannya berbeda. After Effects lebih dalam untuk animasi keyframe manual dan Remotion untuk pipeline React; MooScript yang jalan langsung di satu tab.',
       colMetric: 'Parameter',
       colMoo: 'MooScript Studio',
       colAe: 'After Effects',
@@ -404,14 +431,14 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         {
           criterion: 'Kemudahan skrip AI',
           mooscript: 'HTML/SVG murni + MooTween + Linter',
-          afterEffects: 'Skrip ExtendScript sulit diotomasi',
+          afterEffects: 'ExtendScript dan expression',
           remotion: 'Komponen TSX + proses bundler'
         },
         {
           criterion: 'Mesin perender',
-          mooscript: 'GPU lokal via WebCodecs (mediabunny)',
-          afterEffects: 'Cache RAM & CPU berat',
-          remotion: 'Headless Chromium + biaya server'
+          mooscript: 'Panggung browser + encoder WebCodecs lokal',
+          afterEffects: 'Perender desktop native',
+          remotion: 'Headless Chromium, lokal atau di Lambda'
         },
         {
           criterion: 'Format keluaran',
@@ -422,20 +449,20 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
         {
           criterion: 'Ekspor multi-rasio',
           mooscript: 'Antrean 9:16 + 16:9 + 1:1 sekaligus',
-          afterEffects: 'Duplikasi komposisi manual',
+          afterEffects: 'Satu komposisi per rasio',
           remotion: 'Render komposisi terpisah'
         },
         {
           criterion: 'Suara, SFX & B-roll',
           mooscript: 'TTS Piper Offline, Auto-SFX, B-roll 300 MB',
-          afterEffects: 'Plugin tambahan & mixing manual',
-          remotion: 'API TTS eksternal & audio via kode'
+          afterEffects: 'Alat audio lengkap, TTS lewat plugin',
+          remotion: 'Audio lewat kode, TTS lewat API'
         },
         {
           criterion: 'Lisensi & biaya',
           mooscript: '100% Gratis & Open Source (AGPLv3)',
-          afterEffects: 'Langganan bulanan berbayar',
-          remotion: 'Gratis individu, berbayar tim + cloud'
+          afterEffects: 'Berlangganan',
+          remotion: 'Gratis untuk individu, lisensi untuk perusahaan'
         }
       ],
       stats: [
@@ -456,7 +483,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
     faqHeading: 'Pertanyaan teknis',
     cta: {
       heading: 'Render adegan pertama Anda',
-      body: 'Buka studio di browser ini. Tanpa daftar, tanpa instalasi, ekspor penuh lewat GPU lokal.',
+      body: 'Buka studio di browser ini. Tanpa daftar, tanpa instalasi, dan videonya dikodekan di perangkat Anda sendiri.',
       primary: 'Buka Studio',
       secondary: 'Lihat template',
       after: 'Mana pun pilihannya, file Anda tetap di perangkat Anda.',

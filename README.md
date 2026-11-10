@@ -15,7 +15,7 @@
 
 ### MooScript Studio
 
-The workstation: storyboard on the left, the stage and master timeline in the middle, and the inspector rack (Mograph, Style, Assets, Audio, Subtitles, Export) on the right. The interface is in Bahasa Indonesia.
+The workstation: storyboard on the left, the stage and master timeline in the middle, and the inspector rack (Mograph, Style, Assets, Audio, Subtitles, Export) on the right. The interface is available in English and Bahasa Indonesia.
 
 ![MooScript Studio with the Kinetic Signal Slam template loaded](docs/preview/studio.jpg)
 
@@ -55,7 +55,8 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 - **Stage contract & motion grammar** (`apps/studio/src/engine/ai/director/motionLaws.ts`): each shot is a fixed film frame (1080×1920, 1920×1080 or 1080×1080) composed in absolute coordinates inside a `.moo-camera` layer. Frame 0 must already show the subject, nothing holds still for long, accents land on spoken words, and every shot ends with a hand-off.
 - **Shot continuity**: every shot prompt carries the world bible, its neighbouring shots and the incoming/outgoing match cut.
 - **Anti-PPT linter** (`apps/studio/src/engine/composition/mographLint.ts`): scores generated code for slide/web-page patterns (no camera, card layouts, pasted narration, fade-up-only motion, empty first frame, …) and requests one rewrite when needed. The rewrite is kept only if it is valid and scores better.
-- **Mograph kit** (`apps/studio/src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
+- **Mograph kit** (`apps/studio/src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.squash`, `ctx.follow`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
+- **Depth and continuity**: layers inside `.moo-camera` that carry `data-moo-depth` move with parallax (below 1 lags behind the camera, above 1 moves more). A shot's hand-off is remembered, so the next shot opens on the matching entrance (a `whip-left` exit is met by a world arriving from the right), and a shot with a transition in already plays, slowly, while the previous one leaves.
 - **Instant visuals without AI** (`apps/studio/src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs.
 
 ### Composition runtime
@@ -116,9 +117,9 @@ A scene is three blocks: HTML, CSS and JavaScript. The JavaScript runs once, as 
 
 **Properties**: `x`, `y` (px or `'50%'`), `shiftX` / `shiftY` (percent of the element's size), `scale`, `scaleX`, `scaleY`, `spin` (degrees), `tiltX` / `tiltY` with `depth` (3D, perspective in px), `skewX` / `skewY`, `pivot: '50% 100%'` (transform origin), `pivotPoint: '540 960'` (SVG origin in viewBox units), `opacity` and `fade` (also hides the element at 0), numeric CSS (`width`, `fontSize`, `borderRadius`, …), colors (`color`, `backgroundColor`, `fill`, `stroke`: hex, rgb, hsl, names, `var(--moo-accent)`), `clipPath` / `filter` / `boxShadow`, `strokeDasharray` / `strokeDashoffset`, and SVG attributes as `attrs: { cx, r, d }`. Relative values are written `'by(40)'` or `'by(-0.5)'`.
 
-**Curves** are written `name-direction`, where the direction is `-in`, `-out` (the default) or `-inout`: `linear`, `soft`, `smooth`, `strong`, `sharp` (from gentle to steep acceleration), `gentle`, `rush` (fast, then a hard brake), `arc`, `overshoot-out(1.7)`, `spring-out(1, 0.3)` (amplitude, period), `bounce-out` and `steps(5)`.
+**Curves** are written `name-direction`, where the direction is `-in`, `-out` (the default) or `-inout`: `linear`, `soft`, `smooth`, `strong`, `sharp` (from gentle to steep acceleration), `gentle`, `rush` (fast, then a hard brake), `arc`, `overshoot-out(1.7)`, `spring-out(1, 0.3)` (amplitude, period), `bounce-out`, `steps(5)` and `bezier(0.2, 0, 0, 1)` (a CSS-style cubic bezier).
 
-**ctx helpers** place their own moves and keep everything inside `[0, ctx.dur]`: `ctx.camera({ move, handoff })`, `ctx.handoff('zoom')`, `ctx.hero(target)`, `ctx.draw(paths, { at, dur, cascade })`, `ctx.pop(targets, { at, cascade })`, `ctx.kinetic(el, { style, by, at })`, `ctx.count(el, { from, to, at, dur })`, `ctx.reveal(targets, { dir, at })`, `ctx.punch` / `ctx.shake` / `ctx.flash`, `ctx.drift`, `ctx.orbit` and `ctx.particles`.
+**ctx helpers** place their own moves and keep everything inside `[0, ctx.dur]`: `ctx.camera({ move, handoff })` (`'push'` moves in, `'pull'` backs away), `ctx.handoff('zoom')`, `ctx.hero(target)`, `ctx.draw(paths, { at, dur, cascade })`, `ctx.pop(targets, { at, cascade })`, `ctx.kinetic(el, { style, by, at })`, `ctx.count(el, { from, to, at, dur })`, `ctx.reveal(targets, { dir, at })`, `ctx.punch` / `ctx.shake` / `ctx.flash`, `ctx.squash(target, { at, amount })`, `ctx.follow(target, path, { at, dur, rotate })`, `ctx.drift`, `ctx.orbit` and `ctx.particles`.
 
 **Utilities**: `MooTween.math.clamp(min, max, v)`, `MooTween.math.mix(a, b, t)`, `MooTween.math.remap(inMin, inMax, outMin, outMax, v)`, `MooTween.math.cycle(list, i)` and `MooTween.select('.dot')`.
 
@@ -156,7 +157,7 @@ shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
 
 - TTS: OpenAI, ElevenLabs, or **offline Piper** voices running in a Web Worker (ONNX Runtime Web).
 - Word timestamps from Whisper alignment or a deterministic estimate; generated shots sync accents to them.
-- Procedural BGM presets or your own track, mixed with speech ducking via the Web Audio API.
+- Procedural BGM presets or your own track, mixed with speech ducking via the Web Audio API. The final mix passes a peak limiter, so voice, music and effects together never clip.
 - The voice-over is stored apart from the music (per project, in IndexedDB), so changing the BGM preset, volume or ducking remixes it without generating the voice again, also after a reload. Without a voice-over the music becomes a music-only track; switching the music off removes it.
 - Scenes without narration stay silent for their own length instead of being sent to a TTS provider.
 
@@ -164,6 +165,9 @@ shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
 
 - WebCodecs `VideoEncoder` + [Mediabunny](https://mediabunny.dev) MP4 muxing, with codec fallbacks, backpressure control and frame cleanup.
 - The video is as long as the timeline (the scenes decide); an audio track that runs longer is trimmed. Scenes without a visual of their own render with the same instant visual the preview shows.
+- Optional **motion blur**: four moments over a 180° shutter are blended into each frame.
+- Shots are written for the full-size stage and scaled as a whole when the project renders at 720p.
+- A long export is written to the browser's private file system as it encodes instead of being held in memory.
 - Quality presets (compact / standard / high) at 24, 30 or 60 fps; captions burned in or exported as SRT / WebVTT. Captions follow the project setting, and each scene can opt out in its detail panel.
 - Standalone HTML export of the composition.
 
@@ -282,10 +286,9 @@ apps/
 │   │   │   │   ├── tts.ts         # Cloud TTS and word alignment
 │   │   │   │   ├── localTts.ts    # Offline Piper TTS (Web Worker)
 │   │   │   │   └── voiceAlign.ts  # Whisper word-level alignment
-│   │   │   ├── audio/             # BGM mixer and waveform peaks
+│   │   │   ├── audio/             # BGM mixer, limiter, SFX and waveform peaks
 │   │   │   ├── composition/       # Document builder, MooTween + runtime, mograph kit, linter, CSS scoping, procedural archetypes
-│   │   │   ├── export/            # MP4 exporter, export options, subtitle export
-│   │   │   └── renderer/          # Legacy canvas renderer (old projects only)
+│   │   │   └── export/            # MP4 / WebM / GIF exporters, export options, subtitle export
 │   │   ├── features/scene/        # Per-shot code editor
 │   │   ├── store/                 # Zustand slices (project, script, audio, bgm, playback, export, settings, ui)
 │   │   └── types/                 # Shared data contracts

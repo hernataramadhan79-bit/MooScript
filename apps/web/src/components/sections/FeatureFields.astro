@@ -25,11 +25,11 @@ const tones = [
       const tone = tones[i % tones.length];
       return (
         <div class:list={[tone.cls, 'w-full']}>
-          <div class="frame relative flex min-h-[44svh] flex-col justify-between gap-12 py-10 md:min-h-[64svh] md:py-14">
+          <div class="frame relative flex min-h-[40svh] flex-col justify-between gap-12 py-10 md:min-h-[52svh] md:py-14">
             <p
               data-reveal
               class:list={[
-                'max-w-[34ch] text-[17px] leading-[1.55]',
+                'max-w-[30ch] text-[clamp(19px,1.55vw,25px)] font-medium leading-[1.4]',
                 tone.mirror ? 'md:ml-[16.6%]' : 'md:ml-[58%]'
               ]}
             >
