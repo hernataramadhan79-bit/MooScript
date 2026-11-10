@@ -14,6 +14,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- 'unsafe-eval' is required: the offline voice worker (espeak-ng, built with Emscripten embind)
+         creates its bindings with new Function, and a worker inherits this policy. Generated scene code
+         never runs here; it runs in the sandboxed stage iframe, which has its own policy. -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.groq.com https://api.anthropic.com https://openrouter.ai https://api.elevenlabs.io https://huggingface.co https://*.huggingface.co https://*.cdn.hf.co https://cdn.jsdelivr.net https://*.jsdelivr.net https://cas-bridge.xethub.hf.co https://*.xethub.hf.co blob: data:; worker-src 'self' blob:; frame-src 'self' data:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"

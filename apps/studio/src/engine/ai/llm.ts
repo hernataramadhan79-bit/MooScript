@@ -646,11 +646,11 @@ export const DEFAULT_PROVIDER_MODELS: Record<LLMProvider, ProviderModelInfo[]> =
     { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', description: 'Blazing Fast' }
   ],
   anthropic: [
-    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
-    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Ultra Fast' },
-    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', description: 'Latest Generation' },
-    { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', description: 'Latest • Ultra Fast' },
-    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', description: 'Latest • Deepest Reasoning' }
+    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', description: 'Recommended • Top Codegen & Motion', isRecommended: true },
+    { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', description: 'Ultra Fast' },
+    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', description: 'Deepest Reasoning' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Previous Generation' },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Previous Generation • Fast' }
   ],
   openrouter: [
     { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Router)', description: 'Recommended', isRecommended: true },
@@ -667,7 +667,7 @@ export function sanitizeModelName(provider: LLMProvider, model?: string): string
       : provider === 'openai'
         ? 'gpt-4o-mini'
         : provider === 'anthropic'
-          ? 'claude-sonnet-4-6'
+          ? 'claude-sonnet-5-5'
           : provider === 'openrouter'
             ? 'anthropic/claude-sonnet-4.6'
             : 'llama-3.3-70b-versatile';
@@ -805,7 +805,7 @@ export function parseAnthropicModelsList(
   const models: ProviderModelInfo[] = filtered.map((m) => {
     const id = m.id || '';
     const label = m.display_name || id;
-    const isRecommended = id.includes('claude-sonnet-4-6') || id.includes('claude-sonnet-5-5');
+    const isRecommended = id.includes('claude-sonnet-5-5');
     return {
       id,
       label,

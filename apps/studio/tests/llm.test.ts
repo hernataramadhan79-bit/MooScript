@@ -174,15 +174,15 @@ describe('extractJsonObject & tryParseAndValidate (Phase 1e)', () => {
 
 describe('Anthropic & OpenRouter Model Configurations (Phase 1b)', () => {
   it('sets correct anthropic and openrouter defaults in DEFAULT_SETTINGS', () => {
-    expect(DEFAULT_SETTINGS.anthropicModel).toBe('claude-sonnet-4-6');
+    expect(DEFAULT_SETTINGS.anthropicModel).toBe('claude-sonnet-5-5');
     expect(DEFAULT_SETTINGS.openrouterModel).toBe('anthropic/claude-sonnet-4.6');
   });
 
-  it('provides updated anthropic model list with recommended claude-sonnet-4-6', () => {
+  it('provides updated anthropic model list with recommended claude-sonnet-5-5', () => {
     const anthropicModels = DEFAULT_PROVIDER_MODELS.anthropic;
-    expect(anthropicModels[0].id).toBe('claude-sonnet-4-6');
+    expect(anthropicModels[0].id).toBe('claude-sonnet-5-5');
     expect(anthropicModels[0].isRecommended).toBe(true);
-    expect(anthropicModels[1].id).toBe('claude-haiku-4-5-20251001');
+    expect(anthropicModels[1].id).toBe('claude-haiku-5-5');
   });
 
   it('sets openrouter default to anthropic/claude-sonnet-4.6 and lists no retired routes', () => {
@@ -200,7 +200,7 @@ describe('Anthropic & OpenRouter Model Configurations (Phase 1b)', () => {
   });
 
   it('sanitizes empty model names to new defaults', () => {
-    expect(sanitizeModelName('anthropic', '')).toBe('claude-sonnet-4-6');
+    expect(sanitizeModelName('anthropic', '')).toBe('claude-sonnet-5-5');
     expect(sanitizeModelName('openrouter', '')).toBe('anthropic/claude-sonnet-4.6');
   });
 });
@@ -265,14 +265,14 @@ describe('Dynamic Model Resolution & BYOK Independence', () => {
 
   it('dynamically parses Anthropic models directly from API format', () => {
     const rawAnthropic = [
-      { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6', type: 'model' },
+      { id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', type: 'model' },
       { id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5', type: 'model' }
     ];
 
     const parsed = parseAnthropicModelsList(rawAnthropic);
     expect(parsed.length).toBe(2);
-    expect(parsed[0].id).toBe('claude-sonnet-4-6');
-    expect(parsed[0].label).toBe('Claude Sonnet 4.6');
+    expect(parsed[0].id).toBe('claude-sonnet-5-5');
+    expect(parsed[0].label).toBe('Claude Sonnet 5.5');
     expect(parsed[0].isRecommended).toBe(true);
   });
 

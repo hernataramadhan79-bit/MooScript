@@ -1,6 +1,7 @@
 import {
   Output,
   BufferTarget,
+  StreamTarget,
   Mp4OutputFormat,
   WebMOutputFormat,
   CanvasSource,
@@ -59,6 +60,44 @@ export interface ExportOptions {
   transparent?: boolean;
   /** Blends several moments into each frame (composition projects). */
   motionBlur?: boolean;
+  /** Write the file to the browser's private file system while encoding. Unset decides by the expected size. */
+  streamToDisk?: boolean;
+}
+
+/** Above this expected size the file is written to disk instead of being held in memory. */
+const DISK_EXPORT_THRESHOLD_BYTES = 96 * 1024 * 1024;
+const EXPORT_FILE_PREFIX = 'mooscript-export-';
+/** Files this page has written; older ones are left over from an earlier visit and are removed. */
+const sessionExportFiles = new Set<string>();
+
+/**
+ * Opens a new file in the origin private file system for the export, after clearing the ones an
+ * earlier visit left behind. Returns null where the browser has no such file system (the export then
+ * stays in memory).
+ */
+async function openExportFile(
+  extension: string
+): Promise<{ handle: FileSystemFileHandle; writable: FileSystemWritableFileStream } | null> {
+  try {
+    const root = await navigator.storage?.getDirectory?.();
+    if (!root) return null;
+    const entries = (root as unknown as { keys?: () => AsyncIterable<string> }).keys?.();
+    if (entries) {
+      for await (const name of entries) {
+        if (name.startsWith(EXPORT_FILE_PREFIX) && !sessionExportFiles.has(name)) {
+          await root.removeEntry(name).catch(() => {});
+        }
+      }
+    }
+    const name = `${EXPORT_FILE_PREFIX}${Date.now()}-${sessionExportFiles.size}.${extension}`;
+    const handle = await root.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable();
+    sessionExportFiles.add(name);
+    return { handle, writable };
+  } catch (err) {
+    console.warn('Export file on disk is unavailable, keeping the export in memory:', err);
+    return null;
+  }
 }
 
 async function yieldOrSleep(ms = 4): Promise<void> {
@@ -255,11 +294,16 @@ export async function exportMooProjectToMP4(
     }
   }
 
-  // 4. Initialize Mediabunny Output with in-memory fastStart
-  const target = new BufferTarget();
+  // 4. Initialize the Mediabunny output. A short film is muxed in memory with the index at the front
+  // (fast start). A long one would hold the whole file in RAM, which a phone does not have, so it is
+  // written to the browser's private file system as it is encoded and handed back as a file on disk.
+  const estimatedBytes = ((bitrate + (hasAudioTrack ? audioBitrate : 0)) / 8) * totalDuration;
+  const wantsDisk = opts?.streamToDisk ?? estimatedBytes > DISK_EXPORT_THRESHOLD_BYTES;
+  const diskFile = wantsDisk ? await openExportFile(isWebm ? 'webm' : 'mp4') : null;
+  const bufferTarget = diskFile ? null : new BufferTarget();
   const output = new Output({
-    target,
-    format: isWebm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' })
+    target: diskFile ? new StreamTarget(diskFile.writable, { chunked: true }) : bufferTarget!,
+    format: isWebm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: diskFile ? false : 'in-memory' })
   });
 
   if (project.scenes.length === 0) {
@@ -410,14 +454,22 @@ export async function exportMooProjectToMP4(
 
     await output.finalize();
 
-    const buffer = target.buffer;
-    if (!buffer) {
-      throw new Error('Mediabunny output buffer is empty.');
+    const mime = isWebm ? 'video/webm' : 'video/mp4';
+    let blob: Blob;
+    if (diskFile) {
+      // A File on disk: the browser reads it when it is played or saved, not into memory.
+      const file = await diskFile.handle.getFile();
+      blob = file.type === mime ? file : file.slice(0, file.size, mime);
+    } else {
+      const buffer = bufferTarget?.buffer;
+      if (!buffer) {
+        throw new Error('Mediabunny output buffer is empty.');
+      }
+      blob = new Blob([buffer], { type: mime });
     }
 
     let objectUrl: string | null = null;
     try {
-      const blob = new Blob([buffer], { type: isWebm ? 'video/webm' : 'video/mp4' });
       objectUrl = URL.createObjectURL(blob);
 
       onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: t('Ekspor selesai!') });

@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   geminiModel: 'gemini-3.6-flash',
   openaiModel: 'gpt-4o-mini',
   groqModel: 'llama-3.3-70b-versatile',
-  anthropicModel: 'claude-sonnet-4-6',
+  anthropicModel: 'claude-sonnet-5-5',
   openrouterModel: 'anthropic/claude-sonnet-4.6',
   maxOutputTokens: 2048,
   voiceIds: {

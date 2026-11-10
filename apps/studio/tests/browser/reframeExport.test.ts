@@ -43,4 +43,26 @@ describe('reframed output', () => {
     expect(result.fileSizeBytes).toBeGreaterThan(1000);
     URL.revokeObjectURL(result.objectUrl);
   }, 60000);
+
+  it('writes a long export to disk and hands back a playable file', async () => {
+    if (typeof VideoEncoder === 'undefined' || !navigator.storage?.getDirectory) return;
+    const inMemory = await exportMooProjectToMP4(project(), () => {}, undefined, { quality: 'compact', streamToDisk: false });
+    const onDisk = await exportMooProjectToMP4(project(), () => {}, undefined, { quality: 'compact', streamToDisk: true });
+    expect(onDisk.blob.type).toBe(inMemory.blob.type);
+    // Same frames, so about the same size; only the index sits at the other end of the file.
+    expect(onDisk.fileSizeBytes).toBeGreaterThan(inMemory.fileSizeBytes * 0.8);
+    expect(onDisk.fileSizeBytes).toBeLessThan(inMemory.fileSizeBytes * 1.2);
+
+    const video = document.createElement('video');
+    video.muted = true;
+    video.src = onDisk.objectUrl;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('the file written to disk does not play'));
+    });
+    expect(video.duration).toBeCloseTo(1, 1);
+    expect([video.videoWidth, video.videoHeight]).toEqual([720, 1280]);
+    URL.revokeObjectURL(inMemory.objectUrl);
+    URL.revokeObjectURL(onDisk.objectUrl);
+  }, 90000);
 });
