@@ -10,6 +10,7 @@ import { resolveAssetRefs } from './assetRefs';
 import { watermarkHtml } from '../brand/brandKit';
 import { voiceShift } from '../audio/voiceEdit';
 import { sceneHasRenderableCode } from './legacyScenes';
+import { sceneDesignSize } from './designSize';
 import type { Scene } from '../../types';
 // Local WOFF2 subsets inlined as data-URIs so the sandboxed stage iframe (CSP font-src data:)
 // and SVG foreignObject export frames render correct typography with zero network access.
@@ -243,6 +244,7 @@ MOO.scene(${jsString(mod.beatId)}, {
   transitionCurve: ${safeJson(ts?.transitionCurve ?? null)},
   transitionDirection: ${safeJson(ts?.transitionDirection ?? null)},
   clearBg: ${safeJson(Boolean(ts?.broll))},
+  designSize: ${safeJson(sceneDesignSize({ html: html || '', stageSize: mod.stageSize }, width, height))},
   inPoint: ${safeJson(mod.inPoint ?? 0)},
   sourceDuration: ${safeJson(mod.sourceDuration ?? null)},
   seed: ${safeJson(mod.seed ?? null)}
@@ -479,10 +481,11 @@ MOO.scene(${jsString(mod.beatId)}, {
       seeThrough
         ? `.moo-scene-wrapper { background: var(--moo-bg); }
     .moo-scene-wrapper[data-clear-bg] { background: transparent; }
-    .moo-scene-wrapper[data-clear-bg] > :first-child { background: transparent !important; }`
+    .moo-scene-wrapper[data-clear-bg] > :first-child,
+    .moo-scene-wrapper[data-clear-bg] > .moo-scene-fit > :first-child { background: transparent !important; }`
         : ''
     }
-    ${options?.clearBackgrounds ? '.moo-scene-wrapper { background: transparent; } .moo-scene-wrapper > :first-child { background: transparent !important; }' : ''}
+    ${options?.clearBackgrounds ? '.moo-scene-wrapper { background: transparent; } .moo-scene-wrapper > :first-child, .moo-scene-wrapper > .moo-scene-fit > :first-child { background: transparent !important; }' : ''}
 
     /* Global styles */
     ${comp.globalCss || ''}

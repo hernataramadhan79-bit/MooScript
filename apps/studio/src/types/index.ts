@@ -738,6 +738,9 @@ export interface GeneratedScene {
   version: number;
   userEdited: boolean;
 
+  /** Stage size (px) this code was written for; the stage scales it when the project's size differs. */
+  stageSize?: { width: number; height: number };
+
   /** Per-layer non-destructive tweaks (position / scale / rotation / opacity / color). */
   overrides?: Record<string, LayerOverride>;
   /** Per-layer entrance / move / exit added in the editor. */

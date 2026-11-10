@@ -749,6 +749,8 @@ export async function generateCustomScene(params: GenerateCustomSceneParams): Pr
         buildJs: parsed.buildJs,
         editableLayers,
         generatorVersion: 'generative-mograph-v2',
+        // The prompt always composes at the full-size stage of the frame shape.
+        stageSize: { width: stageSizeFor(aspectRatio).w, height: stageSizeFor(aspectRatio).h },
         status: 'ok',
         version: 1,
         userEdited: false

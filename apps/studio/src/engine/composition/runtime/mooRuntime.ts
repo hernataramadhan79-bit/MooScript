@@ -128,7 +128,24 @@ export function getRuntimeScript(): string {
       sceneWrapper.style.overflow = 'hidden';
       sceneWrapper.style.opacity = i === 0 ? '1' : '0';
       sceneWrapper.style.visibility = i === 0 ? 'visible' : 'hidden';
-      sceneWrapper.innerHTML = def.html || '';
+      // A shot written for another resolution of the same frame keeps its own pixel space and is
+      // scaled to this stage as a whole.
+      const design = def.designSize && def.designSize.width > 0 && def.designSize.height > 0 ? def.designSize : null;
+      if (design) {
+        const fit = document.createElement('div');
+        fit.className = 'moo-scene-fit';
+        fit.style.position = 'absolute';
+        fit.style.left = '0';
+        fit.style.top = '0';
+        fit.style.width = design.width + 'px';
+        fit.style.height = design.height + 'px';
+        fit.style.transformOrigin = '0 0';
+        fit.style.transform = 'scale(' + (stageElem.clientWidth / design.width) + ')';
+        fit.innerHTML = def.html || '';
+        sceneWrapper.appendChild(fit);
+      } else {
+        sceneWrapper.innerHTML = def.html || '';
+      }
 
       stageElem.appendChild(sceneWrapper);
       sceneElements.push({
@@ -239,6 +256,8 @@ export function getRuntimeScript(): string {
       engine.activeTrack = shotTrack;
       try {
         installMographKit(shotTrack, sceneWrapper, ctx);
+        // The shot's code measures the stage it was written for.
+        if (def.designSize && def.designSize.width > 0) ctx.stage = { w: def.designSize.width, h: def.designSize.height };
       } catch (kitErr) {
         console.warn('Mograph kit unavailable for scene ' + current.item.id, kitErr);
       }
