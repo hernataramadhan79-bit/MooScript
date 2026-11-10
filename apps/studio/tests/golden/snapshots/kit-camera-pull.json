@@ -1,7 +1,7 @@
 {
   "version": 1,
   "case": "kit-camera-pull",
-  "env": {"platform":"Linux x86_64","browser":"chromium-153"},
+  "env": {"platform":"Linux x86_64","browser":"chromium-156"},
   "duration": 3,
   "times": [0,0.1579,0.3158,0.4737,0.6316,0.7895,0.9474,1.1053,1.2632,1.4211,1.5789,1.7368,1.8947,2.0526,2.2105,2.3684,2.5263,2.6842,2.8421,3],
   "posters": [],

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "case": "transition-cut",
-  "env": {"platform":"Linux x86_64","browser":"chromium-153"},
+  "env": {"platform":"Linux x86_64","browser":"chromium-156"},
   "duration": 5,
   "times": [0,0.2632,0.5263,0.7895,1.0526,1.3158,1.5789,1.8421,2.1053,2.2,2.3,2.3684,2.4,2.5,2.55,2.6316,2.8947,3.1579,3.4211,3.6842,3.9474,4.2105,4.4737,4.7368,5],
   "posters": [{"start":2.5,"end":2.85}],
