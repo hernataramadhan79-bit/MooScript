@@ -114,7 +114,7 @@ shot.travel('.kt1-wave', { scale: 0.9, opacity: 0.85, pivotPoint: '540 960' }, {
 ctx.draw('.kt1-spokes path', { at: 0.1, dur: 0.7, cascade: 0.08, from: 0.35 });
 ctx.pop('.kt1-nodes circle', { at: 0.75, cascade: 0.09 });
 // The headline is on screen from frame 0 (the shot's poster) and slams into place.
-shot.travel('.kt1-top span', { scale: 1.7, opacity: 0.45 }, { scale: 1, opacity: 1, dur: 0.42, cascade: 0.09, curve: 'sharp-out' }, 0);
+shot.travel('.kt1-top span', { scale: 1.08, shiftY: 22, opacity: 0.55 }, { scale: 1, shiftY: 0, opacity: 1, dur: 0.42, cascade: 0.09, curve: 'sharp-out' }, 0);
 ctx.kinetic('.kt1-bottom', { style: 'rise', by: 'words', at: hit });
 ctx.punch('.kt1-core', { at: hit, scale: 1.24 });`
       },

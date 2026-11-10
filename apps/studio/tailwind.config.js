@@ -1,3 +1,10 @@
+/**
+ * A design token as a Tailwind colour that accepts an opacity modifier (bg-accent/15, border-border/60).
+ * A bare var() cannot take one: Tailwind then emits no rule at all, and a border falls back to the
+ * browser's light default colour.
+ */
+const token = (name) => `color-mix(in srgb, var(${name}) calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   // Resolved from this file, not the working directory, so Vite can be started from the repo root.
@@ -14,38 +21,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: 'var(--bg)',
-        surface: 'var(--surface-1)',
-        'surface-1': 'var(--surface-1)',
-        'surface-2': 'var(--surface-2)',
-        'surface-3': 'var(--surface-3)',
-        'surface-hover': 'var(--surface-hover)',
+        background: token('--bg'),
+        surface: token('--surface-1'),
+        'surface-1': token('--surface-1'),
+        'surface-2': token('--surface-2'),
+        'surface-3': token('--surface-3'),
+        'surface-hover': token('--surface-hover'),
         'surface-container-lowest': '#050507',
-        'surface-container-low': 'var(--surface-1)',
-        'surface-container': 'var(--surface-2)',
-        'surface-container-high': 'var(--surface-3)',
-        'surface-container-highest': 'var(--surface-hover)',
-        primary: 'var(--accent)',
-        'primary-fixed': 'var(--accent-hover)',
-        'primary-container': 'var(--accent)',
-        'on-primary': 'var(--on-accent)',
-        'on-surface': 'var(--text)',
-        'on-surface-variant': 'var(--text-muted)',
-        outline: 'var(--border)',
-        'outline-variant': 'var(--border-subtle)',
-        border: 'var(--border)',
-        'border-strong': 'var(--border-strong)',
-        'on-accent': 'var(--on-accent)',
-        'text-muted': 'var(--text-muted)',
-        'text-faint': 'var(--text-faint)',
+        'surface-container-low': token('--surface-1'),
+        'surface-container': token('--surface-2'),
+        'surface-container-high': token('--surface-3'),
+        'surface-container-highest': token('--surface-hover'),
+        primary: token('--accent'),
+        'primary-fixed': token('--accent-hover'),
+        'primary-container': token('--accent'),
+        'on-primary': token('--on-accent'),
+        'on-surface': token('--text'),
+        'on-surface-variant': token('--text-muted'),
+        outline: token('--border'),
+        'outline-variant': token('--border-subtle'),
+        border: token('--border'),
+        'border-strong': token('--border-strong'),
+        'on-accent': token('--on-accent'),
+        'text-muted': token('--text-muted'),
+        'text-faint': token('--text-faint'),
         accent: {
-          DEFAULT: 'var(--accent)',
-          hover: 'var(--accent-hover)',
-          muted: 'var(--accent-muted)',
-          danger: 'var(--danger)',
-          warning: 'var(--warning)',
-          success: 'var(--success)',
-          lime: 'var(--accent)'
+          DEFAULT: token('--accent'),
+          hover: token('--accent-hover'),
+          muted: token('--accent-muted'),
+          danger: token('--danger'),
+          warning: token('--warning'),
+          success: token('--success'),
+          lime: token('--accent')
         }
       },
       fontFamily: {
@@ -53,7 +60,7 @@ export default {
         mono: ['JetBrains Mono', 'monospace']
       },
       minHeight: {
-        tap: 'var(--tap)'
+        tap: token('--tap')
       },
       keyframes: {
         fadeIn: {
@@ -70,7 +77,7 @@ export default {
         slideLeft: 'slideLeft 220ms cubic-bezier(0.16, 1, 0.3, 1)'
       },
       minWidth: {
-        tap: 'var(--tap)'
+        tap: token('--tap')
       }
     }
   },

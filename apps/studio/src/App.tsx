@@ -70,15 +70,21 @@ export const App: React.FC = () => {
     setMobileTab('asset');
   };
 
-  const mobileTabs: { id: MobileTab; label: string; icon: string }[] = [
-    { id: 'naskah', label: t('Naskah'), icon: 'edit_note' },
-    { id: 'mograph', label: t('Mograph'), icon: 'movie_filter' },
-    { id: 'style', label: t('Gaya'), icon: 'tune' },
-    { id: 'asset', label: t('Aset'), icon: 'perm_media' },
-    { id: 'audio', label: t('Audio'), icon: 'graphic_eq' },
-    { id: 'subtitle', label: t('Subtitel'), icon: 'subtitles' },
-    { id: 'ekspor', label: t('Ekspor'), icon: 'download' }
+  // Five destinations fit a phone's bottom bar with room for a thumb. Look, assets and subtitles are
+  // one destination ("Gaya") with a switch at the top of the panel; the list on each entry says which panels it holds.
+  const mobileTabs: { id: MobileTab; label: string; icon: string; tabs: MobileTab[] }[] = [
+    { id: 'naskah', label: t('Naskah'), icon: 'edit_note', tabs: ['naskah'] },
+    { id: 'mograph', label: t('Mograph'), icon: 'movie_filter', tabs: ['mograph'] },
+    { id: 'style', label: t('Gaya'), icon: 'tune', tabs: ['style', 'asset', 'subtitle'] },
+    { id: 'audio', label: t('Audio'), icon: 'graphic_eq', tabs: ['audio'] },
+    { id: 'ekspor', label: t('Ekspor'), icon: 'download', tabs: ['ekspor'] }
   ];
+  const lookTabs: { id: MobileTab; label: string }[] = [
+    { id: 'style', label: t('Gaya & Layer') },
+    { id: 'asset', label: t('Aset') },
+    { id: 'subtitle', label: t('Subtitel') }
+  ];
+  const isLookTab = lookTabs.some((tab) => tab.id === mobileTab);
 
   // Swipe left/right on the mobile workspace to move between tabs. Gestures that start on
   // fields, sliders or horizontally scrolling rows are left alone.
@@ -101,7 +107,8 @@ export const App: React.FC = () => {
     const dx = e.changedTouches[0].clientX - start.x;
     const dy = e.changedTouches[0].clientY - start.y;
     if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - start.t > 600) return;
-    const order = mobileTabs.map((t) => t.id);
+    // Swiping walks every panel in order, including the three inside "Gaya".
+    const order = mobileTabs.flatMap((t) => t.tabs);
     const next = order.indexOf(mobileTab) + (dx < 0 ? 1 : -1);
     if (next >= 0 && next < order.length) setMobileTab(order[next]);
   };
@@ -192,6 +199,23 @@ export const App: React.FC = () => {
                   />
                 </div>
                 <div className={`flex-1 min-h-0 overflow-hidden ${mobileTab === 'naskah' ? 'hidden' : 'flex flex-col'}`}>
+                  {isLookTab && (
+                    <div role="group" aria-label={t('Bagian Gaya')} className="shrink-0 grid grid-cols-3 gap-1 m-2 mb-0 p-1 rounded-xl bg-surface-2 border border-border">
+                      {lookTabs.map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          aria-pressed={mobileTab === tab.id}
+                          onClick={() => setMobileTab(tab.id)}
+                          className={`min-h-[36px] rounded-lg text-[12px] font-semibold transition-colors ${
+                            mobileTab === tab.id ? 'bg-surface-3 text-accent' : 'text-text-muted hover:text-on-surface'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <InspectorRack
                     activeTab={mobileTab === 'naskah' ? 'mograph' : mobileTab}
                     onTabChange={(t) => setMobileTab(t)}
@@ -230,17 +254,17 @@ export const App: React.FC = () => {
                 {/* Mobile bottom navigation (swipe the panel above to move between tabs) */}
                 <nav
                   aria-label={t('Panel studio')}
-                  className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-7 gap-0.5 select-none"
+                  className="shrink-0 border-t border-border bg-surface-1 px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] grid grid-cols-5 gap-0.5 select-none"
                 >
                   {mobileTabs.map((tab) => {
-                    const isActive = mobileTab === tab.id;
+                    const isActive = tab.tabs.includes(mobileTab);
                     return (
                       <button
                         key={tab.id}
                         type="button"
                         onClick={() => setMobileTab(tab.id)}
                         aria-current={isActive ? 'page' : undefined}
-                        className={`min-h-[48px] py-1 px-0 rounded-xl text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
+                        className={`min-h-[48px] py-1 px-0 rounded-xl text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
                           isActive ? 'bg-surface-3 text-accent' : 'text-text-muted hover:text-on-surface'
                         }`}
                       >

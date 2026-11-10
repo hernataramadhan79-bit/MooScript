@@ -1142,4 +1142,6 @@ export const EN: Record<string, string> = {
   'Menyelesaikan berkas video...': 'Finishing the video file...',
   'Ekspor selesai!': 'Export complete!',
   'Pemeriksaan kesiapan font dilewati.': 'The font readiness check was skipped.',
+  'Gaya & Layer': 'Look & layers',
+  'Bagian Gaya': 'Look sections'
 };

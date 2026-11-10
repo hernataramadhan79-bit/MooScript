@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { t, useLocale } from '../i18n';
 
@@ -26,6 +26,13 @@ export const PwaReloadPrompt: React.FC = () => {
     setOfflineReady(false);
     setNeedRefresh(false);
   };
+
+  // "Ready offline" is only good news: it leaves by itself. An update stays until it is answered.
+  useEffect(() => {
+    if (!offlineReady || needRefresh) return;
+    const timer = setTimeout(() => setOfflineReady(false), 6000);
+    return () => clearTimeout(timer);
+  }, [offlineReady, needRefresh, setOfflineReady]);
 
   if (!offlineReady && !needRefresh) {
     return null;
