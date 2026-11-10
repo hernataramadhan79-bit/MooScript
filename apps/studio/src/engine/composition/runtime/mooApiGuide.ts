@@ -113,7 +113,8 @@ export const MOO_API_GUIDE: MooApiSection[] = [
       { use: "'overshoot-out(1.7)'", does: L('Melewati target lalu kembali; angka = seberapa jauh.') },
       { use: "'spring-out(1, 0.3)'", does: L('Memantul seperti per; (amplitudo, periode).') },
       { use: "'bounce-out'", does: L('Memantul seperti bola jatuh.') },
-      { use: "'steps(5)'", does: L('Melompat bertahap.') }
+      { use: "'steps(5)'", does: L('Melompat bertahap.') },
+      { use: "'bezier(0.2, 0, 0, 1)'", does: L('Kurva sendiri, sama seperti cubic-bezier di CSS.') }
     ]
   },
   {
@@ -121,8 +122,9 @@ export const MOO_API_GUIDE: MooApiSection[] = [
     title: L('Helper ctx (disarankan)'),
     intro: L('Setiap helper menaruh geraknya di shot dan menjaga semuanya di dalam [0, ctx.dur].'),
     entries: [
-      { use: "ctx.camera({ move, handoff })", does: L("Kamera bergerak sepanjang shot. move: 'push' | 'pull' | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down' | 'roll'.") },
-      { use: "ctx.handoff('zoom')", does: L("Gerak keluar di 0.4 detik terakhir: 'zoom' | 'whip-left' | 'whip-right' | 'whip-up' | 'drop' | 'spin'.") },
+      { use: "ctx.camera({ move, handoff })", does: L("Kamera bergerak sepanjang shot. move: 'push' (mendekat) | 'pull' (menjauh) | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down' | 'roll'.") },
+      { use: 'data-moo-depth="0.4"', does: L('Parallax: lapisan di dalam .moo-camera dengan atribut ini bergerak lebih lambat (di bawah 1, jauh) atau lebih cepat (di atas 1, dekat) daripada kamera.') },
+      { use: "ctx.handoff('zoom')", does: L("Gerak keluar di 0.4 detik terakhir: 'zoom' | 'whip-left' | 'whip-right' | 'whip-up' | 'drop' | 'spin'. Shot berikutnya otomatis masuk dari arah pasangannya.") },
       { use: 'ctx.hero(target)', does: L('Subjek utama: terlihat di frame 0, tumbuh dengan overshoot, lalu bernapas.') },
       { use: 'ctx.draw(paths, { at, dur, cascade })', does: L('Menggambar garis SVG.') },
       { use: 'ctx.pop(targets, { at, cascade })', does: L('Muncul dengan overshoot untuk detail pendukung.') },
@@ -130,6 +132,8 @@ export const MOO_API_GUIDE: MooApiSection[] = [
       { use: 'ctx.count(el, { from, to, at, dur, prefix, suffix })', does: L('Angka berjalan.') },
       { use: "ctx.reveal(targets, { dir, at })", does: L("Wipe clip-path. dir: 'left' | 'right' | 'up' | 'down' | 'circle'.") },
       { use: 'ctx.punch / ctx.shake / ctx.flash', does: L('Aksen untuk kata kunci: hentakan skala, getar, kilat layar.') },
+      { use: 'ctx.squash(target, { at, amount })', does: L('Squash and stretch saat mendarat atau terkena hentakan.') },
+      { use: 'ctx.follow(target, path, { at, dur, rotate })', does: L('Bergerak mengikuti garis path SVG; rotate: true menghadap arah jalur.') },
       { use: 'ctx.drift(targets) / ctx.orbit(targets, { cx, cy })', does: L('Melayang pelan, atau berputar mengelilingi titik.') },
       { use: 'ctx.particles({ count, size, color })', does: L('Partikel latar yang naik sepanjang shot.') }
     ]

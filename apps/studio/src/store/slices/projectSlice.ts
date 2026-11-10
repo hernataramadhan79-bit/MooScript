@@ -4,6 +4,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   BUILTIN_THEMES,
   TRANSITION_CURVES,
+  TRANSITION_DIRECTIONS,
   TRANSITION_DURATION_RANGE,
   migrateLegacyScene
 } from '../../types';
@@ -52,7 +53,7 @@ import {
 } from '../../engine/composition/proceduralCompiler';
 import type { InsertElementKind, MooStoreState, ProjectSlice } from '../types';
 import { extractLayersFromHtml } from '../../engine/composition/layers';
-import { t } from '../../i18n';
+import { getLocale, t } from '../../i18n';
 
 export const DEFAULT_PROJECT_ID = 'moo-default-project';
 const MAX_FONT_BYTES = 2 * 1024 * 1024;
@@ -407,6 +408,8 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         id: newId,
         title: title || t('Proyek Tanpa Judul #{0}', existingCount + 1),
         schemaVersion: CURRENT_SCHEMA_VERSION,
+        // Counters follow the language the project was made in.
+        numberLocale: getLocale(),
         aspectRatio: '9:16',
         renderMode: 'composition',
         fps: 30,
@@ -1677,6 +1680,10 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         if (timing.curve !== undefined) {
           if (timing.curve === null || !TRANSITION_CURVES.includes(timing.curve)) delete next.transitionCurve;
           else next.transitionCurve = timing.curve;
+        }
+        if (timing.direction !== undefined) {
+          if (timing.direction === null || !TRANSITION_DIRECTIONS.includes(timing.direction)) delete next.transitionDirection;
+          else next.transitionDirection = timing.direction;
         }
         return next;
       });

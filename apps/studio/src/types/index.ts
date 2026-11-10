@@ -3,6 +3,9 @@ export type SceneTransition = 'flow' | 'cut' | 'fade' | 'slide' | 'wipe' | 'zoom
 /** MooTween curve family for a transition; the runtime keeps each transition's own in/out direction. */
 export type TransitionCurve = 'smooth' | 'soft' | 'strong' | 'sharp' | 'linear' | 'rush';
 export const TRANSITION_CURVES: TransitionCurve[] = ['smooth', 'soft', 'strong', 'sharp', 'linear', 'rush'];
+/** Where a slide brings the next shot from, or a wipe clears the current one to. */
+export type TransitionDirection = 'left' | 'right' | 'up' | 'down';
+export const TRANSITION_DIRECTIONS: TransitionDirection[] = ['left', 'right', 'up', 'down'];
 /** Seconds a transition may last; the runtime also keeps it inside the outgoing shot. */
 export const TRANSITION_DURATION_RANGE = { min: 0.1, max: 2 } as const;
 export type CaptionStyle = 'boxed' | 'karaoke' | 'bold-pop' | 'minimal' | 'outline';
@@ -307,6 +310,8 @@ export interface Scene {
   transitionDuration?: number;
   /** Curve family of that transition; unset uses each transition's own curve. */
   transitionCurve?: TransitionCurve;
+  /** Where a slide or wipe travels; unset is left for a slide and up for a wipe. */
+  transitionDirection?: TransitionDirection;
   /** @deprecated legacy — migration only */
   text?: string;
   /** @deprecated legacy — migration only */
@@ -781,6 +786,8 @@ export interface MooProject {
   /** 2 = generative composition format. Absent/1 = legacy template-era project. */
   schemaVersion?: number;
   renderMode?: RenderMode;
+  /** Number format of animated counters: 'id' writes 1.234,5 and 'en' writes 1,234.5. Unset is 'id'. */
+  numberLocale?: 'id' | 'en';
   aspectRatio: AspectRatio;
   resolution?: '1080p' | '720p';
   fps: number; // default 30

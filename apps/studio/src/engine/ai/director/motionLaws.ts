@@ -26,7 +26,7 @@ Topik contoh: "Satu ide kecil menyebar ke banyak orang" — 9:16, panggung 1080x
 \`\`\`html
 <div class="scene-ex">
   <div class="moo-camera" data-moo-layer="camera">
-    <div class="ex-glow" data-moo-layer="bg-glow"></div>
+    <div class="ex-glow" data-moo-layer="bg-glow" data-moo-depth="0.35"></div>
     <svg class="ex-net" data-moo-layer="network" viewBox="0 0 1080 1920">
       <g class="ex-links" fill="none" stroke="var(--moo-primary, #38bdf8)" stroke-width="5" stroke-linecap="round">
         <path d="M540 1060 C 420 900, 300 820, 230 700" />
@@ -41,7 +41,7 @@ Topik contoh: "Satu ide kecil menyebar ke banyak orang" — 9:16, panggung 1080x
       <circle class="ex-ring" cx="540" cy="1060" r="80" fill="none" stroke="var(--moo-accent, #f59e0b)" stroke-width="6" />
       <circle class="ex-core" data-moo-layer="core" cx="540" cy="1060" r="80" fill="var(--moo-accent, #f59e0b)" />
     </svg>
-    <div class="ex-word" data-moo-layer="headline"><span>SATU</span> <span>IDE</span></div>
+    <div class="ex-word" data-moo-layer="headline" data-moo-depth="1.25"><span>SATU</span> <span>IDE</span></div>
   </div>
 </div>
 \`\`\`
@@ -91,9 +91,9 @@ It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landin
 2. Structure:
    <div class="scene-sN">                                  ← root, 100% x 100%, overflow hidden, background
      <div class="moo-camera" data-moo-layer="camera">      ← wraps EVERYTHING; the camera moves the world
-       background layer (gradients, grids, atmosphere)
-       mid layer (SVG objects, paths, diagrams, characters)
-       foreground layer (1-3 big kinetic words, or nothing)
+       background layer (gradients, grids, atmosphere)          ← data-moo-depth="0.3" (far: lags behind the camera)
+       mid layer (SVG objects, paths, diagrams, characters)     ← no depth attribute (the camera plane)
+       foreground layer (1-3 big kinetic words, or nothing)     ← data-moo-depth="1.2" (near: moves more)
      </div>
    </div>
 3. FORBIDDEN (these make it look like a slide/web page):
@@ -106,7 +106,10 @@ It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landin
 5. The subject must be SHOWN: build the actual objects, mechanisms, data shapes or metaphors in SVG.
 
 === MOTION GRAMMAR (WAJIB) ===
-1. CAMERA: move .moo-camera for the whole shot with ctx.camera({ move }) (push-in, pull-out, pan, roll).
+1. CAMERA: move .moo-camera for the whole shot with ctx.camera({ move }) ('push' moves IN on the subject, 'pull'
+   backs AWAY from it, pan, roll). DEPTH: give the background layer data-moo-depth="0.2".."0.5" and any foreground
+   layer data-moo-depth="1.15".."1.4"; ctx.camera then moves them with parallax, so the world is not one flat plane.
+   Put the attribute on a full-stage container layer, and do not animate that same element's scale yourself.
 2. FRAME 0 IS A POSTER: the editor shows t=0 as the scene's still. At t=0 the background, the camera and
    the main subject are already VISIBLE and composed, and already moving. Never hide the camera, the root
    or the hero object at t=0 (no opacity:0 / scale:0 start for them); grow the hero from a visible state
@@ -118,15 +121,18 @@ It is a film frame rendered to MP4 — NOT a web page, NOT a slide, NOT a landin
 5. SYNC TO VOICE: place accents at ctx.beat('kata', <fallback>) (seconds within this shot).
    Focus words get a punch (ctx.punch, ctx.flash, ctx.shake, color hit).
 6. HAND-OFF: the last ~0.4s (position ctx.dur - 0.4) is an exit (ctx.camera does this via its handoff option) — whip, zoom-through, wipe, or objects
-   leaving frame — so the cut into the next shot feels continuous.
-7. CURVE CONTRAST: 'rush-out' / 'overshoot-out' for snaps and pops, 'gentle-inout' for drifts, 'sharp-in' for exits.
+   leaving frame — so the cut into the next shot feels continuous. PICK the hand-off that fits this shot's match cut
+   instead of always 'zoom'; the next shot automatically opens on the matching entrance (a 'whip-left' exit is met
+   by the next world arriving from the right), so never add your own fade-in at the start of a shot.
+7. CURVE CONTRAST: 'rush-out' / 'overshoot-out' for snaps and pops, 'gentle-inout' for drifts, 'sharp-in' for exits;
+   'bezier(x1, y1, x2, y2)' gives a custom curve when none of the named ones fits.
    Absolute times in seconds (or ctx.beat / shot.mark) are preferred over long 'end-0.3' chains.
 
 === MOGRAPH KIT (ctx helpers — PREFER these over hand-written moves) ===
 Every helper adds moves to the shot, accepts a selector / element / list, and keeps everything inside [0, ctx.dur].
-- ctx.camera({ move, handoff, from, to })   move: 'push' | 'pull' | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down' | 'roll'
-                                            moves .moo-camera for the whole shot, then runs the hand-off (default 'zoom';
-                                            'whip-left' | 'whip-right' | 'whip-up' | 'drop' | 'spin' | false). Call it in EVERY shot.
+- ctx.camera({ move, handoff, from, to })   move: 'push' (in) | 'pull' (away) | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down' | 'roll'
+                                            moves .moo-camera for the whole shot (layers with data-moo-depth get parallax), then runs the
+                                            hand-off: 'zoom' | 'whip-left' | 'whip-right' | 'whip-up' | 'drop' | 'spin' | false. Call it in EVERY shot.
 - ctx.beat('kata', fallbackSec)             time of a spoken word inside this shot (fallback when unknown). Use for every accent.
 - ctx.hero(target)                          main subject: visible on frame 0 at scale 0.55, grows with overshoot, then breathes.
 - ctx.draw(paths, { at, dur, cascade, from })   SVG stroke draw (path / line / circle / polyline).
@@ -135,6 +141,8 @@ Every helper adds moves to the shot, accepts a selector / element / list, and ke
 - ctx.count(el, { from, to, at, dur, decimals, prefix, suffix })   animated number counter.
 - ctx.reveal(targets, { dir, at })          clip-path wipe. dir: 'left' | 'right' | 'up' | 'down' | 'circle'.
 - ctx.punch(target, { at, scale })  ctx.shake(target, { at, strength })  ctx.flash({ at, color })   accents for focus words.
+- ctx.squash(target, { at, amount })        squash and stretch when an object lands or gets hit (pivot defaults to its base).
+- ctx.follow(target, svgPath, { at, dur, rotate, curve })   moves an SVG shape along a <path> of the same <svg> (rotate: true faces along it).
 - ctx.drift(targets, { amount, rotate })    slow float for the whole shot (nothing holds still).
 - ctx.orbit(targets, { turns, cx, cy })     spin around a point (cx/cy in SVG viewBox units).
 - ctx.particles({ count, size: [min, max], color, rise })   ambient particles behind the content, visible from frame 0.

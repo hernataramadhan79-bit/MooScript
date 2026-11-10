@@ -116,6 +116,35 @@ export function installMooTween(win: any): any {
     const out: Ease = (p) => (p === 1 ? 1 : a * Math.pow(2, -10 * p) * Math.sin(((p - shift) * 2 * Math.PI) / per) + 1);
     return pick(dir, outOf(out));
   };
+  /** CSS-style cubic-bezier(x1, y1, x2, y2): 'bezier(0.2, 0, 0, 1)'. */
+  const bezierEase = (x1: number, y1: number, x2: number, y2: number): Ease => {
+    const ax = clamp(0, 1, x1);
+    const bx = clamp(0, 1, x2);
+    const coord = (a: number, b: number, t: number) => ((1 - 3 * b + 3 * a) * t + (3 * b - 6 * a)) * t * t + 3 * a * t;
+    const slope = (a: number, b: number, t: number) => 3 * (1 - 3 * b + 3 * a) * t * t + 2 * (3 * b - 6 * a) * t + 3 * a;
+    return (p) => {
+      if (p <= 0) return 0;
+      if (p >= 1) return 1;
+      // Newton steps for the curve parameter at x = p, then bisection if the slope flattens out.
+      let t = p;
+      for (let i = 0; i < 8; i++) {
+        const d = slope(ax, bx, t);
+        if (Math.abs(d) < 1e-6) break;
+        t -= (coord(ax, bx, t) - p) / d;
+      }
+      if (!(t >= 0 && t <= 1) || Math.abs(coord(ax, bx, t) - p) > 1e-4) {
+        let lo = 0;
+        let hi = 1;
+        t = p;
+        for (let i = 0; i < 24; i++) {
+          if (coord(ax, bx, t) < p) lo = t;
+          else hi = t;
+          t = (lo + hi) / 2;
+        }
+      }
+      return coord(y1, y2, t);
+    };
+  };
   const stepsEase = (steps?: number): Ease => {
     const n = Math.max(1, Math.round(steps || 1));
     return (p) => Math.floor((n + 1) * clamp(0, 1 - 1e-8, p)) / n;
@@ -138,6 +167,7 @@ export function installMooTween(win: any): any {
       if (base === 'overshoot') result = backEase(dir, args[0]);
       else if (base === 'spring') result = elasticEase(dir, args[0], args[1]);
       else if (base === 'steps') result = stepsEase(args[0]);
+      else if (base === 'bezier' && args.length === 4) result = bezierEase(args[0], args[1], args[2], args[3]);
       else result = easeMap[base + '-' + dir];
     }
     if (!result) {

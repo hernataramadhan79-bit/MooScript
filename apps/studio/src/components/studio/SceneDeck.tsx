@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../../store/useMooStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { SceneTransition, TransitionCurve } from '../../types';
+import type { SceneTransition, TransitionCurve, TransitionDirection } from '../../types';
 
 const TRANSITION_DURATIONS = [0.2, 0.3, 0.5, 0.8, 1, 1.5];
 
@@ -1034,6 +1034,28 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                           </option>
                         )}
                       </select>
+                      {(scene.transition === 'slide' || scene.transition === 'wipe') && (
+                        <>
+                          <span aria-hidden="true" className="text-text-faint">·</span>
+                          <select
+                            value={scene.transitionDirection ?? ''}
+                            onChange={(e) =>
+                              setSceneTransitionTiming(scene.id, {
+                                direction: e.target.value === '' ? null : (e.target.value as TransitionDirection)
+                              })
+                            }
+                            className="bg-transparent text-text text-[10px] font-medium focus:outline-none cursor-pointer"
+                            aria-label={t('Arah transisi dari adegan {0}', index + 1)}
+                            title={t('Arah gerak gambar saat berpindah adegan')}
+                          >
+                            <option value="" className="bg-surface-1 text-text">{t('Arah otomatis')}</option>
+                            <option value="left" className="bg-surface-1 text-text">{t('Ke kiri')}</option>
+                            <option value="right" className="bg-surface-1 text-text">{t('Ke kanan')}</option>
+                            <option value="up" className="bg-surface-1 text-text">{t('Ke atas')}</option>
+                            <option value="down" className="bg-surface-1 text-text">{t('Ke bawah')}</option>
+                          </select>
+                        </>
+                      )}
                       <span aria-hidden="true" className="text-text-faint">·</span>
                       <select
                         value={scene.transitionCurve ?? ''}

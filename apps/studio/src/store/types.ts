@@ -6,6 +6,7 @@ import type {
   MotionPreset,
   SceneTransition,
   TransitionCurve,
+  TransitionDirection,
   CaptionStyle,
   CaptionPosition,
   SubtitleCustomization,
@@ -165,7 +166,7 @@ export interface ProjectSlice {
   /** null returns the duration or curve to automatic. */
   setSceneTransitionTiming: (
     sceneId: string,
-    timing: { duration?: number | null; curve?: TransitionCurve | null }
+    timing: { duration?: number | null; curve?: TransitionCurve | null; direction?: TransitionDirection | null }
   ) => void;
   setSceneIcon: (sceneId: string, icon: string) => void;
   setSceneDuration: (sceneId: string, duration: number, allowWithAudio?: boolean) => void;

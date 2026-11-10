@@ -31,10 +31,12 @@ Your JavaScript runs once inside function(shot, root, ctx, MooTween). Never rede
   shot.pin(target, props, at)
   shot.mark('hit', at)
 - Options inside props:
-  dur: 0.6, wait: 0.1, curve: 'rush-out' | 'overshoot-out(1.7)' | 'spring-out(1, 0.3)' | 'smooth-inout' | 'gentle-inout',
+  dur: 0.6, wait: 0.1, curve: 'rush-out' | 'overshoot-out(1.7)' | 'spring-out(1, 0.3)' | 'smooth-inout' | 'gentle-inout' | 'bezier(0.2, 0, 0, 1)',
   cascade: 0.08 | { gap: 0.08, from: 'middle' }, loop: 2 | true, pingpong: true, pivot: '50% 50%', pivotPoint: '540 960', attrs: { cx, cy, r }.
 - Built-in Mograph Kit helpers on ctx (prefer these):
-  ctx.camera({ move: 'push' | 'pull' | 'pan-left' | 'pan-right' | 'roll', handoff: 'zoom' | 'whip-left' | 'whip-up' })
+  ctx.camera({ move: 'push' | 'pull' | 'pan-left' | 'pan-right' | 'roll', handoff: 'zoom' | 'whip-left' | 'whip-right' | 'whip-up' | 'drop' })
+    'push' moves in on the subject, 'pull' backs away. Layers inside .moo-camera with data-moo-depth="0.3" (far)
+    or data-moo-depth="1.2" (near) move with parallax. The next shot opens on the entrance that matches the hand-off.
   ctx.hero(selector)
   ctx.draw(svgPaths, { at, dur, cascade })
   ctx.pop(targets, { at, cascade })
@@ -42,6 +44,8 @@ Your JavaScript runs once inside function(shot, root, ctx, MooTween). Never rede
   ctx.count(el, { from, to, prefix, suffix, at, dur })
   ctx.reveal(targets, { dir: 'left' | 'up' | 'circle', at })
   ctx.punch(target, { at, scale })
+  ctx.squash(target, { at, amount })
+  ctx.follow(svgShape, svgPath, { at, dur, rotate })
   ctx.orbit(targets, { turns, cx, cy })
   ctx.particles({ count, size: [4, 9], color })
   ctx.beat('keyword', fallbackSeconds)

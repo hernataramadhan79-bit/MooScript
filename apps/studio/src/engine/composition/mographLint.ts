@@ -32,7 +32,7 @@ const MAX_ON_SCREEN_WORDS = 14;
 
 // ctx helpers from the runtime mograph kit that add real motion (see runtime/mographKit.ts).
 const MOTION_KIT_CALLS = [
-  'camera', 'hero', 'draw', 'pop', 'kinetic', 'count', 'reveal', 'punch', 'shake', 'flash', 'drift', 'orbit', 'particles', 'handoff'
+  'camera', 'hero', 'draw', 'pop', 'kinetic', 'count', 'reveal', 'punch', 'shake', 'squash', 'follow', 'flash', 'drift', 'orbit', 'particles', 'handoff'
 ];
 
 // Move properties that only express "fade / slide in" — the default web entrance.
@@ -178,6 +178,8 @@ export function lintMographQuality(
   const layerCount = (html.match(/data-moo-layer\s*=/gi) || []).length;
   if (layerCount < 3) {
     add('flat-depth', 1, `Hanya ${layerCount} layer; buat minimal 3 lapisan kedalaman (latar, objek tengah, depan).`);
+  } else if (!/data-moo-depth\s*=/i.test(html)) {
+    add('no-parallax', 1, 'Semua lapisan bergerak sebagai satu bidang datar: beri latar data-moo-depth="0.3" dan lapisan depan data-moo-depth="1.2" supaya kamera punya parallax.');
   }
 
   // --- Motion vocabulary -----------------------------------------------------

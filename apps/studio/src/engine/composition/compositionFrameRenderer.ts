@@ -135,6 +135,8 @@ export async function createCompositionFrameRenderer(
                   id: frame,
                   width,
                   height,
+                  // A transferred bitmap skips encoding every frame to PNG and decoding it again.
+                  preferBitmap: true,
                   // An underlay needs the stage's empty pixels to stay see-through.
                   transparent: Boolean(draw?.transparent || draw?.underlay)
                 },

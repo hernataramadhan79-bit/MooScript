@@ -241,6 +241,7 @@ MOO.scene(${jsString(mod.beatId)}, {
   transition: ${safeJson(ts?.transition || 'flow')},
   transitionDuration: ${safeJson(ts?.transitionDuration ?? null)},
   transitionCurve: ${safeJson(ts?.transitionCurve ?? null)},
+  transitionDirection: ${safeJson(ts?.transitionDirection ?? null)},
   clearBg: ${safeJson(Boolean(ts?.broll))},
   inPoint: ${safeJson(mod.inPoint ?? 0)},
   sourceDuration: ${safeJson(mod.sourceDuration ?? null)},
@@ -378,6 +379,8 @@ MOO.scene(${jsString(mod.beatId)}, {
   const wordShift = voiceShift(project.voiceEdit);
 
   const meta = {
+    // Number format of ctx.count: projects made before the setting existed stay Indonesian.
+    locale: project.numberLocale || 'id',
     scenes: resolved.map(({ mod }) => {
       const ts = timelineScenes.find((s) => s.id === mod.beatId);
       return {

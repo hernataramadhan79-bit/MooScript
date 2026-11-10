@@ -1,7 +1,8 @@
 /**
- * Shot starts must not stutter: with the Flow transition the incoming shot waits underneath at its
- * frame 0 and only its own moves set it in motion. A wrapper push during the overlap fought the
- * shot's camera, so each shot zoomed one way, stopped and restarted from where the push began.
+ * Shot starts must not stutter. With a transition in, the incoming shot is already playing its own
+ * moves underneath, slowly at first and at full speed just after the cut (the pre-roll ramp in
+ * mooRuntime). Once it is moving it must keep moving: an earlier wrapper push during the overlap fought
+ * the shot's camera, so each shot zoomed one way, stopped and restarted from where the push began.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildCompositionDocument } from '../../src/engine/composition/buildDocument';
@@ -51,7 +52,7 @@ function templateProject(): MooProject {
 }
 
 describe('shot boundaries (Flow transition)', () => {
-  it('holds the incoming shot still until its own first frame plays', async () => {
+  it('sets the incoming shot in motion during the overlap and never stops it again', async () => {
     const win = await loadStage(templateProject());
     const wrappers = Array.from(win.document.querySelectorAll('.moo-scene-wrapper')) as HTMLElement[];
     const snapshot = (el: HTMLElement) =>
@@ -65,16 +66,19 @@ describe('shot boundaries (Flow transition)', () => {
 
     for (let shot = 1; shot < wrappers.length; shot++) {
       const start = shot * 3;
-      const seen = new Set<string>();
-      // Every frame from the overlap's start up to (not including) the shot's first frame.
-      for (let f = Math.round((start - 0.4) * FPS); f < start * FPS; f++) {
+      const frames: string[] = [];
+      // Every frame from the overlap's start until well after the ramp has caught up with real time.
+      for (let f = Math.round((start - 0.4) * FPS); f <= Math.round((start + 0.6) * FPS); f++) {
         win.__MOO_SEEK__(f / FPS, false);
         if (win.getComputedStyle(wrappers[shot]).visibility !== 'visible') continue;
-        seen.add(snapshot(wrappers[shot]));
+        frames.push(snapshot(wrappers[shot]));
       }
-      win.__MOO_SEEK__(start, false);
-      seen.add(snapshot(wrappers[shot]));
-      expect(seen.size, `shot ${shot + 1} moved before it started`).toBe(1);
+      const firstMove = frames.findIndex((s, i) => i > 0 && s !== frames[i - 1]);
+      expect(firstMove, `shot ${shot + 1} sat frozen under the transition`).toBeGreaterThan(0);
+      expect(firstMove, `shot ${shot + 1} only started moving at the cut`).toBeLessThan(Math.round(0.4 * FPS));
+      for (let i = firstMove + 1; i < frames.length; i++) {
+        expect(frames[i], `shot ${shot + 1} stopped at frame ${i} after it had started`).not.toBe(frames[i - 1]);
+      }
     }
   });
 });

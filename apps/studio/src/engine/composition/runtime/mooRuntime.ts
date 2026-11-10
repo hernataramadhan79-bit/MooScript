@@ -48,6 +48,25 @@ export function getRuntimeScript(): string {
   // Curve families a shot may pick for its transition (TRANSITION_CURVES in types).
   const TRANSITION_CURVE_FAMILIES = ['smooth', 'soft', 'strong', 'sharp', 'linear', 'rush'];
 
+  const TRANSITION_DIRECTIONS = ['left', 'right', 'up', 'down'];
+  // The outgoing shot is clipped away towards the named side.
+  const WIPE_INSETS = {
+    up: 'inset(0% 0% 100% 0%)',
+    down: 'inset(100% 0% 0% 0%)',
+    left: 'inset(0% 100% 0% 0%)',
+    right: 'inset(0% 0% 0% 100%)'
+  };
+  // Transitions that leave the incoming shot in place, so it can open on a paired entrance.
+  const PAIRED_TRANSITIONS = ['flow', 'fade', 'cut'];
+
+  /** Seconds the transition out of a shot takes: its own setting (kept inside the shot), else 0.2-0.4 s. */
+  function transitionLength(entry) {
+    const setDur = Number(entry.def.transitionDuration);
+    return setDur > 0
+      ? Math.min(Math.max(0.1, setDur), Math.max(0.1, entry.duration * 0.8))
+      : Math.min(0.4, Math.max(0.2, entry.duration * 0.25));
+  }
+
   // 3. MOO global API for scene modules
   window.MOO = {
     scene: function(id, definition) {
@@ -128,12 +147,15 @@ export function getRuntimeScript(): string {
         opacity: i === 0 ? 1 : 0,
         zIndex: 1,
         x: '0%',
+        y: '0%',
         scale: 1,
         clipPath: 'none'
       }, 0);
     }
 
     const shotAccents = [];
+    // Hand-off the previous shot left with, so the next one can open on the matching move.
+    let prevHandoff = null;
 
     // Phase 3: Build each shot track and the inter-shot transitions
     for (let i = 0; i < sceneElements.length; i++) {
@@ -151,6 +173,7 @@ export function getRuntimeScript(): string {
         opacity: 1,
         zIndex: 1,
         x: '0%',
+        y: '0%',
         scale: 1,
         clipPath: 'none'
       }, accumulatedTime);
@@ -162,6 +185,21 @@ export function getRuntimeScript(): string {
       const shotWords = (meta.wordTimestamps || []).map(function(w) {
         return { word: w.word, start: w.start + inPoint, end: w.end + inPoint };
       });
+
+      // Pre-roll: with a transition in, the shot already plays (slowly) while the previous one leaves,
+      // and catches up with real time just after the cut. It never sits frozen under a dissolve, and its
+      // word sync is exact again once the ramp ends. A split piece keeps its own timing.
+      const prevEl = sceneElements[i - 1];
+      const prevTransition = prevEl ? (prevEl.item.transition || prevEl.def.transition || 'flow') : 'cut';
+      const ramp = prevEl && inPoint === 0 && prevTransition !== 'cut'
+        ? Math.min(transitionLength(prevEl), duration * 0.25)
+        : 0;
+      const shotStart = accumulatedTime;
+      // Local shot time -> film time (the inverse of the ramp below).
+      const masterTimeOf = function(local) {
+        if (ramp > 0 && local < ramp) return shotStart - ramp + Math.sqrt(4 * ramp * Math.max(0, local));
+        return shotStart - inPoint + local;
+      };
 
       // Context passed to build(shot, root, ctx)
       const scenePrng = createPrng(Number(def.seed) > 0 ? Number(def.seed) : i + 1);
@@ -183,9 +221,12 @@ export function getRuntimeScript(): string {
         },
         rand: scenePrng,
         index: i,
+        locale: compositionMeta && compositionMeta.locale ? compositionMeta.locale : 'id',
+        // Only a shot that plays from its own start opens on the previous shot's hand-off.
+        incoming: inPoint === 0 && PAIRED_TRANSITIONS.indexOf(sceneElements[i - 1] ? (sceneElements[i - 1].item.transition || 'flow') : '') !== -1 ? prevHandoff : null,
         // Hits the shot's code makes (ctx.pop, ctx.punch, ...), kept when they land on screen.
         accent: function(kind, at) {
-          const t = accumulatedTime - inPoint + Number(at || 0);
+          const t = masterTimeOf(Number(at || 0));
           if (t >= accumulatedTime - 0.001 && t < accumulatedTime + duration) {
             shotAccents.push({ kind: kind, time: Math.round(t * 1000) / 1000 });
           }
@@ -212,17 +253,29 @@ export function getRuntimeScript(): string {
         console.error('Error in scene build(): ' + current.item.id, err);
       }
       engine.activeTrack = null;
+      // A hand-off only counts when this piece plays through to the end of its code.
+      prevHandoff = sourceDuration - (inPoint + duration) < 0.05 ? (ctx.outgoing || null) : null;
 
-      // Place the shot track at accumulatedTime (earlier by inPoint, while the shot is still hidden)
-      masterTrack.nest(shotTrack, accumulatedTime - inPoint);
+      if (ramp > 0) {
+        // Starts "ramp" seconds early and eases up to full speed over 2 x ramp: local = t^2 / (4 ramp), then t - ramp.
+        const content = Math.max(shotTrack.duration(), sourceDuration);
+        const span = content + ramp;
+        shotTrack.cue(function() {}, span);
+        shotTrack._ease = function(p) {
+          const t = p * span;
+          return (t < 2 * ramp ? (t * t) / (4 * ramp) : t - ramp) / span;
+        };
+        masterTrack.nest(shotTrack, accumulatedTime - ramp);
+      } else {
+        // Place the shot track at accumulatedTime (earlier by inPoint, while the shot is still hidden)
+        masterTrack.nest(shotTrack, accumulatedTime - inPoint);
+      }
 
       // Inter-scene transitions
       if (next) {
-        // A duration set on the shot wins (kept inside the shot); otherwise 0.2-0.4 s from its length.
-        const setDur = Number(def.transitionDuration);
-        const transDur = setDur > 0
-          ? Math.min(Math.max(0.1, setDur), Math.max(0.1, duration * 0.8))
-          : Math.min(0.4, Math.max(0.2, duration * 0.25));
+        const transDur = transitionLength(current);
+        // Where the picture travels: 'left' (default for slide), 'right', 'up' (default for wipe), 'down'.
+        const dir = TRANSITION_DIRECTIONS.indexOf(def.transitionDirection) !== -1 ? def.transitionDirection : null;
         // A curve family set on the shot replaces each transition's own family but keeps its direction.
         const curveFamily = TRANSITION_CURVE_FAMILIES.indexOf(def.transitionCurve) !== -1 ? def.transitionCurve : null;
         const curve = function(own) { return curveFamily ? curveFamily + own.slice(own.indexOf('-')) : own; };
@@ -234,14 +287,14 @@ export function getRuntimeScript(): string {
           // its in-scene hand-off on top and dissolves. The next shot is held still on purpose: moving
           // its wrapper here (a scale push) fought its own camera move, so every shot start zoomed one
           // way, stopped, and set off again from where the push began.
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', y: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
           masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: curve('smooth-in') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'fade') {
           // Crossfade: Next scene appears underneath at transStart, current scene fades out
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', y: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
           masterTrack.go(sceneWrapper, { opacity: 0, dur: transDur, curve: curve('smooth-inout') }, transStart);
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0, zIndex: 1 }, transEnd);
@@ -249,15 +302,17 @@ export function getRuntimeScript(): string {
         } else if (transitionType === 'slide') {
           // Push slide: Next scene enters from right, current scene slides left. The next scene is made visible
           // with its own pin: a travel() with showStart: false never applies values only its start props name.
+          const slideDir = dir || 'left';
+          const axis = slideDir === 'up' || slideDir === 'down' ? 'y' : 'x';
+          const sign = slideDir === 'left' || slideDir === 'up' ? 1 : -1;
+          const enterFrom = {}; enterFrom[axis] = (100 * sign) + '%';
+          const enterTo = { dur: transDur, curve: curve('smooth-inout'), showStart: false }; enterTo[axis] = '0%';
+          const leaveTo = { dur: transDur, curve: curve('smooth-inout') }; leaveTo[axis] = (-100 * sign) + '%';
           masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 2, scale: 1, clipPath: 'none' }, transStart);
-          masterTrack.travel(next.wrapper,
-            { x: '100%' },
-            { x: '0%', dur: transDur, curve: curve('smooth-inout'), showStart: false },
-            transStart
-          );
-          masterTrack.go(sceneWrapper, { x: '-100%', dur: transDur, curve: curve('smooth-inout') }, transStart);
-          masterTrack.pin(sceneWrapper, { visibility: 'hidden', x: '0%', opacity: 0, zIndex: 1 }, transEnd);
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', zIndex: 1 }, transEnd);
+          masterTrack.travel(next.wrapper, enterFrom, enterTo, transStart);
+          masterTrack.go(sceneWrapper, leaveTo, transStart);
+          masterTrack.pin(sceneWrapper, { visibility: 'hidden', x: '0%', y: '0%', opacity: 0, zIndex: 1 }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, x: '0%', y: '0%', zIndex: 1 }, transEnd);
         } else if (transitionType === 'zoom') {
           // Zoom transition: Next scene zooms from 0.92 to 1.0 and fades in on top, current scene zooms to 1.15 and fades
           masterTrack.pin(next.wrapper, { visibility: 'visible', zIndex: 2, x: '0%', clipPath: 'none' }, transStart);
@@ -271,11 +326,11 @@ export function getRuntimeScript(): string {
           masterTrack.pin(next.wrapper, { visibility: 'visible', scale: 1, opacity: 1, zIndex: 1 }, transEnd);
         } else if (transitionType === 'wipe') {
           // Vertical wipe: Next scene visible underneath, current scene wipes away
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transStart);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', y: '0%', scale: 1, clipPath: 'none' }, transStart);
           masterTrack.pin(sceneWrapper, { zIndex: 2 }, transStart);
           masterTrack.travel(sceneWrapper,
             { clipPath: 'inset(0% 0% 0% 0%)' },
-            { clipPath: 'inset(0% 0% 100% 0%)', dur: transDur, curve: curve('smooth-inout'), showStart: false },
+            { clipPath: WIPE_INSETS[dir || 'up'], dur: transDur, curve: curve('smooth-inout'), showStart: false },
             transStart
           );
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', clipPath: 'none', opacity: 0, zIndex: 1 }, transEnd);
@@ -283,7 +338,7 @@ export function getRuntimeScript(): string {
         } else {
           // Default cut: Instant switch at end of scene
           masterTrack.pin(sceneWrapper, { visibility: 'hidden', opacity: 0 }, transEnd);
-          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', scale: 1, clipPath: 'none' }, transEnd);
+          masterTrack.pin(next.wrapper, { visibility: 'visible', opacity: 1, zIndex: 1, x: '0%', y: '0%', scale: 1, clipPath: 'none' }, transEnd);
         }
       }
 
@@ -450,6 +505,8 @@ export function getRuntimeScript(): string {
   window.__MOO_SEEK__ = seekTo;
 
   // Canvas pooling for zero-allocation frame capture
+  let captureStylesRaw = null;
+  let captureStylesClean = null;
   let sharedExportCanvas = null;
   let sharedExportCtx = null;
 
@@ -514,12 +571,15 @@ export function getRuntimeScript(): string {
         const rawStyles = Array.from(document.querySelectorAll('style'))
           .map(function(s) { return s.textContent || ''; })
           .join(String.fromCharCode(10));
+        // The stylesheet (with its embedded fonts) rarely changes between frames: clean it once.
+        var styles = captureStylesRaw === rawStyles ? captureStylesClean : null;
+        if (styles === null) {
 
         // Only neutralize EXTERNAL urls (http/https/protocol-relative). data: URIs,
         // blob: URIs and #fragment anchors must survive rasterization intact.
         // NOTE: backslashes are doubled because this script is emitted through
         // a TypeScript template literal.
-        var styles = rawStyles.replace(/url\\(\\s*['"]?(?:https?:|\\/\\/)[^)'"]*['"]?\\s*\\)/gi, 'none');
+        styles = rawStyles.replace(/url\\(\\s*['"]?(?:https?:|\\/\\/)[^)'"]*['"]?\\s*\\)/gi, 'none');
         if (styles.indexOf('@import') !== -1) {
           styles = styles.split('@import').map(function(part, i) {
             if (i === 0) return part;
@@ -527,9 +587,22 @@ export function getRuntimeScript(): string {
             return semi !== -1 ? part.slice(semi + 1) : '';
           }).join('');
         }
+        captureStylesRaw = rawStyles;
+        captureStylesClean = styles;
+        }
 
         const stageContainer = document.getElementById('moo-stage') || document.getElementById('moo-viewport') || document.body;
         const clone = stageContainer ? stageContainer.cloneNode(true) : document.createElement('div');
+
+        // Shots that are not on screen at this frame are left out of the picture entirely.
+        if (clone.children) {
+          for (let i = clone.children.length - 1; i >= 0; i--) {
+            const child = clone.children[i];
+            if (child.classList && child.classList.contains('moo-scene-wrapper') && child.style && child.style.visibility === 'hidden') {
+              clone.removeChild(child);
+            }
+          }
+        }
 
         if (clone.querySelectorAll) {
           const extImgs = clone.querySelectorAll('img, image');

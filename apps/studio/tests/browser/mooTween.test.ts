@@ -88,6 +88,18 @@ describe('MooTween curves', () => {
     });
   }
 
+  it("reads 'bezier(x1, y1, x2, y2)' like a CSS cubic-bezier", () => {
+    const linear = mt.curve('bezier(0.25, 0.25, 0.75, 0.75)');
+    for (const p of [0, 0.2, 0.5, 0.8, 1]) expect(linear(p)).toBeCloseTo(p, 3);
+    // The standard CSS "ease" curve.
+    const ease = mt.curve('bezier(0.25, 0.1, 0.25, 1)');
+    expect(ease(0)).toBe(0);
+    expect(ease(1)).toBe(1);
+    expect(ease(0.5)).toBeCloseTo(0.8024, 3);
+    // Control points above 1 overshoot the target.
+    expect(Math.max(...[0.5, 0.6, 0.7, 0.8].map(mt.curve('bezier(0.3, 1.6, 0.6, 1)')))).toBeGreaterThan(1);
+  });
+
   it('falls back to soft-out for an unknown curve and warns once', () => {
     const warnings: string[] = [];
     win.console.warn = (msg: string) => warnings.push(msg);

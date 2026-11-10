@@ -64,7 +64,7 @@ const FOREIGN_API: Array<{ api: string; pattern: RegExp; fix: string }> = [
 
 // A scene animates something when it calls a shot move or a ctx helper that adds one.
 const MOVES =
-  /\bshot\s*\.\s*(?:go|arrive|travel|pin|nest|cue)\b|\bctx\s*\.\s*(?:camera|hero|draw|pop|kinetic|count|reveal|punch|shake|flash|drift|orbit|particles|handoff)\b/;
+  /\bshot\s*\.\s*(?:go|arrive|travel|pin|nest|cue)\b|\bctx\s*\.\s*(?:camera|hero|draw|pop|kinetic|count|reveal|punch|shake|squash|follow|flash|drift|orbit|particles|handoff)\b/;
 
 /** Names of the foreign APIs this scene code uses (comments ignored). */
 export function findForeignApis(buildJs: string): string[] {

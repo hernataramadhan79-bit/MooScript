@@ -337,7 +337,7 @@ export function synthesizeFallbackScene(params: {
     <svg class="synth-line-wrap" data-moo-layer="Accent Line" viewBox="0 0 ${w} ${h}">
       <path class="synth-accent-line" d="M ${Math.round(w * 0.2)} ${Math.round(h * 0.3)} L ${Math.round(w * 0.8)} ${Math.round(h * 0.3)}" fill="none" stroke="var(--moo-accent, ${palette.accent})" stroke-width="8" stroke-linecap="round" />
     </svg>
-    <div class="synth-headline" data-moo-layer="Headline">${titleWords.map((word) => `<span>${escapeHtml(word)}</span>`).join(' ')}</div>
+    <div class="synth-headline" data-moo-layer="Headline" data-moo-depth="1.2">${titleWords.map((word) => `<span>${escapeHtml(word)}</span>`).join(' ')}</div>
   </div>
 </div>`;
 

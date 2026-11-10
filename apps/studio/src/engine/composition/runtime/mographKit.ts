@@ -64,6 +64,10 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
 
   let handoffDone = false;
 
+  // Without a named hand-off, shots take turns so a film does not end every shot the same way.
+  const AUTO_HANDOFFS = ['zoom', 'whip-left', 'whip-up', 'zoom', 'whip-right', 'drop'];
+  const autoHandoff = () => AUTO_HANDOFFS[(Math.max(0, Math.floor(Number(ctx.index) || 0))) % AUTO_HANDOFFS.length];
+
   /** Word time from the voice-over (scene-relative), or the fallback when the word is not found. */
   ctx.beat = (word: string, fallback?: number) => {
     const t = typeof ctx.at === 'function' ? Number(ctx.at(word)) || 0 : 0;
@@ -86,14 +90,18 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const o = opts || {};
     const cam = o.target ? list(o.target) : [cameraEl()];
     const len = Math.min(0.4, dur * 0.25);
-    const vars = Object.assign({}, HANDOFFS[type || 'zoom'] || HANDOFFS.zoom, { dur: len });
+    const name = type && HANDOFFS[type] ? type : autoHandoff();
+    // The next shot opens on the matching move (see ENTRIES).
+    ctx.outgoing = name;
+    const vars = Object.assign({}, HANDOFFS[name], { dur: len });
     shot.go(cam, vars, dur - len);
     return cam;
   });
 
   const CAMERA_MOVES: Record<string, any[]> = {
-    push: [{ scale: 1.18, spin: -2 }, { scale: 1, spin: 0 }],
-    pull: [{ scale: 1 }, { scale: 1.15 }],
+    // push moves in on the subject (it grows); pull backs away from it and settles.
+    push: [{ scale: 1 }, { scale: 1.15 }],
+    pull: [{ scale: 1.18, spin: -2 }, { scale: 1, spin: 0 }],
     'pan-left': [{ shiftX: 6, scale: 1.12 }, { shiftX: -6, scale: 1.12 }],
     'pan-right': [{ shiftX: -6, scale: 1.12 }, { shiftX: 6, scale: 1.12 }],
     'pan-up': [{ shiftY: 5, scale: 1.12 }, { shiftY: -5, scale: 1.12 }],
@@ -101,7 +109,24 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     roll: [{ spin: -6, scale: 1.15 }, { spin: 3, scale: 1.04 }]
   };
 
-  /** Moves the whole world (.moo-camera) for the shot, then runs the hand-off (default 'zoom'). */
+  // How a shot opens when the previous one left with a hand-off: the world arrives from the side the
+  // last one left to, so the cut reads as one continuous move. Offsets only, never opacity, so the
+  // first frame still shows the subject.
+  const ENTRIES: Record<string, any> = {
+    // Larger, never smaller: a shrunken world would show the empty stage around its edges.
+    zoom: { scale: 1.28 },
+    'whip-left': { shiftX: 30 },
+    'whip-right': { shiftX: -30 },
+    'whip-up': { shiftY: 30 },
+    drop: { shiftY: -24 },
+    spin: { spin: -24, scale: 1.3 }
+  };
+
+  /**
+   * Moves the whole world (.moo-camera) for the shot, then runs the hand-off. Layers inside the camera
+   * that carry data-moo-depth move with parallax: 0 is far away and barely follows the camera, 1 is the
+   * camera plane, above 1 is foreground and moves more.
+   */
   ctx.camera = safe('camera', (opts?: any) => {
     const o = opts || {};
     const cam = cameraEl();
@@ -109,9 +134,42 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const withHandoff = o.handoff !== false && o.handoff !== 'none';
     const end = withHandoff ? dur - Math.min(0.4, dur * 0.25) : dur;
     const from = Object.assign({ pivot: o.pivot || '50% 50%' }, move[0], o.from);
-    const to = Object.assign({}, move[1], o.to, { dur: Math.max(0.1, end), curve: o.curve || 'gentle-inout' });
+    const curve = o.curve || 'gentle-inout';
+    const to = Object.assign({}, move[1], o.to, { dur: Math.max(0.1, end), curve });
     shot.travel(cam, from, to, 0);
-    if (withHandoff) ctx.handoff(typeof o.handoff === 'string' ? o.handoff : 'zoom');
+
+    if (o.parallax !== false && cam.querySelectorAll) {
+      const layers = Array.prototype.slice.call(cam.querySelectorAll('[data-moo-depth]'));
+      layers.forEach((layer: any) => {
+        const depth = Math.max(0, Math.min(2, parseFloat(layer.getAttribute('data-moo-depth'))));
+        if (!isFinite(depth) || depth === 1) return;
+        // The layer undoes (far) or adds to (near) part of the camera's own move.
+        const k = 1 - depth;
+        const part = (v: any) => {
+          const out: any = {};
+          const sx = Number(v.shiftX) || 0;
+          const sy = Number(v.shiftY) || 0;
+          const sc = Number(v.scale) > 0 ? Number(v.scale) : 1;
+          out.shiftX = -sx * k;
+          out.shiftY = -sy * k;
+          out.scale = Math.pow(sc, -k);
+          return out;
+        };
+        const a = part(from);
+        const b = part(to);
+        if (a.shiftX === b.shiftX && a.shiftY === b.shiftY && a.scale === b.scale) return;
+        shot.travel(layer, Object.assign({ pivot: '50% 50%' }, a), Object.assign(b, { dur: Math.max(0.1, end), curve }), 0);
+      });
+    }
+
+    // Paired entrance, on the element around the camera so it never fights the camera's own move.
+    const incoming = o.entry === false ? '' : typeof o.entry === 'string' ? o.entry : ctx.incoming;
+    const outer = cam.parentElement;
+    if (incoming && ENTRIES[incoming] && outer && outer !== root) {
+      shot.arrive(outer, Object.assign({ pivot: '50% 50%' }, ENTRIES[incoming], { dur: Math.min(0.35, dur * 0.2), curve: 'rush-out' }), 0);
+    }
+
+    if (withHandoff) ctx.handoff(typeof o.handoff === 'string' ? o.handoff : undefined);
     return [cam];
   });
 
@@ -236,11 +294,15 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const el = list(target)[0];
     if (!el) return [];
     const decimals = Math.max(0, Math.min(4, o.decimals || 0));
+    // 1.234,5 for Indonesian projects (and ones made before the setting existed), 1,234.5 otherwise.
+    const dotGroups = String(ctx.locale || 'id').toLowerCase().indexOf('id') === 0;
+    const group = o.separator ?? (dotGroups ? '.' : ',');
+    const point = o.decimal ?? (dotGroups ? ',' : '.');
     const fmt = (v: number) => {
       const fixed = v.toFixed(decimals);
       const parts = fixed.split('.');
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, o.separator ?? '.');
-      return (o.prefix || '') + parts.join(',') + (o.suffix || '');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, group);
+      return (o.prefix || '') + parts.join(point) + (o.suffix || '');
     };
     const state = { v: Number(o.from) || 0 };
     const to = Number(o.to) || 0;
@@ -258,6 +320,89 @@ export function installMographKit(shot: any, root: any, ctx: any): void {
     const f = fit(o.at, 0.24, 0, 1);
     accent('impact', f.start);
     shot.go(els, { scale: o.scale || 1.25, pivot: '50% 50%', dur: f.d / 2, pingpong: true, loop: 1, curve: 'smooth-out' }, f.start);
+    return els;
+  });
+
+  /** Squash and stretch on a landing or a hit: flattens, rebounds taller, then settles. */
+  ctx.squash = safe('squash', (targets: any, opts?: any) => {
+    const o = opts || {};
+    const els = list(targets);
+    if (els.length === 0) return els;
+    const a = Math.max(0.05, Math.min(0.6, Number(o.amount) || 0.25));
+    const f = fit(o.at, o.dur || 0.36, 0, 1);
+    accent('impact', f.start);
+    shot.go(els, {
+      sequence: [
+        { pivot: o.pivot || '50% 100%', scaleX: 1 + a, scaleY: 1 - a, dur: f.d * 0.25, curve: 'soft-out' },
+        { scaleX: 1 - a * 0.45, scaleY: 1 + a * 0.45, dur: f.d * 0.3, curve: 'gentle-inout' },
+        { scaleX: 1, scaleY: 1, dur: f.d * 0.45, curve: 'overshoot-out(2.5)' }
+      ]
+    }, f.start);
+    return els;
+  });
+
+  /**
+   * Moves elements along an SVG path (their centre rides the line). The element and the path share
+   * one coordinate system: an SVG shape and a path of the same <svg>, or an HTML layer and a path
+   * drawn in stage pixels. rotate: true turns the element to face along the path.
+   */
+  ctx.follow = safe('follow', (targets: any, pathTarget: any, opts?: any) => {
+    const o = opts || {};
+    const els = list(targets);
+    const path = list(pathTarget)[0];
+    if (els.length === 0 || !path || typeof path.getTotalLength !== 'function') return els;
+    const total = path.getTotalLength();
+    if (!total || !isFinite(total)) return els;
+    const view = doc.defaultView || (typeof window !== 'undefined' ? window : null);
+    const engine = view && (view as any).MooTween;
+    const ease = engine && engine.curve ? engine.curve(o.curve || 'smooth-inout') : (p: number) => p;
+    const f = fit(o.at, o.dur || Math.min(1.6, dur), o.cascade ?? 0.1, els.length);
+    const p0 = Math.max(0, Math.min(1, Number(o.from) || 0));
+    const p1 = Math.max(0, Math.min(1, o.to === undefined ? 1 : Number(o.to) || 0));
+    // The curve is baked into where the samples sit, so each step can stay linear.
+    const count = Math.max(8, Math.min(60, Math.round(f.d * 30)));
+    const pointAt = (i: number) => path.getPointAtLength(total * (p0 + (p1 - p0) * ease(i / count)));
+    els.forEach((el: any, index: number) => {
+      let cx = 0;
+      let cy = 0;
+      try {
+        if (el.ownerSVGElement && el.getBBox) {
+          const b = el.getBBox();
+          cx = b.x + b.width / 2;
+          cy = b.y + b.height / 2;
+        } else {
+          cx = (el.offsetLeft || 0) + (el.offsetWidth || 0) / 2;
+          cy = (el.offsetTop || 0) + (el.offsetHeight || 0) / 2;
+        }
+      } catch {
+        cx = 0;
+        cy = 0;
+      }
+      const steps: any[] = [];
+      let prev = pointAt(0);
+      let angle = 0;
+      let turned = false;
+      for (let i = 1; i <= count; i++) {
+        const pt = pointAt(i);
+        const step: any = { x: pt.x - cx, y: pt.y - cy, dur: f.d / count };
+        if (o.rotate && (pt.x !== prev.x || pt.y !== prev.y)) {
+          let next = (Math.atan2(pt.y - prev.y, pt.x - prev.x) * 180) / Math.PI;
+          // Keep turning the short way round instead of snapping from 179 to -179.
+          if (turned) while (next - angle > 180) next -= 360;
+          if (turned) while (next - angle < -180) next += 360;
+          angle = next;
+          turned = true;
+          step.spin = angle;
+        }
+        steps.push(step);
+        prev = pt;
+      }
+      const first = pointAt(0);
+      const startAt: any = { x: first.x - cx, y: first.y - cy };
+      if (o.rotate && steps[0] && steps[0].spin !== undefined) startAt.spin = steps[0].spin;
+      shot.pin(el, startAt, 0);
+      shot.go(el, { sequence: steps }, f.start + f.s * index);
+    });
     return els;
   });
 

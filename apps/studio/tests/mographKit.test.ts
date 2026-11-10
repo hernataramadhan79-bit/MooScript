@@ -110,13 +110,119 @@ describe('Mograph kit (ctx helpers)', () => {
     expect(move.targets).toBe(camera);
     expect(move.position).toBe(0);
     expect(move.vars.dur).toBeCloseTo(3.6);
-    expect(move.fromVars.scale).toBeGreaterThan(1);
+    // push moves in on the subject: the world ends larger than it starts.
+    expect(move.vars.scale).toBeGreaterThan(move.fromVars.scale);
 
     const exits = calls.filter((c) => c.method === 'go');
     expect(exits).toHaveLength(1);
     expect(exits[0].position).toBeCloseTo(3.6);
     expect(exits[0].vars.opacity).toBe(0);
     expect(exits[0].vars.scale).toBe(2.6);
+  });
+
+  it('names the camera moves the way a camera operator would', () => {
+    const push = setup(4);
+    push.ctx.camera({ move: 'push', handoff: false });
+    const pull = setup(4);
+    pull.ctx.camera({ move: 'pull', handoff: false });
+    const scales = (c: Call) => [c.fromVars.scale, c.vars.scale];
+    const [pushFrom, pushTo] = scales(push.calls[0]);
+    const [pullFrom, pullTo] = scales(pull.calls[0]);
+    expect(pushTo).toBeGreaterThan(pushFrom);
+    expect(pullTo).toBeLessThan(pullFrom);
+  });
+
+  it('moves layers with data-moo-depth less (far) or more (near) than the camera', () => {
+    const { calls, ctx, camera } = setup(4);
+    const far = new FakeEl();
+    const near = new FakeEl();
+    const depth = new Map<any, string>([[far, '0.3'], [near, '1.4']]);
+    for (const [layer, value] of depth) (layer as any).getAttribute = () => value;
+    (camera as any).querySelectorAll = () => [far, near];
+    ctx.camera({ move: 'pan-left', handoff: false });
+
+    const cam = calls.find((c) => c.targets === camera)!;
+    const farMove = calls.find((c) => c.targets === far)!;
+    const nearMove = calls.find((c) => c.targets === near)!;
+    // The camera pans from +6% to -6%: a far layer takes most of that back, a near one adds to it.
+    const travel = (c: Call) => c.vars.shiftX - c.fromVars.shiftX;
+    expect(Math.sign(travel(farMove))).toBe(-Math.sign(travel(cam)));
+    expect(Math.abs(travel(farMove))).toBeLessThan(Math.abs(travel(cam)));
+    expect(Math.sign(travel(nearMove))).toBe(Math.sign(travel(cam)));
+    expect(farMove.vars.dur).toBe(cam.vars.dur);
+  });
+
+  it('takes turns on the hand-off and tells the next shot how it left', () => {
+    const exits = [0, 1, 2].map((index) => {
+      const s = setup(4);
+      s.ctx.index = index;
+      s.ctx.camera({ move: 'push' });
+      return s.ctx.outgoing;
+    });
+    expect(exits[0]).toBe('zoom');
+    expect(new Set(exits).size).toBeGreaterThan(1);
+
+    const named = setup(4);
+    named.ctx.camera({ move: 'push', handoff: 'whip-left' });
+    expect(named.ctx.outgoing).toBe('whip-left');
+  });
+
+  it('opens on the entrance that matches the previous hand-off, without hiding the first frame', () => {
+    const { calls, ctx, camera } = setup(4);
+    const sceneRoot = new FakeEl();
+    (camera as any).parentElement = sceneRoot;
+    ctx.incoming = 'whip-left';
+    ctx.camera({ move: 'push', handoff: false });
+
+    const entry = calls.find((c) => c.method === 'arrive' && c.targets === sceneRoot)!;
+    expect(entry.position).toBe(0);
+    // The last world left to the left, so this one arrives from the right.
+    expect(entry.vars.shiftX).toBeGreaterThan(0);
+    expect(entry.vars.opacity).toBeUndefined();
+    expect(entry.vars.dur).toBeLessThanOrEqual(0.35);
+
+    const off = setup(4);
+    (off.camera as any).parentElement = new FakeEl();
+    off.ctx.incoming = 'whip-left';
+    off.ctx.camera({ move: 'push', handoff: false, entry: false });
+    expect(off.calls.some((c) => c.method === 'arrive')).toBe(false);
+  });
+
+  it('ctx.squash flattens, rebounds and settles back to scale 1', () => {
+    const { calls, ctx } = setup(4);
+    ctx.squash('.stat', { at: 1 });
+    const steps = calls[0].vars.sequence;
+    expect(steps[0].scaleX).toBeGreaterThan(1);
+    expect(steps[0].scaleY).toBeLessThan(1);
+    expect(steps[1].scaleY).toBeGreaterThan(1);
+    expect(steps[steps.length - 1]).toMatchObject({ scaleX: 1, scaleY: 1 });
+    expect(calls[0].position + steps.reduce((sum: number, s: any) => sum + s.dur, 0)).toBeLessThanOrEqual(4);
+  });
+
+  it('ctx.follow rides the centre of an element along a path inside the shot', () => {
+    const { calls, ctx, stat } = setup(4);
+    const path = { getTotalLength: () => 200, getPointAtLength: (d: number) => ({ x: d, y: 100 }) };
+    Object.assign(stat, { offsetLeft: 0, offsetTop: 0, offsetWidth: 40, offsetHeight: 20 });
+    ctx.follow('.stat', path, { at: 0.5, dur: 1, curve: 'linear' });
+
+    const start = calls.find((c) => c.method === 'pin')!;
+    expect(start.vars).toMatchObject({ x: -20, y: 90 });
+    const ride = calls.find((c) => c.method === 'go')!;
+    const steps = ride.vars.sequence;
+    expect(steps[steps.length - 1]).toMatchObject({ x: 180, y: 90 });
+    expect(steps.reduce((sum: number, s: any) => sum + s.dur, 0)).toBeCloseTo(1);
+    expect(ride.position).toBe(0.5);
+  });
+
+  it('ctx.count writes numbers in the project\'s format', () => {
+    const id = setup(4);
+    id.ctx.count('.stat', { from: 1234.5, to: 1234.5, decimals: 1 });
+    expect(id.stat.textContent).toBe('1.234,5');
+
+    const en = setup(4);
+    en.ctx.locale = 'en';
+    en.ctx.count('.stat', { from: 1234.5, to: 1234.5, decimals: 1 });
+    expect(en.stat.textContent).toBe('1,234.5');
   });
 
   it('ctx.hero keeps the main subject visible on frame 0', () => {
@@ -205,7 +311,7 @@ describe('Linter understands the kit', () => {
   it('treats kit calls as camera motion, hand-off, voice sync and mograph vocabulary', () => {
     const code = {
       html: `<div class="scene-s1"><div class="moo-camera" data-moo-layer="camera">
-        <div data-moo-layer="bg"></div><svg data-moo-layer="net" viewBox="0 0 1080 1920"><path d="M0 0L9 9"/></svg>
+        <div data-moo-layer="bg" data-moo-depth="0.3"></div><svg data-moo-layer="net" viewBox="0 0 1080 1920"><path d="M0 0L9 9"/></svg>
         <div class="title" data-moo-layer="headline"><span>SATU</span></div></div></div>`,
       css: '.scene-s1 { position: relative; width: 100%; height: 100%; }',
       buildJs: `ctx.camera({ move: 'push' });
