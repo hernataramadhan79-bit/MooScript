@@ -1139,5 +1139,6 @@ export const EN: Record<string, string> = {
   'Bergerak mengikuti garis path SVG; rotate: true menghadap arah jalur.': 'Moves along an SVG path; rotate: true faces along the line.',
   'Kurva sendiri, sama seperti cubic-bezier di CSS.': 'Your own curve, the same as cubic-bezier in CSS.',
   'Motion blur': 'Motion blur',
-  'Gerak cepat (whip, slam, zoom) jadi berbayang seperti rekaman kamera. Render sekitar {0}x lebih lama.': 'Fast moves (whips, slams, zooms) smear the way a camera records them. Rendering takes about {0}x longer.'
+  'Gerak cepat (whip, slam, zoom) jadi berbayang seperti rekaman kamera. Render sekitar {0}x lebih lama.': 'Fast moves (whips, slams, zooms) smear the way a camera records them. Rendering takes about {0}x longer.',
+  'Memuat panel…': 'Loading panel…'
 };
