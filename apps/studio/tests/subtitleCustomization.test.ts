@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useMooStore } from '../src/store/useMooStore';
 import { buildCaptionScript } from '../src/engine/composition/captions';
-import { CanvasRenderer } from '../src/engine/renderer/canvasRenderer';
-import { createMockCanvas } from './mocks/mockCanvas';
-import type { MooProject, Scene, CaptionStyle, CaptionPosition } from '../src/types';
+import type { CaptionStyle, CaptionPosition } from '../src/types';
 
 describe('Subtitle Customization Suite', () => {
   beforeEach(() => {
@@ -103,69 +101,6 @@ describe('Subtitle Customization Suite', () => {
         []
       );
       expect(script).toBe('');
-    });
-  });
-
-  describe('CanvasRenderer subtitle overlay', () => {
-    it('renders subtitle overlay with custom style, colors, and font scaling without throwing', () => {
-      const renderer = new CanvasRenderer();
-      const mock = createMockCanvas(1080, 1920);
-      const ctx = mock.ctx;
-
-      const mockProject: MooProject = {
-        id: 'proj-sub-test',
-        title: 'Subtitle Test Project',
-        aspectRatio: '9:16',
-        fps: 30,
-        width: 1080,
-        height: 1920,
-        theme: {
-          bg: '#131315',
-          textPrimary: '#ffffff',
-          textHighlight: '#84cc16',
-          fontFamily: 'Jakarta',
-          captionStyle: 'outline',
-          captionPosition: 'bottom',
-          showSubtitles: true,
-          subtitleCustomization: {
-            fontScale: 1.2,
-            activeColor: '#eab308',
-            textColor: '#f4f4f5',
-            uppercase: true,
-            bgOpacity: 0.75,
-            maxWordsPerChunk: 3
-          }
-        },
-        scenes: [],
-        audioDuration: 3,
-        bgm: { preset: 'none', level: 0.18, duckRatio: 0.15 }
-      };
-
-      const mockScene: Scene = {
-        id: 'scene-1',
-        layout: 'KINETIC_QUOTE',
-        narrationText: 'Teks naskah subtitle animasi.',
-        text: 'Teks naskah subtitle animasi.',
-        visualData: { title: 'Scene 1', focusWords: ['subtitle'] },
-        focusWords: ['subtitle'],
-        motionPreset: 'punch_zoom',
-        durationInSeconds: 3.0,
-        wordTimestamps: [
-          { word: 'Teks', start: 0, end: 0.6 },
-          { word: 'naskah', start: 0.6, end: 1.2 },
-          { word: 'subtitle', start: 1.2, end: 2.0 },
-          { word: 'animasi', start: 2.0, end: 2.8 }
-        ]
-      };
-
-      // Test across different elapsed times and styles
-      const styles: CaptionStyle[] = ['boxed', 'karaoke', 'bold-pop', 'minimal', 'outline'];
-      for (const style of styles) {
-        mockProject.theme.captionStyle = style;
-        expect(() => {
-          renderer.renderBottomSubtitleOverlay(ctx, 1080, 1920, mockScene, 1.5, mockProject);
-        }).not.toThrow();
-      }
     });
   });
 });

@@ -35,8 +35,8 @@ export async function createCompositionFrameRenderer(
     return null;
   }
 
-  // Only proceed if composition has scenes
-  if (!project.composition || !project.composition.scenes || project.composition.scenes.length === 0) {
+  // Shots without generated code still render (their instant visual), so the timeline alone is enough.
+  if (!project.composition?.scenes?.length && !project.scenes?.length) {
     return null;
   }
 

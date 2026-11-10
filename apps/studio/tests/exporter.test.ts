@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exportMooProjectToMP4 } from '../src/engine/export/mp4Exporter';
 import { createMockCanvas } from './mocks/mockCanvas';
+import { installExportStage } from './mocks/exportStage';
 import type { MooProject } from '../src/types';
 
 class MockEventTarget {
@@ -258,6 +259,7 @@ describe('MP4 Exporter Engine (Mediabunny)', () => {
   let origOffscreenCanvas: any;
   let origAudioBuffer: any;
   let origCreateObjectURL: any;
+  let exportStage: ReturnType<typeof installExportStage>;
 
   beforeEach(() => {
     origVideoEncoder = (globalThis as any).VideoEncoder;
@@ -300,9 +302,11 @@ describe('MP4 Exporter Engine (Mediabunny)', () => {
       }
     };
     URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-export-url');
+    exportStage = installExportStage();
   });
 
   afterEach(() => {
+    exportStage.restore();
     (globalThis as any).VideoEncoder = origVideoEncoder;
     (globalThis as any).AudioEncoder = origAudioEncoder;
     (globalThis as any).VideoFrame = origVideoFrame;
@@ -320,8 +324,7 @@ describe('MP4 Exporter Engine (Mediabunny)', () => {
     const result = await exportMooProjectToMP4(
       TEST_PROJECT,
       (progress) => progressUpdates.push(progress.percent),
-      undefined,
-      { hud: false, watermark: false }
+      undefined
     );
 
     expect(result).toBeDefined();
@@ -339,7 +342,7 @@ describe('MP4 Exporter Engine (Mediabunny)', () => {
       TEST_PROJECT,
       (progress) => progressUpdates.push(progress.percent),
       undefined,
-      { format: 'webm', hud: false, watermark: false }
+      { format: 'webm', }
     );
 
     expect(result).toBeDefined();

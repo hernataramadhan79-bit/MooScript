@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { serializeSvgFrame, getRuntimeScript } from '../src/engine/composition/runtime/mooRuntime';
 import { buildCompositionDocument } from '../src/engine/composition/buildDocument';
-import { withAlpha } from '../src/engine/renderer/canvasRenderer';
 import { buildDuckingCurve } from '../src/engine/audio/bgmMixer';
 import { validateSceneCode, stripCommentsRespectingStrings } from '../src/engine/composition/validator';
 import { cleanJsonFence } from '../src/engine/ai/llm';
@@ -105,22 +104,6 @@ describe('Master Plan regression suite', () => {
       expect(standalone).toContain('scale(');
       const embedded = buildCompositionDocument(baseProject());
       expect(embedded).not.toContain('moo-standalone-controller');
-    });
-  });
-
-  describe('withAlpha', () => {
-    it('appends alpha to 6-digit hex', () => {
-      expect(withAlpha('#84cc16', '22')).toBe('#84cc1622');
-    });
-    it('expands 3-digit hex before appending alpha', () => {
-      expect(withAlpha('#fff', '22')).toBe('#ffffff22');
-    });
-    it('converts rgb() to rgba() instead of producing garbage', () => {
-      expect(withAlpha('rgb(10, 20, 30)', '80')).toContain('rgba(10, 20, 30,');
-      expect(() => withAlpha('rgb(10, 20, 30)', '80')).not.toThrow();
-    });
-    it('passes named colors through untouched (never crashes addColorStop)', () => {
-      expect(withAlpha('red', '22')).toBe('red');
     });
   });
 

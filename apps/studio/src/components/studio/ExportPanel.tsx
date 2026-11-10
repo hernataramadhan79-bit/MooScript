@@ -70,15 +70,12 @@ export const ExportPanel: React.FC = () => {
 
   // Export choices are remembered per project.
   const exportSettings = { ...DEFAULT_EXPORT_SETTINGS, ...project.exportSettings };
-  const { format, fps, quality, watermark, hud, transparent, motionBlur } = exportSettings;
+  const { format, fps, quality, transparent, motionBlur } = exportSettings;
 
   const scenes = project.scenes || [];
   const hasProjectAudio = Boolean(project.audioBlob);
   const currentResolution: '1080p' | '720p' =
     project.resolution || (project.width === 1080 || project.height === 1080 ? '1080p' : '720p');
-  // Mirrors exporter logic: watermark/HUD only apply to the legacy canvas renderer.
-  const isCompositionExport =
-    (project.renderMode || 'composition') === 'composition' && scenes.length > 0 && Boolean(project.composition);
   const unbuiltModules = (project.composition?.scenes || []).filter((m) => !sceneHasRenderableCode(m));
   const failedVisualCount = unbuiltModules.filter((m) => m.status === 'error').length;
   const pendingVisualCount = unbuiltModules.length - failedVisualCount;
@@ -98,8 +95,6 @@ export const ExportPanel: React.FC = () => {
       format,
       fps,
       quality,
-      watermark,
-      hud,
       transparent,
       motionBlur
     ];
@@ -119,8 +114,6 @@ export const ExportPanel: React.FC = () => {
     format,
     fps,
     quality,
-    watermark,
-    hud,
     transparent,
     motionBlur,
     revokeExportResult
@@ -151,8 +144,6 @@ export const ExportPanel: React.FC = () => {
       format,
       fps,
       quality,
-      watermark,
-      hud,
       transparent: format !== 'gif' && Boolean(transparent),
       motionBlur: format !== 'gif' && Boolean(motionBlur)
     });
@@ -342,7 +333,7 @@ export const ExportPanel: React.FC = () => {
         {fps === 60 && (
           <span className="text-[10px] text-text-muted">{t('60 fps memakan waktu render dua kali lebih lama dan lebih berat di HP.')}</span>
         )}
-        {format !== 'gif' && isCompositionExport && (
+        {format !== 'gif' && (
           <label className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
             <input
               type="checkbox"
@@ -377,39 +368,6 @@ export const ExportPanel: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* Opsi Overlay Ekspor: hanya berlaku untuk render legacy (canvas) */}
-      {!isCompositionExport && (
-        <div className="flex flex-col gap-2">
-          <SectionLabel>{t('Opsi Ekspor')}</SectionLabel>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-              <input
-                type="checkbox"
-                checked={watermark}
-                onChange={(e) => updateExportSettings({ watermark: e.target.checked })}
-                className="w-4 h-4 rounded accent-accent cursor-pointer"
-              />
-              <div className="flex flex-col">
-                <span className="text-[12px] font-semibold text-on-surface">{t('Watermark')}</span>
-                <span className="text-[10px] text-text-muted">{t('Logo MooScript')}</span>
-              </div>
-            </label>
-            <label className="flex items-center gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
-              <input
-                type="checkbox"
-                checked={hud}
-                onChange={(e) => updateExportSettings({ hud: e.target.checked })}
-                className="w-4 h-4 rounded accent-accent cursor-pointer"
-              />
-              <div className="flex flex-col">
-                <span className="text-[12px] font-semibold text-on-surface">{t('Info FPS')}</span>
-                <span className="text-[10px] text-text-muted">{t('Overlay teknis')}</span>
-              </div>
-            </label>
-          </div>
-        </div>
-      )}
 
       {/* Peringatan audio sebelum ekspor */}
       {!hasProjectAudio && (

@@ -7,7 +7,6 @@ import {
   type MotionNode,
   type ThemeTokens
 } from '../src/types';
-import { runWorkerRenderPipeline } from '../src/engine/export/mp4Exporter';
 import { normalizeMotionNode } from '../src/engine/ai/llm';
 import { normalizeProject } from '../src/db/mooDb';
 
@@ -229,19 +228,6 @@ describe('Atomic Scene Graph & Theme Studio (Phases 1-5)', () => {
 
     setSelectedNodeId(null);
     expect(useMooStore.getState().selectedNodeId).toBeNull();
-  });
-
-  it('runWorkerRenderPipeline throws cleanly when Worker is not supported in environment', async () => {
-    await expect(
-      runWorkerRenderPipeline(
-        useMooStore.getState().project,
-        1080,
-        1920,
-        30,
-        30,
-        6_000_000
-      )
-    ).rejects.toThrow();
   });
 
   it('normalizeMotionNode safely normalizes enterType, missing transforms, and recursive children', () => {

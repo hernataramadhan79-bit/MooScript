@@ -4,6 +4,7 @@ import { serializeSvgFrame, getRuntimeScript, resetSharedCanvas } from '../src/e
 import { exportMooProjectToMP4 } from '../src/engine/export/mp4Exporter';
 import * as compRendererModule from '../src/engine/composition/compositionFrameRenderer';
 import { createMockCanvas } from './mocks/mockCanvas';
+import { installExportStage } from './mocks/exportStage';
 import type { MooProject } from '../src/types';
 
 class MockEventTarget {
@@ -603,6 +604,7 @@ describe('Phase 3: Composition & Export Tests', () => {
     let origAudioContext: any;
     let origOffscreenCanvas: any;
     let origCreateObjectURL: any;
+    let exportStage: ReturnType<typeof installExportStage>;
 
     beforeEach(() => {
       origVideoEncoder = (globalThis as any).VideoEncoder;
@@ -648,9 +650,11 @@ describe('Phase 3: Composition & Export Tests', () => {
       MockVideoEncoder.isConfigSupported = vi.fn().mockResolvedValue({ supported: true, config: {} });
       MockAudioEncoder.isConfigSupported = vi.fn().mockResolvedValue({ supported: true, config: {} });
       URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-export-url');
+      exportStage = installExportStage();
     });
 
     afterEach(() => {
+      exportStage.restore();
       (globalThis as any).VideoEncoder = origVideoEncoder;
       (globalThis as any).AudioEncoder = origAudioEncoder;
       (globalThis as any).VideoFrame = origVideoFrame;
@@ -712,11 +716,11 @@ describe('Phase 3: Composition & Export Tests', () => {
       }
     };
 
-    it('3e: throws error if isCompositionMode and createCompositionFrameRenderer returns null', async () => {
+    it('3e: throws when the render stage cannot be created', async () => {
       vi.spyOn(compRendererModule, 'createCompositionFrameRenderer').mockResolvedValue(null);
 
       await expect(exportMooProjectToMP4(baseProject, () => {})).rejects.toThrow(
-        /Composition renderer gagal diinisialisasi untuk mode komposisi/
+        /Panggung render gagal dimuat/
       );
     });
 
@@ -764,7 +768,6 @@ describe('Phase 3: Composition & Export Tests', () => {
       // Audio buffer mock duration is 3.0s, while baseProject scene duration sum is 1.0s (|3.0 - 1.0| = 2.0s > 0.5s)
       const projectWithAudio: MooProject = {
         ...baseProject,
-        renderMode: 'legacy-canvas', // Use legacy canvas to test duration without comp renderer
         audioBlob: new Blob(['dummy audio bytes'], { type: 'audio/mp3' })
       };
 
@@ -779,7 +782,6 @@ describe('Phase 3: Composition & Export Tests', () => {
     it('3f: uses scene duration sum when useAudioDuration is false', async () => {
       const projectWithAudio: MooProject = {
         ...baseProject,
-        renderMode: 'legacy-canvas',
         audioBlob: new Blob(['dummy audio bytes'], { type: 'audio/mp3' })
       };
 
@@ -806,7 +808,6 @@ describe('Phase 3: Composition & Export Tests', () => {
       // The store never passes audioStale, and it is lost on reload: the scenes must decide.
       const projectWithLongAudio: MooProject = {
         ...baseProject,
-        renderMode: 'legacy-canvas',
         audioBlob: new Blob(['dummy audio bytes'], { type: 'audio/mp3' })
       };
 

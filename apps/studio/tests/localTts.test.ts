@@ -9,6 +9,7 @@ import {
 import { generateSceneAudio, generateProjectAudioPerScene } from '../src/engine/ai/tts';
 import { exportMooProjectToMP4 } from '../src/engine/export/mp4Exporter';
 import { createMockCanvas } from './mocks/mockCanvas';
+import { installExportStage } from './mocks/exportStage';
 import type { Scene, MooProject, EngineSettings } from '../src/types';
 
 class MockEventTarget {
@@ -582,7 +583,8 @@ describe('Local TTS Engine (Prompt 8.1)', () => {
       };
       (URL as any).createObjectURL = vi.fn().mockReturnValue('blob:mock-local-mp4-url');
 
-      const exportResult = await exportMooProjectToMP4(projectForExport, () => {});
+      const exportStage = installExportStage();
+      const exportResult = await exportMooProjectToMP4(projectForExport, () => {}).finally(() => exportStage.restore());
       expect(exportResult).toBeDefined();
       expect(exportResult.blob).toBeInstanceOf(Blob);
       expect(exportResult.objectUrl).toBe('blob:mock-local-mp4-url');

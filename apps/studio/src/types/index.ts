@@ -947,8 +947,6 @@ export interface ProjectExportSettings {
   format: 'mp4' | 'webm' | 'gif';
   fps: number;
   quality: 'compact' | 'standard' | 'high';
-  watermark: boolean;
-  hud: boolean;
   /** WebM with an alpha channel: only the graphics, for layering in another editor. */
   transparent?: boolean;
   /** Blends several moments of each frame, so fast moves smear like a camera shutter would. */
@@ -959,8 +957,6 @@ export const DEFAULT_EXPORT_SETTINGS: ProjectExportSettings = {
   format: 'mp4',
   fps: 30,
   quality: 'standard',
-  watermark: false,
-  hud: false
 };
 
 export interface PersonaSkill {

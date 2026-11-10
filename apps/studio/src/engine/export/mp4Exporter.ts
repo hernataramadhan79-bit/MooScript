@@ -5,18 +5,13 @@ import {
   WebMOutputFormat,
   CanvasSource,
   AudioBufferSource,
-  EncodedVideoPacketSource,
-  EncodedPacket,
   canEncodeAudio,
   canEncodeVideo
 } from 'mediabunny';
-import type { AspectRatio, MooProject, ThemeTokens } from '../../types';
+import type { AspectRatio, MooProject } from '../../types';
 import { drawReframed, frameSize, type ReframeOptions } from './reframe';
 import { createBrollReader, drawBrollFrame, type BrollReader } from './brollReader';
-import { resolveTheme } from '../../types';
-import { CanvasRenderer } from '../renderer/canvasRenderer';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
-import { sceneHasRenderableCode } from '../composition/legacyScenes';
 import { EXPORT_AUDIO_BITRATE, EXPORT_QUALITY_FACTOR, MOTION_BLUR_SAMPLES, motionBlurTimes, type ExportQuality } from './exportOptions';
 import { t } from '../../i18n';
 
@@ -40,6 +35,14 @@ export interface ExportResult {
   height: number;
 }
 
+/** The stage (not the encoder) failed: the message is shown to the user as it is. */
+export class ExportStageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ExportStageError';
+  }
+}
+
 export type ExportContainerFormat = 'mp4' | 'webm' | 'gif';
 
 export interface ExportOptions {
@@ -47,10 +50,7 @@ export interface ExportOptions {
   fps?: number;
   quality?: ExportQuality;
   format?: ExportContainerFormat;
-  hud?: boolean;
-  watermark?: boolean;
   useAudioDuration?: boolean;
-  useWorker?: boolean;
   /** Renders into another frame shape (crop or fit) instead of the project's own. */
   reframe?: ReframeOptions;
   /** Video files of the B-roll assets, by asset id. */
@@ -59,104 +59,6 @@ export interface ExportOptions {
   transparent?: boolean;
   /** Blends several moments into each frame (composition projects). */
   motionBlur?: boolean;
-}
-
-export async function runWorkerRenderPipeline(
-  project: MooProject,
-  width: number,
-  height: number,
-  fps: number,
-  totalFrames: number,
-  bitrate: number,
-  opts?: ExportOptions,
-  onProgress?: (progress: ExportProgress) => void,
-  abortSignal?: AbortSignal,
-  themeTokens?: ThemeTokens,
-  audioData?: {
-    channelData: Float32Array[];
-    sampleRate: number;
-    numberOfChannels: number;
-    duration: number;
-  }
-): Promise<Array<{ type: 'key' | 'delta'; timestamp: number; duration?: number; data: ArrayBuffer; meta?: any }>> {
-  if (typeof Worker === 'undefined') {
-    throw new Error('Web Workers are not supported in this environment.');
-  }
-
-  return new Promise((resolve, reject) => {
-    let worker: Worker | null = null;
-    try {
-      worker = new Worker(new URL('../../workers/renderWorker.ts', import.meta.url), { type: 'module' });
-    } catch (e) {
-      reject(e);
-      return;
-    }
-
-    const cleanup = () => {
-      if (worker) {
-        worker.terminate();
-        worker = null;
-      }
-    };
-
-    if (abortSignal) {
-      abortSignal.addEventListener(
-        'abort',
-        () => {
-          if (worker) {
-            worker.postMessage({ type: 'CANCEL' });
-            cleanup();
-          }
-          reject(new DOMException('Export was cancelled by user', 'AbortError'));
-        },
-        { once: true }
-      );
-    }
-
-    worker.onmessage = (e: MessageEvent) => {
-      const data = e.data;
-      if (!data) return;
-
-      if (data.type === 'PROGRESS') {
-        onProgress?.({
-          percent: data.percent,
-          currentFrame: data.currentFrame,
-          totalFrames: data.totalFrames,
-          statusText: data.statusText
-        });
-      } else if (data.type === 'SUCCESS') {
-        cleanup();
-        resolve(data.chunks);
-      } else if (data.type === 'ERROR') {
-        cleanup();
-        reject(new Error(data.error || 'Worker render error'));
-      } else if (data.type === 'CANCELLED') {
-        cleanup();
-        reject(new DOMException('Export was cancelled by user', 'AbortError'));
-      }
-    };
-
-    worker.onerror = (err) => {
-      cleanup();
-      reject(new Error(`Worker error: ${err.message || String(err)}`));
-    };
-
-    worker.postMessage({
-      type: 'START_RENDER',
-      project,
-      themeTokens,
-      audioData,
-      fps,
-      width,
-      height,
-      totalFrames,
-      bitrate,
-      opts: {
-        hud: opts?.hud ?? false,
-        watermark: opts?.watermark ?? false
-      }
-    });
-  });
 }
 
 async function yieldOrSleep(ms = 4): Promise<void> {
@@ -259,11 +161,11 @@ export async function exportMooProjectToMP4(
         warnings.push(t('Font "Plus Jakarta Sans" tidak dapat dimuat; rendering menggunakan font fallback sistem.'));
       }
     } catch {
-      warnings.push('Pemeriksaan kesiapan font sistem dilewati.');
+      warnings.push(t('Pemeriksaan kesiapan font dilewati.'));
     }
   }
 
-  onProgress({ percent: 2, currentFrame: 0, totalFrames: 0, statusText: 'Initializing audio buffer...' });
+  onProgress({ percent: 2, currentFrame: 0, totalFrames: 0, statusText: t('Menyiapkan audio...') });
 
   // 2. Decode Audio if present
   let audioBuffer: AudioBuffer | null = null;
@@ -318,7 +220,7 @@ export async function exportMooProjectToMP4(
 
   const totalFrames = Math.max(1, Math.ceil(totalDuration * fps));
 
-  onProgress({ percent: 5, currentFrame: 0, totalFrames, statusText: 'Setting up Mediabunny MP4 muxer & codecs...' });
+  onProgress({ percent: 5, currentFrame: 0, totalFrames, statusText: t('Menyiapkan encoder video...') });
 
   // 3. Test AudioEncoder capability & Resample if necessary
   let hasAudioTrack = false;
@@ -360,231 +262,35 @@ export async function exportMooProjectToMP4(
     format: isWebm ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' })
   });
 
-  const hasGeneratedCompositionScenes = Boolean(project.composition?.scenes?.some(sceneHasRenderableCode));
-
-  // A composition project always renders through the same stage document as the editor preview,
-  // including scenes that still show their instant (procedural) visual.
-  const isCompositionMode =
-    (project.renderMode || 'composition') === 'composition' &&
-    project.scenes.length > 0 &&
-    Boolean(project.composition);
-
-  // 5. Worker-driven rendering pipeline (OffscreenCanvas) with seamless main-thread fallback
-  let workerChunks: Array<{
-    type: 'key' | 'delta';
-    timestamp: number;
-    duration?: number;
-    data: ArrayBuffer;
-    meta?: any;
-  }> | null = null;
-
-  // The worker only emits H.264 packets, so WebM always renders on the main thread.
-  const canAttemptWorker =
-    !reframe &&
-    opts?.useWorker !== false &&
-    !isWebm &&
-    !isCompositionMode &&
-    typeof Worker !== 'undefined';
-
-  if (canAttemptWorker) {
-    try {
-      onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: 'Starting background render worker...' });
-
-      let audioData: { channelData: Float32Array[]; sampleRate: number; numberOfChannels: number; duration: number } | undefined = undefined;
-      if (targetAudioBuffer) {
-        const channels: Float32Array[] = [];
-        for (let ch = 0; ch < targetAudioBuffer.numberOfChannels; ch++) {
-          channels.push(targetAudioBuffer.getChannelData(ch));
-        }
-        audioData = {
-          channelData: channels,
-          sampleRate: targetAudioBuffer.sampleRate,
-          numberOfChannels: targetAudioBuffer.numberOfChannels,
-          duration: targetAudioBuffer.duration
-        };
-      }
-
-      const activeScene = project.scenes[0] || null;
-      const themeTokens = resolveTheme(project, activeScene);
-
-      workerChunks = await runWorkerRenderPipeline(
-        project,
-        width,
-        height,
-        fps,
-        totalFrames,
-        bitrate,
-        opts,
-        onProgress,
-        abortSignal,
-        themeTokens,
-        audioData
-      );
-    } catch (workerErr) {
-      if (abortSignal?.aborted || (workerErr instanceof DOMException && workerErr.name === 'AbortError')) {
-        throw workerErr;
-      }
-      console.warn('Worker render pipeline fell back to main-thread renderer:', workerErr);
-      warnings.push('Render worker dialihkan ke main-thread rendering loop.');
-      workerChunks = null;
-    }
+  if (project.scenes.length === 0) {
+    throw new Error(t('Gagal mengekspor: proyek belum memiliki adegan.'));
   }
 
-  // If worker pipeline succeeded, mux encoded worker packets into MP4
-  if (workerChunks && workerChunks.length > 0) {
-    const videoPacketSource = new EncodedVideoPacketSource('avc');
-    output.addVideoTrack(videoPacketSource);
-
-    let audioSource: AudioBufferSource | null = null;
-    if (hasAudioTrack && targetAudioBuffer) {
-      audioSource = new AudioBufferSource({
-        codec: audioCodec,
-        bitrate: audioBitrate
-      });
-      output.addAudioTrack(audioSource);
-    }
-
-    try {
-      await output.start();
-
-      if (audioSource && targetAudioBuffer) {
-        try {
-          await audioSource.add(targetAudioBuffer);
-          hasAudio = true;
-        } catch (audioErr) {
-          if (abortSignal?.aborted || (audioErr instanceof DOMException && audioErr.name === 'AbortError')) {
-            throw audioErr;
-          }
-          warnings.push(
-            t('Encoding audio gagal ({0}). Video diekspor tanpa audio.', audioErr instanceof Error ? audioErr.message : String(audioErr))
-          );
-          hasAudio = false;
-        }
-      }
-
-      // Ensure chunk 0 or first packet has valid metadata containing decoderConfig
-      const firstValidMeta = workerChunks.find((c) => c.meta?.decoderConfig)?.meta;
-      const defaultMeta = {
-        decoderConfig: {
-          codec: 'avc1.4d002a',
-          codedWidth: width,
-          codedHeight: height
-        }
-      };
-
-      for (let i = 0; i < workerChunks.length; i++) {
-        if (abortSignal?.aborted) {
-          await output.cancel().catch(() => {});
-          throw new DOMException('Export was cancelled by user', 'AbortError');
-        }
-
-        const chunk = workerChunks[i];
-        const packet = new EncodedPacket(
-          new Uint8Array(chunk.data),
-          chunk.type,
-          chunk.timestamp / 1_000_000,
-          (chunk.duration || (1_000_000 / fps)) / 1_000_000
-        );
-
-        const packetMeta = i === 0
-          ? (chunk.meta || firstValidMeta || defaultMeta)
-          : chunk.meta;
-
-        await videoPacketSource.add(packet, packetMeta);
-
-        const percent = Math.min(99, Math.round(((i + 1) / workerChunks.length) * 95) + 5);
-        onProgress({
-          percent,
-          currentFrame: i + 1,
-          totalFrames,
-          statusText: `Muxing video frame ${i + 1}/${workerChunks.length} (${percent}%)`
-        });
-      }
-
-      videoPacketSource.close();
-
-      onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: 'Finalizing MP4 container...' });
-      await output.finalize();
-
-      const buffer = target.buffer;
-      if (!buffer) {
-        throw new Error('Mediabunny output buffer is empty.');
-      }
-
-      let objectUrl: string | null = null;
-      try {
-        const blob = new Blob([buffer], { type: isWebm ? 'video/webm' : 'video/mp4' });
-        objectUrl = URL.createObjectURL(blob);
-
-        onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
-
-        return {
-          blob,
-          objectUrl,
-          fileSizeBytes: blob.size,
-          durationSeconds: totalDuration,
-          hasAudio,
-          warnings,
-          aspectRatio: outAspect,
-          width: outSize.width,
-          height: outSize.height
-        };
-      } catch (err: unknown) {
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          objectUrl = null;
-        }
-        throw err;
-      }
-    } catch (err: unknown) {
-      await output.cancel().catch(() => {});
-      if (abortSignal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
-        throw new DOMException('Export was cancelled by user', 'AbortError');
-      }
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`VideoEncoder error during export: ${message}`);
-    }
-  }
-
-  // 6. Fallback: Main-thread offline Canvas Renderer
-  const canvasRenderer = new CanvasRenderer(undefined, width, height);
-  const rawCanvas = canvasRenderer.getCanvas();
-
-  if (transparent && !isCompositionMode) {
-    throw new Error(t('Video transparan hanya tersedia untuk proyek komposisi.'));
-  }
-  // The canvas renderer's canvas has no alpha; a transparent video renders into one that keeps it.
-  let frameCanvas = rawCanvas as HTMLCanvasElement;
-  if (transparent) {
-    frameCanvas = document.createElement('canvas');
-    frameCanvas.width = width;
-    frameCanvas.height = height;
-  }
+  // Every project renders through the same stage document as the editor preview, so the file shows
+  // what the editor showed. Frames are drawn here; a transparent export keeps this canvas's alpha.
+  const frameCanvas = document.createElement('canvas');
+  frameCanvas.width = width;
+  frameCanvas.height = height;
 
   let compRenderer: FrameRenderer | null = null;
   let brollReader: BrollReader | null = null;
   // Motion blur: each moment is drawn here, then added to the frame at an equal share.
-  const blurSamples = opts?.motionBlur && isCompositionMode ? MOTION_BLUR_SAMPLES : 1;
+  const blurSamples = opts?.motionBlur ? MOTION_BLUR_SAMPLES : 1;
   let sampleCanvas: HTMLCanvasElement | null = null;
   if (blurSamples > 1) {
     sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = width;
     sampleCanvas.height = height;
   }
-  if (isCompositionMode) {
-    onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: t('Menyiapkan panggung render...') });
-    compRenderer = await createCompositionFrameRenderer(project, width, height, transparent ? { clearBackgrounds: true } : undefined);
-    brollReader = await createBrollReader(project.scenes, opts?.brollSources);
-    if (!brollReader && project.scenes.some((s) => s.broll)) {
-      warnings.push(t('Video B-roll tidak bisa dibaca; shot dengan B-roll dirender tanpa video.'));
-    }
-    if (!compRenderer) {
-      if (hasGeneratedCompositionScenes) {
-        throw new Error(t('Composition renderer gagal diinisialisasi untuk mode komposisi.'));
-      }
-      // Only instant visuals and no stage available: the canvas renderer still produces a video.
-      warnings.push(t('Panggung komposisi gagal dimuat; video dirender dengan renderer cadangan.'));
-    }
+  onProgress({ percent: 3, currentFrame: 0, totalFrames, statusText: t('Menyiapkan panggung render...') });
+  compRenderer = await createCompositionFrameRenderer(project, width, height, transparent ? { clearBackgrounds: true } : undefined);
+  if (!compRenderer) {
+    throw new ExportStageError(t('Panggung render gagal dimuat. Muat ulang halaman lalu coba ekspor lagi.'));
+  }
+  const stage = compRenderer;
+  brollReader = await createBrollReader(project.scenes, opts?.brollSources);
+  if (!brollReader && project.scenes.some((s) => s.broll)) {
+    warnings.push(t('Video B-roll tidak bisa dibaca; shot dengan B-roll dirender tanpa video.'));
   }
 
   // With a reframe, frames are drawn at the project's size and redrawn into this canvas.
@@ -640,7 +346,7 @@ export async function exportMooProjectToMP4(
       }
 
       // 1. Draw frame deterministically: RenderState = f(currentFrame, fps, project)
-      if (compRenderer) {
+      {
         try {
           const footage = brollReader ? await brollReader.frameAt(frame / fps) : null;
           const draw = {
@@ -653,7 +359,7 @@ export async function exportMooProjectToMP4(
             const frameCtx = frameCanvas.getContext('2d');
             if (!frameCtx) throw new Error('Canvas 2D context is unavailable');
             for (let k = 0; k < times.length; k++) {
-              await compRenderer.renderFrame(frame * blurSamples + k, times[k], sampleCanvas, draw);
+              await stage.renderFrame(frame * blurSamples + k, times[k], sampleCanvas, draw);
               frameCtx.save();
               if (k === 0) frameCtx.clearRect(0, 0, width, height);
               frameCtx.globalCompositeOperation = 'lighter';
@@ -662,23 +368,18 @@ export async function exportMooProjectToMP4(
               frameCtx.restore();
             }
           } else {
-            await compRenderer.renderFrame(frame, frame / fps, frameCanvas, draw);
+            await stage.renderFrame(frame, frame / fps, frameCanvas, draw);
           }
           consecutiveFrameFailures = 0;
         } catch (frameErr) {
           consecutiveFrameFailures++;
           failedFrameCount++;
           if (consecutiveFrameFailures >= 3) {
-            throw new Error(
+            throw new ExportStageError(
               t('Ekspor komposisi gagal: 3 kegagalan frame berturut-turut pada frame {0} ({1})', frame + 1, frameErr instanceof Error ? frameErr.message : String(frameErr))
             );
           }
         }
-      } else {
-        canvasRenderer.draw(frame, totalFrames, project, {
-          hud: opts?.hud ?? false,
-          watermark: opts?.watermark ?? false
-        });
       }
 
       if (reframe) drawReframed(frameCanvas, outputCanvas, reframe.mode, transparent);
@@ -692,7 +393,7 @@ export async function exportMooProjectToMP4(
         percent,
         currentFrame: frame + 1,
         totalFrames,
-        statusText: `Encoding frame ${frame + 1}/${totalFrames} (${percent}%)`
+        statusText: t('Merender frame {0}/{1} ({2}%)', frame + 1, totalFrames, percent)
       });
 
       // 4. Yield periodically
@@ -705,7 +406,7 @@ export async function exportMooProjectToMP4(
       warnings.push(t('Terdapat {0} frame yang gagal dirender saat ekspor komposisi.', failedFrameCount));
     }
 
-    onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: 'Finalizing MP4 container...' });
+    onProgress({ percent: 98, currentFrame: totalFrames, totalFrames, statusText: t('Menyelesaikan berkas video...') });
 
     await output.finalize();
 
@@ -719,7 +420,7 @@ export async function exportMooProjectToMP4(
       const blob = new Blob([buffer], { type: isWebm ? 'video/webm' : 'video/mp4' });
       objectUrl = URL.createObjectURL(blob);
 
-      onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: 'Export completed!' });
+      onProgress({ percent: 100, currentFrame: totalFrames, totalFrames, statusText: t('Ekspor selesai!') });
 
       return {
         blob,
@@ -744,15 +445,10 @@ export async function exportMooProjectToMP4(
     if (abortSignal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
       throw new DOMException('Export was cancelled by user', 'AbortError');
     }
+    // A stage failure already says what went wrong; anything else here came from the encoder or muxer.
+    if (err instanceof ExportStageError) throw err;
     const message = err instanceof Error ? err.message : String(err);
-    if (
-      message.includes('Composition renderer') ||
-      message.includes('kegagalan frame') ||
-      message.includes('Ekspor komposisi')
-    ) {
-      throw err instanceof Error ? err : new Error(message);
-    }
-    throw new Error(`VideoEncoder error during export: ${message}`);
+    throw new Error(t('Encoder video gagal saat ekspor: {0}', message));
   } finally {
     if (compRenderer) {
       compRenderer.cleanup();
