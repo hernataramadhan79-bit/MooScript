@@ -1,0 +1,44 @@
+# Temporary: re-records the golden-frame snapshots on the CI runner, whose text metrics the CI
+# comparison uses, and commits them back to this branch. Removed once the snapshots are in.
+name: Record golden frames
+
+on:
+  push:
+    branches: [ccr-16e5c451-ewr90h]
+    paths: ['.github/workflows/golden-record.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mooscript/studio exec playwright install --with-deps chromium
+      - name: Record
+        run: GOLDEN_UPDATE=1 pnpm --filter @mooscript/studio exec vitest run --project browser tests/golden/golden.test.ts
+      - name: Keep only the cases whose motion changed
+        run: |
+          cd apps/studio/tests/golden/snapshots
+          keep="demo-project kit-camera-pull kit-camera-push procedural-bento-list procedural-code-terminal procedural-kinetic-impact ref-example ref-example-nowords transition-cut transition-fade transition-flow transition-slide transition-wipe transition-zoom"
+          for f in $(git status --short . | awk '{print $2}'); do
+            n=$(basename "$f" .json)
+            echo " $keep " | grep -q " $n " || git checkout -- "$GITHUB_WORKSPACE/$f"
+          done
+          git status --short .
+      - name: Verify against the recorded snapshots
+        run: pnpm --filter @mooscript/studio exec vitest run --project browser
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/studio/tests/golden/snapshots
+          git commit -m "test(golden): re-record the changed cases on the CI runner" || echo "nothing to commit"
+          git push
