@@ -30,7 +30,7 @@ jobs:
           keep="demo-project kit-camera-pull kit-camera-push procedural-bento-list procedural-code-terminal procedural-kinetic-impact ref-example ref-example-nowords transition-cut transition-fade transition-flow transition-slide transition-wipe transition-zoom"
           for f in $(git status --short . | awk '{print $2}'); do
             n=$(basename "$f" .json)
-            echo " $keep " | grep -q " $n " || git checkout -- "$GITHUB_WORKSPACE/$f"
+            echo " $keep " | grep -q " $n " || git checkout -- "$f"
           done
           git status --short .
       - name: Verify against the recorded snapshots
