@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type { ExportOptions, ExportProgress } from '../../engine/export/mp4Exporter';
 import type { MooStoreState, ExportSlice, ExportQueueItem } from '../types';
 import { listAssetsFromDb } from '../../db/mooDb';
+import { withCreditCard } from '../../engine/brand/creditCard';
 import { t } from '../../i18n';
 
 let exportAbortController: AbortController | null = null;
@@ -86,11 +87,11 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
       // GIF has its own encoder; video goes through WebCodecs.
       const result =
         opts?.format === 'gif'
-          ? await (await import('../../engine/export/gifExport')).exportGif(get().project, onProgress, localController.signal, {
+          ? await (await import('../../engine/export/gifExport')).exportGif(withCreditCard(get().project), onProgress, localController.signal, {
               brollSources,
               reframe: opts.reframe
             })
-          : await (await import('../../engine/export/mp4Exporter')).exportMooProjectToMP4(get().project, onProgress, localController.signal, {
+          : await (await import('../../engine/export/mp4Exporter')).exportMooProjectToMP4(withCreditCard(get().project, opts), onProgress, localController.signal, {
               ...opts,
               brollSources
             });
@@ -160,8 +161,8 @@ export const createExportSlice: StateCreator<MooStoreState, [], [], ExportSlice>
           const reframe = { aspect: aspects[i], mode };
           const result =
             opts?.format === 'gif'
-              ? await exportGif(get().project, onProgress, localController.signal, { brollSources, reframe })
-              : await exportMooProjectToMP4(get().project, onProgress, localController.signal, { ...opts, brollSources, reframe });
+              ? await exportGif(withCreditCard(get().project), onProgress, localController.signal, { brollSources, reframe })
+              : await exportMooProjectToMP4(withCreditCard(get().project, opts), onProgress, localController.signal, { ...opts, brollSources, reframe });
           patchItem(i, { status: 'done', result });
         } catch (err: unknown) {
           const aborted = localController.signal.aborted || (err instanceof DOMException && err.name === 'AbortError');

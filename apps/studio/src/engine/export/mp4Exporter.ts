@@ -14,6 +14,7 @@ import { drawReframed, frameSize, type ReframeOptions } from './reframe';
 import { createBrollReader, drawBrollFrame, type BrollReader } from './brollReader';
 import { createCompositionFrameRenderer, type FrameRenderer } from '../composition/compositionFrameRenderer';
 import { EXPORT_AUDIO_BITRATE, EXPORT_QUALITY_FACTOR, MOTION_BLUR_SAMPLES, motionBlurTimes, type ExportQuality } from './exportOptions';
+import { creditSeconds } from '../brand/creditCard';
 import { t } from '../../i18n';
 
 export interface ExportProgress {
@@ -237,9 +238,10 @@ export async function exportMooProjectToMP4(
         }
       }
 
-      if (Math.abs(audioDuration - scenesDurationSum) > 0.5) {
+      const scoredDuration = scenesDurationSum - creditSeconds(project);
+      if (Math.abs(audioDuration - scoredDuration) > 0.5) {
         warnings.push(
-          t('Durasi audio ({0}s) berbeda dari total durasi scene ({1}s) lebih dari 0.5s.', audioDuration.toFixed(2), scenesDurationSum.toFixed(2))
+          t('Durasi audio ({0}s) berbeda dari total durasi scene ({1}s) lebih dari 0.5s.', audioDuration.toFixed(2), scoredDuration.toFixed(2))
         );
       }
     } catch {

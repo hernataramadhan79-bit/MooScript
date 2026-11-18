@@ -7,6 +7,7 @@ import { EXPORT_FPS_CHOICES, MOTION_BLUR_SAMPLES, type ExportQuality } from '../
 import { buildCompositionDocument } from '../../engine/composition/buildDocument';
 import { syncComposition } from '../../engine/composition/sync';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
+import { creditCardEnabled, shareCaption } from '../../engine/brand/creditCard';
 import { DEFAULT_EXPORT_SETTINGS } from '../../types';
 import { MultiFormatExport } from './MultiFormatExport';
 import { t } from '../../i18n';
@@ -71,6 +72,7 @@ export const ExportPanel: React.FC = () => {
   // Export choices are remembered per project.
   const exportSettings = { ...DEFAULT_EXPORT_SETTINGS, ...project.exportSettings };
   const { format, fps, quality, transparent, motionBlur } = exportSettings;
+  const showCredit = creditCardEnabled(project);
 
   const scenes = project.scenes || [];
   const hasProjectAudio = Boolean(project.audioBlob);
@@ -96,7 +98,8 @@ export const ExportPanel: React.FC = () => {
       fps,
       quality,
       transparent,
-      motionBlur
+      motionBlur,
+      showCredit
     ];
     const prev = exportSnapshotRef.current;
     exportSnapshotRef.current = snapshot;
@@ -116,6 +119,7 @@ export const ExportPanel: React.FC = () => {
     quality,
     transparent,
     motionBlur,
+    showCredit,
     revokeExportResult
   ]);
 
@@ -162,11 +166,20 @@ export const ExportPanel: React.FC = () => {
     if (!exportResult) return;
     try {
       const file = new File([exportResult.blob], resultFileName, { type: exportResult.blob.type });
-      await navigator.share({ files: [file], title: project.title });
+      await navigator.share({ files: [file], title: project.title, text: shareCaption(project.title) });
     } catch (err) {
       if ((err as DOMException)?.name !== 'AbortError') {
         addToast(t('Gagal membagikan video. Coba unduh saja.'), 'error');
       }
+    }
+  };
+
+  const handleCopyCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(shareCaption(project.title));
+      addToast(t('Caption disalin.'), 'success');
+    } catch {
+      addToast(t('Gagal menyalin caption.'), 'error');
     }
   };
 
@@ -267,6 +280,15 @@ export const ExportPanel: React.FC = () => {
               {t('Buang')}
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleCopyCaption}
+            className="min-h-[40px] px-3 rounded-xl border border-border text-text-muted font-medium text-[12px] flex items-center justify-center gap-1.5 hover:text-on-surface hover:bg-surface-3 transition-colors"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">content_copy</span>
+            {t('Salin caption untuk diunggah')}
+          </button>
         </div>
       )}
 
@@ -368,6 +390,24 @@ export const ExportPanel: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Kartu penutup */}
+      {!transparent && (
+        <label className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors">
+          <input
+            type="checkbox"
+            checked={showCredit}
+            onChange={(e) => updateExportSettings({ creditCard: e.target.checked })}
+            className="w-4 h-4 mt-0.5 rounded accent-accent cursor-pointer"
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[12px] font-semibold text-on-surface">{t('Kartu "Dibuat dengan MooScript"')}</span>
+            <span className="text-[10px] text-text-muted leading-snug">
+              {t('Kartu singkat di akhir video. Membantu lebih banyak orang menemukan MooScript. Boleh dimatikan.')}
+            </span>
+          </span>
+        </label>
+      )}
 
       {/* Peringatan audio sebelum ekspor */}
       {!hasProjectAudio && (

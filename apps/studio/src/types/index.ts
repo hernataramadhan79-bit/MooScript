@@ -958,6 +958,8 @@ export interface ProjectExportSettings {
   transparent?: boolean;
   /** Blends several moments of each frame, so fast moves smear like a camera shutter would. */
   motionBlur?: boolean;
+  /** The "made with MooScript" end card. Unset means on, except for branded projects. */
+  creditCard?: boolean;
 }
 
 export const DEFAULT_EXPORT_SETTINGS: ProjectExportSettings = {
