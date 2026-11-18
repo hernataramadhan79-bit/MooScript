@@ -31,13 +31,14 @@ capture
 chat
 check
 check_circle
+checklist
 chevron_right
 circle
-class
 close
 close_fullscreen
 cloud_done
 code
+compare
 compare_arrows
 content_copy
 content_cut
@@ -73,6 +74,7 @@ folder
 folder_open
 font_download
 format_list_bulleted
+format_list_numbered
 format_quote
 fullscreen
 function
@@ -175,7 +177,6 @@ uppercase
 verified
 vertical_distribute
 video_library
-videocam
 visibility
 visibility_off
 volume_off

@@ -40,6 +40,14 @@ export function collectUsedIconNames(valid = readValidIconNames()) {
       if (valid.has(match[1])) used.add(match[1]);
     }
   }
+  // Template icons live in the shared presets package. Only `icon:` fields count there: the rest
+  // is narration and shot code, full of words that also happen to be icon names.
+  for (const file of listSourceFiles(path.join(STUDIO_ROOT, '../../packages/presets/src'))) {
+    const text = fs.readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/\bicon:\s*['"`]([a-z0-9_]+)['"`]/g)) {
+      if (valid.has(match[1])) used.add(match[1]);
+    }
+  }
   return [...used].sort();
 }
 
