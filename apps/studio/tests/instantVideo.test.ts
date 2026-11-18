@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildInstantStoryboard } from '../src/engine/ai/instantStoryboard';
 import { INITIAL_PROJECT } from '../src/store/slices/projectSlice';
 import { useMooStore } from '../src/store/useMooStore';
+import { compileProceduralScene } from '../src/engine/composition/proceduralCompiler';
 import { setLocale } from '../src/i18n';
-import type { MooProject } from '../src/types';
+import type { MooProject, Scene } from '../src/types';
 
 const narration = (input: string) => buildInstantStoryboard(input, 1)!.scenes.map((s) => s.narrationText);
 const wordCount = (s: string) => s.trim().split(/\s+/).length;
@@ -50,6 +51,97 @@ describe('buildInstantStoryboard', () => {
   it('never prints a whole narration as the small shot label', () => {
     const board = buildInstantStoryboard('Satu dua tiga empat. Lima enam tujuh delapan. Sembilan sepuluh sebelas dua belas.', 1)!;
     expect(board.scenes.map((s) => s.visualIntent)).toEqual(['Pembuka', 'Bagian 2', 'Penutup']);
+  });
+});
+
+describe('large type on instant visuals', () => {
+  const line = 'Pertama, pahami dulu dasar menabung untuk masa depan keluarga kecilmu';
+  const scene = (patch: Partial<Scene> = {}): Scene => ({
+    id: 'sc-1',
+    narrationText: line,
+    text: line,
+    visualIntent: 'Bagian 2',
+    durationInSeconds: 4,
+    wordTimestamps: [],
+    largeType: true,
+    ...patch
+  });
+
+  afterEach(() => setLocale('id'));
+
+  it('shows the whole line once, in phone-sized type', () => {
+    const mod = compileProceduralScene(scene(), 1, 5, undefined, 'bento-list');
+    expect(mod.html).toContain(line);
+    expect(mod.html).not.toContain('-bento-item');
+    expect(mod.css).toMatch(/-bento-title[^{]*\{\s*font-size: \d{2,3}px/);
+    expect(mod.instantArchetype).toBe('bento-list');
+  });
+
+  it('labels shots with the scene label, not fixed Indonesian text', () => {
+    setLocale('en');
+    const { scenes } = buildInstantStoryboard('First line goes here. Second line goes here. Third line goes here.', 1)!;
+    const mod = compileProceduralScene(scenes[1], 1, 3, undefined, 'bento-list');
+    expect(mod.html).toContain('PART 2');
+    expect(mod.html).not.toContain('POIN KUNCI');
+  });
+
+  it('leaves other instant visuals exactly as they were', () => {
+    const plain = compileProceduralScene(scene({ largeType: undefined }), 1, 5, undefined, 'bento-list');
+    expect(plain.html).toContain('POIN KUNCI • 02 / 05');
+    expect(plain.html).toContain('-bento-item');
+    expect(plain.css).not.toContain('text-wrap: balance');
+    expect(plain.instantArchetype).toBeUndefined();
+  });
+});
+
+describe('editing the text of an instant video', () => {
+  const build = async () => {
+    useMooStore.setState({
+      project: { ...structuredClone(INITIAL_PROJECT), id: 'proj-edit' },
+      isGeneratingScript: false,
+      generateBgmOnlyAudio: vi.fn().mockResolvedValue(undefined)
+    } as never);
+    await useMooStore.getState().createInstantVideo('sejarah kopi');
+    return useMooStore.getState().project;
+  };
+  const original = useMooStore.getState().generateBgmOnlyAudio;
+  afterEach(() => useMooStore.setState({ generateBgmOnlyAudio: original }));
+
+  it('updates the picture in the same layout and keeps layer tweaks', async () => {
+    const before = await build();
+    const id = before.scenes[1].id;
+    const mod = before.composition!.scenes[1];
+    useMooStore.setState({
+      project: {
+        ...before,
+        composition: {
+          ...before.composition!,
+          scenes: before.composition!.scenes.map((m) => (m.id === id ? { ...m, overrides: { Headline: { x: 20 } } } : m))
+        }
+      }
+    });
+
+    useMooStore.getState().updateSceneText(id, 'Kopi lahir di Etiopia');
+    const after = useMooStore.getState().project.composition!.scenes[1];
+    expect(after.html).toContain('Kopi lahir di Etiopia');
+    expect(after.instantArchetype).toBe(mod.instantArchetype);
+    expect(after.overrides).toEqual({ Headline: { x: 20 } });
+  });
+
+  it('never overwrites a shot the user edited', async () => {
+    const before = await build();
+    const id = before.scenes[1].id;
+    useMooStore.setState({
+      project: {
+        ...before,
+        composition: {
+          ...before.composition!,
+          scenes: before.composition!.scenes.map((m) => (m.id === id ? { ...m, html: '<div>mine</div>', userEdited: true } : m))
+        }
+      }
+    });
+    useMooStore.getState().updateSceneText(id, 'Teks baru');
+    expect(useMooStore.getState().project.composition!.scenes[1].html).toBe('<div>mine</div>');
   });
 });
 

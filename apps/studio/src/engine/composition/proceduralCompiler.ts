@@ -256,7 +256,9 @@ export function resolveProceduralArchetype(
 ): ConcreteArchetype {
   const narration = scene.narrationText || scene.text || '';
   const phrases = extractKeyPhrases(narration);
-  const usable = (a: ConcreteArchetype) => archetypeHasData(a, phrases, narration);
+  // Large type drops the list items, so the list layout no longer needs any.
+  const usable = (a: ConcreteArchetype) =>
+    (a === 'bento-list' && Boolean(scene.largeType)) || archetypeHasData(a, phrases, narration);
 
   if (archetype !== 'auto' && usable(archetype)) return archetype;
 
@@ -282,6 +284,53 @@ function chartBars(phrases: KeyPhrases, narration: string): { height: number; la
   return (FALLING_RE.test(narration) ? [...rising].reverse() : rising).map((height) => ({ height, label: '' }));
 }
 
+/** A headline fills the frame when short and steps down as the line gets longer. */
+function largeHeadlinePx(length: number): number {
+  if (length <= 28) return 116;
+  if (length <= 56) return 100;
+  if (length <= 90) return 84;
+  return 72;
+}
+
+/** Phone-sized type for every layout; appended after its own styles so it wins. */
+function largeTypeCss(sid: string, headlineLength: number): string {
+  const lead = largeHeadlinePx(headlineLength);
+  // Next to a card, chart or code window the headline shares the frame.
+  const shared = Math.round(lead * 0.72);
+  const select = (names: string[]) => names.map((n) => `.${sid}-${n}`).join(', ');
+  return `
+.${sid}-stage > .moo-camera { padding: 6% 6%; }
+.${sid}-badge { font-size: 30px; padding: 14px 30px; margin-bottom: 44px; }
+.${sid}-dot { width: 14px; height: 14px; }
+${select(['slam-title', 'glass-title', 'quote-text', 'bento-title'])} {
+  font-size: ${lead}px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+${select(['stat-title', 'term-heading', 'vs-title', 'chart-title'])} {
+  font-size: ${shared}px;
+  line-height: 1.12;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+${select(['slam-sub', 'glass-body', 'stat-desc', 'term-sub', 'vs-sub', 'bento-sub', 'chart-sub'])} { font-size: 42px; }
+.${sid}-slam-pill { font-size: 40px; padding: 16px 36px; margin-bottom: 36px; }
+${select(['quote-footer', 'kicker'])} { font-size: 30px; }
+.${sid}-quote-mark { font-size: 180px; }
+.${sid}-stat-num { font-size: 220px; }
+.${sid}-vs-tag { font-size: 30px; }
+.${sid}-vs-val { font-size: 56px; overflow-wrap: break-word; }
+.${sid}-vs-pill { width: 96px; height: 96px; font-size: 34px; }
+.${sid}-code { font-size: 36px; }
+.${sid}-term-title { font-size: 26px; }
+.${sid}-chart-caption { font-size: 42px; }
+`;
+}
+
 export function compileProceduralScene(
   scene: Scene,
   index: number,
@@ -294,7 +343,17 @@ export function compileProceduralScene(
   const narration = scene.narrationText || scene.text || `Adegan ${index + 1}`;
   const intent = scene.visualIntent || scene.visualConcept || `Shot ${index + 1} / ${total}`;
   const duration = Math.max(1.5, scene.durationInSeconds || 3.5);
-  const phrases = extractKeyPhrases(narration);
+  const large = Boolean(scene.largeType);
+  const extracted = extractKeyPhrases(narration);
+  // Large type shows the line once, whole: no second copy of it as chips or a cut-off subtext.
+  const phrases: KeyPhrases = large
+    ? {
+        ...extracted,
+        headline: extracted.fullText,
+        subtext: narration.trim().split(/\s+/).slice(22).join(' '),
+        chips: []
+      }
+    : extracted;
   const { headline, accentWord, subtext, fullText, chips, detectedNumber } = phrases;
 
   const safeIntent = escapeHtml(intent.slice(0, 48).toUpperCase());
@@ -302,8 +361,10 @@ export function compileProceduralScene(
   const safeAccent = escapeHtml(accentWord.toUpperCase());
   const safeSubtext = escapeHtml(subtext);
   const stepLabel = `${String(index + 1).padStart(2, '0')} / ${String(Math.max(1, total)).padStart(2, '0')}`;
+  // These fixed labels are Indonesian; an instant video uses its own, in the viewer's language.
+  const badgeLabel = (fixed: string) => (large ? safeIntent : `${fixed} • ${stepLabel}`);
 
-  const sid = `p_${scene.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  const sid =`p_${scene.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
   let html = '';
   let css = '';
@@ -385,7 +446,7 @@ export function compileProceduralScene(
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Badge" class="${sid}-badge">
     <span class="${sid}-dot"></span>
-    <span>METRIK UTAMA • ${stepLabel}</span>
+    <span>${badgeLabel('METRIK UTAMA')}</span>
   </div>
   <div data-moo-layer="Main Card" class="${sid}-stat-card">
     <div data-moo-layer="Stat Number" class="${sid}-stat-num accent">${statValue}</div>
@@ -482,7 +543,7 @@ shot.travel(badge, { y: -30, opacity: 0 }, { y: 0, opacity: 1, dur: 0.45, curve:
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Badge" class="${sid}-badge">
     <span class="${sid}-dot"></span>
-    <span>TERMINAL • ${stepLabel}</span>
+    <span>${badgeLabel('TERMINAL')}</span>
   </div>
   <h1 data-moo-layer="Headline" class="${sid}-term-heading">${safeHeadline}</h1>
   <div data-moo-layer="Terminal Window" class="${sid}-terminal">
@@ -571,18 +632,23 @@ shot.travel(badge, { y: -25, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
     const leftText = escapeHtml(phrases.sides[0] || '');
     const rightText = escapeHtml(phrases.sides[1] || '');
     // Side labels only claim "before/after" or "old/new" when the narration says so.
-    const [leftTag, rightTag] = /(sebelum|sesudah|before|after)/i.test(narration)
-      ? ['SEBELUM', 'SESUDAH']
-      : /(lama|baru|\bold\b|\bnew\b)/i.test(narration)
-        ? ['LAMA', 'BARU']
-        : ['A', 'B'];
+    const [leftTag, rightTag] =
+      large && /(before|after)/i.test(narration)
+        ? ['BEFORE', 'AFTER']
+        : large && /(\bold\b|\bnew\b)/i.test(narration)
+          ? ['OLD', 'NEW']
+          : /(sebelum|sesudah|before|after)/i.test(narration)
+            ? ['SEBELUM', 'SESUDAH']
+            : /(lama|baru|\bold\b|\bnew\b)/i.test(narration)
+              ? ['LAMA', 'BARU']
+              : ['A', 'B'];
     html = `
 <div class="${sid}-stage">
   <div class="${sid}-grid-bg"></div>
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Badge" class="${sid}-badge">
     <span class="${sid}-dot"></span>
-    <span>PERBANDINGAN • ${stepLabel}</span>
+    <span>${badgeLabel('PERBANDINGAN')}</span>
   </div>
   <h1 data-moo-layer="Headline" class="${sid}-vs-title">${safeHeadline}</h1>
   <div class="${sid}-vs-grid">
@@ -694,7 +760,7 @@ shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Badge" class="${sid}-badge">
     <span class="${sid}-dot"></span>
-    <span>POIN KUNCI • ${stepLabel}</span>
+    <span>${badgeLabel('POIN KUNCI')}</span>
   </div>
   <h1 data-moo-layer="Headline" class="${sid}-bento-title">${safeHeadline}</h1>
   <div class="${sid}-bento-list">${itemsHtml}
@@ -780,7 +846,7 @@ shot.travel(badge, { y: -20, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
   <div data-moo-layer="Ambient Glow" class="${sid}-orb"></div>
   <div data-moo-layer="Badge" class="${sid}-badge">
     <span class="${sid}-dot"></span>
-    <span>ANALISIS DATA • ${stepLabel}</span>
+    <span>${badgeLabel('ANALISIS DATA')}</span>
   </div>
   <h1 data-moo-layer="Headline" class="${sid}-chart-title">${safeHeadline}</h1>
   <div data-moo-layer="Main Card" class="${sid}-chart-card">
@@ -920,7 +986,7 @@ shot.travel(card, { y: 50, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity:
     <span>${safeIntent}</span>
   </div>
   <div data-moo-layer="Main Card" class="${sid}-glass-card">
-    <div data-moo-layer="Accent Kicker" class="${sid}-kicker accent">SOROTAN ${stepLabel}</div>
+    <div data-moo-layer="Accent Kicker" class="${sid}-kicker accent">${large ? stepLabel : `SOROTAN ${stepLabel}`}</div>
     <h1 data-moo-layer="Headline" class="${sid}-glass-title">${safeHeadline}</h1>
     <p data-moo-layer="Subtext" class="${sid}-glass-body">${safeSubtext}</p>
     <div data-moo-layer="Tags Row" class="${sid}-chips">${chipsHtml}</div>
@@ -1050,6 +1116,8 @@ shot.travel(badge, { y: -24, opacity: 0 }, { y: 0, opacity: 1, dur: 0.4, curve: 
 `.trim();
   }
 
+  if (large) css += largeTypeCss(sid, headline.length);
+
   // Instant visuals still move like a shot: camera life, ambient particles, a hand-off, and a
   // composed frame 0 instead of a slide that fades in from black.
   html = wrapInCamera(html, sid);
@@ -1072,7 +1140,31 @@ ${keepPosterLayersVisible(buildJs, POSTER_LAYERS[chosen] || [])}`;
     editableLayers,
     status: 'ok',
     version: 1,
-    userEdited: false
+    userEdited: false,
+    ...(large ? { instantArchetype: chosen } : {})
+  };
+}
+
+/**
+ * Rebuilds an instant-video shot after its text changed, in the layout it already has, so the
+ * picture follows the words. Layer tweaks stay; shots the user or the AI wrote are left alone.
+ */
+export function refreshInstantScene(project: MooProject, sceneId: string): MooProject {
+  const composition = project.composition;
+  const index = project.scenes.findIndex((s) => s.id === sceneId);
+  const existing = composition?.scenes.find((m) => m.beatId === sceneId);
+  if (!composition || index === -1 || !existing?.instantArchetype || existing.userEdited) return project;
+  const rebuilt = compileProceduralScene(
+    project.scenes[index],
+    index,
+    project.scenes.length,
+    existing.palette,
+    existing.instantArchetype
+  );
+  const merged: GeneratedScene = { ...existing, ...rebuilt, version: (existing.version || 1) + 1 };
+  return {
+    ...project,
+    composition: { ...composition, scenes: composition.scenes.map((m) => (m === existing ? merged : m)) }
   };
 }
 

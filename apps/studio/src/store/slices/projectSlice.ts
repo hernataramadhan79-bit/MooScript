@@ -47,6 +47,7 @@ import { applySize, syncComposition } from '../../engine/composition/sync';
 import {
   compileProceduralScene,
   compileProceduralProject,
+  refreshInstantScene,
   resolveProceduralArchetype,
   PROCEDURAL_ARCHETYPES,
   type ProceduralArchetype
@@ -1300,7 +1301,7 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
         scenes: updatedScenes,
         audioDuration: hasAudio ? current.audioDuration : totalDur
       };
-      const updated = syncComposition(updatedProject);
+      const updated = syncComposition(refreshInstantScene(updatedProject, id));
       set({
         project: updated,
         audioStale: hasAudio ? true : get().audioStale

@@ -270,6 +270,8 @@ export interface Scene {
   wordTimestamps: WordTimestamp[];
   /** Leaves this scene without captions while project subtitles are on. */
   hideSubtitles?: boolean;
+  /** Instant visuals show the whole line in phone-sized type (set on scenes of an instant video). */
+  largeType?: boolean;
   /** Set on the intro / outro card scenes the brand kit adds; they are replaced when it is applied again. */
   brandCard?: 'intro' | 'outro';
   /** Video footage playing behind this shot's graphics (the shot's own background is cleared). */
@@ -736,6 +738,8 @@ export interface GeneratedScene {
   status: GeneratedSceneStatus;
   errors?: string[];
   version: number;
+  /** The layout of an instant-video shot, kept so a text edit can rebuild it in place. */
+  instantArchetype?: import('../engine/composition/proceduralCompiler').ProceduralArchetype;
   userEdited: boolean;
 
   /** Stage size (px) this code was written for; the stage scales it when the project's size differs. */

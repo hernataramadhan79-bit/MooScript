@@ -138,6 +138,7 @@ export function buildInstantStoryboard(input: string, now = Date.now()): Instant
       text: line,
       // Instant layouts print this as the small label above the headline.
       visualIntent: shotLabel(idx, lines.length),
+      largeType: true,
       emphasis: focusWords,
       focusWords,
       durationInSeconds,
