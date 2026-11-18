@@ -8,6 +8,16 @@ export interface FaqItem {
 export const FAQS: Record<Locale, FaqItem[]> = {
   en: [
     {
+      question: 'What is MooScript?',
+      answer:
+        'MooScript is a free, open-source motion graphics video maker that runs in your browser. Type a topic or paste a script, get an animated video with music, and export it as MP4 for YouTube Shorts, TikTok or Instagram Reels.'
+    },
+    {
+      question: 'Is MooScript free and open source?',
+      answer:
+        'Yes. MooScript Studio needs no account and no API key to start, and its full source code is on GitHub at github.com/hernataramadhan79-bit/MooScript under the AGPL-3.0-or-later license.'
+    },
+    {
       question: 'Does MooScript use GSAP or require a commercial animation license?',
       answer:
         'No. MooScript runs on MooTween, our clean-room deterministic timeline and spring engine built specifically for frame-accurate SVG and DOM motion. Every video you render is free from third-party animation engine fees.'
@@ -39,6 +49,16 @@ export const FAQS: Record<Locale, FaqItem[]> = {
     }
   ],
   id: [
+    {
+      question: 'Apa itu MooScript?',
+      answer:
+        'MooScript adalah aplikasi pembuat video motion graphics gratis dan open source yang berjalan di browser. Ketik topik atau tempel naskah, dapatkan video animasi dengan musik, lalu ekspor sebagai MP4 untuk YouTube Shorts, TikTok, atau Instagram Reels.'
+    },
+    {
+      question: 'Apakah MooScript gratis dan open source?',
+      answer:
+        'Ya. MooScript Studio bisa dipakai tanpa akun dan tanpa API key, dan seluruh kode sumbernya tersedia di GitHub pada github.com/hernataramadhan79-bit/MooScript dengan lisensi AGPL-3.0-or-later.'
+    },
     {
       question: 'Apakah MooScript memakai GSAP atau terikat lisensi animasi berbayar?',
       answer:

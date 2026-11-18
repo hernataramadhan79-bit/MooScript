@@ -1,6 +1,6 @@
 # MooScript
 
-> Turn a topic or a script into a motion graphics video, entirely in the browser. An AI motion director writes each shot as SVG + CSS + a MooTween track, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server, no account, bring your own API key.
+> **MooScript is a free, open-source AI motion graphics video maker that runs in your browser.** Turn a topic or a script into a video for YouTube Shorts, TikTok or Instagram Reels. An AI motion director can write each shot as SVG + CSS + a MooTween track, a sandboxed runtime plays it as one continuous film, and WebCodecs exports the MP4 on your own device. No server and no account, and no API key needed to start.
 
 [![CI](https://github.com/hernataramadhan79-bit/MooScript/actions/workflows/ci.yml/badge.svg)](https://github.com/hernataramadhan79-bit/MooScript/actions/workflows/ci.yml)
 [![License: AGPL v3+](https://img.shields.io/badge/license-AGPL--3.0--or--later-84cc16)](LICENSE)

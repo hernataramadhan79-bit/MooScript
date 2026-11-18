@@ -126,9 +126,9 @@ export interface HomeCopy {
 
 export const HOME_COPY: Record<Locale, HomeCopy> = {
   en: {
-    seoTitle: 'MooScript: Programmatic Motion Graphics in Browser (WebCodecs & AI)',
+    seoTitle: 'MooScript: Free AI Motion Graphics Video Maker in Your Browser',
     seoDescription:
-      'Open-source programmatic motion graphics studio in your browser. Write or AI-generate MooTween SVG shots, layer 300 MB B-roll, and export MP4, WebM Alpha, and GIF via WebCodecs.',
+      'Turn a topic or script into a motion graphics video for free, with no sign-up. Open source, runs in your browser, exports MP4 for Shorts, TikTok and Reels.',
     nav: {
       how: 'How it works',
       templates: 'Templates',
@@ -145,7 +145,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       lineTwoBefore: 'from',
       lineTwoAfter: 'code',
       subheadline:
-        'Write a shot or prompt it. MooScript plays SVG scenes over your B-roll, then encodes MP4, transparent WebM or GIF on your own device, in one browser tab.',
+        'Type a topic or paste a script and get a motion graphics video for Shorts, TikTok or Reels. MooScript is free, open source and renders MP4 on your own device, in one browser tab.',
       primaryCta: 'Launch Studio',
       secondaryCta: 'Browse templates',
       installCta: 'Install as app',
@@ -315,9 +315,9 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
     }
   },
   id: {
-    seoTitle: 'MooScript: Studio Motion Graphics Koding & AI di Browser (WebCodecs)',
+    seoTitle: 'MooScript: Aplikasi Pembuat Video Motion Graphics AI Gratis',
     seoDescription:
-      'Aplikasi motion graphics open-source berbasis kode dan AI langsung di browser. Tulis animasi SVG MooTween, tumpuk B-roll 300 MB, dan ekspor MP4, WebM Alpha, serta GIF via WebCodecs.',
+      'Buat video motion graphics dari topik atau naskah secara gratis, tanpa daftar. Open source, berjalan di browser, ekspor MP4 untuk Shorts, TikTok, dan Reels.',
     nav: {
       how: 'Cara kerja',
       templates: 'Template',
@@ -334,7 +334,7 @@ export const HOME_COPY: Record<Locale, HomeCopy> = {
       lineTwoBefore: 'lewat',
       lineTwoAfter: 'kode',
       subheadline:
-        'Tulis adegan atau minta AI membuatnya. MooScript memutar adegan SVG di atas B-roll, lalu mengekspor MP4, WebM transparan atau GIF di perangkat Anda sendiri, cukup di satu tab browser.',
+        'Ketik topik atau tempel naskah, lalu dapatkan video motion graphics untuk Shorts, TikTok, atau Reels. MooScript gratis, open source, dan merender MP4 di perangkat Anda sendiri, cukup di satu tab browser.',
       primaryCta: 'Buka Studio',
       secondaryCta: 'Lihat template',
       installCta: 'Pasang sebagai aplikasi',

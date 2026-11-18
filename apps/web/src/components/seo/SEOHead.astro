@@ -48,19 +48,64 @@ const ogImageUrl = new URL(ogImage, SITE_URL).toString();
 const alternates = alternatePaths(pathname);
 
 const schemas: Record<string, unknown>[] = [];
+const siteRoot = `${SITE_URL}/`;
+const organizationId = `${siteRoot}#organization`;
+const applicationId = `${siteRoot}#studio`;
+const logoUrl = new URL('/icon-512.png', SITE_URL).toString();
+const isHome = pathname === '/' || pathname === '/id/';
+
+// The site's name, logo and repository, stated once on the pages search engines read them from.
+if (isHome) {
+  schemas.push(
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      '@id': `${siteRoot}#website`,
+      name: 'MooScript',
+      alternateName: ['MooScript Studio', 'mooscript.web.id'],
+      url: siteRoot,
+      inLanguage: ['en', 'id'],
+      publisher: { '@id': organizationId }
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      '@id': organizationId,
+      name: 'MooScript',
+      url: siteRoot,
+      logo: { '@type': 'ImageObject', url: logoUrl, width: 512, height: 512 },
+      sameAs: [GITHUB_URL]
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareSourceCode',
+      name: 'MooScript',
+      description,
+      url: GITHUB_URL,
+      codeRepository: GITHUB_URL,
+      programmingLanguage: 'TypeScript',
+      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+      targetProduct: { '@id': applicationId }
+    }
+  );
+}
 
 if (includeSoftwareSchema) {
   schemas.push({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
+    '@id': applicationId,
     name: 'MooScript Studio',
+    alternateName: 'MooScript',
+    image: logoUrl,
+    sameAs: [GITHUB_URL],
+    publisher: { '@id': organizationId },
     softwareVersion: RELEASE_VERSION,
     applicationCategory: 'MultimediaApplication',
     applicationSubCategory: 'Programmatic Motion Graphics & Video Editor',
     operatingSystem: 'Web Browser (Chrome, Edge, Brave, Arc)',
     url: STUDIO_URL,
     downloadUrl: STUDIO_URL,
-    codeRepository: GITHUB_URL,
     license: 'https://www.gnu.org/licenses/agpl-3.0.html',
     inLanguage: ['en', 'id'],
     description,
@@ -120,8 +165,14 @@ if (breadcrumbs.length > 0) {
 />
 {GOOGLE_SITE_VERIFICATION && <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />}
 {BING_SITE_VERIFICATION && <meta name="msvalidate.01" content={BING_SITE_VERIFICATION} />}
-<link rel="icon" type="image/svg+xml" href="/logo.svg" />
-<link rel="alternate icon" href="/favicon.ico" />
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" type="image/png" href="/icon-96.png" sizes="96x96" />
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
+<link rel="icon" type="image/svg+xml" href="/logo.svg" sizes="any" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#09090b" />
+<link rel="me" href={GITHUB_URL} />
 
 {
   !noindex && (
