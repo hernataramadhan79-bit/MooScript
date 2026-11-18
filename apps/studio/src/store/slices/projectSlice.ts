@@ -35,6 +35,7 @@ import { syncCustomBgmForProject } from '../../db/customBgm';
 import { loadProjectVoice, NO_VOICE } from '../../db/voiceTrack';
 import { getProjectTemplate, getPrecompiledShowcase } from '../../engine/templates/projectTemplates';
 import { computeDeterministicWordAlignment, calculateFallbackSceneDuration } from '../../engine/ai/tts';
+import { shotLabel } from '../../engine/ai/instantStoryboard';
 import {
   DEFAULT_SCENE_SECONDS,
   MAX_SCENE_SECONDS,
@@ -550,7 +551,9 @@ export const createProjectSlice: StateCreator<MooStoreState, [], [], ProjectSlic
           id: `sc-${now}-${i}`,
           narrationText: t.narration,
           text: t.narration,
-          visualIntent: t.visualIntent,
+          // Starters are filled in by hand, so they use the instant look that follows text edits.
+          largeType: true,
+          visualIntent: shotLabel(i, template.scenes.length),
           visualConcept: t.visualIntent,
           visualElements: ['headline', 'supporting-detail'],
           focusWords: t.focusWords,

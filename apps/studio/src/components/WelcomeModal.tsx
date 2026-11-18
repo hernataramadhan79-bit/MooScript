@@ -3,6 +3,7 @@ import { useMooStore } from '../store/useMooStore';
 import { L, t } from '../i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { FreeAiHelper } from './studio/FreeAiHelper';
+import { hasRemixHash } from '../engine/share/remixLink';
 
 export const WELCOME_KEY = 'mooscript_welcome_seen';
 
@@ -33,7 +34,7 @@ function shouldShowWelcome(): boolean {
   // Arriving from the website's install button: the install dialog is the only thing to show.
   if (hasInstallDeepLink()) return false;
   if (!hasWebCodecs) return true;
-  if (hasTemplateDeepLink()) {
+  if (hasTemplateDeepLink() || (typeof window !== 'undefined' && hasRemixHash(window.location?.hash || ''))) {
     try {
       localStorage.setItem(WELCOME_KEY, '1');
     } catch {

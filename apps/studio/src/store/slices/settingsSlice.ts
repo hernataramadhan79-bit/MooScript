@@ -6,8 +6,10 @@ import { syncComposition } from '../../engine/composition/sync';
 import { syncCustomBgmForProject } from '../../db/customBgm';
 import { removePristineLegacyDemo } from '../../db/legacyDemo';
 import { loadProjectVoice } from '../../db/voiceTrack';
+import { hasRemixHash, readRemixHash } from '../../engine/share/remixLink';
 import { DEFAULT_PROJECT_ID, INITIAL_PROJECT } from './projectSlice';
 import type { MooStoreState, SettingsSlice } from '../types';
+import { t } from '../../i18n';
 
 const ACTIVE_SKILL_KEY = 'mooscript_active_skill_id';
 let handledDeepLinkSlug: string | null = null;
@@ -262,6 +264,27 @@ export const createSettingsSlice: StateCreator<MooStoreState, [], [], SettingsSl
           // ignore history errors in sandboxed/test environments
         }
         await get().createProjectFromTemplate(tplSlug);
+      }
+    }
+
+    // A shared remix link (#remix=...): the script opens as a new instant video.
+    if (typeof window !== 'undefined' && hasRemixHash(window.location?.hash || '')) {
+      const remix = readRemixHash(window.location.hash);
+      try {
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
+      } catch {
+        // ignore history errors in sandboxed/test environments
+      }
+      if (remix) {
+        await get().createInstantVideo(remix.lines.join('\n'), {
+          firstRun: true,
+          asScript: true,
+          title: remix.title,
+          // Nobody has touched the page yet, so the browser would block sound.
+          autoplay: false
+        });
+      } else {
+        get().addToast(t('Link remix tidak valid.'), 'warning');
       }
     }
   }

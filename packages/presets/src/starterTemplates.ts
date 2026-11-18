@@ -116,6 +116,195 @@ export const LEGACY_STARTER_TEMPLATES: StarterProjectTemplate[] = [
         visualIntent: 'Penutup sederhana dengan nama atau logo merek'
       }
     ]
+  },
+  {
+    id: 'myth-vs-fact',
+    title: 'Mitos vs Fakta',
+    description: 'Bantah satu anggapan populer dengan fakta.',
+    icon: 'compare_arrows',
+    aspectRatio: '9:16',
+    scenes: [
+      {
+        narration: 'Banyak orang percaya hal ini, padahal keliru.',
+        focusWords: ['keliru'],
+        visualIntent: 'Pernyataan pembuka yang memancing rasa penasaran'
+      },
+      {
+        narration: 'Mitosnya: tulis anggapan populer di sini.',
+        focusWords: ['mitosnya'],
+        visualIntent: 'Anggapan populer ditampilkan lalu dicoret'
+      },
+      {
+        narration: 'Faktanya: tulis kenyataan yang benar di sini.',
+        focusWords: ['faktanya'],
+        visualIntent: 'Fakta muncul besar dengan warna aksen'
+      },
+      {
+        narration: 'Tambahkan sumber atau contoh yang bisa dicek.',
+        focusWords: ['sumber'],
+        visualIntent: 'Bukti singkat sebagai penguat'
+      },
+      {
+        narration: 'Mitos apa lagi yang pernah kamu percaya?',
+        focusWords: ['mitos'],
+        visualIntent: 'Ajakan berkomentar yang jelas'
+      }
+    ]
+  },
+  {
+    id: 'did-you-know',
+    title: 'Tahukah Kamu',
+    description: 'Satu fakta unik yang dijelaskan singkat.',
+    icon: 'psychology',
+    aspectRatio: '9:16',
+    scenes: [
+      {
+        narration: 'Tahukah kamu tentang hal ini?',
+        focusWords: ['tahukah'],
+        visualIntent: 'Pertanyaan besar sebagai pembuka'
+      },
+      {
+        narration: 'Tulis fakta unik yang ingin kamu bagikan.',
+        focusWords: ['fakta'],
+        visualIntent: 'Fakta utama sebagai fokus'
+      },
+      {
+        narration: 'Jelaskan alasan di balik fakta itu.',
+        focusWords: ['alasan'],
+        visualIntent: 'Penjelasan sebab dan akibat'
+      },
+      {
+        narration: 'Bagikan ke teman yang belum tahu.',
+        focusWords: ['bagikan'],
+        visualIntent: 'Ajakan membagikan video'
+      }
+    ]
+  },
+  {
+    id: 'three-mistakes',
+    title: 'Tiga Kesalahan',
+    description: 'Kesalahan umum dan cara menghindarinya.',
+    icon: 'local_fire_department',
+    aspectRatio: '9:16',
+    scenes: [
+      {
+        narration: 'Tiga kesalahan ini sering tidak disadari.',
+        focusWords: ['kesalahan'],
+        visualIntent: 'Angka tiga sebagai pemancing perhatian'
+      },
+      {
+        narration: 'Kesalahan pertama: tulis di sini.',
+        focusWords: ['pertama'],
+        visualIntent: 'Nomor satu dengan kesalahan singkat'
+      },
+      {
+        narration: 'Kesalahan kedua: tulis di sini.',
+        focusWords: ['kedua'],
+        visualIntent: 'Nomor dua dengan kesalahan singkat'
+      },
+      {
+        narration: 'Kesalahan ketiga: tulis di sini.',
+        focusWords: ['ketiga'],
+        visualIntent: 'Nomor tiga dengan kesalahan singkat'
+      },
+      {
+        narration: 'Mulai perbaiki satu saja hari ini.',
+        focusWords: ['perbaiki'],
+        visualIntent: 'Penutup dengan satu langkah nyata'
+      }
+    ]
+  },
+  {
+    id: 'mini-story',
+    title: 'Cerita Singkat',
+    description: 'Awal, masalah, titik balik, dan pelajaran.',
+    icon: 'star',
+    aspectRatio: '9:16',
+    scenes: [
+      {
+        narration: 'Semuanya berubah pada hari itu.',
+        focusWords: ['berubah'],
+        visualIntent: 'Pembuka cerita yang menggantung'
+      },
+      {
+        narration: 'Ceritakan keadaan awal di sini.',
+        focusWords: ['awal'],
+        visualIntent: 'Latar cerita yang tenang'
+      },
+      {
+        narration: 'Lalu muncul masalah besar: tulis di sini.',
+        focusWords: ['masalah'],
+        visualIntent: 'Ketegangan meningkat'
+      },
+      {
+        narration: 'Titik baliknya datang saat tulis di sini.',
+        focusWords: ['titik'],
+        visualIntent: 'Momen perubahan yang kuat'
+      },
+      {
+        narration: 'Pelajarannya: tulis satu kalimat yang berkesan.',
+        focusWords: ['pelajarannya'],
+        visualIntent: 'Penutup yang mudah diingat'
+      }
+    ]
+  },
+  {
+    id: 'honest-review',
+    title: 'Ulasan Jujur',
+    description: 'Kelebihan, kekurangan, dan kesimpulan produk.',
+    icon: 'star',
+    aspectRatio: '9:16',
+    scenes: [
+      {
+        narration: 'Apakah produk ini layak dibeli?',
+        focusWords: ['layak'],
+        visualIntent: 'Pertanyaan pembuka dengan nama produk'
+      },
+      {
+        narration: 'Yang saya suka: tulis kelebihannya.',
+        focusWords: ['suka'],
+        visualIntent: 'Kelebihan utama'
+      },
+      {
+        narration: 'Yang kurang: tulis kekurangannya dengan jujur.',
+        focusWords: ['kurang'],
+        visualIntent: 'Kekurangan utama'
+      },
+      {
+        narration: 'Cocok untuk: tulis siapa yang butuh.',
+        focusWords: ['cocok'],
+        visualIntent: 'Sasaran pengguna yang jelas'
+      },
+      {
+        narration: 'Kesimpulan saya: tulis pendapat akhirmu.',
+        focusWords: ['kesimpulan'],
+        visualIntent: 'Putusan akhir yang tegas'
+      }
+    ]
+  },
+  {
+    id: 'daily-tip',
+    title: 'Tips Harian',
+    description: 'Satu tips praktis untuk feed persegi.',
+    icon: 'share',
+    aspectRatio: '1:1',
+    scenes: [
+      {
+        narration: 'Tips hari ini: tulis judul singkat.',
+        focusWords: ['tips'],
+        visualIntent: 'Judul tips yang tegas'
+      },
+      {
+        narration: 'Lakukan langkah ini: tulis caranya.',
+        focusWords: ['langkah'],
+        visualIntent: 'Satu langkah praktis'
+      },
+      {
+        narration: 'Simpan supaya tidak lupa besok.',
+        focusWords: ['simpan'],
+        visualIntent: 'Ajakan menyimpan'
+      }
+    ]
   }
 ];
 
@@ -229,6 +418,195 @@ export const LEGACY_STARTER_TEMPLATES_EN: StarterProjectTemplate[] = [
         narration: "Your name or your brand.",
         focusWords: ["name"],
         visualIntent: "A simple sign-off with the brand name or logo"
+      }
+    ]
+  },
+  {
+    id: "myth-vs-fact",
+    title: "Myth vs Fact",
+    description: "Debunk one popular belief with a fact.",
+    icon: "compare_arrows",
+    aspectRatio: "9:16",
+    scenes: [
+      {
+        narration: "Many people believe this, and they are wrong.",
+        focusWords: ["wrong"],
+        visualIntent: "An opening statement that sparks curiosity"
+      },
+      {
+        narration: "The myth: write the popular belief here.",
+        focusWords: ["myth"],
+        visualIntent: "The popular belief shown, then crossed out"
+      },
+      {
+        narration: "The fact: write what is actually true here.",
+        focusWords: ["fact"],
+        visualIntent: "The fact appears large in the accent color"
+      },
+      {
+        narration: "Add a source or an example people can check.",
+        focusWords: ["source"],
+        visualIntent: "Short proof as support"
+      },
+      {
+        narration: "What other myth did you once believe?",
+        focusWords: ["myth"],
+        visualIntent: "A clear call to comment"
+      }
+    ]
+  },
+  {
+    id: "did-you-know",
+    title: "Did You Know",
+    description: "One surprising fact, explained briefly.",
+    icon: "psychology",
+    aspectRatio: "9:16",
+    scenes: [
+      {
+        narration: "Did you know about this?",
+        focusWords: ["know"],
+        visualIntent: "A large question as the opening"
+      },
+      {
+        narration: "Write the surprising fact you want to share.",
+        focusWords: ["fact"],
+        visualIntent: "The main fact as the focus"
+      },
+      {
+        narration: "Explain the reason behind that fact.",
+        focusWords: ["reason"],
+        visualIntent: "A short cause and effect"
+      },
+      {
+        narration: "Share this with a friend who has no idea.",
+        focusWords: ["share"],
+        visualIntent: "A call to share the video"
+      }
+    ]
+  },
+  {
+    id: "three-mistakes",
+    title: "Three Mistakes",
+    description: "Common mistakes and how to avoid them.",
+    icon: "local_fire_department",
+    aspectRatio: "9:16",
+    scenes: [
+      {
+        narration: "Most people never notice these three mistakes.",
+        focusWords: ["mistakes"],
+        visualIntent: "The number three as the hook"
+      },
+      {
+        narration: "Mistake one: write it here.",
+        focusWords: ["one"],
+        visualIntent: "Number one with a short mistake"
+      },
+      {
+        narration: "Mistake two: write it here.",
+        focusWords: ["two"],
+        visualIntent: "Number two with a short mistake"
+      },
+      {
+        narration: "Mistake three: write it here.",
+        focusWords: ["three"],
+        visualIntent: "Number three with a short mistake"
+      },
+      {
+        narration: "Start by fixing just one today.",
+        focusWords: ["fixing"],
+        visualIntent: "A closing with one concrete step"
+      }
+    ]
+  },
+  {
+    id: "mini-story",
+    title: "Mini Story",
+    description: "A start, a problem, a turning point, and a lesson.",
+    icon: "star",
+    aspectRatio: "9:16",
+    scenes: [
+      {
+        narration: "Everything changed that day.",
+        focusWords: ["changed"],
+        visualIntent: "An opening that leaves a question"
+      },
+      {
+        narration: "Describe how things were at the start.",
+        focusWords: ["start"],
+        visualIntent: "A calm story setting"
+      },
+      {
+        narration: "Then a big problem appeared: write it here.",
+        focusWords: ["problem"],
+        visualIntent: "Rising tension"
+      },
+      {
+        narration: "The turning point came when: write it here.",
+        focusWords: ["turning"],
+        visualIntent: "A strong moment of change"
+      },
+      {
+        narration: "The lesson: write one memorable sentence.",
+        focusWords: ["lesson"],
+        visualIntent: "An easy-to-remember closing"
+      }
+    ]
+  },
+  {
+    id: "honest-review",
+    title: "Honest Review",
+    description: "A product's pros, cons, and verdict.",
+    icon: "star",
+    aspectRatio: "9:16",
+    scenes: [
+      {
+        narration: "Is this product worth buying?",
+        focusWords: ["worth"],
+        visualIntent: "An opening question with the product name"
+      },
+      {
+        narration: "What I like: write the best part.",
+        focusWords: ["like"],
+        visualIntent: "The main strength"
+      },
+      {
+        narration: "What falls short: be honest here.",
+        focusWords: ["short"],
+        visualIntent: "The main weakness"
+      },
+      {
+        narration: "Best for: write who really needs it.",
+        focusWords: ["best"],
+        visualIntent: "A clear target user"
+      },
+      {
+        narration: "My verdict: write your final opinion.",
+        focusWords: ["verdict"],
+        visualIntent: "A firm final call"
+      }
+    ]
+  },
+  {
+    id: "daily-tip",
+    title: "Daily Tip",
+    description: "One practical tip for a square feed.",
+    icon: "share",
+    aspectRatio: "1:1",
+    scenes: [
+      {
+        narration: "Today's tip: write a short title.",
+        focusWords: ["tip"],
+        visualIntent: "A bold tip title"
+      },
+      {
+        narration: "Do this: write the step here.",
+        focusWords: ["step"],
+        visualIntent: "One practical step"
+      },
+      {
+        narration: "Save this so you remember tomorrow.",
+        focusWords: ["save"],
+        visualIntent: "A call to save"
       }
     ]
   }

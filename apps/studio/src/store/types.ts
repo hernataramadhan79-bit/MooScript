@@ -203,7 +203,10 @@ export interface ScriptSlice {
   setScriptPrompt: (p: string) => void;
   generateScript: () => Promise<void>;
   /** Builds a playable video from a topic or script with no AI call. Resolves false if nothing was built. */
-  createInstantVideo: (input: string, options?: { firstRun?: boolean }) => Promise<boolean>;
+  createInstantVideo: (
+    input: string,
+    options?: { firstRun?: boolean; asScript?: boolean; title?: string; autoplay?: boolean }
+  ) => Promise<boolean>;
   cancelGenerateScript: () => void;
   previousScenesSnapshot: Scene[] | null;
   undoGenerateScript: () => Promise<void>;

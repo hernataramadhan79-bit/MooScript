@@ -98,7 +98,7 @@ function topicLines(topic: string): string[] {
   ];
 }
 
-function shotLabel(index: number, total: number): string {
+export function shotLabel(index: number, total: number): string {
   if (index === 0) return t('Pembuka');
   if (index === total - 1) return t('Penutup');
   return t('Bagian {0}', index + 1);
@@ -151,11 +151,11 @@ export function cleanPastedScript(input: string): string {
   return lines.join('\n');
 }
 
-export function buildInstantStoryboard(input: string, now = Date.now()): InstantStoryboard | null {
+export function buildInstantStoryboard(input: string, now = Date.now(), asScript = false): InstantStoryboard | null {
   const text = cleanPastedScript(input);
   if (!text) return null;
 
-  const isScript = looksLikeScript(text);
+  const isScript = asScript || looksLikeScript(text);
   const topic = text.replace(/\s+/g, ' ').replace(/[.,;:!?…]+$/, '');
   if (!isScript && !topic) return null;
   const lines = isScript ? scriptLines(text) : topicLines(topic);

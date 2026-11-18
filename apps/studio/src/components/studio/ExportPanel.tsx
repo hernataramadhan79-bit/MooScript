@@ -8,6 +8,7 @@ import { buildCompositionDocument } from '../../engine/composition/buildDocument
 import { syncComposition } from '../../engine/composition/sync';
 import { sceneHasRenderableCode } from '../../engine/composition/legacyScenes';
 import { creditCardEnabled, shareCaption } from '../../engine/brand/creditCard';
+import { buildRemixUrl } from '../../engine/share/remixLink';
 import { DEFAULT_EXPORT_SETTINGS } from '../../types';
 import { MultiFormatExport } from './MultiFormatExport';
 import { t } from '../../i18n';
@@ -174,6 +175,18 @@ export const ExportPanel: React.FC = () => {
     }
   };
 
+  const remixUrl = typeof window === 'undefined' ? null : buildRemixUrl(project, window.location.origin);
+
+  const handleCopyRemix = async () => {
+    if (!remixUrl) return;
+    try {
+      await navigator.clipboard.writeText(remixUrl);
+      addToast(t('Link remix disalin. Siapa pun bisa membuat versinya sendiri dari naskah ini.'), 'success');
+    } catch {
+      addToast(t('Gagal menyalin link remix.'), 'error');
+    }
+  };
+
   const handleCopyCaption = async () => {
     try {
       await navigator.clipboard.writeText(shareCaption(project.title));
@@ -281,14 +294,27 @@ export const ExportPanel: React.FC = () => {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCopyCaption}
-            className="min-h-[40px] px-3 rounded-xl border border-border text-text-muted font-medium text-[12px] flex items-center justify-center gap-1.5 hover:text-on-surface hover:bg-surface-3 transition-colors"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">content_copy</span>
-            {t('Salin caption untuk diunggah')}
-          </button>
+          <div className={`grid gap-2 ${remixUrl ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <button
+              type="button"
+              onClick={handleCopyCaption}
+              className="min-h-[40px] px-3 rounded-xl border border-border text-text-muted font-medium text-[12px] flex items-center justify-center gap-1.5 hover:text-on-surface hover:bg-surface-3 transition-colors"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">content_copy</span>
+              {t('Salin caption')}
+            </button>
+            {remixUrl && (
+              <button
+                type="button"
+                onClick={handleCopyRemix}
+                title={t('Link berisi naskah video ini, tanpa kode dan tanpa berkas')}
+                className="min-h-[40px] px-3 rounded-xl border border-border text-text-muted font-medium text-[12px] flex items-center justify-center gap-1.5 hover:text-on-surface hover:bg-surface-3 transition-colors"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">content_copy</span>
+                {t('Salin link remix')}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

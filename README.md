@@ -43,6 +43,8 @@ The landing site is built to look like the product: poster typography, whole fie
 3. **Add a voice-over and music.** Cloud or fully offline TTS, Whisper word alignment, procedural background music with speech ducking.
 4. **Edit and export.** Drag layers on the canvas, tweak colors, edit the code of any shot, then export MP4 (plus SRT/VTT subtitles) locally.
 
+No API key? Type a topic or paste a script on the first screen and get an instant video with music. For a real script, copy the ready-made request into a free AI chat and paste the answer back.
+
 Projects start empty. Everything is stored in your browser (IndexedDB).
 
 ---
@@ -57,7 +59,7 @@ Projects start empty. Everything is stored in your browser (IndexedDB).
 - **Anti-PPT linter** (`apps/studio/src/engine/composition/mographLint.ts`): scores generated code for slide/web-page patterns (no camera, card layouts, pasted narration, fade-up-only motion, empty first frame, …) and requests one rewrite when needed. The rewrite is kept only if it is valid and scores better.
 - **Mograph kit** (`apps/studio/src/engine/composition/runtime/mographKit.ts`): helpers on `ctx` that generated code calls instead of hand-rolled tweens — `ctx.camera`, `ctx.hero`, `ctx.draw`, `ctx.pop`, `ctx.kinetic`, `ctx.count`, `ctx.reveal`, `ctx.punch`, `ctx.shake`, `ctx.squash`, `ctx.follow`, `ctx.flash`, `ctx.drift`, `ctx.orbit`, `ctx.particles`, `ctx.beat`. All stay inside the shot duration and are deterministic.
 - **Depth and continuity**: layers inside `.moo-camera` that carry `data-moo-depth` move with parallax (below 1 lags behind the camera, above 1 moves more). A shot's hand-off is remembered, so the next shot opens on the matching entrance (a `whip-left` exit is met by a world arriving from the right), and a shot with a transition in already plays, slowly, while the previous one leaves.
-- **Instant visuals without AI** (`apps/studio/src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs.
+- **Instant visuals without AI** (`apps/studio/src/engine/composition/proceduralCompiler.ts`): eight procedural archetypes with camera moves, particles and hand-offs. Instant videos use phone-sized type and rebuild a shot when its text changes.
 
 ### Composition runtime
 
@@ -170,6 +172,8 @@ shot.go('.core', { scale: 1.35, dur: 0.12, pingpong: true, loop: 1 }, 'hit');
 - A long export is written to the browser's private file system as it encodes instead of being held in memory.
 - Quality presets (compact / standard / high) at 24, 30 or 60 fps; captions burned in or exported as SRT / WebVTT. Captions follow the project setting, and each scene can opt out in its detail panel.
 - Standalone HTML export of the composition.
+- A short "Made with MooScript" end card, on by default and off for branded projects or in the Export tab.
+- Sharing tools: a ready caption and a remix link. The link holds only the script, in the URL fragment, so it never carries shot code.
 
 ### App
 

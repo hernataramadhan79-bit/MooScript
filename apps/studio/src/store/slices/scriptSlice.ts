@@ -275,18 +275,19 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
 
   createInstantVideo: async (input, options) => {
     if (get().isGeneratingScript) return false;
-    const storyboard = buildInstantStoryboard(input);
+    const storyboard = buildInstantStoryboard(input, Date.now(), options?.asScript);
     if (!storyboard) return false;
     const firstRun = Boolean(options?.firstRun);
+    const title = options?.title || storyboard.title;
 
     // The first-run screen never replaces work that is already there.
-    if (firstRun && get().project.scenes.length > 0) await get().createNewProject(storyboard.title);
+    if (firstRun && get().project.scenes.length > 0) await get().createNewProject(title);
 
     const latest = get().project;
     const totalDur = storyboard.scenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
     const updatedProject: MooProject = {
       ...latest,
-      title: storyboard.title,
+      title,
       scenes: storyboard.scenes,
       audioBlob: undefined,
       audioDuration: totalDur,
@@ -305,7 +306,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       'success',
       6000
     );
-    if (firstRun) get().play();
+    if (firstRun && options?.autoplay !== false) get().play();
     return true;
   }
 });
