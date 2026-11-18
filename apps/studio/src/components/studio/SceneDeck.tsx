@@ -156,6 +156,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
     scriptPrompt,
     setScriptPrompt,
     generateScript,
+    createInstantVideo,
     cancelGenerateScript,
     isGeneratingScript,
     undoGenerateScript,
@@ -191,6 +192,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
       scriptPrompt: s.scriptPrompt,
       setScriptPrompt: s.setScriptPrompt,
       generateScript: s.generateScript,
+      createInstantVideo: s.createInstantVideo,
       cancelGenerateScript: s.cancelGenerateScript,
       isGeneratingScript: s.isGeneratingScript,
       undoGenerateScript: s.undoGenerateScript,
@@ -380,6 +382,21 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
                   {t('Batal')}
                 </button>
               )}
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="bolt"
+                disabled={!scriptPrompt.trim() || isGeneratingScript}
+                onClick={() => createInstantVideo(scriptPrompt)}
+                title={
+                  scenes.length > 0
+                    ? t('Buat video instan tanpa AI, menggantikan adegan saat ini (bisa diurungkan)')
+                    : t('Buat video instan tanpa AI dan tanpa API key')
+                }
+                className="!px-2.5 !text-[12px] !min-h-[36px] lg:!min-h-[32px] whitespace-nowrap"
+              >
+                {t('Instan')}
+              </Button>
               <Button
                 variant="primary"
                 size="sm"

@@ -3,8 +3,10 @@ import type { Scene, MooProject, StyleBrief } from '../../types';
 import type { WorldBible } from '../../engine/ai/llm';
 import { generateStoryboard } from '../../engine/ai/llm';
 import { planShots } from '../../engine/ai/brief';
+import { buildInstantStoryboard } from '../../engine/ai/instantStoryboard';
 import { withBrandCards } from '../../engine/brand/brandKit';
 import { calculateFallbackSceneDuration, computeDeterministicWordAlignment } from '../../engine/ai/tts';
+import { compileProceduralProject } from '../../engine/composition/proceduralCompiler';
 import { syncComposition } from '../../engine/composition/sync';
 import { saveProjectToDb, saveVoiceTrackToDb } from '../../db/mooDb';
 import { stopPlaybackAudio } from './playbackSlice';
@@ -72,6 +74,39 @@ function revokeUrl(url: string | null): void {
   } catch {
     // ignore
   }
+}
+
+type SliceArgs = Parameters<StateCreator<MooStoreState, [], [], ScriptSlice>>;
+
+/**
+ * Puts a new storyboard in place of the current one as a single undo step. It has no voice-over
+ * yet, so the old audio is stopped and released; "Urungkan" brings all of it back.
+ */
+async function installStoryboard(set: SliceArgs[0], get: SliceArgs[1], latest: MooProject, next: MooProject): Promise<void> {
+  get().pause();
+  stopPlaybackAudio();
+  revokeUrl(get().audioBlobUrl);
+  projectBeforeStoryboard = {
+    project: latest,
+    rawVoiceBlob: get().rawVoiceBlob ?? null,
+    bgmOnlyAudio: get().bgmOnlyAudio
+  };
+
+  get().setProject(next, { preserveHistory: true });
+  set({
+    audioBlobUrl: null,
+    rawVoiceBlob: null,
+    bgmOnlyAudio: false,
+    waveformPeaks: null,
+    previousScenesSnapshot: latest.scenes,
+    isGeneratingScript: false,
+    audioStale: false,
+    activeSceneId: null,
+    selectedLayerId: null,
+    currentFrame: 0
+  });
+  await flushPendingSave();
+  await saveVoiceTrackToDb(next.id, null);
 }
 
 export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice> = (set, get) => ({
@@ -203,16 +238,6 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
         };
       });
 
-      // The new storyboard has no voice-over yet: stop and release the old one.
-      get().pause();
-      stopPlaybackAudio();
-      revokeUrl(get().audioBlobUrl);
-      projectBeforeStoryboard = {
-        project: latest,
-        rawVoiceBlob: get().rawVoiceBlob ?? null,
-        bgmOnlyAudio: get().bgmOnlyAudio
-      };
-
       const totalDur = newScenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
       const updatedProject: MooProject = applyWorldBible(
         {
@@ -227,22 +252,7 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
       // A branded project keeps its intro / outro cards around the new shots.
       const syncedProject = withBrandCards(syncComposition(updatedProject));
 
-      // One undo step for the whole storyboard.
-      get().setProject(syncedProject, { preserveHistory: true });
-      set({
-        audioBlobUrl: null,
-        rawVoiceBlob: null,
-        bgmOnlyAudio: false,
-        waveformPeaks: null,
-        previousScenesSnapshot: latest.scenes,
-        isGeneratingScript: false,
-        audioStale: false,
-        activeSceneId: null,
-        selectedLayerId: null,
-        currentFrame: 0
-      });
-      await flushPendingSave();
-      await saveVoiceTrackToDb(syncedProject.id, null);
+      await installStoryboard(set, get, latest, syncedProject);
       addToast(t('Storyboard AI siap: {0} adegan.', newScenes.length), 'success');
     } catch (err: unknown) {
       const isUserCancelled =
@@ -261,5 +271,41 @@ export const createScriptSlice: StateCreator<MooStoreState, [], [], ScriptSlice>
     } finally {
       if (scriptAbortController === controller) scriptAbortController = null;
     }
+  },
+
+  createInstantVideo: async (input, options) => {
+    if (get().isGeneratingScript) return false;
+    const storyboard = buildInstantStoryboard(input);
+    if (!storyboard) return false;
+    const firstRun = Boolean(options?.firstRun);
+
+    // The first-run screen never replaces work that is already there.
+    if (firstRun && get().project.scenes.length > 0) await get().createNewProject(storyboard.title);
+
+    const latest = get().project;
+    const totalDur = storyboard.scenes.reduce((acc, s) => acc + s.durationInSeconds, 0);
+    const updatedProject: MooProject = {
+      ...latest,
+      title: storyboard.title,
+      scenes: storyboard.scenes,
+      audioBlob: undefined,
+      audioDuration: totalDur,
+      // A first video should not be silent; procedural music needs no download or key.
+      bgm: firstRun && latest.bgm.preset === 'none' ? { ...latest.bgm, preset: 'lofi' } : latest.bgm
+    };
+    const compiled = compileProceduralProject(withBrandCards(syncComposition(updatedProject)), 'auto');
+
+    await installStoryboard(set, get, latest, compiled);
+    await get().generateBgmOnlyAudio();
+
+    get().addToast(
+      storyboard.isOutline
+        ? t('Draf video siap. Ganti teks tiap adegan dengan isi topikmu, lalu ekspor.')
+        : t('Video siap: {0} adegan. Cek hasilnya, lalu ekspor.', storyboard.scenes.length),
+      'success',
+      6000
+    );
+    if (firstRun) get().play();
+    return true;
   }
 });
