@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMooStore } from '../store/useMooStore';
 import { L, t } from '../i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { FreeAiHelper } from './studio/FreeAiHelper';
 
 export const WELCOME_KEY = 'mooscript_welcome_seen';
 
@@ -158,6 +159,8 @@ export const WelcomeModal: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            <FreeAiHelper topic={scriptPrompt} onCopied={() => inputRef.current?.select()} />
 
             <p className="flex gap-2 text-xs text-zinc-400">
               <span className="material-symbols-outlined text-primary text-[16px] shrink-0">lock</span>

@@ -19,6 +19,7 @@ import { Button } from '../ui/Button';
 import { MAX_SCENE_SECONDS, sceneSeconds } from '../../utils/projectDuration';
 import { briefSummary } from '../../engine/ai/brief';
 import { BriefPanel } from './BriefPanel';
+import { FreeAiHelper } from './FreeAiHelper';
 import { L, t } from '../../i18n';
 
 interface AutoExpandTextareaProps {
@@ -300,6 +301,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
   const showDropLine = (gap: number) =>
     drag !== null && drag.gap === gap && dropTarget(drag.fromIndex, gap) !== drag.fromIndex;
 
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
   const toggleDetail = (sceneId: string) => {
     setExpandedDetails((prev) => ({
       ...prev,
@@ -331,6 +334,7 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
 
         <div className="flex flex-col gap-2">
           <textarea
+            ref={promptRef}
             value={scriptPrompt}
             onChange={(e) => setScriptPrompt(e.target.value)}
             placeholder={t('Tulis topik atau tempel naskah video… (Ctrl+Enter untuk menyusun)')}
@@ -344,6 +348,8 @@ export const SceneDeck: React.FC<SceneDeckProps> = ({
             aria-label={t('Ide atau naskah video')}
             className="w-full bg-surface-2/70 border border-border/70 focus:border-accent rounded-lg px-2.5 py-2 text-[13px] text-text placeholder:text-text-faint resize-y min-h-[64px] focus:outline-none transition-colors leading-relaxed max-h-48 overflow-y-auto"
           />
+
+          <FreeAiHelper topic={scriptPrompt} onCopied={() => promptRef.current?.select()} />
 
           {isBriefOpen && <BriefPanel />}
 

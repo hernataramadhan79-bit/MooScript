@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildInstantStoryboard } from '../src/engine/ai/instantStoryboard';
+import {
+  buildInstantStoryboard,
+  buildScriptRequest,
+  cleanPastedScript,
+  looksLikeScript
+} from '../src/engine/ai/instantStoryboard';
 import { INITIAL_PROJECT } from '../src/store/slices/projectSlice';
 import { useMooStore } from '../src/store/useMooStore';
 import { compileProceduralScene } from '../src/engine/composition/proceduralCompiler';
@@ -51,6 +56,27 @@ describe('buildInstantStoryboard', () => {
   it('never prints a whole narration as the small shot label', () => {
     const board = buildInstantStoryboard('Satu dua tiga empat. Lima enam tujuh delapan. Sembilan sepuluh sebelas dua belas.', 1)!;
     expect(board.scenes.map((s) => s.visualIntent)).toEqual(['Pembuka', 'Bagian 2', 'Penutup']);
+  });
+});
+
+describe('script from a free AI chat', () => {
+  afterEach(() => setLocale('id'));
+
+  it('asks for a clean script about the topic', () => {
+    expect(buildScriptRequest(' sejarah kopi ')).toContain('tentang: sejarah kopi.');
+    setLocale('en');
+    expect(buildScriptRequest('coffee')).toContain('about: coffee.');
+  });
+
+  it('strips what chats wrap around the answer', () => {
+    const answer = 'Tentu, ini naskahnya:\n\n1. **Kopi lahir di Etiopia.**\n- "Lalu menyebar ke Yaman."\n* Sekarang kopi ada di mana-mana.';
+    expect(cleanPastedScript(answer)).toBe('Kopi lahir di Etiopia.\nLalu menyebar ke Yaman.\nSekarang kopi ada di mana-mana.');
+    expect(narration(answer)).toEqual(['Kopi lahir di Etiopia.', 'Lalu menyebar ke Yaman.', 'Sekarang kopi ada di mana-mana.']);
+  });
+
+  it('tells a topic from a script', () => {
+    expect(looksLikeScript('sejarah kopi')).toBe(false);
+    expect(looksLikeScript('Kopi enak. Teh juga.')).toBe(true);
   });
 });
 

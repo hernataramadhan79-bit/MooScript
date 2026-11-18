@@ -120,11 +120,42 @@ function titleFrom(text: string): string {
   return words.length > 6 ? `${title}…` : title;
 }
 
+/** True for text that is already a script, as opposed to a topic to write one about. */
+export function looksLikeScript(text: string): boolean {
+  return wordsOf(text).length > MAX_TOPIC_WORDS || splitSentences(text.trim()).length > 1;
+}
+
+/** The request a user pastes into a free AI chat to get a script for their topic. */
+export function buildScriptRequest(topic: string): string {
+  return t(
+    'Tulis naskah video pendek vertikal tentang: {0}. Buat 5 sampai 7 kalimat pendek, maksimal 14 kata per kalimat. Kalimat pertama harus memancing rasa penasaran dan kalimat terakhir mengajak penonton berkomentar. Pakai hanya fakta yang kamu yakini benar. Tulis satu kalimat per baris. Jawab dengan naskahnya saja, tanpa judul, nomor, atau catatan.',
+    topic.trim()
+  );
+}
+
+/** Removes what AI chats wrap around a script: an intro line, list markers, bold marks, quotes. */
+export function cleanPastedScript(input: string): string {
+  const lines = input
+    .split(/\r?\n/)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/^(?:[-*•]|\d+[.)])\s+/, '')
+        .replace(/\*\*|__/g, '')
+        .replace(/^["“”]+|["“”]+$/g, '')
+        .trim()
+    )
+    .filter(Boolean);
+  if (lines.length > 1 && lines[0].endsWith(':')) lines.shift();
+  return lines.join('\n');
+}
+
 export function buildInstantStoryboard(input: string, now = Date.now()): InstantStoryboard | null {
-  const text = input.trim();
+  const text = cleanPastedScript(input);
   if (!text) return null;
 
-  const isScript = wordsOf(text).length > MAX_TOPIC_WORDS || splitSentences(text).length > 1;
+  const isScript = looksLikeScript(text);
   const topic = text.replace(/\s+/g, ' ').replace(/[.,;:!?…]+$/, '');
   if (!isScript && !topic) return null;
   const lines = isScript ? scriptLines(text) : topicLines(topic);
